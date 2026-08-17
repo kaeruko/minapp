@@ -7,20 +7,14 @@ sealed class AuthResult {
 }
 
 class AuthenticatedSession extends AuthResult {
-  const AuthenticatedSession({
-    required this.accessToken,
-    required this.expiresIn,
-  });
+  const AuthenticatedSession({required this.accessToken, required this.expiresIn});
 
   final String accessToken;
   final int expiresIn;
 }
 
 class NewPasswordChallenge extends AuthResult {
-  const NewPasswordChallenge({
-    required this.loginId,
-    required this.session,
-  });
+  const NewPasswordChallenge({required this.loginId, required this.session});
 
   final String loginId;
   final String session;
@@ -46,35 +40,24 @@ class PublishedApp {
   final DateTime reviewedAt;
 
   factory PublishedApp.fromJson(Map<String, Object?> json) {
-    final String appId = _requiredString(json, 'app_id');
-    final String versionId = _requiredString(json, 'version_id');
-    final String groupId = _requiredString(json, 'group_id');
-    final String groupName = _requiredString(json, 'group_name');
-    final String ownerLoginId = _requiredString(json, 'owner_login_id');
-    final String title = _requiredString(json, 'title');
     final String status = _requiredString(json, 'status');
     if (status != 'approved') {
       throw const FormatException('Mobile catalog contained a non-approved app.');
     }
-    final String reviewedAtRaw = _requiredString(json, 'reviewed_at');
-    final DateTime reviewedAt = DateTime.parse(reviewedAtRaw).toUtc();
     return PublishedApp(
-      appId: appId,
-      versionId: versionId,
-      groupId: groupId,
-      groupName: groupName,
-      ownerLoginId: ownerLoginId,
-      title: title,
-      reviewedAt: reviewedAt,
+      appId: _requiredString(json, 'app_id'),
+      versionId: _requiredString(json, 'version_id'),
+      groupId: _requiredString(json, 'group_id'),
+      groupName: _requiredString(json, 'group_name'),
+      ownerLoginId: _requiredString(json, 'owner_login_id'),
+      title: _requiredString(json, 'title'),
+      reviewedAt: DateTime.parse(_requiredString(json, 'reviewed_at')).toUtc(),
     );
   }
 }
 
 class LaunchGrant {
-  const LaunchGrant({
-    required this.url,
-    required this.expiresIn,
-  });
+  const LaunchGrant({required this.url, required this.expiresIn});
 
   final Uri url;
   final int expiresIn;
@@ -106,17 +89,12 @@ abstract interface class MinAppApi {
 
   Future<List<PublishedApp>> listPublishedApps(String accessToken);
 
-  Future<LaunchGrant> createLaunch(
-    String accessToken,
-    PublishedApp app,
-  );
+  Future<LaunchGrant> createLaunch(String accessToken, PublishedApp app);
 }
 
 class MinAppApiClient implements MinAppApi {
-  MinAppApiClient({
-    required Uri baseUri,
-    http.Client? client,
-  })  : _baseUri = _validateBaseUri(baseUri),
+  MinAppApiClient({required Uri baseUri, http.Client? client})
+      : _baseUri = _validateBaseUri(baseUri),
         _client = client ?? http.Client();
 
   final Uri _baseUri;
@@ -127,10 +105,7 @@ class MinAppApiClient implements MinAppApi {
     final Map<String, Object?> payload = await _jsonRequest(
       method: 'POST',
       path: '/auth/login',
-      body: <String, Object?>{
-        'login_id': loginId,
-        'password': password,
-      },
+      body: <String, Object?>{'login_id': loginId, 'password': password},
     );
     return _parseAuthResult(payload);
   }
@@ -179,10 +154,7 @@ class MinAppApiClient implements MinAppApi {
   }
 
   @override
-  Future<LaunchGrant> createLaunch(
-    String accessToken,
-    PublishedApp app,
-  ) async {
+  Future<LaunchGrant> createLaunch(String accessToken, PublishedApp app) async {
     final Map<String, Object?> payload = await _jsonRequest(
       method: 'POST',
       path: '/mobile/apps/${app.appId}/versions/${app.versionId}/launch',
@@ -223,25 +195,20 @@ class MinAppApiClient implements MinAppApi {
       }
       headers['Authorization'] = 'Bearer $accessToken';
     }
-    if (body != null) {
-      headers['Content-Type'] = 'application/json';
-    }
+    if (body != null) headers['Content-Type'] = 'application/json';
 
-    final http.Response response;
-    switch (method) {
-      case 'GET':
-        if (body != null) {
-          throw ArgumentError('GET request must not contain a body.');
-        }
-        response = await _client.get(uri, headers: headers);
-      case 'POST':
-        response = await _client.post(
-          uri,
-          headers: headers,
-          body: body == null ? null : jsonEncode(body),
-        );
-      default:
-        throw ArgumentError.value(method, 'method', 'Unsupported HTTP method.');
+    late final http.Response response;
+    if (method == 'GET') {
+      if (body != null) throw ArgumentError('GET request must not contain a body.');
+      response = await _client.get(uri, headers: headers);
+    } else if (method == 'POST') {
+      response = await _client.post(
+        uri,
+        headers: headers,
+        body: body == null ? null : jsonEncode(body),
+      );
+    } else {
+      throw ArgumentError.value(method, 'method', 'Unsupported HTTP method.');
     }
 
     final String? contentType = response.headers['content-type'];
