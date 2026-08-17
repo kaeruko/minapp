@@ -39,6 +39,7 @@ resource "aws_iam_role_policy" "mobile_api_application" {
         Effect = "Allow"
         Action = [
           "dynamodb:GetItem",
+          "dynamodb:PutItem",
           "dynamodb:Query",
           "dynamodb:TransactWriteItems",
         ]
