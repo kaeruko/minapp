@@ -21,6 +21,8 @@ __pycache__/
 *.tfstate.*
 crash.log
 infra/terraform/*.zip
+infra/terraform/backend.hcl
+infra/terraform/terraform.tfvars
 
 # Local configuration / secrets
 .env
