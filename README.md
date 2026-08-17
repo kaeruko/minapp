@@ -17,6 +17,21 @@ MVPでは次の体験だけを完成させる。
 
 詳細は [docs/MVP.md](docs/MVP.md) を参照。
 
+## Phase 0
+
+実装の土台を次の構成で置いている。
+
+```text
+apps/mobile/       Flutter Android
+apps/web/          Webポータル
+backend/           Python Lambda API
+infra/terraform/   AWS IaC
+tools/             ローカル開発ツール
+scripts/           開発スクリプト
+```
+
+開発手順は [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) を参照。
+
 ## MVPの大原則
 
 - メールアドレス・電話番号・本名は必須にしない
@@ -35,8 +50,10 @@ MVPでは次の体験だけを完成させる。
 - API: API Gateway + Lambda
 - DB: DynamoDB
 - ファイル: S3
-- 配信: CloudFront
-- IaC: AWS CDK または Terraform（実装開始時にどちらか一方へ固定）
+- 配信: CloudFront（起動認可を実装するPhaseで追加）
+- IaC: Terraform
+
+Phase 0ではCloudFrontを作らない。公開コンテンツへの短寿命認可を実装する前に、配信用URLを外部公開しないため。
 
 ## MVPではやらないこと
 
