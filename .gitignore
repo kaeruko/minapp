@@ -1,0 +1,35 @@
+# Flutter / Dart
+.dart_tool/
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+**/build/
+
+# Android generated local state
+**/.gradle/
+**/local.properties
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+infra/terraform/*.zip
+
+# Local configuration / secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

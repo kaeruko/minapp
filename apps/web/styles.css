@@ -1,0 +1,196 @@
+:root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #172033;
+  background: #f6f8fc;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 68px;
+  padding: 0 24px;
+  border-bottom: 1px solid #e2e7f0;
+  background: #ffffff;
+}
+
+.brand {
+  color: #214d9d;
+  font-size: 1.35rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.phase-badge,
+.status {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.phase-badge {
+  border: 1px solid #cbd5e6;
+  background: #ffffff;
+}
+
+.page-shell {
+  width: min(980px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 64px 0 80px;
+}
+
+.hero {
+  max-width: 720px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #43669f;
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 18px;
+  font-size: clamp(2.1rem, 6vw, 4.4rem);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+}
+
+.hero-copy {
+  color: #526078;
+  font-size: 1.08rem;
+  line-height: 1.8;
+}
+
+.status-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 40px 0 24px;
+  padding: 20px 22px;
+  border: 1px solid #dce3ef;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.status-panel h2 {
+  margin-bottom: 0;
+  font-size: 1.1rem;
+}
+
+.status-checking {
+  color: #5c6680;
+  background: #eef1f6;
+}
+
+.status-ok {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.status-error {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.role-card,
+.security-note {
+  border: 1px solid #dce3ef;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgb(35 56 92 / 6%);
+}
+
+.role-card {
+  padding: 28px;
+}
+
+.role-icon {
+  margin-bottom: 18px;
+  font-size: 2rem;
+}
+
+.role-card h2 {
+  margin-bottom: 10px;
+}
+
+.role-card p,
+.security-note p {
+  color: #5b667c;
+  line-height: 1.7;
+}
+
+.role-card button {
+  width: 100%;
+  margin-top: 14px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 12px;
+  color: #7a8498;
+  background: #edf0f5;
+  cursor: not-allowed;
+}
+
+.security-note {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  margin-top: 20px;
+  padding: 22px;
+}
+
+.security-note h2 {
+  margin-bottom: 6px;
+  font-size: 1.05rem;
+}
+
+.security-note p {
+  margin-bottom: 0;
+}
+
+@media (max-width: 680px) {
+  .page-shell {
+    padding-top: 40px;
+  }
+
+  .role-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .status-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

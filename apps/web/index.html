@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>みんアプ | Webポータル</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="みんアプ ホーム">みんアプ</a>
+      <span class="phase-badge">Phase 0</span>
+    </header>
+
+    <main class="page-shell">
+      <section class="hero" aria-labelledby="hero-title">
+        <p class="eyebrow">学校・教室のアプリ共有</p>
+        <h1 id="hero-title">作ったアプリを、みんなで使おう。</h1>
+        <p class="hero-copy">
+          生徒が作った静的Webアプリを、先生の承認後に同じグループのみんなへ届けるためのポータルです。
+        </p>
+      </section>
+
+      <section class="status-panel" aria-labelledby="status-title">
+        <div>
+          <p class="eyebrow">開発環境</p>
+          <h2 id="status-title">API接続</h2>
+        </div>
+        <p id="api-status" class="status status-checking" role="status" aria-live="polite">
+          確認中…
+        </p>
+      </section>
+
+      <section class="role-grid" aria-label="MVPの利用者">
+        <article class="role-card">
+          <div class="role-icon" aria-hidden="true">👩‍🏫</div>
+          <h2>先生</h2>
+          <p>グループを作り、生徒アカウントを発行し、作品の公開申請を確認します。</p>
+          <button type="button" disabled>先生としてログイン（Phase 1）</button>
+        </article>
+
+        <article class="role-card">
+          <div class="role-icon" aria-hidden="true">🧑‍💻</div>
+          <h2>生徒</h2>
+          <p>IDとパスワードでログインし、ZIP形式のWebアプリをアップロードして公開申請します。</p>
+          <button type="button" disabled>生徒としてログイン（Phase 1）</button>
+        </article>
+      </section>
+
+      <section class="security-note" aria-labelledby="security-title">
+        <div aria-hidden="true">🛡️</div>
+        <div>
+          <h2 id="security-title">安全な機能だけを順番に有効化します</h2>
+          <p>
+            Phase 0では認証・アップロード・公開機能をまだ有効にしません。サーバ側の認可と検査が完成した機能だけを公開します。
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
