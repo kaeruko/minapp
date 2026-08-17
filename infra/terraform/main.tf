@@ -263,7 +263,7 @@ resource "aws_lambda_function" "api" {
 
   depends_on = [
     aws_iam_role_policy_attachment.api_basic_execution,
-    aws_iam_role.api_application,
+    aws_iam_role_policy.api_application,
     terraform_data.tenant_identity,
   ]
 }
