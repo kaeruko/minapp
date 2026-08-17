@@ -1,6 +1,16 @@
 locals {
   project_name = "minapp"
   name_prefix  = "${local.project_name}-${var.environment}"
+
+  protected_routes = toset([
+    "GET /me",
+    "GET /groups",
+    "POST /groups",
+    "GET /groups/{group_id}/members",
+    "POST /groups/{group_id}/students",
+    "POST /users/{user_id}/reset-password",
+    "DELETE /groups/{group_id}/members/{user_id}",
+  ])
 }
 
 data "aws_caller_identity" "current" {}
@@ -181,6 +191,40 @@ resource "aws_iam_role_policy_attachment" "api_basic_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_role_policy" "api_application" {
+  name = "${local.name_prefix}-api-application"
+  role = aws_iam_role.api.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "MinAppData"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:DeleteItem",
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:Query",
+          "dynamodb:TransactWriteItems",
+        ]
+        Resource = aws_dynamodb_table.main.arn
+      },
+      {
+        Sid    = "MinAppUserAdministration"
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminDeleteUser",
+          "cognito-idp:AdminGetUser",
+          "cognito-idp:AdminSetUserPassword",
+        ]
+        Resource = aws_cognito_user_pool.main.arn
+      },
+    ]
+  })
+}
+
 resource "aws_lambda_function" "api" {
   function_name = "${local.name_prefix}-api"
   role          = aws_iam_role.api.arn
@@ -195,15 +239,19 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      ENVIRONMENT      = var.environment
-      DATA_TABLE_NAME  = aws_dynamodb_table.main.name
-      UPLOAD_BUCKET    = aws_s3_bucket.uploads.bucket
-      PUBLISHED_BUCKET = aws_s3_bucket.published.bucket
-      USER_POOL_ID     = aws_cognito_user_pool.main.id
+      ENVIRONMENT         = var.environment
+      DATA_TABLE_NAME     = aws_dynamodb_table.main.name
+      UPLOAD_BUCKET       = aws_s3_bucket.uploads.bucket
+      PUBLISHED_BUCKET    = aws_s3_bucket.published.bucket
+      USER_POOL_ID        = aws_cognito_user_pool.main.id
+      USER_POOL_CLIENT_ID = aws_cognito_user_pool_client.app.id
     }
   }
 
-  depends_on = [aws_iam_role_policy_attachment.api_basic_execution]
+  depends_on = [
+    aws_iam_role_policy_attachment.api_basic_execution,
+    aws_iam_role_policy.api_application,
+  ]
 }
 
 resource "aws_cloudwatch_log_group" "api" {
@@ -225,6 +273,19 @@ resource "aws_apigatewayv2_integration" "api" {
   payload_format_version = "2.0"
 }
 
+resource "aws_apigatewayv2_authorizer" "cognito" {
+  api_id = aws_apigatewayv2_api.api.id
+
+  authorizer_type  = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+  name             = "${local.name_prefix}-cognito"
+
+  jwt_configuration {
+    audience = [aws_cognito_user_pool_client.app.id]
+    issuer   = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.main.id}"
+  }
+}
+
 resource "aws_apigatewayv2_route" "health" {
   api_id = aws_apigatewayv2_api.api.id
 
@@ -232,11 +293,41 @@ resource "aws_apigatewayv2_route" "health" {
   target    = "integrations/${aws_apigatewayv2_integration.api.id}"
 }
 
+resource "aws_apigatewayv2_route" "auth_login" {
+  api_id = aws_apigatewayv2_api.api.id
+
+  route_key = "POST /auth/login"
+  target    = "integrations/${aws_apigatewayv2_integration.api.id}"
+}
+
+resource "aws_apigatewayv2_route" "auth_change_password" {
+  api_id = aws_apigatewayv2_api.api.id
+
+  route_key = "POST /auth/change-password"
+  target    = "integrations/${aws_apigatewayv2_integration.api.id}"
+}
+
+resource "aws_apigatewayv2_route" "protected" {
+  for_each = local.protected_routes
+
+  api_id = aws_apigatewayv2_api.api.id
+
+  route_key          = each.value
+  target             = "integrations/${aws_apigatewayv2_integration.api.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
 resource "aws_apigatewayv2_stage" "default" {
   api_id = aws_apigatewayv2_api.api.id
 
   name        = "$default"
   auto_deploy = true
+
+  default_route_settings {
+    throttling_burst_limit = 50
+    throttling_rate_limit  = 25
+  }
 }
 
 resource "aws_lambda_permission" "api_gateway" {

@@ -17,9 +17,11 @@ MVPでは次の体験だけを完成させる。
 
 詳細は [docs/MVP.md](docs/MVP.md) を参照。
 
-## Phase 0
+## 実装状況
 
-実装の土台を次の構成で置いている。
+### Phase 0: skeleton
+
+完了。
 
 ```text
 apps/mobile/       Flutter Android
@@ -30,7 +32,24 @@ tools/             ローカル開発ツール
 scripts/           開発スクリプト
 ```
 
-開発手順は [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) を参照。
+### Phase 1: identity / group
+
+実装済みの範囲:
+
+- Cognito ID + パスワード認証
+- 初回仮パスワード変更
+- API Gateway JWT authorizer
+- `teacher` / `student`
+- グループ作成
+- Membership
+- 先生による生徒ID・仮パスワード発行
+- 生徒の仮パスワード再発行
+- 生徒の所属解除
+- WebポータルからのPhase 1操作
+- Cognito subjectとアプリ内user idの分離
+- teacher権限とgroup所属のサーバ側再確認
+
+開発・deploy・最初の先生アカウント作成手順は [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) を参照。
 
 ## MVPの大原則
 
@@ -53,7 +72,7 @@ scripts/           開発スクリプト
 - 配信: CloudFront（起動認可を実装するPhaseで追加）
 - IaC: Terraform
 
-Phase 0ではCloudFrontを作らない。公開コンテンツへの短寿命認可を実装する前に、配信用URLを外部公開しないため。
+CloudFrontはまだ作らない。公開コンテンツへの短寿命認可を実装する前に、配信用URLを外部公開しないため。
 
 ## MVPではやらないこと
 
