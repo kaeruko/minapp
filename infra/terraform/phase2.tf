@@ -5,7 +5,6 @@ locals {
     "GET /groups/{group_id}/review-queue",
     "POST /apps/{app_id}/versions/{version_id}/submit",
     "POST /apps/{app_id}/versions/{version_id}/preview",
-    "POST /apps/{app_id}/versions/{version_id}/approve",
   ])
 }
 
