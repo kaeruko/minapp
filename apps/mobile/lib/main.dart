@@ -77,7 +77,7 @@ class HomePage extends StatelessWidget {
 }
 
 class _AppCard extends StatelessWidget {
-  const _AppCard({required this.app, super.key});
+  const _AppCard({required this.app});
 
   final _DemoApp app;
 
@@ -97,7 +97,7 @@ class _AppCard extends StatelessWidget {
 }
 
 class _PhaseBadge extends StatelessWidget {
-  const _PhaseBadge({super.key});
+  const _PhaseBadge();
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +115,7 @@ class _PhaseBadge extends StatelessWidget {
 }
 
 class _SecurityNote extends StatelessWidget {
-  const _SecurityNote({super.key});
+  const _SecurityNote();
 
   @override
   Widget build(BuildContext context) {
