@@ -60,7 +60,7 @@ resource "aws_iam_role_policy" "mobile_api_application" {
 resource "aws_lambda_function" "mobile_api" {
   function_name = "${local.name_prefix}-mobile-api"
   role          = aws_iam_role.mobile_api.arn
-  handler       = "phase3_handler.lambda_handler"
+  handler       = "phase4_mobile_handler.lambda_handler"
   runtime       = "python3.12"
 
   filename         = data.archive_file.api.output_path
@@ -111,9 +111,6 @@ resource "aws_apigatewayv2_route" "phase3_protected" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
-# Launch content has no JWT header because the untrusted WebView never receives
-# the Cognito access token. The URL instead carries a high-entropy, server-side,
-# 10-minute bearer token. Navigation is additionally restricted in the Android client.
 resource "aws_apigatewayv2_route" "launch_content" {
   api_id = aws_apigatewayv2_api.api.id
 

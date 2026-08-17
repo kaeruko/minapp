@@ -50,7 +50,7 @@ void main() {
 
     expect(find.text('みんアプ'), findsOneWidget);
     expect(find.text('先生からもらったIDでログイン'), findsOneWidget);
-    expect(find.text('Phase 3'), findsOneWidget);
+    expect(find.text('Phase 4'), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('login-id')), 'student-demo');
     await tester.enterText(
@@ -63,5 +63,6 @@ void main() {
     expect(find.text('みんなのアプリ'), findsOneWidget);
     expect(find.text('ねんねぐみのじかんわり'), findsOneWidget);
     expect(find.textContaining('ねんね組'), findsOneWidget);
+    expect(find.text('1個'), findsOneWidget);
   });
 }

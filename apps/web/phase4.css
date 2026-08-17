@@ -1,0 +1,26 @@
+.phase4-version-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: 0.35rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: #eef1f5;
+  color: #4a5568;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.phase4-version-badge-live { background: #e6f6ed; color: #176b3a; }
+.phase4-hidden-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.phase4-delete-button { background: #fff5f5; border-color: #f3b8b8; color: #9b2c2c; }
+.phase4-delete-button:hover:not(:disabled) { background: #ffe8e8; }
