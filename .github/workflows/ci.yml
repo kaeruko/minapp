@@ -27,7 +27,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Check JavaScript syntax
-        run: node --check apps/web/app.js
+        run: |
+          node --check apps/web/app.js
+          node --check apps/web/phase2.js
 
   flutter:
     runs-on: ubuntu-latest
