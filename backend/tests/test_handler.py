@@ -78,7 +78,7 @@ class HandlerTests(unittest.TestCase):
         payload = json.loads(response["body"])
         self.assertEqual(payload["service"], "minapp-api")
         self.assertEqual(payload["status"], "ok")
-        self.assertEqual(payload["version"], "0.2.0")
+        self.assertEqual(payload["version"], "0.3.0")
 
     def test_unknown_route_is_404_without_auth(self) -> None:
         response = handler.lambda_handler(_event("GET", "/unknown"), None)
