@@ -11,52 +11,92 @@
   <body>
     <header class="site-header">
       <a class="brand" href="/" aria-label="みんアプ ホーム">みんアプ</a>
-      <span class="phase-badge">Phase 0</span>
+      <div class="header-actions">
+        <span class="phase-badge">Phase 1</span>
+        <button id="logout-button" class="button button-quiet hidden" type="button">ログアウト</button>
+      </div>
     </header>
 
     <main class="page-shell">
       <section class="hero" aria-labelledby="hero-title">
         <p class="eyebrow">学校・教室のアプリ共有</p>
         <h1 id="hero-title">作ったアプリを、みんなで使おう。</h1>
-        <p class="hero-copy">
-          生徒が作った静的Webアプリを、先生の承認後に同じグループのみんなへ届けるためのポータルです。
-        </p>
+        <p class="hero-copy">Phase 1では、先生・生徒のログインとグループ管理まで動きます。作品アップロードは次のPhaseで追加します。</p>
+        <p id="api-status" class="status" role="status">APIを確認中…</p>
       </section>
 
-      <section class="status-panel" aria-labelledby="status-title">
+      <section id="login-panel" class="panel" aria-labelledby="login-title">
         <div>
-          <p class="eyebrow">開発環境</p>
-          <h2 id="status-title">API接続</h2>
+          <p class="eyebrow">ログイン</p>
+          <h2 id="login-title">先生からもらったIDでログイン</h2>
+          <p class="muted">メールアドレスや電話番号は使いません。</p>
         </div>
-        <p id="api-status" class="status status-checking" role="status" aria-live="polite">
-          確認中…
-        </p>
+        <form id="login-form" class="form-stack">
+          <label>ID<input id="login-id" name="login_id" autocomplete="username" inputmode="text" pattern="[a-z0-9][a-z0-9-]{2,31}" required /></label>
+          <label>パスワード<input id="login-password" name="password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required /></label>
+          <button class="button" type="submit">ログイン</button>
+        </form>
+        <p id="login-error" class="form-error hidden" role="alert"></p>
       </section>
 
-      <section class="role-grid" aria-label="MVPの利用者">
-        <article class="role-card">
-          <div class="role-icon" aria-hidden="true">👩‍🏫</div>
-          <h2>先生</h2>
-          <p>グループを作り、生徒アカウントを発行し、作品の公開申請を確認します。</p>
-          <button type="button" disabled>先生としてログイン（Phase 1）</button>
-        </article>
-
-        <article class="role-card">
-          <div class="role-icon" aria-hidden="true">🧑‍💻</div>
-          <h2>生徒</h2>
-          <p>IDとパスワードでログインし、ZIP形式のWebアプリをアップロードして公開申請します。</p>
-          <button type="button" disabled>生徒としてログイン（Phase 1）</button>
-        </article>
-      </section>
-
-      <section class="security-note" aria-labelledby="security-title">
-        <div aria-hidden="true">🛡️</div>
+      <section id="password-panel" class="panel hidden" aria-labelledby="password-title">
         <div>
-          <h2 id="security-title">安全な機能だけを順番に有効化します</h2>
-          <p>
-            Phase 0では認証・アップロード・公開機能をまだ有効にしません。サーバ側の認可と検査が完成した機能だけを公開します。
-          </p>
+          <p class="eyebrow">初回ログイン</p>
+          <h2 id="password-title">自分のパスワードに変更</h2>
+          <p class="muted">10文字以上で、大文字・小文字・数字をそれぞれ含めてください。</p>
         </div>
+        <form id="password-form" class="form-stack">
+          <label>新しいパスワード<input id="new-password" name="new_password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required /></label>
+          <label>新しいパスワード（確認）<input id="new-password-confirm" name="new_password_confirm" type="password" autocomplete="new-password" minlength="10" maxlength="128" required /></label>
+          <button class="button" type="submit">変更してログイン</button>
+        </form>
+        <p id="password-error" class="form-error hidden" role="alert"></p>
+      </section>
+
+      <section id="dashboard" class="dashboard hidden" aria-labelledby="dashboard-title">
+        <section class="panel">
+          <div class="section-heading">
+            <div><p class="eyebrow">アカウント</p><h2 id="dashboard-title">参加しているグループ</h2></div>
+            <p id="account-label" class="account-label"></p>
+          </div>
+          <div id="group-list" class="card-grid" aria-live="polite"></div>
+          <p id="no-groups" class="muted hidden">まだ参加しているグループがありません。</p>
+        </section>
+
+        <section id="teacher-panel" class="panel hidden">
+          <div><p class="eyebrow">先生メニュー</p><h2>グループと生徒を管理</h2></div>
+          <div class="teacher-grid">
+            <form id="create-group-form" class="subpanel form-stack">
+              <h3>グループを作る</h3>
+              <label>グループ名<input id="group-name" name="name" maxlength="60" placeholder="例: 6年2組" required /></label>
+              <button class="button" type="submit">グループを作成</button>
+              <p id="create-group-error" class="form-error hidden" role="alert"></p>
+            </form>
+            <form id="create-student-form" class="subpanel form-stack">
+              <h3>生徒IDを発行</h3>
+              <label>グループ<select id="student-group" name="group_id" required></select></label>
+              <p class="muted">IDと仮パスワードは自動生成します。メール送信はしません。</p>
+              <button class="button" type="submit">生徒IDを1人分発行</button>
+              <p id="create-student-error" class="form-error hidden" role="alert"></p>
+            </form>
+          </div>
+
+          <section id="credential-result" class="credential-card hidden" aria-live="polite">
+            <p class="eyebrow">生徒に渡すもの</p>
+            <p><strong>ID:</strong> <code id="issued-login-id"></code></p>
+            <p><strong>仮パスワード:</strong> <code id="issued-password"></code></p>
+            <p class="warning">仮パスワードはこの画面で一度だけ表示します。必要な場所へ安全に控えてください。</p>
+          </section>
+
+          <section class="members-section" aria-labelledby="members-title">
+            <div class="section-heading">
+              <div><p class="eyebrow">メンバー</p><h3 id="members-title">グループのメンバー</h3></div>
+              <select id="members-group" aria-label="メンバーを表示するグループ"></select>
+            </div>
+            <div id="members-list" class="members-list"></div>
+            <p id="members-error" class="form-error hidden" role="alert"></p>
+          </section>
+        </section>
       </section>
     </main>
   </body>
