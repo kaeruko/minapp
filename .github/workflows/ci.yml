@@ -18,9 +18,16 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile Python
-        run: python -m py_compile backend/src/handler.py tools/dev_server.py
+        run: python -m compileall -q backend/src backend/tests tools
       - name: Run backend tests
         run: python -m unittest discover -s backend/tests -v
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check JavaScript syntax
+        run: node --check apps/web/app.js
 
   flutter:
     runs-on: ubuntu-latest
