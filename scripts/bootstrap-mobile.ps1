@@ -44,6 +44,8 @@ try {
         throw "Android platform copy did not produce the expected target directory: $androidTarget"
     }
 
+    & (Join-Path $PSScriptRoot "configure-mobile-android.ps1")
+
     Write-Host "Generated apps/mobile/android with package id jp.cloxs.min"
 }
 finally {
