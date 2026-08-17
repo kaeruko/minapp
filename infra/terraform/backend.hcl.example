@@ -1,0 +1,5 @@
+bucket       = "minapp-terraform-state-123456789012-ap-northeast-1"
+key          = "tenants/0123456789abcdef0123456789abcdef/terraform.tfstate"
+region       = "ap-northeast-1"
+encrypt      = true
+use_lockfile = true
