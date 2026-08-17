@@ -1,5 +1,15 @@
+output "tenant_id" {
+  description = "Immutable MinApp tenant identity for this deployment."
+  value       = var.tenant_id
+}
+
+output "api_protocol_version" {
+  description = "Protocol version exposed by the tenant API."
+  value       = local.api_protocol_version
+}
+
 output "api_base_url" {
-  description = "Base URL of the Phase 0 HTTP API."
+  description = "Base URL of the tenant HTTP API."
   value       = aws_apigatewayv2_api.api.api_endpoint
 }
 

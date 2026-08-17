@@ -71,18 +71,21 @@ resource "aws_lambda_function" "mobile_api" {
 
   environment {
     variables = {
-      ENVIRONMENT         = var.environment
-      DATA_TABLE_NAME     = aws_dynamodb_table.main.name
-      UPLOAD_BUCKET       = aws_s3_bucket.uploads.bucket
-      PUBLISHED_BUCKET    = aws_s3_bucket.published.bucket
-      USER_POOL_ID        = aws_cognito_user_pool.main.id
-      USER_POOL_CLIENT_ID = aws_cognito_user_pool_client.app.id
+      ENVIRONMENT          = var.environment
+      TENANT_ID            = var.tenant_id
+      API_PROTOCOL_VERSION = tostring(local.api_protocol_version)
+      DATA_TABLE_NAME      = aws_dynamodb_table.main.name
+      UPLOAD_BUCKET        = aws_s3_bucket.uploads.bucket
+      PUBLISHED_BUCKET     = aws_s3_bucket.published.bucket
+      USER_POOL_ID         = aws_cognito_user_pool.main.id
+      USER_POOL_CLIENT_ID  = aws_cognito_user_pool_client.app.id
     }
   }
 
   depends_on = [
     aws_iam_role_policy_attachment.mobile_api_basic_execution,
     aws_iam_role_policy.mobile_api_application,
+    terraform_data.tenant_identity,
   ]
 }
 
