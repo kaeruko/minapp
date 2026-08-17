@@ -3,7 +3,6 @@ locals {
     "GET /lifecycle/apps",
     "POST /apps/{app_id}/versions",
     "DELETE /apps/{app_id}",
-    "POST /apps/{app_id}/versions/{version_id}/approve",
   ])
 }
 
