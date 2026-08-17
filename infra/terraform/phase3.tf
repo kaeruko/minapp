@@ -48,7 +48,9 @@ resource "aws_iam_role_policy" "mobile_api_application" {
       {
         Sid    = "MinAppPublishedRead"
         Effect = "Allow"
-        Action = ["s3:GetObject"]
+        Action = [
+          "s3:GetObject",
+        ]
         Resource = "${aws_s3_bucket.published.arn}/*"
       },
     ]
