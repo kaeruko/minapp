@@ -12,6 +12,8 @@ if str(BACKEND_SRC) not in sys.path:
 
 import phase3_handler  # noqa: E402
 
+LAUNCH_TOKEN = "t" * 32
+
 
 class FakeBackend:
     def __init__(self) -> None:
@@ -37,7 +39,7 @@ class FakeBackend:
 
     def create_launch(self, auth_subject: str, app_id: str, version_id: str) -> dict[str, Any]:
         self.last_call = ("create_launch", auth_subject, app_id, version_id)
-        return {"content_path": "/launch/token123/index.html", "expires_in": 600}
+        return {"content_path": f"/launch/{LAUNCH_TOKEN}/index.html", "expires_in": 600}
 
     def get_launch_file(self, token: str, path: str) -> tuple[bytes, str]:
         self.last_call = ("get_launch_file", token, path)
@@ -105,7 +107,7 @@ class Phase3HandlerTests(unittest.TestCase):
         payload = json.loads(response["body"])
         self.assertEqual(
             payload["url"],
-            "https://example.execute-api.ap-northeast-1.amazonaws.com/launch/token123/index.html",
+            f"https://example.execute-api.ap-northeast-1.amazonaws.com/launch/{LAUNCH_TOKEN}/index.html",
         )
         self.assertEqual(payload["expires_in"], 600)
         self.assertEqual(
@@ -127,13 +129,13 @@ class Phase3HandlerTests(unittest.TestCase):
 
     def test_launch_content_does_not_require_jwt(self) -> None:
         response = phase3_handler.lambda_handler(
-            _event("GET", "/launch/token123/index.html"),
+            _event("GET", f"/launch/{LAUNCH_TOKEN}/index.html"),
             None,
         )
         self.assertEqual(response["statusCode"], 200)
         self.assertTrue(response["isBase64Encoded"])
         self.assertIn("connect-src 'none'", response["headers"]["content-security-policy"])
-        self.assertEqual(self.backend.last_call, ("get_launch_file", "token123", "index.html"))
+        self.assertEqual(self.backend.last_call, ("get_launch_file", LAUNCH_TOKEN, "index.html"))
 
 
 if __name__ == "__main__":
