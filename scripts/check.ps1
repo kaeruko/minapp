@@ -24,14 +24,23 @@ function Invoke-Checked {
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
 Require-Command -Name "python"
+Require-Command -Name "node"
 Require-Command -Name "flutter"
 Require-Command -Name "terraform"
 
 Push-Location $repoRoot
 try {
     Write-Host "== Python =="
-    Invoke-Checked -Command "python" -Arguments @("-m", "py_compile", "backend/src/handler.py", "tools/dev_server.py")
-    Invoke-Checked -Command "python" -Arguments @("-m", "unittest", "discover", "-s", "backend/tests", "-v")
+    Invoke-Checked -Command "python" -Arguments @(
+        "-m", "compileall", "-q",
+        "backend/src", "backend/tests", "tools"
+    )
+    Invoke-Checked -Command "python" -Arguments @(
+        "-m", "unittest", "discover", "-s", "backend/tests", "-v"
+    )
+
+    Write-Host "== Web =="
+    Invoke-Checked -Command "node" -Arguments @("--check", "apps/web/app.js")
 
     Write-Host "== Flutter =="
     Push-Location (Join-Path $repoRoot "apps\mobile")
@@ -45,9 +54,15 @@ try {
     }
 
     Write-Host "== Terraform =="
-    Invoke-Checked -Command "terraform" -Arguments @("fmt", "-check", "-recursive", "infra/terraform")
-    Invoke-Checked -Command "terraform" -Arguments @("-chdir=infra/terraform", "init", "-backend=false", "-input=false")
-    Invoke-Checked -Command "terraform" -Arguments @("-chdir=infra/terraform", "validate")
+    Invoke-Checked -Command "terraform" -Arguments @(
+        "fmt", "-check", "-recursive", "infra/terraform"
+    )
+    Invoke-Checked -Command "terraform" -Arguments @(
+        "-chdir=infra/terraform", "init", "-backend=false", "-input=false"
+    )
+    Invoke-Checked -Command "terraform" -Arguments @(
+        "-chdir=infra/terraform", "validate"
+    )
 
     Write-Host "All checks passed."
 }
