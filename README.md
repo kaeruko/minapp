@@ -50,7 +50,7 @@ scripts/           開発スクリプト
 
 ### Phase 2: upload / review
 
-実装済み。
+完了。
 
 - 生徒による静的WebアプリZIPアップロード
 - ZIP安全検査と `index.html` 必須チェック
@@ -62,7 +62,21 @@ scripts/           開発スクリプト
 - 先生による承認
 - private published S3へのimmutable publish
 
-Phase 2の詳細とAWS反映手順は [docs/PHASE2.md](docs/PHASE2.md) を参照。
+### Phase 3: Android catalog / launch
+
+実装済み。
+
+- AndroidからID + パスワードでログイン
+- 初回仮パスワード変更
+- activeな所属グループの承認済み作品だけを一覧表示
+- 作品起動時に10分の短寿命launch URLを発行
+- Cognito access tokenを作品WebViewへ渡さない
+- published S3 bucketはprivateのまま
+- WebViewにnative JavaScript bridgeを作らない
+- 同一launch token配下以外へのWebView navigationを拒否
+- 外部通信・フォーム送信・カメラ・マイク・位置情報を作品へ公開しない
+
+Phase 2の詳細は [docs/PHASE2.md](docs/PHASE2.md)、Phase 3のAWS反映・Android実行手順は [docs/PHASE3.md](docs/PHASE3.md) を参照。
 開発・認証・最初の先生アカウント作成手順は [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) を参照。
 
 ## MVPの大原則
@@ -85,7 +99,7 @@ Phase 2の詳細とAWS反映手順は [docs/PHASE2.md](docs/PHASE2.md) を参照
 - ファイル: private S3
 - IaC: Terraform
 
-CloudFrontによる承認済み作品のAndroid向け配信は、次のクライアント統合Phaseで追加する。
+MVPのAndroid配信は、API Gateway + 専用Lambdaがprivate published S3の検証済みZIPから必要なファイルだけを短寿命launch URL経由で返す。CloudFrontは必須構成にせず、配信量や性能要件が出た段階の最適化候補とする。
 
 ## MVPではやらないこと
 
