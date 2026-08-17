@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:minapp_mobile/api.dart';
 import 'package:minapp_mobile/session_app.dart';
@@ -24,9 +25,9 @@ class FakeApi implements MinAppApi {
     expect(accessToken, 'token');
     return <PublishedApp>[
       PublishedApp(
-        appId: 'a' * 32,
-        versionId: 'b' * 32,
-        groupId: 'c' * 32,
+        appId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        versionId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        groupId: 'cccccccccccccccccccccccccccccccc',
         groupName: 'ねんね組',
         ownerLoginId: 'student-demo',
         title: 'ねんねぐみのじかんわり',
