@@ -41,6 +41,7 @@ try {
 
     Write-Host "== Web =="
     Invoke-Checked -Command "node" -Arguments @("--check", "apps/web/app.js")
+    Invoke-Checked -Command "node" -Arguments @("--check", "apps/web/phase2.js")
 
     Write-Host "== Flutter =="
     Push-Location (Join-Path $repoRoot "apps\mobile")

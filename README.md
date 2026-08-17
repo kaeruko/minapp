@@ -34,7 +34,7 @@ scripts/           開発スクリプト
 
 ### Phase 1: identity / group
 
-実装済みの範囲:
+完了。
 
 - Cognito ID + パスワード認証
 - 初回仮パスワード変更
@@ -45,11 +45,25 @@ scripts/           開発スクリプト
 - 先生による生徒ID・仮パスワード発行
 - 生徒の仮パスワード再発行
 - 生徒の所属解除
-- WebポータルからのPhase 1操作
 - Cognito subjectとアプリ内user idの分離
 - teacher権限とgroup所属のサーバ側再確認
 
-開発・deploy・最初の先生アカウント作成手順は [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) を参照。
+### Phase 2: upload / review
+
+実装済み。
+
+- 生徒による静的WebアプリZIPアップロード
+- ZIP安全検査と `index.html` 必須チェック
+- 自分の作品一覧
+- 公開申請
+- 先生のグループ別レビューキュー
+- 15分の短寿命プレビューURL
+- CSP + sandbox iframeによる作品確認
+- 先生による承認
+- private published S3へのimmutable publish
+
+Phase 2の詳細とAWS反映手順は [docs/PHASE2.md](docs/PHASE2.md) を参照。
+開発・認証・最初の先生アカウント作成手順は [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) を参照。
 
 ## MVPの大原則
 
@@ -68,11 +82,10 @@ scripts/           開発スクリプト
 - 認証: Amazon Cognito User Pools
 - API: API Gateway + Lambda
 - DB: DynamoDB
-- ファイル: S3
-- 配信: CloudFront（起動認可を実装するPhaseで追加）
+- ファイル: private S3
 - IaC: Terraform
 
-CloudFrontはまだ作らない。公開コンテンツへの短寿命認可を実装する前に、配信用URLを外部公開しないため。
+CloudFrontによる承認済み作品のAndroid向け配信は、次のクライアント統合Phaseで追加する。
 
 ## MVPではやらないこと
 

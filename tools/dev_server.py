@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qsl, urljoin, urlparse
 from urllib.request import Request, urlopen
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WEB_ROOT = REPO_ROOT / "apps" / "web"
 BACKEND_SRC = REPO_ROOT / "backend" / "src"
-MAX_REQUEST_BODY_BYTES = 16 * 1024
+MAX_REQUEST_BODY_BYTES = 3 * 1024 * 1024
 
 if not WEB_ROOT.is_dir():
     raise RuntimeError(f"Web root does not exist: {WEB_ROOT}")
@@ -58,12 +59,12 @@ class MinAppDevHandler(SimpleHTTPRequestHandler):
 
         body = self._request_body()
         if self.server.api_base_url is not None:
-            self._proxy_remote_api(method, api_path, body)
+            self._proxy_remote_api(method, api_path, parsed.query, body)
         else:
-            self._invoke_local_api(method, api_path, body)
+            self._invoke_local_api(method, api_path, parsed.query, body)
         return True
 
-    def _request_body(self) -> str | None:
+    def _request_body(self) -> bytes | None:
         raw_length = self.headers.get("content-length")
         if raw_length is None:
             return None
@@ -76,14 +77,38 @@ class MinAppDevHandler(SimpleHTTPRequestHandler):
             raise ValueError(
                 f"Request body must be between 0 and {MAX_REQUEST_BODY_BYTES} bytes"
             )
-        encoded = self.rfile.read(length)
-        return encoded.decode("utf-8")
+        return self.rfile.read(length)
 
-    def _invoke_local_api(self, method: str, path: str, body: str | None) -> None:
+    @staticmethod
+    def _query_parameters(query: str) -> dict[str, str] | None:
+        if not query:
+            return None
+        pairs = parse_qsl(query, keep_blank_values=True, strict_parsing=True)
+        result: dict[str, str] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"Duplicate query parameter is not supported: {key}")
+            result[key] = value
+        return result
+
+    def _invoke_local_api(
+        self,
+        method: str,
+        path: str,
+        query: str,
+        body: bytes | None,
+    ) -> None:
         event: dict[str, Any] = {
             "rawPath": path,
-            "requestContext": {"http": {"method": method}},
+            "requestContext": {
+                "http": {"method": method},
+                "domainName": f"{self.server.server_address[0]}:{self.server.server_address[1]}",
+            },
         }
+
+        params = self._query_parameters(query)
+        if params is not None:
+            event["queryStringParameters"] = params
 
         content_type = self.headers.get("content-type")
         authorization = self.headers.get("authorization")
@@ -94,27 +119,43 @@ class MinAppDevHandler(SimpleHTTPRequestHandler):
             headers["authorization"] = authorization
         if headers:
             event["headers"] = headers
+
         if body is not None:
-            event["body"] = body
+            if content_type is not None and content_type.split(";", 1)[0].strip().lower() in {
+                "application/zip",
+                "application/x-zip-compressed",
+            }:
+                event["body"] = base64.b64encode(body).decode("ascii")
+                event["isBase64Encoded"] = True
+            else:
+                event["body"] = body.decode("utf-8")
 
         response = lambda_handler(event, None)
         self._write_lambda_response(response)
 
-    def _proxy_remote_api(self, method: str, path: str, body: str | None) -> None:
+    def _proxy_remote_api(
+        self,
+        method: str,
+        path: str,
+        query: str,
+        body: bytes | None,
+    ) -> None:
         if self.server.api_base_url is None:
             raise RuntimeError("Remote API base URL is not configured")
 
         target = urljoin(self.server.api_base_url.rstrip("/") + "/", path.lstrip("/"))
+        if query:
+            target = f"{target}?{query}"
+
         headers: dict[str, str] = {"accept": "application/json"}
         for header_name in ("authorization", "content-type"):
             value = self.headers.get(header_name)
             if value is not None:
                 headers[header_name] = value
 
-        encoded_body = None if body is None else body.encode("utf-8")
-        request = Request(target, data=encoded_body, headers=headers, method=method)
+        request = Request(target, data=body, headers=headers, method=method)
         try:
-            with urlopen(request, timeout=15) as remote:
+            with urlopen(request, timeout=30) as remote:
                 status = remote.status
                 response_headers = remote.headers
                 encoded = remote.read()
@@ -144,7 +185,11 @@ class MinAppDevHandler(SimpleHTTPRequestHandler):
         if not isinstance(body, str):
             raise TypeError("Lambda response body must be a string")
 
-        encoded = body.encode("utf-8")
+        if response.get("isBase64Encoded") is True:
+            encoded = base64.b64decode(body, validate=True)
+        else:
+            encoded = body.encode("utf-8")
+
         self.send_response(status_code)
         for name, value in headers.items():
             if not isinstance(name, str) or not isinstance(value, str):
