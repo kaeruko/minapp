@@ -1,0 +1,248 @@
+locals {
+  project_name = "minapp"
+  name_prefix  = "${local.project_name}-${var.environment}"
+}
+
+data "aws_caller_identity" "current" {}
+
+data "archive_file" "api" {
+  type        = "zip"
+  source_dir  = abspath("${path.module}/../../backend/src")
+  output_path = "${path.module}/minapp-api.zip"
+  excludes    = ["__pycache__"]
+}
+
+provider "aws" {
+  region = var.aws_region
+
+  default_tags {
+    tags = {
+      Project     = local.project_name
+      Environment = var.environment
+      ManagedBy   = "terraform"
+    }
+  }
+}
+
+resource "aws_cognito_user_pool" "main" {
+  name = "${local.name_prefix}-users"
+
+  username_configuration {
+    case_sensitive = false
+  }
+
+  admin_create_user_config {
+    allow_admin_create_user_only = true
+  }
+
+  account_recovery_setting {
+    recovery_mechanism {
+      name     = "admin_only"
+      priority = 1
+    }
+  }
+
+  password_policy {
+    minimum_length                   = 10
+    require_lowercase                = true
+    require_numbers                  = true
+    require_symbols                  = false
+    require_uppercase                = true
+    temporary_password_validity_days = 7
+  }
+
+  deletion_protection = var.environment == "prod" ? "ACTIVE" : "INACTIVE"
+}
+
+resource "aws_cognito_user_pool_client" "app" {
+  name         = "${local.name_prefix}-app-client"
+  user_pool_id = aws_cognito_user_pool.main.id
+
+  generate_secret = false
+
+  explicit_auth_flows = [
+    "ALLOW_REFRESH_TOKEN_AUTH",
+    "ALLOW_USER_PASSWORD_AUTH",
+  ]
+
+  prevent_user_existence_errors = "ENABLED"
+}
+
+resource "aws_dynamodb_table" "main" {
+  name         = "${local.name_prefix}-data"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "pk"
+  range_key    = "sk"
+
+  attribute {
+    name = "pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "sk"
+    type = "S"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
+}
+
+resource "aws_s3_bucket" "uploads" {
+  bucket = "${local.name_prefix}-${data.aws_caller_identity.current.account_id}-${var.aws_region}-uploads"
+
+  force_destroy = false
+}
+
+resource "aws_s3_bucket_versioning" "uploads" {
+  bucket = aws_s3_bucket.uploads.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "uploads" {
+  bucket = aws_s3_bucket.uploads.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "uploads" {
+  bucket = aws_s3_bucket.uploads.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket" "published" {
+  bucket = "${local.name_prefix}-${data.aws_caller_identity.current.account_id}-${var.aws_region}-published"
+
+  force_destroy = false
+}
+
+resource "aws_s3_bucket_versioning" "published" {
+  bucket = aws_s3_bucket.published.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "published" {
+  bucket = aws_s3_bucket.published.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "published" {
+  bucket = aws_s3_bucket.published.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_iam_role" "api" {
+  name = "${local.name_prefix}-api"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = "sts:AssumeRole"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "api_basic_execution" {
+  role       = aws_iam_role.api.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_lambda_function" "api" {
+  function_name = "${local.name_prefix}-api"
+  role          = aws_iam_role.api.arn
+  handler       = "handler.lambda_handler"
+  runtime       = "python3.12"
+
+  filename         = data.archive_file.api.output_path
+  source_code_hash = data.archive_file.api.output_base64sha256
+
+  memory_size = 128
+  timeout     = 10
+
+  environment {
+    variables = {
+      ENVIRONMENT      = var.environment
+      DATA_TABLE_NAME  = aws_dynamodb_table.main.name
+      UPLOAD_BUCKET    = aws_s3_bucket.uploads.bucket
+      PUBLISHED_BUCKET = aws_s3_bucket.published.bucket
+      USER_POOL_ID     = aws_cognito_user_pool.main.id
+    }
+  }
+
+  depends_on = [aws_iam_role_policy_attachment.api_basic_execution]
+}
+
+resource "aws_cloudwatch_log_group" "api" {
+  name              = "/aws/lambda/${aws_lambda_function.api.function_name}"
+  retention_in_days = 30
+}
+
+resource "aws_apigatewayv2_api" "api" {
+  name          = "${local.name_prefix}-api"
+  protocol_type = "HTTP"
+}
+
+resource "aws_apigatewayv2_integration" "api" {
+  api_id = aws_apigatewayv2_api.api.id
+
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.api.invoke_arn
+  integration_method     = "POST"
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "health" {
+  api_id = aws_apigatewayv2_api.api.id
+
+  route_key = "GET /health"
+  target    = "integrations/${aws_apigatewayv2_integration.api.id}"
+}
+
+resource "aws_apigatewayv2_stage" "default" {
+  api_id = aws_apigatewayv2_api.api.id
+
+  name        = "$default"
+  auto_deploy = true
+}
+
+resource "aws_lambda_permission" "api_gateway" {
+  statement_id  = "AllowExecutionFromApiGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
+}
