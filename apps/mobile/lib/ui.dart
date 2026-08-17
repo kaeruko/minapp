@@ -16,7 +16,7 @@ class PhaseBadge extends StatelessWidget {
         ),
         child: const Padding(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          child: Text('Phase 3'),
+          child: Text('Phase 4'),
         ),
       ),
     );
