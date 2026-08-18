@@ -278,7 +278,7 @@ def _login_id(payload: dict[str, Any]) -> str:
 
 
 def _password(payload: dict[str, Any], field: str) -> str:
-    return _required_string(payload, field, min_length=10, max_length=128)
+    return _required_string(payload, field, min_length=6, max_length=128)
 
 
 def _group_name(payload: dict[str, Any]) -> str:
