@@ -1,0 +1,8 @@
+aws_region          = "us-west-2"
+environment         = "dev"
+operator_account_id = "123456789012"
+
+# Optional tuning. Defaults shown here.
+descriptor_ttl_seconds    = 86400
+rate_limit_requests       = 60
+rate_limit_window_seconds = 60

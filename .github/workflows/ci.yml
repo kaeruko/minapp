@@ -18,9 +18,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile Python
-        run: python -m compileall -q backend/src backend/tests tools
+        run: python -m compileall -q backend/src backend/tests directory/src directory/tests tools
       - name: Run backend tests
         run: python -m unittest discover -s backend/tests -v
+      - name: Run Directory tests
+        run: python -m unittest discover -s directory/tests -v
 
   web:
     runs-on: ubuntu-latest
@@ -57,8 +59,12 @@ jobs:
         with:
           terraform_version: "1.15.5"
       - name: Format
-        run: terraform fmt -check -recursive infra/terraform
-      - name: Init without remote backend
+        run: terraform fmt -check -diff -recursive infra
+      - name: Init tenant stack without remote backend
         run: terraform -chdir=infra/terraform init -backend=false -input=false
-      - name: Validate
+      - name: Validate tenant stack
         run: terraform -chdir=infra/terraform validate
+      - name: Init Directory stack without remote backend
+        run: terraform -chdir=infra/directory init -backend=false -input=false
+      - name: Validate Directory stack
+        run: terraform -chdir=infra/directory validate
