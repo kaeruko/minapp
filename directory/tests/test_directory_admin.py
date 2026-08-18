@@ -113,6 +113,42 @@ class DirectoryAdminTests(unittest.TestCase):
         with self.assertRaises(DuplicateRecordError):
             self.service.create_tenant("Another School")
 
+    def test_register_existing_tenant_verifies_before_storing(self) -> None:
+        result = self.service.register_existing_tenant(
+            "b" * 32,
+            "Existing School",
+            "https://tenant.example.com/",
+        )
+        self.assertEqual(result["tenant_id"], "b" * 32)
+        self.assertEqual(result["api_base_url"], "https://tenant.example.com")
+        self.assertEqual(result["status"], "pending")
+        self.assertEqual(self.verifications, [("https://tenant.example.com", "b" * 32, 1)])
+        tenant = self.store.tenants["b" * 32]
+        self.assertEqual(tenant["api_base_url"], "https://tenant.example.com")
+        self.assertEqual(tenant["status"], "pending")
+        code_hash = hash_classroom_code(normalize_classroom_code(result["classroom_code"]))
+        self.assertIn(code_hash, self.store.codes)
+        self.assertNotIn(result["classroom_code"], repr(self.store.tenants))
+        self.assertNotIn(result["classroom_code"], repr(self.store.codes))
+        self.assertNotIn(result["classroom_code"], repr(self.store.audits))
+        self.assertEqual(self.store.audits[-1]["action"], "existing_tenant_registered")
+
+    def test_register_existing_tenant_does_not_write_when_verification_fails(self) -> None:
+        def fail_verification(url: str, tenant_id: str, protocol: int) -> dict[str, Any]:
+            del url, tenant_id, protocol
+            raise RuntimeError("tenant identity mismatch")
+
+        self.service.endpoint_verifier = fail_verification
+        with self.assertRaises(RuntimeError):
+            self.service.register_existing_tenant(
+                "b" * 32,
+                "Existing School",
+                "https://tenant.example.com",
+            )
+        self.assertEqual(self.store.tenants, {})
+        self.assertEqual(self.store.codes, {})
+        self.assertEqual(self.store.audits, [])
+
     def test_endpoint_must_verify_before_activation(self) -> None:
         self.service.create_tenant("Test School")
         updated = self.service.update_endpoint(
