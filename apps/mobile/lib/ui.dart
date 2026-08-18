@@ -16,7 +16,7 @@ class PhaseBadge extends StatelessWidget {
         ),
         child: const Padding(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          child: Text('Phase 4'),
+          child: Text('Phase 6'),
         ),
       ),
     );
@@ -27,8 +27,8 @@ String messageFor(Object error) {
   if (error is ApiException) {
     return error.message;
   }
-  if (error is FormatException) {
-    return 'サーバーの応答形式が不正です。';
+  if (error is FormatException || error is ArgumentError) {
+    return '教室またはサーバーの設定形式が不正です。';
   }
-  return '通信に失敗しました: $error';
+  return '通信または端末保存に失敗しました: $error';
 }
