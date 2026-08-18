@@ -9,7 +9,7 @@ BACKEND_SRC = Path(__file__).resolve().parents[1] / "src"
 if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
 
-from aws_backend import AwsBackend, _User  # noqa: E402
+from aws_backend import AwsBackend, _User, _new_temporary_password  # noqa: E402
 from errors import ApiProblem  # noqa: E402
 
 
@@ -147,6 +147,12 @@ class AwsBackendTests(unittest.TestCase):
         self.teacher_subject = self.cognito.add_user("teacher-demo", "TeacherPass1", temporary=False)
         self.teacher = _User(user_id="1" * 32, auth_subject=self.teacher_subject, login_id="teacher-demo", role="teacher", status="active")
         self.backend._transact_put_new([self.backend._auth_item(self.teacher), self.backend._user_item(self.teacher)])
+
+    def test_generated_temporary_password_is_eight_easy_digits(self) -> None:
+        for _ in range(100):
+            password = _new_temporary_password()
+            self.assertEqual(len(password), 8)
+            self.assertTrue(all(character in "23456789" for character in password))
 
     def test_temporary_password_login_requires_change(self) -> None:
         self.cognito.add_user("student-demo", "Temporary1", temporary=True)

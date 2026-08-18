@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import secrets
-import string
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -48,10 +47,15 @@ def _new_login_id() -> str:
     return f"student-{secrets.token_hex(4)}"
 
 
+_TEMPORARY_PASSWORD_ALPHABET = "23456789"
+_TEMPORARY_PASSWORD_LENGTH = 8
+
+
 def _new_temporary_password() -> str:
-    alphabet = string.ascii_letters + string.digits
-    random_tail = "".join(secrets.choice(alphabet) for _ in range(13))
-    return f"Ma1{random_tail}"
+    return "".join(
+        secrets.choice(_TEMPORARY_PASSWORD_ALPHABET)
+        for _ in range(_TEMPORARY_PASSWORD_LENGTH)
+    )
 
 
 @dataclass(frozen=True)
