@@ -42,6 +42,7 @@ $productionAssets = @(
     "styles.css",
     "phase2.css",
     "phase4.css",
+    "student_dashboard.css",
     "teacher_dashboard.css",
     "moderation_actions.css",
     "display_names.css",
@@ -50,6 +51,7 @@ $productionAssets = @(
     "phase2.js",
     "phase2_transport.js",
     "phase4.js",
+    "student_dashboard.js",
     "teacher_dashboard.js",
     "moderation_actions.js",
     "display_names.js"
