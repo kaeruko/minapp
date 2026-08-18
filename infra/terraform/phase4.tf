@@ -2,6 +2,8 @@ locals {
   phase4_protected_routes = toset([
     "GET /lifecycle/apps",
     "POST /apps/{app_id}/versions",
+    "POST /apps/{app_id}/versions/{version_id}/reject",
+    "POST /apps/{app_id}/versions/{version_id}/unpublish",
     "DELETE /apps/{app_id}",
   ])
 }

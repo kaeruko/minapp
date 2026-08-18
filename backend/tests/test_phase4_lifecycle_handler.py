@@ -49,6 +49,14 @@ class FakeBackend:
         self.last_call = ("approve", subject, app_id, version_id)
         return {"app_id": app_id, "version_id": version_id}
 
+    def reject_app(self, subject: str, app_id: str, version_id: str) -> dict[str, Any]:
+        self.last_call = ("reject", subject, app_id, version_id)
+        return {"app_id": app_id, "version_id": version_id, "status": "rejected"}
+
+    def unpublish_app(self, subject: str, app_id: str, version_id: str) -> dict[str, Any]:
+        self.last_call = ("unpublish", subject, app_id, version_id)
+        return {"app_id": app_id, "version_id": version_id, "status": "unpublished"}
+
 
 def _event(method: str, path: str, *, subject: str = "sub") -> dict[str, Any]:
     return {
@@ -58,6 +66,13 @@ def _event(method: str, path: str, *, subject: str = "sub") -> dict[str, Any]:
             "authorizer": {"jwt": {"claims": {"sub": subject}}},
         },
     }
+
+
+def _json_post(path: str) -> dict[str, Any]:
+    event = _event("POST", path)
+    event["headers"] = {"content-type": "application/json"}
+    event["body"] = "{}"
+    return event
 
 
 class Phase4LifecycleHandlerTests(unittest.TestCase):
@@ -94,12 +109,43 @@ class Phase4LifecycleHandlerTests(unittest.TestCase):
     def test_approve_uses_lifecycle_backend(self) -> None:
         app_id = "a" * 32
         version_id = "b" * 32
-        event = _event("POST", f"/apps/{app_id}/versions/{version_id}/approve")
-        event["headers"] = {"content-type": "application/json"}
-        event["body"] = "{}"
-        response = phase4_lifecycle_handler.lambda_handler(event, None)
+        response = phase4_lifecycle_handler.lambda_handler(
+            _json_post(f"/apps/{app_id}/versions/{version_id}/approve"),
+            None,
+        )
         self.assertEqual(response["statusCode"], 200)
         self.assertEqual(self.backend.last_call, ("approve", "sub", app_id, version_id))
+
+    def test_reject_uses_moderation_backend(self) -> None:
+        app_id = "a" * 32
+        version_id = "b" * 32
+        response = phase4_lifecycle_handler.lambda_handler(
+            _json_post(f"/apps/{app_id}/versions/{version_id}/reject"),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(json.loads(response["body"])["status"], "rejected")
+        self.assertEqual(self.backend.last_call, ("reject", "sub", app_id, version_id))
+
+    def test_unpublish_uses_moderation_backend(self) -> None:
+        app_id = "a" * 32
+        version_id = "b" * 32
+        response = phase4_lifecycle_handler.lambda_handler(
+            _json_post(f"/apps/{app_id}/versions/{version_id}/unpublish"),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(json.loads(response["body"])["status"], "unpublished")
+        self.assertEqual(self.backend.last_call, ("unpublish", "sub", app_id, version_id))
+
+    def test_moderation_rejects_non_empty_json_body(self) -> None:
+        app_id = "a" * 32
+        version_id = "b" * 32
+        event = _json_post(f"/apps/{app_id}/versions/{version_id}/reject")
+        event["body"] = '{"reason":"no"}'
+        response = phase4_lifecycle_handler.lambda_handler(event, None)
+        self.assertEqual(response["statusCode"], 400)
+        self.assertIsNone(self.backend.last_call)
 
 
 if __name__ == "__main__":
