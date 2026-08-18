@@ -159,12 +159,17 @@
   color: #2457d6;
 }
 
-.student-workspace-card {
+.student-workspace-card,
+.student-profile-card {
   padding: 28px;
   border: 1px solid #dfe7f5;
   border-radius: 22px;
   background: #ffffff;
   box-shadow: 0 14px 38px rgba(51, 77, 125, 0.08);
+}
+
+.student-profile-card {
+  margin-top: 24px;
 }
 
 .student-section-heading {
@@ -227,6 +232,13 @@
   background: #2457d6;
 }
 
+.student-profile-card .display-name-card {
+  margin: 0;
+  border: 1px solid #dce6f8;
+  border-radius: 18px;
+  background: #f8faff;
+}
+
 @media (max-width: 820px) {
   .student-topbar {
     align-items: flex-start;
@@ -282,7 +294,8 @@
     grid-column: 1 / -1;
   }
 
-  .student-workspace-card {
+  .student-workspace-card,
+  .student-profile-card {
     padding: 18px;
   }
 
