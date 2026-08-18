@@ -34,6 +34,7 @@ jobs:
         run: |
           node --check apps/web/app.js
           node --check apps/web/phase2.js
+          node --check apps/web/phase2_transport.js
           node --check apps/web/phase4.js
           node --check apps/web/teacher_dashboard.js
           node --check apps/web/moderation_actions.js
