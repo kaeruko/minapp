@@ -6,6 +6,7 @@
     <meta name="color-scheme" content="light" />
     <title>みんアプ | Webポータル</title>
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/preauth.css" />
     <link rel="stylesheet" href="/phase2.css" />
     <link rel="stylesheet" href="/phase4.css" />
     <link rel="stylesheet" href="/student_dashboard.css" />
@@ -34,60 +35,86 @@
     </header>
 
     <main class="page-shell">
-      <section class="hero" aria-labelledby="hero-title">
-        <p class="eyebrow">学校・教室のアプリ共有</p>
-        <h1 id="hero-title">作ったアプリを、みんなで使おう。</h1>
-        <p class="hero-copy">作品をアップロードして先生へ公開申請できます。公開後は同じ作品の更新版を追加でき、不要になった作品はAndroidの一覧から削除できます。</p>
-        <p id="api-status" class="status" role="status">接続先を確認中…</p>
-      </section>
+      <section class="preauth-shell" aria-label="みんアプ ログイン">
+        <section class="preauth-brand-panel" aria-labelledby="hero-title">
+          <div class="preauth-brand-lockup">
+            <div class="preauth-brand-mark" aria-hidden="true">👥</div>
+            <div class="preauth-brand-copy">
+              <p class="preauth-brand-name">みんアプ</p>
+              <p class="preauth-brand-subtitle">学校・教室のアプリ共有</p>
+            </div>
+          </div>
 
-      <section id="classroom-panel" class="panel hidden" aria-labelledby="classroom-title">
-        <div>
-          <p class="eyebrow">教室を選ぶ</p>
-          <h2 id="classroom-title">先生からもらった教室コードを入力</h2>
-          <p class="muted">教室コードから、あなたの教室専用のみんアプ環境へ安全に接続します。</p>
-        </div>
-        <form id="classroom-form" class="form-stack">
-          <label>教室コード<input id="classroom-code" name="classroom_code" autocomplete="off" inputmode="text" maxlength="64" placeholder="例: 7K2M-4Q9P-W6TX" required /></label>
-          <button class="button" type="submit">この教室を使う</button>
-        </form>
-        <p id="classroom-error" class="form-error hidden" role="alert"></p>
-      </section>
+          <div class="preauth-pitch">
+            <p class="preauth-kicker">つくる → 先生が確認 → クラスで使う</p>
+            <h1 id="hero-title">生徒のアイデアを<br />安全に、クラスへ。</h1>
+            <p class="hero-copy">みんアプは、学校・パソコン教室・プログラミングスクール向けのアプリ共有プラットフォームです。生徒が作った作品を先生が確認し、クラスのみんなへ届けられます。</p>
+          </div>
 
-      <section id="classroom-context" class="classroom-context hidden" aria-label="現在の教室">
-        <div>
-          <p class="classroom-context-label">現在の教室</p>
-          <p id="classroom-name" class="classroom-context-name"></p>
-        </div>
-        <button id="classroom-change-button" class="button button-quiet button-small" type="button">教室を変更</button>
-      </section>
+          <p id="api-status" class="status" role="status">接続先を確認中…</p>
 
-      <section id="login-panel" class="panel hidden" aria-labelledby="login-title">
-        <div>
-          <p class="eyebrow">ログイン</p>
-          <h2 id="login-title">先生からもらったIDでログイン</h2>
-          <p class="muted">メールアドレスや電話番号は使いません。</p>
-        </div>
-        <form id="login-form" class="form-stack">
-          <label>ID<input id="login-id" name="login_id" autocomplete="username" inputmode="text" pattern="[a-z0-9][a-z0-9-]{2,31}" required /></label>
-          <label>パスワード<input id="login-password" name="password" type="password" autocomplete="current-password" minlength="6" maxlength="128" required /></label>
-          <button class="button" type="submit">ログイン</button>
-        </form>
-        <p id="login-error" class="form-error hidden" role="alert"></p>
-      </section>
+          <div class="preauth-flow" aria-hidden="true">
+            <span class="preauth-flow-step">▦</span>
+            <span class="preauth-flow-arrow">→</span>
+            <span class="preauth-flow-step">✓</span>
+            <span class="preauth-flow-arrow">→</span>
+            <span class="preauth-flow-step">▯</span>
+          </div>
+        </section>
 
-      <section id="password-panel" class="panel hidden" aria-labelledby="password-title">
-        <div>
-          <p class="eyebrow">初回ログイン</p>
-          <h2 id="password-title">自分のパスワードに変更</h2>
-          <p class="muted">6文字以上なら使えます。大文字・小文字・数字・記号の組み合わせ指定はありません。</p>
-        </div>
-        <form id="password-form" class="form-stack">
-          <label>新しいパスワード<input id="new-password" name="new_password" type="password" autocomplete="new-password" minlength="6" maxlength="128" required /></label>
-          <label>新しいパスワード（確認）<input id="new-password-confirm" name="new_password_confirm" type="password" autocomplete="new-password" minlength="6" maxlength="128" required /></label>
-          <button class="button" type="submit">変更してログイン</button>
-        </form>
-        <p id="password-error" class="form-error hidden" role="alert"></p>
+        <section class="preauth-auth-panel">
+          <section id="classroom-context" class="classroom-context preauth-context hidden" aria-label="現在の教室">
+            <div>
+              <p class="classroom-context-label">現在の教室</p>
+              <p id="classroom-name" class="classroom-context-name"></p>
+            </div>
+            <button id="classroom-change-button" class="button button-quiet button-small" type="button">教室を変更</button>
+          </section>
+
+          <section id="classroom-panel" class="preauth-card hidden" aria-labelledby="classroom-title">
+            <div class="preauth-card-header">
+              <p class="eyebrow">はじめに</p>
+              <h2 id="classroom-title">教室を選択</h2>
+              <p class="muted">教室でもらったコードを入力すると、その教室専用のみんアプへ接続します。</p>
+            </div>
+            <form id="classroom-form" class="form-stack">
+              <label>教室コード<input id="classroom-code" name="classroom_code" autocomplete="off" inputmode="text" maxlength="64" placeholder="例: 7K2M-4Q9P-W6TX" required /></label>
+              <button class="button" type="submit">この教室を使う</button>
+            </form>
+            <p id="classroom-error" class="form-error hidden" role="alert"></p>
+            <p class="preauth-note">教室コードが分からない場合は、教室の先生・管理者に確認してください。</p>
+          </section>
+
+          <section id="login-panel" class="preauth-card hidden" aria-labelledby="login-title">
+            <div class="preauth-card-header">
+              <p class="eyebrow">ログイン</p>
+              <h2 id="login-title">おかえりなさい</h2>
+              <p class="muted">教室で発行されたIDとパスワードでログインしてください。先生・生徒とも同じ画面を使います。</p>
+            </div>
+            <form id="login-form" class="form-stack">
+              <label>ID<input id="login-id" name="login_id" autocomplete="username" inputmode="text" pattern="[a-z0-9][a-z0-9-]{2,31}" placeholder="例: student-12345678" required /></label>
+              <label>パスワード<input id="login-password" name="password" type="password" autocomplete="current-password" minlength="6" maxlength="128" placeholder="パスワードを入力" required /></label>
+              <button class="button" type="submit">ログインする</button>
+            </form>
+            <p id="login-error" class="form-error hidden" role="alert"></p>
+            <p class="preauth-note">メールアドレスや電話番号は使いません。ログイン後、アカウントの役割に合わせて画面が切り替わります。</p>
+          </section>
+
+          <section id="password-panel" class="preauth-card hidden" aria-labelledby="password-title">
+            <div class="preauth-card-header">
+              <p class="eyebrow">初回ログイン</p>
+              <h2 id="password-title">自分のパスワードを決める</h2>
+              <p class="muted">最初にもらった仮パスワードから、自分だけが使うパスワードへ変更します。</p>
+            </div>
+            <form id="password-form" class="form-stack">
+              <label>新しいパスワード<input id="new-password" name="new_password" type="password" autocomplete="new-password" minlength="6" maxlength="128" placeholder="6文字以上" required /></label>
+              <label>新しいパスワード（確認）<input id="new-password-confirm" name="new_password_confirm" type="password" autocomplete="new-password" minlength="6" maxlength="128" placeholder="もう一度入力" required /></label>
+              <button class="button" type="submit">変更してログイン</button>
+            </form>
+            <p id="password-error" class="form-error hidden" role="alert"></p>
+            <p class="preauth-note">6文字以上なら使えます。大文字・小文字・数字・記号の組み合わせ指定はありません。</p>
+          </section>
+        </section>
       </section>
 
       <section id="dashboard" class="dashboard hidden" aria-labelledby="dashboard-title">
