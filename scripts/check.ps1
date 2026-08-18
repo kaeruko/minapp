@@ -33,15 +33,22 @@ try {
     Write-Host "== Python =="
     Invoke-Checked -Command "python" -Arguments @(
         "-m", "compileall", "-q",
-        "backend/src", "backend/tests", "tools"
+        "backend/src", "backend/tests", "directory/src", "directory/tests", "tools"
     )
     Invoke-Checked -Command "python" -Arguments @(
         "-m", "unittest", "discover", "-s", "backend/tests", "-v"
+    )
+    Invoke-Checked -Command "python" -Arguments @(
+        "-m", "unittest", "discover", "-s", "directory/tests", "-v"
+    )
+    Invoke-Checked -Command "python" -Arguments @(
+        "-m", "unittest", "discover", "-s", "tools/tests", "-v"
     )
 
     Write-Host "== Web =="
     Invoke-Checked -Command "node" -Arguments @("--check", "apps/web/app.js")
     Invoke-Checked -Command "node" -Arguments @("--check", "apps/web/phase2.js")
+    Invoke-Checked -Command "node" -Arguments @("--check", "apps/web/phase4.js")
 
     Write-Host "== Flutter =="
     Push-Location (Join-Path $repoRoot "apps\mobile")
