@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>しば犬どんぐりキャッチ</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: linear-gradient(#bde8ff 0 56%, #d8f1a5 56% 100%);
+      color: #4b3526;
+      overflow: hidden;
+    }
+
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+    }
+
+    .game {
+      position: relative;
+      width: min(100%, 760px);
+      height: min(92vh, 720px);
+      min-height: 520px;
+      overflow: hidden;
+      border: 5px solid #fff8e8;
+      border-radius: 28px;
+      background:
+        radial-gradient(circle at 12% 16%, #fff 0 38px, transparent 39px),
+        radial-gradient(circle at 20% 16%, #fff 0 31px, transparent 32px),
+        radial-gradient(circle at 82% 11%, #fff 0 42px, transparent 43px),
+        radial-gradient(circle at 90% 11%, #fff 0 28px, transparent 29px),
+        linear-gradient(#a8e0ff 0 70%, #a8d968 70% 100%);
+      box-shadow: 0 18px 60px #57452b40;
+      touch-action: manipulation;
+    }
+
+    .topbar {
+      position: absolute;
+      inset: 14px 14px auto 14px;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .pill {
+      min-width: 110px;
+      padding: 9px 14px;
+      border: 3px solid #fff;
+      border-radius: 999px;
+      background: #fff7d9ee;
+      box-shadow: 0 4px 0 #c99754;
+      font-weight: 900;
+      text-align: center;
+      font-size: clamp(14px, 3.8vw, 21px);
+    }
+
+    .title {
+      position: absolute;
+      top: 70px;
+      left: 0;
+      width: 100%;
+      z-index: 5;
+      text-align: center;
+      font-size: clamp(23px, 6vw, 39px);
+      font-weight: 1000;
+      color: #7b441e;
+      text-shadow: 0 3px 0 #fff4d4, 0 5px 0 #dca556;
+      pointer-events: none;
+    }
+
+    .forest {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      height: 31%;
+      pointer-events: none;
+    }
+
+    .bush {
+      position: absolute;
+      bottom: -28px;
+      width: 130px;
+      height: 100px;
+      border-radius: 50%;
+      background: #5ca249;
+      box-shadow:
+        44px -25px 0 #6fb052,
+        92px 0 0 #4d913e;
+    }
+    .bush.left { left: -35px; }
+    .bush.right { right: 60px; transform: scaleX(-1); }
+
+    .tree {
+      position: absolute;
+      bottom: 80px;
+      width: 48px;
+      height: 150px;
+      border-radius: 20px;
+      background: #8b5a37;
+    }
+    .tree::before, .tree::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      background: #5b9c44;
+    }
+    .tree::before {
+      width: 140px;
+      height: 120px;
+      left: -46px;
+      top: -70px;
+    }
+    .tree::after {
+      width: 105px;
+      height: 90px;
+      left: -72px;
+      top: -35px;
+      box-shadow: 82px 10px 0 #70ad4f;
+    }
+    .tree.left { left: 22px; }
+    .tree.right { right: 24px; transform: scaleX(-1); }
+
+    #shiba {
+      position: absolute;
+      z-index: 7;
+      bottom: 54px;
+      left: 50%;
+      width: 96px;
+      height: 100px;
+      transform: translateX(-50%);
+      user-select: none;
+      pointer-events: none;
+      filter: drop-shadow(0 7px 2px #5c452c33);
+    }
+
+    .dog-body {
+      position: absolute;
+      bottom: 0;
+      left: 13px;
+      width: 70px;
+      height: 58px;
+      border-radius: 45% 45% 35% 35%;
+      background: #cf7a32;
+      border: 3px solid #7c4526;
+    }
+
+    .dog-head {
+      position: absolute;
+      left: 9px;
+      top: 6px;
+      width: 78px;
+      height: 70px;
+      border-radius: 45% 45% 42% 42%;
+      background: #dd8939;
+      border: 3px solid #7c4526;
+    }
+
+    .ear {
+      position: absolute;
+      top: -9px;
+      width: 27px;
+      height: 34px;
+      background: #c87031;
+      border: 3px solid #7c4526;
+      transform: rotate(10deg);
+      clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    }
+    .ear.left { left: 7px; transform: rotate(-9deg); }
+    .ear.right { right: 7px; transform: rotate(9deg); }
+
+    .eye {
+      position: absolute;
+      top: 29px;
+      width: 8px;
+      height: 10px;
+      border-radius: 50%;
+      background: #35231c;
+    }
+    .eye.left { left: 20px; }
+    .eye.right { right: 20px; }
+
+    .muzzle {
+      position: absolute;
+      left: 50%;
+      top: 39px;
+      width: 39px;
+      height: 26px;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: #fff1d1;
+    }
+    .nose {
+      position: absolute;
+      left: 50%;
+      top: 40px;
+      width: 10px;
+      height: 8px;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: #38261e;
+      z-index: 2;
+    }
+    .mouth {
+      position: absolute;
+      left: 50%;
+      top: 49px;
+      width: 20px;
+      height: 10px;
+      transform: translateX(-50%);
+      border-bottom: 3px solid #38261e;
+      border-radius: 0 0 50% 50%;
+      z-index: 2;
+    }
+
+    .tail {
+      position: absolute;
+      right: -17px;
+      bottom: 25px;
+      width: 36px;
+      height: 36px;
+      border: 10px solid #d58335;
+      border-left-color: transparent;
+      border-radius: 50%;
+      transform: rotate(-25deg);
+    }
+
+    .acorn {
+      position: absolute;
+      z-index: 6;
+      width: 36px;
+      height: 48px;
+      user-select: none;
+      pointer-events: none;
+      filter: drop-shadow(0 4px 2px #4c392433);
+    }
+    .acorn-cap {
+      position: absolute;
+      top: 6px;
+      left: 3px;
+      width: 30px;
+      height: 15px;
+      border-radius: 50% 50% 40% 40%;
+      background: #734522;
+      border: 2px solid #4e301b;
+      z-index: 2;
+    }
+    .acorn-cap::before {
+      content: "";
+      position: absolute;
+      width: 5px;
+      height: 10px;
+      left: 12px;
+      top: -8px;
+      border-radius: 4px;
+      background: #5e381e;
+      transform: rotate(15deg);
+    }
+    .acorn-body {
+      position: absolute;
+      top: 14px;
+      left: 6px;
+      width: 25px;
+      height: 30px;
+      border-radius: 42% 42% 55% 55%;
+      background: #c87832;
+      border: 2px solid #74421e;
+    }
+
+    .pop {
+      position: absolute;
+      z-index: 20;
+      font-size: 30px;
+      font-weight: 1000;
+      color: #765020;
+      text-shadow: 0 2px #fff;
+      pointer-events: none;
+      animation: pop 650ms ease-out forwards;
+    }
+    @keyframes pop {
+      0% { opacity: 0; transform: translateY(10px) scale(.7); }
+      25% { opacity: 1; transform: translateY(0) scale(1.2); }
+      100% { opacity: 0; transform: translateY(-55px) scale(1); }
+    }
+
+    .controls {
+      position: absolute;
+      z-index: 30;
+      bottom: 9px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 18px;
+    }
+
+    .move {
+      width: 74px;
+      height: 53px;
+      border: 0;
+      border-radius: 20px;
+      background: #fff8dfeb;
+      box-shadow: 0 5px 0 #b68246;
+      color: #65401f;
+      font-size: 29px;
+      font-weight: 1000;
+      cursor: pointer;
+      touch-action: none;
+    }
+    .move:active { transform: translateY(4px); box-shadow: 0 1px 0 #b68246; }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: #62462a6e;
+      backdrop-filter: blur(3px);
+    }
+
+    .card {
+      width: min(92%, 440px);
+      padding: 28px 22px;
+      border: 5px solid #fff;
+      border-radius: 28px;
+      background: #fff6d9;
+      box-shadow: 0 10px 0 #c18b4f, 0 20px 50px #3c2a1c55;
+      text-align: center;
+    }
+    .card h1 {
+      margin: 0 0 10px;
+      color: #81471e;
+      font-size: clamp(28px, 8vw, 46px);
+      line-height: 1.05;
+    }
+    .card p {
+      margin: 8px 0 18px;
+      font-weight: 750;
+      line-height: 1.6;
+    }
+    .start {
+      border: 0;
+      border-radius: 999px;
+      padding: 14px 30px;
+      background: #ef8f39;
+      box-shadow: 0 6px 0 #a95623;
+      color: white;
+      font-size: 21px;
+      font-weight: 1000;
+      cursor: pointer;
+    }
+    .start:active { transform: translateY(5px); box-shadow: 0 1px 0 #a95623; }
+    .hidden { display: none; }
+
+    .hint {
+      position: absolute;
+      bottom: 76px;
+      width: 100%;
+      z-index: 8;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 800;
+      color: #654423;
+      opacity: .75;
+      pointer-events: none;
+    }
+
+    @media (max-height: 620px) {
+      .game { min-height: 480px; height: 96vh; }
+      .title { top: 63px; font-size: 25px; }
+      .tree { transform: scale(.8); transform-origin: bottom; }
+      .tree.right { transform: scaleX(-1) scale(.8); }
+      #shiba { bottom: 46px; transform: translateX(-50%) scale(.85); transform-origin: bottom; }
+      .hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="game" id="game" aria-label="しば犬どんぐりキャッチ">
+    <div class="topbar">
+      <div class="pill">🌰 <span id="score">0</span></div>
+      <div class="pill">❤️ <span id="lives">3</span></div>
+    </div>
+
+    <div class="title">しば犬どんぐりキャッチ！</div>
+
+    <div class="forest" aria-hidden="true">
+      <div class="tree left"></div>
+      <div class="tree right"></div>
+      <div class="bush left"></div>
+      <div class="bush right"></div>
+    </div>
+
+    <div id="shiba" aria-label="しば犬">
+      <div class="tail"></div>
+      <div class="dog-body"></div>
+      <div class="dog-head">
+        <div class="ear left"></div>
+        <div class="ear right"></div>
+        <div class="eye left"></div>
+        <div class="eye right"></div>
+        <div class="muzzle"></div>
+        <div class="nose"></div>
+        <div class="mouth"></div>
+      </div>
+    </div>
+
+    <div class="hint">← → キーでも動かせるよ</div>
+
+    <div class="controls">
+      <button class="move" id="leftBtn" type="button" aria-label="左へ">←</button>
+      <button class="move" id="rightBtn" type="button" aria-label="右へ">→</button>
+    </div>
+
+    <section class="overlay" id="startOverlay">
+      <div class="card">
+        <h1>🐕🌰</h1>
+        <h1>どんぐり<br>キャッチ！</h1>
+        <p>しばちゃんを左右に動かして、<br>落ちてくるどんぐりを集めよう！</p>
+        <button class="start" id="startBtn" type="button">あそぶ！</button>
+      </div>
+    </section>
+
+    <section class="overlay hidden" id="gameOverOverlay">
+      <div class="card">
+        <h1>おしまい！</h1>
+        <p>あつめたどんぐり<br><strong style="font-size:2.3rem">🌰 <span id="finalScore">0</span></strong></p>
+        <button class="start" id="retryBtn" type="button">もういちど！</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+
+    const game = document.getElementById("game");
+    const shiba = document.getElementById("shiba");
+    const scoreEl = document.getElementById("score");
+    const livesEl = document.getElementById("lives");
+    const finalScoreEl = document.getElementById("finalScore");
+    const startOverlay = document.getElementById("startOverlay");
+    const gameOverOverlay = document.getElementById("gameOverOverlay");
+    const startBtn = document.getElementById("startBtn");
+    const retryBtn = document.getElementById("retryBtn");
+    const leftBtn = document.getElementById("leftBtn");
+    const rightBtn = document.getElementById("rightBtn");
+
+    if (!game || !shiba || !scoreEl || !livesEl || !finalScoreEl ||
+        !startOverlay || !gameOverOverlay || !startBtn || !retryBtn ||
+        !leftBtn || !rightBtn) {
+      throw new Error("Game initialization failed: required DOM element is missing.");
+    }
+
+    const state = {
+      running: false,
+      score: 0,
+      lives: 3,
+      dogX: 0,
+      moveDir: 0,
+      acorns: [],
+      lastFrame: 0,
+      spawnElapsed: 0,
+      nextSpawnMs: 700,
+      animationId: 0
+    };
+
+    function gameWidth() {
+      const width = game.clientWidth;
+      if (!Number.isFinite(width) || width <= 0) {
+        throw new Error(`Invalid game width: ${width}`);
+      }
+      return width;
+    }
+
+    function resetDogPosition() {
+      const width = gameWidth();
+      state.dogX = width / 2 - shiba.offsetWidth / 2;
+      renderDog();
+    }
+
+    function renderDog() {
+      const maxX = Math.max(0, gameWidth() - shiba.offsetWidth);
+      state.dogX = Math.min(maxX, Math.max(0, state.dogX));
+      shiba.style.left = `${state.dogX}px`;
+      shiba.style.transform = "none";
+    }
+
+    function updateHud() {
+      scoreEl.textContent = String(state.score);
+      livesEl.textContent = String(state.lives);
+    }
+
+    function clearAcorns() {
+      for (const acorn of state.acorns) {
+        acorn.el.remove();
+      }
+      state.acorns.length = 0;
+    }
+
+    function createAcorn() {
+      const width = gameWidth();
+      const acornWidth = 36;
+      const margin = 24;
+      const available = width - acornWidth - margin * 2;
+
+      if (available <= 0) {
+        throw new Error(`Game area too narrow for acorn spawning: ${width}px`);
+      }
+
+      const el = document.createElement("div");
+      el.className = "acorn";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<div class="acorn-cap"></div><div class="acorn-body"></div>';
+
+      const x = margin + Math.random() * available;
+      const speed = 150 + Math.min(state.score * 4, 220) + Math.random() * 50;
+
+      el.style.left = `${x}px`;
+      el.style.top = "-55px";
+      game.appendChild(el);
+
+      state.acorns.push({ el, x, y: -55, speed });
+    }
+
+    function rectsOverlap(a, b) {
+      return (
+        a.left < b.right &&
+        a.right > b.left &&
+        a.top < b.bottom &&
+        a.bottom > b.top
+      );
+    }
+
+    function showPop(text, x, y) {
+      const el = document.createElement("div");
+      el.className = "pop";
+      el.textContent = text;
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+      game.appendChild(el);
+      window.setTimeout(() => el.remove(), 700);
+    }
+
+    function loseLife(acorn) {
+      acorn.el.remove();
+      state.lives -= 1;
+      updateHud();
+
+      if (state.lives <= 0) {
+        endGame();
+      }
+    }
+
+    function collectAcorn(acorn) {
+      const rect = acorn.el.getBoundingClientRect();
+      const gameRect = game.getBoundingClientRect();
+      showPop("+1 🌰", rect.left - gameRect.left, rect.top - gameRect.top);
+      acorn.el.remove();
+      state.score += 1;
+      updateHud();
+    }
+
+    function updateAcorns(dtSeconds) {
+      const dogRect = shiba.getBoundingClientRect();
+      const groundY = game.clientHeight - 86;
+
+      for (let i = state.acorns.length - 1; i >= 0; i -= 1) {
+        const acorn = state.acorns[i];
+        acorn.y += acorn.speed * dtSeconds;
+        acorn.el.style.top = `${acorn.y}px`;
+
+        const acornRect = acorn.el.getBoundingClientRect();
+
+        if (rectsOverlap(acornRect, dogRect)) {
+          collectAcorn(acorn);
+          state.acorns.splice(i, 1);
+          continue;
+        }
+
+        if (acorn.y > groundY) {
+          loseLife(acorn);
+          state.acorns.splice(i, 1);
+          if (!state.running) {
+            return;
+          }
+        }
+      }
+    }
+
+    function frame(timestamp) {
+      if (!state.running) {
+        return;
+      }
+
+      if (!Number.isFinite(timestamp)) {
+        throw new Error(`Invalid animation timestamp: ${timestamp}`);
+      }
+
+      if (state.lastFrame === 0) {
+        state.lastFrame = timestamp;
+      }
+
+      const dtMs = Math.min(40, timestamp - state.lastFrame);
+      const dtSeconds = dtMs / 1000;
+      state.lastFrame = timestamp;
+
+      state.dogX += state.moveDir * 330 * dtSeconds;
+      renderDog();
+
+      state.spawnElapsed += dtMs;
+      if (state.spawnElapsed >= state.nextSpawnMs) {
+        state.spawnElapsed = 0;
+        state.nextSpawnMs = Math.max(330, 780 - state.score * 10);
+        createAcorn();
+      }
+
+      updateAcorns(dtSeconds);
+
+      if (state.running) {
+        state.animationId = requestAnimationFrame(frame);
+      }
+    }
+
+    function startGame() {
+      cancelAnimationFrame(state.animationId);
+      clearAcorns();
+
+      state.running = true;
+      state.score = 0;
+      state.lives = 3;
+      state.moveDir = 0;
+      state.lastFrame = 0;
+      state.spawnElapsed = 0;
+      state.nextSpawnMs = 600;
+
+      updateHud();
+      resetDogPosition();
+      startOverlay.classList.add("hidden");
+      gameOverOverlay.classList.add("hidden");
+
+      state.animationId = requestAnimationFrame(frame);
+    }
+
+    function endGame() {
+      state.running = false;
+      state.moveDir = 0;
+      cancelAnimationFrame(state.animationId);
+      finalScoreEl.textContent = String(state.score);
+      gameOverOverlay.classList.remove("hidden");
+    }
+
+    function setDirection(direction) {
+      if (direction !== -1 && direction !== 0 && direction !== 1) {
+        throw new TypeError(`Invalid move direction: ${direction}`);
+      }
+      if (state.running) {
+        state.moveDir = direction;
+      }
+    }
+
+    function bindHoldButton(button, direction) {
+      button.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        button.setPointerCapture(event.pointerId);
+        setDirection(direction);
+      });
+
+      const release = () => setDirection(0);
+      button.addEventListener("pointerup", release);
+      button.addEventListener("pointercancel", release);
+      button.addEventListener("lostpointercapture", release);
+    }
+
+    bindHoldButton(leftBtn, -1);
+    bindHoldButton(rightBtn, 1);
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        setDirection(-1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        setDirection(1);
+      }
+    });
+
+    document.addEventListener("keyup", (event) => {
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        event.preventDefault();
+        setDirection(0);
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      if (state.running) {
+        renderDog();
+      } else {
+        resetDogPosition();
+      }
+    });
+
+    startBtn.addEventListener("click", startGame);
+    retryBtn.addEventListener("click", startGame);
+
+    resetDogPosition();
+    updateHud();
+  </script>
+</body>
+</html>

@@ -4,12 +4,15 @@ import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
 import 'app_detail_page.dart';
 import 'app_visual.dart';
+import 'builtin_webview.dart';
 import 'ui.dart';
 
 const Color _brandBlue = Color(0xFF2563EB);
 const Color _brandDark = Color(0xFF1E3A8A);
 const Color _brandAccent = Color(0xFFF59E0B);
 const Color _pageBackground = Color(0xFFF8FAFC);
+const String _shibaGameTitle = 'しば犬どんぐりキャッチ';
+const String _shibaGameAssetPath = 'assets/builtin/shiba_donguri/index.html';
 
 enum _CatalogMenuAction { creatorPortal, changeClassroom, logout }
 
@@ -89,6 +92,17 @@ class _CatalogPageState extends State<CatalogPage> {
     );
   }
 
+  Future<void> _openBuiltInShibaGame() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => const BuiltInWebViewPage(
+          title: _shibaGameTitle,
+          assetPath: _shibaGameAssetPath,
+        ),
+      ),
+    );
+  }
+
   Future<void> _confirmChangeClassroom() async {
     final bool? confirmed = await showDialog<bool>(
       context: context,
@@ -156,6 +170,13 @@ class _CatalogPageState extends State<CatalogPage> {
     }).toList(growable: false);
   }
 
+  bool _matchesBuiltInShibaGame() {
+    final String query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return true;
+    const String searchable = 'しば犬どんぐりキャッチ 柴犬 しばちゃん どんぐり ゲーム みんアプ公式 サンプル';
+    return searchable.toLowerCase().contains(query);
+  }
+
   bool _isNew(PublishedApp app) {
     final DateTime now = DateTime.now().toUtc();
     if (app.reviewedAt.isAfter(now)) return false;
@@ -166,6 +187,7 @@ class _CatalogPageState extends State<CatalogPage> {
   Widget build(BuildContext context) {
     final List<PublishedApp>? apps = _apps;
     final List<PublishedApp>? filteredApps = apps == null ? null : _filterApps(apps);
+    final bool showBuiltInShibaGame = _matchesBuiltInShibaGame();
     return Scaffold(
       backgroundColor: _pageBackground,
       floatingActionButton: FloatingActionButton(
@@ -202,6 +224,22 @@ class _CatalogPageState extends State<CatalogPage> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 110),
                 children: <Widget>[
+                  if (showBuiltInShibaGame) ...<Widget>[
+                    const Text(
+                      'みんアプ公式',
+                      style: TextStyle(
+                        color: _brandDark,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w900,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Color(0xFFFDE68A),
+                        decorationThickness: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _BuiltInAppCard(onTap: _openBuiltInShibaGame),
+                    const SizedBox(height: 30),
+                  ],
                   if (filteredApps != null)
                     Text(
                       'クラスの公開アプリ (${filteredApps.length})',
@@ -418,6 +456,97 @@ class _CatalogHeader extends StatelessWidget {
                     ),
                   ),
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BuiltInAppCard extends StatelessWidget {
+  const _BuiltInAppCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFFFFBEB),
+      elevation: 2,
+      shadowColor: const Color(0x14000000),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        key: const Key('builtin-shiba-game'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDE68A),
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(color: const Color(0xFFF59E0B), width: 2),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.pets_rounded,
+                  size: 31,
+                  color: Color(0xFF92400E),
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      _shibaGameTitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 17,
+                        height: 1.25,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 7),
+                    Row(
+                      children: <Widget>[
+                        Icon(
+                          Icons.auto_awesome_rounded,
+                          size: 16,
+                          color: Color(0xFFD97706),
+                        ),
+                        SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            'みんアプ公式サンプル',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Color(0xFF92400E),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 9),
+              const Icon(
+                Icons.play_circle_fill_rounded,
+                size: 30,
+                color: _brandAccent,
               ),
             ],
           ),
