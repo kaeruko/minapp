@@ -38,6 +38,24 @@ flutter run --dart-define=MINAPP_DIRECTORY_BASE_URL=$directoryApi
 
 初回起動では先生から配布された教室コードを入力する。Directory descriptor受信後にtenant `/tenant-info` を検証し、成功したdescriptorだけを端末へ保存する。
 
+### 公式join link
+
+公式join domainを用意した場合だけ、そのoriginをbuild時に固定できる。
+
+```powershell
+flutter run `
+  --dart-define=MINAPP_DIRECTORY_BASE_URL=$directoryApi `
+  --dart-define=MINAPP_JOIN_BASE_URL=https://<official-join-domain>
+```
+
+このdefineを設定したbuildでは、手入力コードに加えて次の形だけを受け付ける。
+
+```text
+https://<official-join-domain>/c/XXXX-XXXX-XXXX
+```
+
+join linkから使うのはclassroom codeだけで、URLをtenant APIとして扱わない。host、scheme、port、pathが固定originと完全一致しないURL、query/fragment付きURL、余分なpathを持つURLは拒否する。`MINAPP_JOIN_BASE_URL` を設定していないbuildではURL入力自体を拒否し、教室コードだけを受け付ける。
+
 端末へ保存するのは次だけ:
 
 ```text
@@ -59,7 +77,8 @@ V1ではdescriptor TTLのclient許容上限を24時間とする。有効期限�
 ## 安全境界
 
 - production buildのDirectory base URLはbuild時に固定する
-- classroom codeから任意URLを受け取らない
+- classroom codeやjoin linkから任意tenant URLを受け取らない
+- 公式join originを使う場合もbuild時に固定し、`/c/{code}` 以外を拒否する
 - Directory responseのtenant URLをHTTPS/public DNS/default port/no pathとして再検証する
 - Directory descriptorとtenant `/tenant-info` の`tenant_id` / protocolが一致しない場合はLoginを開始しない
 - 未知のDirectory schema / tenant protocol / JSON fieldを推測して受理しない
