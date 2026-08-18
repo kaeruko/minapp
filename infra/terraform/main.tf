@@ -2,6 +2,8 @@ locals {
   project_name         = "minapp"
   name_prefix          = "${local.project_name}-${var.environment}"
   api_protocol_version = 1
+  portal_origin        = "https://minapp.cloxs.jp"
+  cors_allowed_origins = concat([local.portal_origin], var.local_development_cors_origins)
 
   protected_routes = toset([
     "GET /me",
@@ -276,6 +278,13 @@ resource "aws_cloudwatch_log_group" "api" {
 resource "aws_apigatewayv2_api" "api" {
   name          = "${local.name_prefix}-api"
   protocol_type = "HTTP"
+
+  cors_configuration {
+    allow_origins = local.cors_allowed_origins
+    allow_methods = ["DELETE", "GET", "OPTIONS", "PATCH", "POST"]
+    allow_headers = ["authorization", "content-type"]
+    max_age       = 600
+  }
 }
 
 resource "aws_apigatewayv2_integration" "api" {
