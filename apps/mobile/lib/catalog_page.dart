@@ -113,8 +113,10 @@ class _CatalogPageState extends State<CatalogPage> {
     switch (action) {
       case _CatalogMenuAction.changeClassroom:
         await _confirmChangeClassroom();
+        return;
       case _CatalogMenuAction.logout:
         widget.onLogout();
+        return;
     }
   }
 
