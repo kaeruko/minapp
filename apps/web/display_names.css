@@ -1,0 +1,50 @@
+.display-name-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+  gap: 18px;
+  align-items: end;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+.display-name-card h3,
+.teacher-display-name-form h3 { margin: 0 0 5px; }
+.display-name-card p,
+.teacher-display-name-form p { margin: 0; color: #64748b; line-height: 1.6; }
+.display-name-kicker { color: #2563eb !important; font-size: 0.76rem; font-weight: 900; letter-spacing: 0.08em; }
+.display-name-form-row,
+.teacher-display-name-row { display: flex; gap: 10px; align-items: stretch; }
+.display-name-form-row input,
+.teacher-display-name-row input {
+  min-width: 0;
+  flex: 1;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+}
+.display-name-form-row input:focus,
+.teacher-display-name-row input:focus { outline: 3px solid rgba(37, 99, 235, 0.12); border-color: #2563eb; }
+.display-name-message { grid-column: 1 / -1; margin: 0; font-size: 0.86rem; font-weight: 800; }
+.display-name-message-ok { color: #15803d !important; }
+.display-name-message-error { color: #b91c1c !important; }
+
+.teacher-display-name-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid #e2e8f0;
+}
+.teacher-display-name-row { max-width: 620px; }
+.teacher-display-name-form .display-name-message-ok { color: #15803d !important; }
+.teacher-name-button { white-space: nowrap; }
+
+@media (max-width: 720px) {
+  .display-name-card { grid-template-columns: 1fr; }
+  .display-name-form-row,
+  .teacher-display-name-row { flex-direction: column; }
+}
