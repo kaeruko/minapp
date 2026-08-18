@@ -1,0 +1,451 @@
+:root {
+  --portal-blue: #24479d;
+  --portal-blue-strong: #17347d;
+  --portal-blue-soft: #eef4ff;
+  --portal-border: #dbe4f0;
+  --portal-text: #172033;
+  --portal-muted: #64748b;
+  --portal-bg: #f4f7fb;
+  --portal-white: #ffffff;
+}
+
+body.portal-shell-active {
+  margin: 0;
+  min-width: 320px;
+  background: var(--portal-bg);
+  color: var(--portal-text);
+}
+
+.portal-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  background: var(--portal-bg);
+}
+
+.portal-shell-sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-height: 100vh;
+  padding: 20px 14px 18px;
+  overflow-y: auto;
+  background: var(--portal-blue);
+  color: #fff;
+  box-shadow: 5px 0 20px rgba(15, 23, 42, 0.08);
+}
+
+.portal-shell-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 10px 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.portal-shell-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 1.35rem;
+}
+
+.portal-shell-brand-name,
+.portal-shell-brand-context {
+  margin: 0;
+}
+
+.portal-shell-brand-name {
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.portal-shell-brand-context {
+  margin-top: 3px;
+  color: #dbeafe;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.portal-shell-nav {
+  display: grid;
+  gap: 7px;
+  padding: 24px 0;
+}
+
+.portal-shell-nav-item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #e7efff;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 900;
+  text-align: left;
+  cursor: pointer;
+}
+
+.portal-shell-nav-item:hover,
+.portal-shell-nav-item:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  outline: none;
+}
+
+.portal-shell-nav-item-active {
+  background: rgba(255, 255, 255, 0.17);
+  color: #fff;
+  box-shadow: inset 3px 0 0 #fff;
+}
+
+.portal-shell-nav-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  font-size: 1rem;
+}
+
+.portal-shell-nav-badge {
+  min-width: 24px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.portal-shell-account {
+  display: grid;
+  gap: 9px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.portal-shell-account-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+}
+
+.portal-shell-avatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--portal-blue);
+  font-weight: 900;
+}
+
+.portal-shell-account-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.portal-shell-account-copy strong {
+  overflow: hidden;
+  color: #fff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-shell-account-copy span {
+  overflow: hidden;
+  color: #dbeafe;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-shell-secondary-action,
+.portal-shell-logout {
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.portal-shell-secondary-action {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: transparent;
+  color: #fff;
+}
+
+.portal-shell-secondary-action:hover,
+.portal-shell-secondary-action:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+.portal-shell-logout {
+  border: 0;
+  background: rgba(15, 23, 42, 0.18);
+  color: #e7efff;
+}
+
+.portal-shell-logout:hover,
+.portal-shell-logout:focus-visible {
+  background: rgba(15, 23, 42, 0.3);
+  color: #fff;
+  outline: none;
+}
+
+.portal-shell-main {
+  min-width: 0;
+}
+
+.portal-shell-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 80px;
+  padding: 12px 30px;
+  border-bottom: 1px solid var(--portal-border);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+}
+
+.portal-shell-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.portal-shell-role-context,
+.portal-shell-title-wrap h1 {
+  margin: 0;
+}
+
+.portal-shell-role-context {
+  margin-bottom: 2px;
+  color: var(--portal-muted);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.portal-shell-title-wrap h1 {
+  color: var(--portal-text);
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
+  font-weight: 900;
+}
+
+.portal-shell-menu {
+  display: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--portal-border);
+  border-radius: 11px;
+  background: #fff;
+  color: var(--portal-blue);
+  font: inherit;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.portal-shell-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.portal-shell-class-picker {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  color: var(--portal-muted) !important;
+  font-size: 0.78rem !important;
+  font-weight: 900 !important;
+}
+
+.portal-shell-class-picker select {
+  min-width: 190px;
+  min-height: 44px;
+  padding: 8px 36px 8px 12px;
+  border: 2px solid #bfdbfe;
+  border-radius: 11px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font: inherit;
+  font-weight: 900;
+}
+
+.portal-shell-content {
+  min-width: 0;
+}
+
+.portal-shell-scrim {
+  display: none;
+}
+
+/* Existing role modules keep their workflows but no longer own visible product chrome. */
+body.portal-shell-active .teacher-portal,
+body.portal-shell-active .student-portal {
+  min-height: 0 !important;
+  background: transparent !important;
+}
+
+body.portal-shell-active .teacher-portal {
+  display: block !important;
+}
+
+body.portal-shell-active .student-portal {
+  display: block !important;
+}
+
+body.portal-shell-active .teacher-sidebar,
+body.portal-shell-active .teacher-topbar,
+body.portal-shell-active .student-topbar {
+  display: none !important;
+}
+
+body.portal-shell-active .teacher-main,
+body.portal-shell-active .student-main {
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+
+body.portal-shell-active .teacher-content,
+body.portal-shell-active .student-main {
+  width: 100% !important;
+  max-width: 1600px !important;
+  margin: 0 auto !important;
+  padding: 34px clamp(22px, 4vw, 60px) 54px !important;
+}
+
+body.portal-shell-active .student-main {
+  display: grid;
+  gap: 24px;
+}
+
+body.portal-shell-active .student-hero {
+  margin: 0;
+}
+
+body.portal-shell-active .student-workspace-card,
+body.portal-shell-active .student-profile-card {
+  margin: 0;
+}
+
+body.portal-shell-active #app-upload-form.hidden,
+body.portal-shell-active .phase2-list-section.hidden {
+  display: none !important;
+}
+
+body.portal-shell-active .teacher-modal {
+  z-index: 100;
+}
+
+body.portal-shell-active .teacher-table-app[role="button"] {
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .portal-shell {
+    display: block;
+  }
+
+  .portal-shell-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(310px, calc(100vw - 46px));
+    min-height: 100vh;
+    transform: translateX(-105%);
+    transition: transform 180ms ease;
+  }
+
+  .portal-shell-nav-open .portal-shell-sidebar {
+    transform: translateX(0);
+  }
+
+  .portal-shell-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    background: rgba(15, 23, 42, 0.48);
+  }
+
+  .portal-shell-nav-open .portal-shell-scrim {
+    display: block;
+  }
+
+  .portal-shell-menu {
+    display: grid;
+  }
+
+  .portal-shell-topbar {
+    min-height: 70px;
+    padding: 10px 16px;
+  }
+
+  .portal-shell-class-picker span {
+    display: none;
+  }
+
+  .portal-shell-class-picker select {
+    min-width: min(180px, 42vw);
+  }
+
+  body.portal-shell-active .teacher-content,
+  body.portal-shell-active .student-main {
+    padding: 24px 16px 42px !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .portal-shell-topbar {
+    align-items: flex-start;
+  }
+
+  .portal-shell-topbar-actions {
+    align-self: center;
+  }
+
+  .portal-shell-role-context {
+    display: none;
+  }
+
+  .portal-shell-title-wrap h1 {
+    font-size: 1.05rem;
+  }
+
+  .portal-shell-class-picker select {
+    min-width: 132px;
+    max-width: 42vw;
+  }
+}
