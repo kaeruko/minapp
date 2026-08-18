@@ -33,6 +33,32 @@ jobs:
           node --check apps/web/app.js
           node --check apps/web/phase2.js
 
+  powershell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Parse operator scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          Get-ChildItem scripts -Filter *.ps1 | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              Write-Error "PowerShell parse failed: $($_.FullName)"
+              $errors | ForEach-Object { Write-Error $_.Message }
+            }
+          }
+          if ($failed) {
+            exit 1
+          }
+
   flutter:
     runs-on: ubuntu-latest
     defaults:
