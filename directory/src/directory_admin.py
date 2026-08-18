@@ -148,6 +148,57 @@ class DirectoryAdminService:
         )
         return {"tenant_id": tenant_id, "classroom_code": raw_code}
 
+    def register_existing_tenant(
+        self,
+        tenant_id: str,
+        display_name: str,
+        api_base_url: str,
+    ) -> dict[str, str]:
+        tenant_id = validate_tenant_id(tenant_id)
+        display_name = validate_display_name(display_name)
+        endpoint = validate_api_base_url(api_base_url)
+        self.endpoint_verifier(endpoint, tenant_id, API_PROTOCOL_VERSION)
+
+        raw_code = self.code_factory()
+        normalized_code = normalize_classroom_code(raw_code)
+        code_hash = hash_classroom_code(normalized_code)
+        now = self.now_factory()
+        tenant = {
+            "PK": f"TENANT#{tenant_id}",
+            "SK": "META",
+            "entity": "tenant",
+            "schema_version": SCHEMA_VERSION,
+            "tenant_id": tenant_id,
+            "display_name": display_name,
+            "status": "pending",
+            "api_base_url": endpoint,
+            "api_protocol_version": API_PROTOCOL_VERSION,
+            "config_revision": 1,
+            "current_code_hash": code_hash,
+            "created_at": now,
+            "updated_at": now,
+        }
+        code_record = {
+            "PK": f"CODE#{code_hash}",
+            "SK": "META",
+            "entity": "classroom_code",
+            "code_hash": code_hash,
+            "tenant_id": tenant_id,
+            "status": "active",
+            "created_at": now,
+        }
+        self.store.create_tenant(
+            tenant,
+            code_record,
+            _audit_record(tenant_id, "existing_tenant_registered", now),
+        )
+        return {
+            "tenant_id": tenant_id,
+            "classroom_code": raw_code,
+            "api_base_url": endpoint,
+            "status": "pending",
+        }
+
     def update_endpoint(self, tenant_id: str, api_base_url: str) -> dict[str, Any]:
         tenant_id = validate_tenant_id(tenant_id)
         endpoint = validate_api_base_url(api_base_url)
