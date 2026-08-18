@@ -37,6 +37,7 @@ jobs:
           node --check apps/web/phase4.js
           node --check apps/web/teacher_dashboard.js
           node --check apps/web/moderation_actions.js
+          node --check apps/web/display_names.js
 
   powershell:
     runs-on: ubuntu-latest

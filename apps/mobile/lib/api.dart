@@ -36,6 +36,7 @@ class PublishedApp {
   final String versionId;
   final String groupId;
   final String groupName;
+  // Kept as ownerLoginId for API compatibility; UI prefers owner_display_name when present.
   final String ownerLoginId;
   final String title;
   final DateTime reviewedAt;
@@ -51,7 +52,8 @@ class PublishedApp {
       versionId: _requiredString(json, 'version_id'),
       groupId: _requiredString(json, 'group_id'),
       groupName: _requiredString(json, 'group_name'),
-      ownerLoginId: _requiredString(json, 'owner_login_id'),
+      ownerLoginId:
+          _optionalDisplayName(json) ?? _requiredString(json, 'owner_login_id'),
       title: _requiredString(json, 'title'),
       reviewedAt: DateTime.parse(_requiredString(json, 'reviewed_at')).toUtc(),
       description: _optionalDescription(json),
@@ -278,6 +280,21 @@ String _requiredString(Map<String, Object?> json, String key) {
   final Object? value = json[key];
   if (value is! String || value.isEmpty) {
     throw FormatException('JSON field $key must be a non-empty string.');
+  }
+  return value;
+}
+
+String? _optionalDisplayName(Map<String, Object?> json) {
+  final Object? value = json['owner_display_name'];
+  if (value == null) return null;
+  if (value is! String ||
+      value.isEmpty ||
+      value.length > 40 ||
+      value.trim() != value ||
+      RegExp(r'[\x00-\x1f\x7f]').hasMatch(value)) {
+    throw const FormatException(
+      'JSON field owner_display_name must be a trimmed non-empty string up to 40 characters when present.',
+    );
   }
   return value;
 }
