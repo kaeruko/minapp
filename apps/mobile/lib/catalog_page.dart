@@ -8,12 +8,16 @@ class CatalogPage extends StatefulWidget {
   const CatalogPage({
     required this.api,
     required this.session,
+    required this.classroomName,
+    required this.onChangeClassroom,
     required this.onLogout,
     super.key,
   });
 
   final MinAppApi api;
   final AuthenticatedSession session;
+  final String classroomName;
+  final Future<void> Function() onChangeClassroom;
   final VoidCallback onLogout;
 
   @override
@@ -80,6 +84,29 @@ class _CatalogPageState extends State<CatalogPage> {
     }
   }
 
+  Future<void> _confirmChangeClassroom() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('教室を変更しますか？'),
+        content: const Text('ログアウトして、この端末の教室設定と作品のWebViewデータを消します。'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            key: const Key('confirm-change-classroom'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('変更する'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await widget.onChangeClassroom();
+  }
+
   String _dateLabel(DateTime value) {
     final DateTime local = value.toLocal();
     return '${local.month}/${local.day} 更新';
@@ -94,6 +121,12 @@ class _CatalogPageState extends State<CatalogPage> {
         title: const Text('みんアプ'),
         actions: <Widget>[
           const Center(child: PhaseBadge()),
+          IconButton(
+            key: const Key('catalog-change-classroom'),
+            tooltip: '教室を変更',
+            onPressed: _confirmChangeClassroom,
+            icon: const Icon(Icons.swap_horiz),
+          ),
           IconButton(
             tooltip: 'ログアウト',
             onPressed: widget.onLogout,
@@ -120,7 +153,7 @@ class _CatalogPageState extends State<CatalogPage> {
                           style: Theme.of(context).textTheme.headlineSmall,
                         ),
                         const SizedBox(height: 6),
-                        const Text('先生が承認した最新版だけがここに並びます。'),
+                        Text('${widget.classroomName} · 先生が承認した最新版だけがここに並びます。'),
                       ],
                     ),
                   ),
