@@ -7,6 +7,21 @@ const SUPPORTED_DIRECTORY_SCHEMA_VERSION = 1;
 const SUPPORTED_TENANT_API_PROTOCOL_VERSION = 1;
 const MAX_DESCRIPTOR_VALID_FOR_SECONDS = 86400;
 
+const portalRouting = globalThis.MinAppPortalRouting;
+if (typeof portalRouting !== "object" || portalRouting === null) {
+  throw new Error("MinAppPortalRouting must be loaded before app.js.");
+}
+const { PortalApiError, PortalRouter } = portalRouting;
+if (typeof PortalApiError !== "function" || typeof PortalRouter !== "function") {
+  throw new Error("MinAppPortalRouting is incomplete.");
+}
+
+const portalRouter = new PortalRouter({
+  fetchImpl: window.fetch.bind(window),
+  sessionStorage,
+  localStorage,
+});
+
 function requiredElement(id) {
   const element = document.getElementById(id);
   if (!(element instanceof HTMLElement)) {
@@ -99,6 +114,28 @@ function apiErrorMessage(error) {
   return "予期しないエラーが発生しました。";
 }
 
+function isLocalDevelopmentOrigin() {
+  return (
+    window.location.protocol === "http:" &&
+    ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
+  );
+}
+
+function isDirectBrowserMode() {
+  return webMode === "portal";
+}
+
+function usesClassroomRouting() {
+  return webMode === "portal" || webMode === "federated";
+}
+
+function convertPortalApiError(error) {
+  if (error instanceof PortalApiError) {
+    return new ApiError(error.status, error.error, error.message);
+  }
+  return error;
+}
+
 async function jsonRequest(url, options = {}) {
   const headers = new Headers(options.headers ?? {});
   headers.set("Accept", "application/json");
@@ -143,6 +180,18 @@ async function loadWebMode() {
     throw new Error("Web configuration response is invalid.");
   }
   return payload.mode;
+}
+
+async function loadRuntimeMode() {
+  if (isLocalDevelopmentOrigin()) {
+    return loadWebMode();
+  }
+  if (window.location.protocol !== "https:") {
+    throw new Error("Production Web portal must be served over HTTPS.");
+  }
+  webMode = "portal";
+  await portalRouter.loadPortalConfig();
+  return "portal";
 }
 
 function requireExactFields(payload, expectedFields, label) {
@@ -205,12 +254,16 @@ function validateTenantDescriptor(payload) {
   };
 }
 
-function saveTenantDescriptor(descriptor) {
+function showTenantDescriptor(descriptor) {
   currentTenant = descriptor;
-  sessionStorage.setItem(TENANT_DESCRIPTOR_KEY, JSON.stringify(descriptor));
   classroomName.textContent = descriptor.display_name;
   show(classroomContext);
   hide(classroomPanel);
+}
+
+function saveTenantDescriptor(descriptor) {
+  showTenantDescriptor(descriptor);
+  sessionStorage.setItem(TENANT_DESCRIPTOR_KEY, JSON.stringify(descriptor));
 }
 
 function removeTenantDescriptor() {
@@ -266,6 +319,19 @@ async function apiRequest(path, options = {}) {
     throw new TypeError("API path must start with /.");
   }
 
+  if (isDirectBrowserMode()) {
+    const directOptions = { ...options };
+    if (Object.prototype.hasOwnProperty.call(directOptions, "body")) {
+      directOptions.jsonBody = directOptions.body;
+      delete directOptions.body;
+    }
+    try {
+      return await portalRouter.tenantApiRequest(path, directOptions);
+    } catch (error) {
+      throw convertPortalApiError(error);
+    }
+  }
+
   const headers = new Headers(options.headers ?? {});
   if (options.authenticated === true) {
     const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
@@ -285,8 +351,73 @@ async function apiRequest(path, options = {}) {
   return jsonRequest(`/api${path}`, { ...options, headers });
 }
 
+async function binaryApiRequest(path, file, contentType) {
+  if (!(file instanceof Blob)) throw new TypeError("Binary API body must be a Blob.");
+  if (typeof contentType !== "string" || contentType.length === 0) throw new TypeError("contentType must be a non-empty string.");
+
+  if (isDirectBrowserMode()) {
+    try {
+      return await portalRouter.tenantApiRequest(path, {
+        method: "POST",
+        authenticated: true,
+        headers: { "Content-Type": contentType },
+        body: file,
+      });
+    } catch (error) {
+      throw convertPortalApiError(error);
+    }
+  }
+
+  const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+  if (token === null || token.length === 0) {
+    throw new ApiError(401, "unauthorized", "ログインが必要です。");
+  }
+  if (webMode === "federated") {
+    const tokenTenantId = sessionStorage.getItem(ACCESS_TOKEN_TENANT_KEY);
+    if (currentTenant === null || tokenTenantId !== currentTenant.tenant_id) {
+      sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+      sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
+      throw new ApiError(401, "tenant_session_mismatch", "教室が変更されたため、もう一度ログインしてください。");
+    }
+  }
+
+  const response = await fetch(`/api${path}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+      "Content-Type": contentType,
+    },
+    body: file,
+    cache: "no-store",
+  });
+  const contentTypeHeader = response.headers.get("content-type");
+  if (contentTypeHeader === null || !contentTypeHeader.toLowerCase().startsWith("application/json")) {
+    throw new Error(`API returned non-JSON response (HTTP ${response.status}).`);
+  }
+  const payload = await response.json();
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    throw new Error("API returned an unexpected JSON payload.");
+  }
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      typeof payload.error === "string" ? payload.error : "api_error",
+      typeof payload.message === "string" ? payload.message : `HTTP ${response.status}`,
+    );
+  }
+  return payload;
+}
+
+function resetTenantTransientPreview() {
+  const frame = document.getElementById("preview-frame");
+  if (frame instanceof HTMLIFrameElement) frame.removeAttribute("src");
+  const panel = document.getElementById("preview-panel");
+  if (panel instanceof HTMLElement) hide(panel);
+}
+
 async function checkHealth() {
-  if (webMode === "federated" && currentTenant === null) {
+  if (usesClassroomRouting() && currentTenant === null) {
     apiStatus.textContent = "教室を選んでください";
     apiStatus.className = "status";
     return;
@@ -310,12 +441,16 @@ function setAuthenticated(accessToken) {
   if (typeof accessToken !== "string" || accessToken.length === 0) {
     throw new TypeError("accessToken must be a non-empty string.");
   }
-  sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  if (webMode === "federated") {
-    if (currentTenant === null) throw new Error("Cannot authenticate without a selected classroom.");
-    sessionStorage.setItem(ACCESS_TOKEN_TENANT_KEY, currentTenant.tenant_id);
+  if (isDirectBrowserMode()) {
+    portalRouter.storeAccessToken(accessToken);
   } else {
-    sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+    if (webMode === "federated") {
+      if (currentTenant === null) throw new Error("Cannot authenticate without a selected classroom.");
+      sessionStorage.setItem(ACCESS_TOKEN_TENANT_KEY, currentTenant.tenant_id);
+    } else {
+      sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
+    }
   }
   pendingPasswordChallenge = null;
   loginPasswordInput.value = "";
@@ -324,8 +459,12 @@ function setAuthenticated(accessToken) {
 }
 
 function clearAuthentication() {
-  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-  sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
+  if (isDirectBrowserMode()) {
+    portalRouter.clearAuthentication();
+  } else {
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
+  }
   pendingPasswordChallenge = null;
   currentUser = null;
   currentGroups = [];
@@ -335,7 +474,7 @@ function clearAuthentication() {
   hide(logoutButton);
   hide(credentialResult);
 
-  if (webMode === "federated" && currentTenant === null) {
+  if (usesClassroomRouting() && currentTenant === null) {
     hide(loginPanel);
     show(classroomPanel);
     hide(classroomContext);
@@ -388,33 +527,41 @@ classroomForm.addEventListener("submit", async (event) => {
   if (!(submitButton instanceof HTMLButtonElement)) throw new Error("Classroom submit button was not found.");
   submitButton.disabled = true;
   try {
-    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-    sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
-    removeTenantDescriptor();
-    const resolved = await resolveClassroom(code);
-    const selected = await selectTenantRouting(resolved.tenant_id);
-    if (selected.tenant_id !== resolved.tenant_id) {
-      throw new Error("Directory returned a different tenant_id during selection.");
+    if (isDirectBrowserMode()) {
+      const selected = await portalRouter.selectClassroom(code, { resetTransientState: resetTenantTransientPreview });
+      showTenantDescriptor(selected);
+    } else {
+      sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+      sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
+      removeTenantDescriptor();
+      const resolved = await resolveClassroom(code);
+      const selected = await selectTenantRouting(resolved.tenant_id);
+      if (selected.tenant_id !== resolved.tenant_id) {
+        throw new Error("Directory returned a different tenant_id during selection.");
+      }
+      currentTenant = selected;
+      await verifyTenantEndpoint(selected);
+      saveTenantDescriptor(selected);
     }
-    currentTenant = selected;
-    await verifyTenantEndpoint(selected);
-    saveTenantDescriptor(selected);
     classroomCodeInput.value = "";
     clearAuthentication();
     await checkHealth();
     loginIdInput.focus();
   } catch (error) {
     console.error(error);
+    if (isDirectBrowserMode()) portalRouter.clearAuthentication();
     sessionStorage.removeItem(ACCESS_TOKEN_KEY);
     sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
     removeTenantDescriptor();
-    try {
-      await clearTenantRouting();
-    } catch (clearError) {
-      console.error(clearError);
+    if (!isDirectBrowserMode()) {
+      try {
+        await clearTenantRouting();
+      } catch (clearError) {
+        console.error(clearError);
+      }
     }
     clearAuthentication();
-    setError(classroomError, apiErrorMessage(error));
+    setError(classroomError, apiErrorMessage(convertPortalApiError(error)));
   } finally {
     submitButton.disabled = false;
   }
@@ -423,6 +570,21 @@ classroomForm.addEventListener("submit", async (event) => {
 classroomChangeButton.addEventListener("click", async () => {
   const hasLoginState = sessionStorage.getItem(ACCESS_TOKEN_KEY) !== null || pendingPasswordChallenge !== null;
   if (hasLoginState && !window.confirm("教室を変更するとログアウトします。変更しますか？")) return;
+
+  if (isDirectBrowserMode()) {
+    try {
+      await portalRouter.clearForClassroomChange({ resetTransientState: resetTenantTransientPreview });
+    } catch (error) {
+      console.error(error);
+      setError(classroomError, apiErrorMessage(error));
+      return;
+    }
+    pendingPasswordChallenge = null;
+    removeTenantDescriptor();
+    clearAuthentication();
+    window.location.reload();
+    return;
+  }
 
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
   sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
@@ -722,10 +884,34 @@ async function initializeFederatedTenant() {
   }
 }
 
-async function initialize() {
-  webMode = await loadWebMode();
+async function initializePortalTenant() {
+  try {
+    const restored = await portalRouter.restoreCachedTenant();
+    if (restored === null) {
+      removeTenantDescriptor();
+      clearAuthentication();
+      await checkHealth();
+      return false;
+    }
+    showTenantDescriptor(restored);
+    return true;
+  } catch (error) {
+    console.error(error);
+    portalRouter.clearAuthentication();
+    removeTenantDescriptor();
+    clearAuthentication();
+    setError(classroomError, "保存していた教室情報を確認できませんでした。教室コードをもう一度入力してください。");
+    await checkHealth();
+    return false;
+  }
+}
 
-  if (webMode === "federated") {
+async function initialize() {
+  webMode = await loadRuntimeMode();
+
+  if (webMode === "portal") {
+    if (!(await initializePortalTenant())) return;
+  } else if (webMode === "federated") {
     if (!(await initializeFederatedTenant())) return;
   } else {
     hide(classroomPanel);
@@ -738,10 +924,12 @@ async function initialize() {
     clearAuthentication();
     return;
   }
-  if (webMode === "federated" && sessionStorage.getItem(ACCESS_TOKEN_TENANT_KEY) !== currentTenant.tenant_id) {
-    clearAuthentication();
-    setError(loginError, "教室が変更されたため、もう一度ログインしてください。");
-    return;
+  if (usesClassroomRouting()) {
+    if (currentTenant === null || sessionStorage.getItem(ACCESS_TOKEN_TENANT_KEY) !== currentTenant.tenant_id) {
+      clearAuthentication();
+      setError(loginError, "教室が変更されたため、もう一度ログインしてください。");
+      return;
+    }
   }
   await loadDashboard();
 }
@@ -752,5 +940,5 @@ initialize().catch((error) => {
   sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
   removeTenantDescriptor();
   clearAuthentication();
-  setError(webMode === "federated" ? classroomError : loginError, apiErrorMessage(error));
+  setError(usesClassroomRouting() ? classroomError : loginError, apiErrorMessage(convertPortalApiError(error)));
 });
