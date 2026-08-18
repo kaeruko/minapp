@@ -310,18 +310,11 @@ body.portal-shell-active {
 }
 
 /* Existing role modules keep their workflows but no longer own visible product chrome. */
-body.portal-shell-active .teacher-portal,
-body.portal-shell-active .student-portal {
+body.portal-shell-active .portal-shell-content > .teacher-portal,
+body.portal-shell-active .portal-shell-content > .student-portal {
+  display: block !important;
   min-height: 0 !important;
   background: transparent !important;
-}
-
-body.portal-shell-active .teacher-portal {
-  display: block !important;
-}
-
-body.portal-shell-active .student-portal {
-  display: block !important;
 }
 
 body.portal-shell-active .teacher-sidebar,
