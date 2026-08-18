@@ -16,20 +16,21 @@ from handler import (
     _require_fields,
     _zip_body,
 )
-from phase4_backend import Phase4AwsBackend
+from phase4_moderation_backend import Phase4ModerationAwsBackend
 
 _LOGGER = logging.getLogger(__name__)
-_BACKEND: Phase4AwsBackend | None = None
+_BACKEND: Phase4ModerationAwsBackend | None = None
 _ID_RE = r"([0-9a-f]{32})"
 _VERSION_UPLOAD_RE = re.compile(rf"^/apps/{_ID_RE}/versions$")
 _APP_RE = re.compile(rf"^/apps/{_ID_RE}$")
 _APPROVE_RE = re.compile(rf"^/apps/{_ID_RE}/versions/{_ID_RE}/approve$")
+_MODERATION_RE = re.compile(rf"^/apps/{_ID_RE}/versions/{_ID_RE}/(reject|unpublish)$")
 
 
-def _get_backend() -> Phase4AwsBackend:
+def _get_backend() -> Phase4ModerationAwsBackend:
     global _BACKEND
     if _BACKEND is None:
-        _BACKEND = Phase4AwsBackend.from_environment()
+        _BACKEND = Phase4ModerationAwsBackend.from_environment()
     return _BACKEND
 
 
@@ -85,6 +86,19 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
             "headers": {"cache-control": "no-store"},
             "body": "",
         }
+
+    moderation_match = _MODERATION_RE.fullmatch(path)
+    if method == "POST" and moderation_match is not None:
+        payload = _json_body(event)
+        _require_fields(payload, required=set())
+        app_id, version_id, action = moderation_match.groups()
+        if action == "reject":
+            result = _get_backend().reject_app(_auth_subject(event), app_id, version_id)
+        elif action == "unpublish":
+            result = _get_backend().unpublish_app(_auth_subject(event), app_id, version_id)
+        else:
+            raise RuntimeError(f"Unhandled moderation action: {action}")
+        return _json_response(200, result)
 
     approve_match = _APPROVE_RE.fullmatch(path)
     if method == "POST" and approve_match is not None:
