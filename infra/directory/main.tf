@@ -71,9 +71,9 @@ resource "aws_iam_role" "directory_api" {
   name = "${local.name_prefix}-api"
 
   assume_role_policy = jsonencode({
-    Version = "2012-10-17"
+    Version   = "2012-10-17"
     Statement = [{
-      Effect = "Allow"
+      Effect    = "Allow"
       Principal = {
         Service = "lambda.amazonaws.com"
       }
@@ -94,7 +94,7 @@ resource "aws_iam_role_policy" "directory_api_data" {
   role = aws_iam_role.directory_api.id
 
   policy = jsonencode({
-    Version = "2012-10-17"
+    Version   = "2012-10-17"
     Statement = [{
       Effect = "Allow"
       Action = [
@@ -123,10 +123,10 @@ resource "aws_lambda_function" "directory_api" {
 
   environment {
     variables = {
-      DIRECTORY_TABLE_NAME       = aws_dynamodb_table.directory.name
-      DESCRIPTOR_TTL_SECONDS     = tostring(var.descriptor_ttl_seconds)
-      RATE_LIMIT_REQUESTS        = tostring(var.rate_limit_requests)
-      RATE_LIMIT_WINDOW_SECONDS  = tostring(var.rate_limit_window_seconds)
+      DIRECTORY_TABLE_NAME      = aws_dynamodb_table.directory.name
+      DESCRIPTOR_TTL_SECONDS    = tostring(var.descriptor_ttl_seconds)
+      RATE_LIMIT_REQUESTS       = tostring(var.rate_limit_requests)
+      RATE_LIMIT_WINDOW_SECONDS = tostring(var.rate_limit_window_seconds)
     }
   }
 
@@ -181,7 +181,7 @@ resource "aws_apigatewayv2_stage" "default" {
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.directory_access.arn
-    format = jsonencode({
+    format          = jsonencode({
       requestId               = "$context.requestId"
       routeKey                = "$context.routeKey"
       status                  = "$context.status"
