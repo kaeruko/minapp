@@ -43,8 +43,10 @@ jobs:
           node --check apps/web/display_names.js
           node --check apps/web/portal_routing.js
           node --check apps/web/portal_routing.test.js
-      - name: Test direct-browser routing
-        run: node --test apps/web/portal_routing.test.js apps/web/phase2_transport.test.js
+          node --check apps/web/portal_shell.js
+          node --check apps/web/portal_shell.test.js
+      - name: Test Web portal behavior
+        run: node --test apps/web/portal_routing.test.js apps/web/phase2_transport.test.js apps/web/portal_shell.test.js
 
   powershell:
     runs-on: ubuntu-latest
