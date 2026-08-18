@@ -1,16 +1,29 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'directory.dart';
 import 'session_app.dart';
+import 'tenant_store.dart';
 
 void main() {
-  const String rawApiBaseUrl = String.fromEnvironment('MINAPP_API_BASE_URL');
-  if (rawApiBaseUrl.isEmpty) {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  const String rawDirectoryBaseUrl = String.fromEnvironment(
+    'MINAPP_DIRECTORY_BASE_URL',
+  );
+  if (rawDirectoryBaseUrl.isEmpty) {
     throw StateError(
-      'MINAPP_API_BASE_URL is required. Run with '
-      '--dart-define=MINAPP_API_BASE_URL=https://...',
+      'MINAPP_DIRECTORY_BASE_URL is required. Run with '
+      '--dart-define=MINAPP_DIRECTORY_BASE_URL=https://...',
     );
   }
-  final Uri baseUri = Uri.parse(rawApiBaseUrl);
-  runApp(MinApp(api: MinAppApiClient(baseUri: baseUri)));
+
+  final Uri directoryBaseUri = Uri.parse(rawDirectoryBaseUrl);
+  runApp(
+    MinApp(
+      directory: MinAppDirectoryClient(baseUri: directoryBaseUri),
+      tenantStore: SharedPreferencesTenantStore(),
+      apiFactory: (Uri baseUri) => MinAppApiClient(baseUri: baseUri),
+    ),
+  );
 }
