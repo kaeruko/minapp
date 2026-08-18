@@ -1,0 +1,5 @@
+.teacher-unpublish-action:hover { color: #dc2626; }
+.teacher-unpublish-action:disabled { cursor: not-allowed; opacity: 0.55; }
+.teacher-reject-button { border-color: #fecaca; color: #b91c1c; }
+.teacher-reject-button:hover { background: #fef2f2; }
+.teacher-reject-button:disabled { cursor: not-allowed; opacity: 0.55; }
