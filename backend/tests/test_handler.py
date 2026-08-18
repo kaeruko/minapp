@@ -98,6 +98,17 @@ class HandlerTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 200)
         self.assertEqual(self.backend.last_call, ("login", "student-12345678", "Password123"))
 
+    def test_login_accepts_cognito_minimum_password_length(self) -> None:
+        response = handler.lambda_handler(_event("POST", "/auth/login", body={"login_id": "teacher-admin", "password": "aaaaaa"}), None)
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(self.backend.last_call, ("login", "teacher-admin", "aaaaaa"))
+
+    def test_login_rejects_password_shorter_than_cognito_minimum(self) -> None:
+        response = handler.lambda_handler(_event("POST", "/auth/login", body={"login_id": "teacher-admin", "password": "aaaaa"}), None)
+        self.assertEqual(response["statusCode"], 400)
+        self.assertIn("between 6 and 128", json.loads(response["body"])["message"])
+        self.assertIsNone(self.backend.last_call)
+
     def test_protected_route_requires_authorizer_claims(self) -> None:
         response = handler.lambda_handler(_event("GET", "/me"), None)
         self.assertEqual(response["statusCode"], 401)
