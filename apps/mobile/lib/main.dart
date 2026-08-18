@@ -34,12 +34,23 @@ void main() {
           argumentName: 'MINAPP_JOIN_BASE_URL',
         );
 
+  const String rawCreatorPortalBaseUrl = String.fromEnvironment(
+    'MINAPP_CREATOR_PORTAL_BASE_URL',
+  );
+  final Uri? creatorPortalBaseUri = rawCreatorPortalBaseUrl.isEmpty
+      ? null
+      : validatePublicHttpsBaseUri(
+          Uri.parse(rawCreatorPortalBaseUrl),
+          argumentName: 'MINAPP_CREATOR_PORTAL_BASE_URL',
+        );
+
   runApp(
     MinApp(
       directory: MinAppDirectoryClient(baseUri: directoryBaseUri),
       tenantStore: SharedPreferencesTenantStore(),
       apiFactory: (Uri baseUri) => MinAppApiClient(baseUri: baseUri),
       officialJoinBaseUri: joinBaseUri,
+      creatorPortalBaseUri: creatorPortalBaseUri,
     ),
   );
 }

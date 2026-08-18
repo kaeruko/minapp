@@ -56,6 +56,18 @@ https://<official-join-domain>/c/XXXX-XXXX-XXXX
 
 join linkから使うのはclassroom codeだけで、URLをtenant APIとして扱わない。host、scheme、port、pathが固定originと完全一致しないURL、query/fragment付きURL、余分なpathを持つURLは拒否する。`MINAPP_JOIN_BASE_URL` を設定していないbuildではURL入力自体を拒否し、教室コードだけを受け付ける。
 
+### 制作・提出ポータル
+
+公式の制作・提出Webポータルを用意したbuildでは、そのoriginをbuild時に固定する。
+
+```powershell
+flutter run `
+  --dart-define=MINAPP_DIRECTORY_BASE_URL=$directoryApi `
+  --dart-define=MINAPP_CREATOR_PORTAL_BASE_URL=https://<creator-portal-domain>
+```
+
+このdefineを設定した場合だけ、Androidの右上メニューに「アプリを作る・提出する」を表示し、外部ブラウザで公式ポータルを開く。URLはユーザー入力やtenant responseから受け取らず、public HTTPS originとしてbuild時に固定する。不正なURLを設定したbuildは起動時に停止する。
+
 端末へ保存するのは次だけ:
 
 ```text

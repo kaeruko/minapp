@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
 import 'app_detail_page.dart';
@@ -10,13 +11,14 @@ const Color _brandDark = Color(0xFF1E3A8A);
 const Color _brandAccent = Color(0xFFF59E0B);
 const Color _pageBackground = Color(0xFFF8FAFC);
 
-enum _CatalogMenuAction { changeClassroom, logout }
+enum _CatalogMenuAction { creatorPortal, changeClassroom, logout }
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({
     required this.api,
     required this.session,
     required this.classroomName,
+    this.creatorPortalBaseUri,
     required this.onChangeClassroom,
     required this.onLogout,
     super.key,
@@ -25,6 +27,7 @@ class CatalogPage extends StatefulWidget {
   final MinAppApi api;
   final AuthenticatedSession session;
   final String classroomName;
+  final Uri? creatorPortalBaseUri;
   final Future<void> Function() onChangeClassroom;
   final VoidCallback onLogout;
 
@@ -111,6 +114,29 @@ class _CatalogPageState extends State<CatalogPage> {
 
   Future<void> _handleMenuAction(_CatalogMenuAction action) async {
     switch (action) {
+      case _CatalogMenuAction.creatorPortal:
+        final Uri? portalBaseUri = widget.creatorPortalBaseUri;
+        if (portalBaseUri == null) {
+          throw StateError('Creator portal menu is unavailable without a configured URL.');
+        }
+        try {
+          final bool launched = await launchUrl(
+            portalBaseUri,
+            mode: LaunchMode.externalApplication,
+          );
+          if (!launched && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('制作・提出ポータルを開けませんでした。')),
+            );
+          }
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('制作・提出ポータルを開けませんでした。')),
+            );
+          }
+        }
+        return;
       case _CatalogMenuAction.changeClassroom:
         await _confirmChangeClassroom();
         return;
@@ -166,6 +192,7 @@ class _CatalogPageState extends State<CatalogPage> {
             classroomName: widget.classroomName,
             searchController: _searchController,
             onSearchChanged: () => setState(() {}),
+            showCreatorPortal: widget.creatorPortalBaseUri != null,
             onMenuSelected: _handleMenuAction,
           ),
           Expanded(
@@ -250,12 +277,14 @@ class _CatalogHeader extends StatelessWidget {
     required this.classroomName,
     required this.searchController,
     required this.onSearchChanged,
+    required this.showCreatorPortal,
     required this.onMenuSelected,
   });
 
   final String classroomName;
   final TextEditingController searchController;
   final VoidCallback onSearchChanged;
+  final bool showCreatorPortal;
   final ValueChanged<_CatalogMenuAction> onMenuSelected;
 
   @override
@@ -316,8 +345,19 @@ class _CatalogHeader extends StatelessWidget {
                         size: 28,
                       ),
                     ),
-                    itemBuilder: (BuildContext context) => const <PopupMenuEntry<_CatalogMenuAction>>[
-                      PopupMenuItem<_CatalogMenuAction>(
+                    itemBuilder: (BuildContext context) => <PopupMenuEntry<_CatalogMenuAction>>[
+                      if (showCreatorPortal)
+                        const PopupMenuItem<_CatalogMenuAction>(
+                          key: Key('creator-portal-menu-item'),
+                          value: _CatalogMenuAction.creatorPortal,
+                          child: ListTile(
+                            dense: true,
+                            leading: Icon(Icons.upload_file_rounded),
+                            title: Text('アプリを作る・提出する'),
+                            trailing: Icon(Icons.open_in_new_rounded, size: 18),
+                          ),
+                        ),
+                      const PopupMenuItem<_CatalogMenuAction>(
                         value: _CatalogMenuAction.changeClassroom,
                         child: ListTile(
                           dense: true,
@@ -325,7 +365,7 @@ class _CatalogHeader extends StatelessWidget {
                           title: Text('教室を変更'),
                         ),
                       ),
-                      PopupMenuItem<_CatalogMenuAction>(
+                      const PopupMenuItem<_CatalogMenuAction>(
                         value: _CatalogMenuAction.logout,
                         child: ListTile(
                           dense: true,
