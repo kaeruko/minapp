@@ -18,6 +18,7 @@ class MinApp extends StatelessWidget {
     required this.tenantStore,
     required this.apiFactory,
     this.officialJoinBaseUri,
+    this.creatorPortalBaseUri,
     this.webViewDataClearer,
     super.key,
   });
@@ -26,6 +27,7 @@ class MinApp extends StatelessWidget {
   final TenantStore tenantStore;
   final MinAppApiFactory apiFactory;
   final Uri? officialJoinBaseUri;
+  final Uri? creatorPortalBaseUri;
   final WebViewDataClearer? webViewDataClearer;
 
   @override
@@ -46,6 +48,7 @@ class MinApp extends StatelessWidget {
         tenantStore: tenantStore,
         apiFactory: apiFactory,
         officialJoinBaseUri: officialJoinBaseUri,
+        creatorPortalBaseUri: creatorPortalBaseUri,
         webViewDataClearer: webViewDataClearer ?? clearMinAppWebViewData,
       ),
     );
@@ -58,6 +61,7 @@ class _SessionRoot extends StatefulWidget {
     required this.tenantStore,
     required this.apiFactory,
     required this.officialJoinBaseUri,
+    required this.creatorPortalBaseUri,
     required this.webViewDataClearer,
   });
 
@@ -65,6 +69,7 @@ class _SessionRoot extends StatefulWidget {
   final TenantStore tenantStore;
   final MinAppApiFactory apiFactory;
   final Uri? officialJoinBaseUri;
+  final Uri? creatorPortalBaseUri;
   final WebViewDataClearer webViewDataClearer;
 
   @override
@@ -218,6 +223,7 @@ class _SessionRootState extends State<_SessionRoot> {
       api: api,
       session: session,
       classroomName: tenant.displayName,
+      creatorPortalBaseUri: widget.creatorPortalBaseUri,
       onChangeClassroom: _changeClassroom,
       onLogout: _logout,
     );

@@ -145,6 +145,7 @@ MinApp _app({
   required FakeDirectory directory,
   required FakeTenantStore store,
   Uri? officialJoinBaseUri,
+  Uri? creatorPortalBaseUri,
 }) =>
     MinApp(
       directory: directory,
@@ -154,6 +155,7 @@ MinApp _app({
         return FakeApi();
       },
       officialJoinBaseUri: officialJoinBaseUri,
+      creatorPortalBaseUri: creatorPortalBaseUri,
       webViewDataClearer: () async {},
     );
 
@@ -195,6 +197,38 @@ void main() {
     expect(find.text('アプリの情報'), findsOneWidget);
     expect(find.text('作成者：student-demo'), findsOneWidget);
     expect(find.byKey(const Key('app-detail-launch')), findsOneWidget);
+  });
+
+  testWidgets('catalog menu shows creator portal when configured', (
+    WidgetTester tester,
+  ) async {
+    final FakeDirectory directory = FakeDirectory(descriptor: _descriptor());
+    final FakeTenantStore store = FakeTenantStore(
+      _configuredTenant(expired: false),
+    );
+
+    await tester.pumpWidget(
+      _app(
+        directory: directory,
+        store: store,
+        creatorPortalBaseUri: Uri.parse('https://portal.minapp.example'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('login-id')), 'student-demo');
+    await tester.enterText(
+      find.byKey(const Key('login-password')),
+      'Password123',
+    );
+    await tester.tap(find.byKey(const Key('login-submit')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('catalog-menu')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('アプリを作る・提出する'), findsOneWidget);
+    expect(find.byKey(const Key('creator-portal-menu-item')), findsOneWidget);
   });
 
   testWidgets('first setup resolves and verifies classroom before login', (
