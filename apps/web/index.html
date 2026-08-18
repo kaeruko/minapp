@@ -26,10 +26,31 @@
         <p class="eyebrow">学校・教室のアプリ共有</p>
         <h1 id="hero-title">作ったアプリを、みんなで使おう。</h1>
         <p class="hero-copy">作品をアップロードして先生へ公開申請できます。公開後は同じ作品の更新版を追加でき、不要になった作品はAndroidの一覧から削除できます。</p>
-        <p id="api-status" class="status" role="status">APIを確認中…</p>
+        <p id="api-status" class="status" role="status">接続先を確認中…</p>
       </section>
 
-      <section id="login-panel" class="panel" aria-labelledby="login-title">
+      <section id="classroom-panel" class="panel hidden" aria-labelledby="classroom-title">
+        <div>
+          <p class="eyebrow">教室を選ぶ</p>
+          <h2 id="classroom-title">先生からもらった教室コードを入力</h2>
+          <p class="muted">教室コードから、あなたの教室専用のみんアプ環境へ安全に接続します。</p>
+        </div>
+        <form id="classroom-form" class="form-stack">
+          <label>教室コード<input id="classroom-code" name="classroom_code" autocomplete="off" inputmode="text" maxlength="64" placeholder="例: 7K2M-4Q9P-W6TX" required /></label>
+          <button class="button" type="submit">この教室を使う</button>
+        </form>
+        <p id="classroom-error" class="form-error hidden" role="alert"></p>
+      </section>
+
+      <section id="classroom-context" class="classroom-context hidden" aria-label="現在の教室">
+        <div>
+          <p class="classroom-context-label">現在の教室</p>
+          <p id="classroom-name" class="classroom-context-name"></p>
+        </div>
+        <button id="classroom-change-button" class="button button-quiet button-small" type="button">教室を変更</button>
+      </section>
+
+      <section id="login-panel" class="panel hidden" aria-labelledby="login-title">
         <div>
           <p class="eyebrow">ログイン</p>
           <h2 id="login-title">先生からもらったIDでログイン</h2>
