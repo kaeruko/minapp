@@ -150,12 +150,16 @@ try {
     }
 
     $planName = "tfplan-directory"
-    & terraform "-chdir=$directoryDir" plan -out=$planName
+    $planPath = Join-Path $directoryDir $planName
+    & terraform "-chdir=$directoryDir" plan "-out=$planPath"
     if ($LASTEXITCODE -ne 0) {
         throw "terraform plan failed."
     }
+    if (-not (Test-Path $planPath)) {
+        throw "terraform plan did not create the expected plan file: $planPath"
+    }
 
-    $planJson = (& terraform "-chdir=$directoryDir" show -json $planName) -join "`n"
+    $planJson = (& terraform "-chdir=$directoryDir" show -json $planPath) -join "`n"
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($planJson)) {
         throw "terraform show -json failed."
     }
@@ -184,7 +188,7 @@ try {
         exit 0
     }
 
-    & terraform "-chdir=$directoryDir" apply $planName
+    & terraform "-chdir=$directoryDir" apply $planPath
     if ($LASTEXITCODE -ne 0) {
         throw "terraform apply failed."
     }
