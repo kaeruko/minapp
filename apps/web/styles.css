@@ -59,6 +59,9 @@ input:focus, select:focus { outline: 3px solid rgba(55, 103, 200, 0.15); border-
 .form-error { margin-bottom: 0; color: #a52f2f; font-weight: 700; }
 .section-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
 .account-label { margin: 0; color: #59657b; font-size: 0.9rem; font-weight: 700; }
+.classroom-context { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; padding: 16px 20px; border: 1px solid #d9e2f2; border-radius: 16px; background: #f8fbff; }
+.classroom-context-label { margin: 0 0 3px; color: #66738a; font-size: 0.78rem; font-weight: 700; }
+.classroom-context-name { margin: 0; color: #20345d; font-size: 1rem; font-weight: 800; }
 .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
 .group-card { padding: 18px; border: 1px solid #dfe5ef; border-radius: 15px; background: #f9fbff; }
 .group-card h3 { margin-bottom: 6px; }
@@ -81,6 +84,8 @@ input:focus, select:focus { outline: 3px solid rgba(55, 103, 200, 0.15); border-
   .site-header { padding: 0 16px; }
   .page-shell { width: min(100% - 24px, 1040px); padding-top: 28px; }
   .panel { padding: 20px; }
+  .classroom-context { align-items: stretch; flex-direction: column; }
+  .classroom-context .button { width: 100%; }
   .teacher-grid { grid-template-columns: 1fr; }
   .section-heading { display: grid; }
   .members-section .section-heading select { width: 100%; }

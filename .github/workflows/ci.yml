@@ -23,6 +23,8 @@ jobs:
         run: python -m unittest discover -s backend/tests -v
       - name: Run Directory tests
         run: python -m unittest discover -s directory/tests -v
+      - name: Run tool tests
+        run: python -m unittest discover -s tools/tests -v
 
   web:
     runs-on: ubuntu-latest
@@ -32,6 +34,7 @@ jobs:
         run: |
           node --check apps/web/app.js
           node --check apps/web/phase2.js
+          node --check apps/web/phase4.js
 
   powershell:
     runs-on: ubuntu-latest
