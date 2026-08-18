@@ -106,3 +106,7 @@ jobs:
         run: terraform -chdir=infra/directory init -backend=false -input=false
       - name: Validate Directory stack
         run: terraform -chdir=infra/directory validate
+      - name: Init portal stack without remote backend
+        run: terraform -chdir=infra/portal init -backend=false -input=false
+      - name: Validate portal stack
+        run: terraform -chdir=infra/portal validate
