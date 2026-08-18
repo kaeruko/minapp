@@ -1,6 +1,11 @@
 "use strict";
 
 const ACCESS_TOKEN_KEY = "minapp_access_token";
+const ACCESS_TOKEN_TENANT_KEY = "minapp_access_token_tenant_id";
+const TENANT_DESCRIPTOR_KEY = "minapp_tenant_descriptor";
+const SUPPORTED_DIRECTORY_SCHEMA_VERSION = 1;
+const SUPPORTED_TENANT_API_PROTOCOL_VERSION = 1;
+const MAX_DESCRIPTOR_VALID_FOR_SECONDS = 86400;
 
 function requiredElement(id) {
   const element = document.getElementById(id);
@@ -11,6 +16,13 @@ function requiredElement(id) {
 }
 
 const apiStatus = requiredElement("api-status");
+const classroomPanel = requiredElement("classroom-panel");
+const classroomForm = requiredElement("classroom-form");
+const classroomCodeInput = requiredElement("classroom-code");
+const classroomError = requiredElement("classroom-error");
+const classroomContext = requiredElement("classroom-context");
+const classroomName = requiredElement("classroom-name");
+const classroomChangeButton = requiredElement("classroom-change-button");
 const loginPanel = requiredElement("login-panel");
 const loginForm = requiredElement("login-form");
 const loginIdInput = requiredElement("login-id");
@@ -40,6 +52,12 @@ const membersGroupSelect = requiredElement("members-group");
 const membersList = requiredElement("members-list");
 const membersError = requiredElement("members-error");
 
+if (!(classroomForm instanceof HTMLFormElement)) throw new Error("#classroom-form must be a form.");
+if (!(classroomCodeInput instanceof HTMLInputElement)) throw new Error("#classroom-code must be an input.");
+if (!(classroomChangeButton instanceof HTMLButtonElement)) throw new Error("#classroom-change-button must be a button.");
+
+let webMode = null;
+let currentTenant = null;
 let pendingPasswordChallenge = null;
 let currentUser = null;
 let currentGroups = [];
@@ -81,25 +99,14 @@ function apiErrorMessage(error) {
   return "予期しないエラーが発生しました。";
 }
 
-async function apiRequest(path, options = {}) {
-  if (typeof path !== "string" || !path.startsWith("/")) {
-    throw new TypeError("API path must start with /.");
-  }
-
+async function jsonRequest(url, options = {}) {
   const headers = new Headers(options.headers ?? {});
   headers.set("Accept", "application/json");
   if (options.body !== undefined) {
     headers.set("Content-Type", "application/json");
   }
-  if (options.authenticated === true) {
-    const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
-    if (token === null || token.length === 0) {
-      throw new ApiError(401, "unauthorized", "ログインが必要です。");
-    }
-    headers.set("Authorization", `Bearer ${token}`);
-  }
 
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(url, {
     method: options.method ?? "GET",
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
@@ -130,13 +137,167 @@ async function apiRequest(path, options = {}) {
   return payload;
 }
 
+async function loadWebMode() {
+  const payload = await jsonRequest("/web-config");
+  if (Object.keys(payload).length !== 1 || !["local", "fixed", "federated"].includes(payload.mode)) {
+    throw new Error("Web configuration response is invalid.");
+  }
+  return payload.mode;
+}
+
+function requireExactFields(payload, expectedFields, label) {
+  const actual = Object.keys(payload).sort();
+  const expected = [...expectedFields].sort();
+  if (actual.length !== expected.length || actual.some((name, index) => name !== expected[index])) {
+    throw new Error(`${label} response schema is invalid.`);
+  }
+}
+
+function validateTenantId(value) {
+  if (typeof value !== "string" || !/^[0-9a-f]{32}$/.test(value)) {
+    throw new Error("tenant_id is invalid.");
+  }
+  return value;
+}
+
+function validateTenantDescriptor(payload) {
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    throw new Error("Directory descriptor must be an object.");
+  }
+  requireExactFields(
+    payload,
+    ["schema_version", "tenant_id", "display_name", "api_base_url", "api_protocol_version", "config_revision", "valid_for_seconds"],
+    "Directory descriptor",
+  );
+
+  if (payload.schema_version !== SUPPORTED_DIRECTORY_SCHEMA_VERSION) {
+    throw new Error(`未対応のDirectory schema_versionです: ${payload.schema_version}`);
+  }
+  const tenantId = validateTenantId(payload.tenant_id);
+  if (typeof payload.display_name !== "string" || payload.display_name.trim() !== payload.display_name || payload.display_name.length < 1 || payload.display_name.length > 120 || /[\u0000-\u001f]/.test(payload.display_name)) {
+    throw new Error("Directory display_name is invalid.");
+  }
+  if (typeof payload.api_base_url !== "string") {
+    throw new Error("Directory api_base_url is invalid.");
+  }
+  const apiBaseUrl = new URL(payload.api_base_url);
+  if (apiBaseUrl.protocol !== "https:" || apiBaseUrl.username !== "" || apiBaseUrl.password !== "" || apiBaseUrl.search !== "" || apiBaseUrl.hash !== "" || !["", "/"].includes(apiBaseUrl.pathname)) {
+    throw new Error("Directory api_base_url is invalid.");
+  }
+  if (payload.api_protocol_version !== SUPPORTED_TENANT_API_PROTOCOL_VERSION) {
+    throw new Error(`未対応のtenant api_protocol_versionです: ${payload.api_protocol_version}`);
+  }
+  if (!Number.isInteger(payload.config_revision) || payload.config_revision < 1) {
+    throw new Error("Directory config_revision is invalid.");
+  }
+  if (!Number.isInteger(payload.valid_for_seconds) || payload.valid_for_seconds < 1 || payload.valid_for_seconds > MAX_DESCRIPTOR_VALID_FOR_SECONDS) {
+    throw new Error("Directory valid_for_seconds is invalid.");
+  }
+
+  return {
+    schema_version: payload.schema_version,
+    tenant_id: tenantId,
+    display_name: payload.display_name,
+    api_base_url: apiBaseUrl.origin,
+    api_protocol_version: payload.api_protocol_version,
+    config_revision: payload.config_revision,
+    valid_for_seconds: payload.valid_for_seconds,
+  };
+}
+
+function saveTenantDescriptor(descriptor) {
+  currentTenant = descriptor;
+  sessionStorage.setItem(TENANT_DESCRIPTOR_KEY, JSON.stringify(descriptor));
+  classroomName.textContent = descriptor.display_name;
+  show(classroomContext);
+  hide(classroomPanel);
+}
+
+function removeTenantDescriptor() {
+  sessionStorage.removeItem(TENANT_DESCRIPTOR_KEY);
+  currentTenant = null;
+  classroomName.textContent = "";
+  hide(classroomContext);
+}
+
+function restoredTenantId() {
+  const raw = sessionStorage.getItem(TENANT_DESCRIPTOR_KEY);
+  if (raw === null) return null;
+  try {
+    return validateTenantDescriptor(JSON.parse(raw)).tenant_id;
+  } catch (error) {
+    console.error(error);
+    sessionStorage.removeItem(TENANT_DESCRIPTOR_KEY);
+    return null;
+  }
+}
+
+async function resolveClassroom(code) {
+  const payload = await jsonRequest("/directory/v1/classrooms/resolve", {
+    method: "POST",
+    body: { code },
+  });
+  return validateTenantDescriptor(payload);
+}
+
+async function selectTenantRouting(tenantId) {
+  const payload = await jsonRequest("/federation/select", {
+    method: "POST",
+    body: { tenant_id: validateTenantId(tenantId) },
+  });
+  return validateTenantDescriptor(payload);
+}
+
+async function clearTenantRouting() {
+  await jsonRequest("/federation/clear", { method: "POST", body: {} });
+}
+
+async function verifyTenantEndpoint(descriptor) {
+  const payload = await apiRequest("/tenant-info");
+  requireExactFields(payload, ["service", "tenant_id", "api_protocol_version", "environment"], "tenant-info");
+  if (payload.service !== "minapp-tenant-api") throw new Error("tenant-info service mismatch.");
+  if (validateTenantId(payload.tenant_id) !== descriptor.tenant_id) throw new Error("tenant-info tenant_id mismatch.");
+  if (payload.api_protocol_version !== descriptor.api_protocol_version) throw new Error("tenant-info api_protocol_version mismatch.");
+  if (typeof payload.environment !== "string" || payload.environment.length === 0) throw new Error("tenant-info environment is invalid.");
+}
+
+async function apiRequest(path, options = {}) {
+  if (typeof path !== "string" || !path.startsWith("/")) {
+    throw new TypeError("API path must start with /.");
+  }
+
+  const headers = new Headers(options.headers ?? {});
+  if (options.authenticated === true) {
+    const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+    if (token === null || token.length === 0) {
+      throw new ApiError(401, "unauthorized", "ログインが必要です。");
+    }
+    if (webMode === "federated") {
+      const tokenTenantId = sessionStorage.getItem(ACCESS_TOKEN_TENANT_KEY);
+      if (currentTenant === null || tokenTenantId !== currentTenant.tenant_id) {
+        sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+        sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
+        throw new ApiError(401, "tenant_session_mismatch", "教室が変更されたため、もう一度ログインしてください。");
+      }
+    }
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  return jsonRequest(`/api${path}`, { ...options, headers });
+}
+
 async function checkHealth() {
+  if (webMode === "federated" && currentTenant === null) {
+    apiStatus.textContent = "教室を選んでください";
+    apiStatus.className = "status";
+    return;
+  }
   try {
     const payload = await apiRequest("/health");
     if (payload.status !== "ok" || payload.service !== "minapp-api") {
       throw new Error("Health endpoint returned an unexpected payload.");
     }
-    apiStatus.textContent = `API接続OK · ${payload.version}`;
+    const prefix = currentTenant === null ? "" : `${currentTenant.display_name} · `;
+    apiStatus.textContent = `${prefix}API接続OK · ${payload.version}`;
     apiStatus.className = "status status-ok";
   } catch (error) {
     console.error(error);
@@ -150,6 +311,12 @@ function setAuthenticated(accessToken) {
     throw new TypeError("accessToken must be a non-empty string.");
   }
   sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  if (webMode === "federated") {
+    if (currentTenant === null) throw new Error("Cannot authenticate without a selected classroom.");
+    sessionStorage.setItem(ACCESS_TOKEN_TENANT_KEY, currentTenant.tenant_id);
+  } else {
+    sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
+  }
   pendingPasswordChallenge = null;
   loginPasswordInput.value = "";
   newPasswordInput.value = "";
@@ -158,6 +325,7 @@ function setAuthenticated(accessToken) {
 
 function clearAuthentication() {
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
   pendingPasswordChallenge = null;
   currentUser = null;
   currentGroups = [];
@@ -165,8 +333,21 @@ function clearAuthentication() {
   hide(teacherPanel);
   hide(passwordPanel);
   hide(logoutButton);
-  show(loginPanel);
   hide(credentialResult);
+
+  if (webMode === "federated" && currentTenant === null) {
+    hide(loginPanel);
+    show(classroomPanel);
+    hide(classroomContext);
+    return;
+  }
+
+  hide(classroomPanel);
+  show(loginPanel);
+  if (currentTenant !== null) {
+    classroomName.textContent = currentTenant.display_name;
+    show(classroomContext);
+  }
 }
 
 function showCredential(loginId, temporaryPassword) {
@@ -193,6 +374,67 @@ function validateAuthenticatedResponse(payload) {
   }
   throw new Error("Authentication response has an unsupported state.");
 }
+
+classroomForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setError(classroomError, null);
+  const code = classroomCodeInput.value.trim();
+  if (code.length === 0) {
+    setError(classroomError, "教室コードを入力してください。");
+    return;
+  }
+
+  const submitButton = classroomForm.querySelector("button[type='submit']");
+  if (!(submitButton instanceof HTMLButtonElement)) throw new Error("Classroom submit button was not found.");
+  submitButton.disabled = true;
+  try {
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
+    removeTenantDescriptor();
+    const resolved = await resolveClassroom(code);
+    const selected = await selectTenantRouting(resolved.tenant_id);
+    if (selected.tenant_id !== resolved.tenant_id) {
+      throw new Error("Directory returned a different tenant_id during selection.");
+    }
+    currentTenant = selected;
+    await verifyTenantEndpoint(selected);
+    saveTenantDescriptor(selected);
+    classroomCodeInput.value = "";
+    clearAuthentication();
+    await checkHealth();
+    loginIdInput.focus();
+  } catch (error) {
+    console.error(error);
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
+    removeTenantDescriptor();
+    try {
+      await clearTenantRouting();
+    } catch (clearError) {
+      console.error(clearError);
+    }
+    clearAuthentication();
+    setError(classroomError, apiErrorMessage(error));
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
+classroomChangeButton.addEventListener("click", async () => {
+  const hasLoginState = sessionStorage.getItem(ACCESS_TOKEN_KEY) !== null || pendingPasswordChallenge !== null;
+  if (hasLoginState && !window.confirm("教室を変更するとログアウトします。変更しますか？")) return;
+
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
+  sessionStorage.removeItem(TENANT_DESCRIPTOR_KEY);
+  pendingPasswordChallenge = null;
+  try {
+    await clearTenantRouting();
+  } catch (error) {
+    console.error(error);
+  }
+  window.location.reload();
+});
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -446,11 +688,59 @@ function renderMember(groupId, member) {
   membersList.append(row);
 }
 
+async function initializeFederatedTenant() {
+  const tenantId = restoredTenantId();
+  if (tenantId === null) {
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
+    removeTenantDescriptor();
+    clearAuthentication();
+    await checkHealth();
+    return false;
+  }
+
+  try {
+    const descriptor = await selectTenantRouting(tenantId);
+    currentTenant = descriptor;
+    await verifyTenantEndpoint(descriptor);
+    saveTenantDescriptor(descriptor);
+    return true;
+  } catch (error) {
+    console.error(error);
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
+    removeTenantDescriptor();
+    try {
+      await clearTenantRouting();
+    } catch (clearError) {
+      console.error(clearError);
+    }
+    clearAuthentication();
+    setError(classroomError, "保存していた教室情報を確認できませんでした。教室コードをもう一度入力してください。");
+    await checkHealth();
+    return false;
+  }
+}
+
 async function initialize() {
+  webMode = await loadWebMode();
+
+  if (webMode === "federated") {
+    if (!(await initializeFederatedTenant())) return;
+  } else {
+    hide(classroomPanel);
+    hide(classroomContext);
+  }
+
   await checkHealth();
   const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
   if (token === null || token.length === 0) {
     clearAuthentication();
+    return;
+  }
+  if (webMode === "federated" && sessionStorage.getItem(ACCESS_TOKEN_TENANT_KEY) !== currentTenant.tenant_id) {
+    clearAuthentication();
+    setError(loginError, "教室が変更されたため、もう一度ログインしてください。");
     return;
   }
   await loadDashboard();
@@ -458,6 +748,9 @@ async function initialize() {
 
 initialize().catch((error) => {
   console.error(error);
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  sessionStorage.removeItem(ACCESS_TOKEN_TENANT_KEY);
+  removeTenantDescriptor();
   clearAuthentication();
-  setError(loginError, apiErrorMessage(error));
+  setError(webMode === "federated" ? classroomError : loginError, apiErrorMessage(error));
 });
