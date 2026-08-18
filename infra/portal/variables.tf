@@ -36,7 +36,13 @@ variable "portal_domain" {
   default     = "minapp.cloxs.jp"
 
   validation {
-    condition     = can(regex("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$", trimspace(var.portal_domain)))
+    condition = (
+      can(regex("^[a-z0-9][a-z0-9.-]*[a-z0-9]$", trimspace(var.portal_domain))) &&
+      strcontains(trimspace(var.portal_domain), ".") &&
+      !strcontains(trimspace(var.portal_domain), "..") &&
+      !strcontains(trimspace(var.portal_domain), ".-") &&
+      !strcontains(trimspace(var.portal_domain), "-.")
+    )
     error_message = "portal_domain must be a lowercase DNS hostname without scheme, path, query, fragment, or trailing dot."
   }
 }
@@ -46,7 +52,10 @@ variable "directory_api_base_url" {
   type        = string
 
   validation {
-    condition     = can(regex("^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$", trimspace(var.directory_api_base_url)))
+    condition = (
+      can(regex("^https://[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$", trimspace(var.directory_api_base_url))) &&
+      !strcontains(trimprefix(trimspace(var.directory_api_base_url), "https://"), "..")
+    )
     error_message = "directory_api_base_url must be a public HTTPS origin with no path, query, fragment, or trailing slash."
   }
 }
@@ -60,7 +69,8 @@ variable "tenant_api_origins" {
       length(var.tenant_api_origins) > 0 &&
       alltrue([
         for origin in var.tenant_api_origins :
-        can(regex("^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$", trimspace(origin)))
+        can(regex("^https://[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$", trimspace(origin))) &&
+        !strcontains(trimprefix(trimspace(origin), "https://"), "..")
       ])
     )
     error_message = "tenant_api_origins must contain at least one public HTTPS origin and may not contain paths, queries, fragments, or trailing slashes."
