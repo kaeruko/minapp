@@ -174,11 +174,9 @@ int _requiredInt(Map<String, Object?> json, String key) {
 
 DateTime _requiredUtcDateTime(Map<String, Object?> json, String key) {
   final String value = _requiredString(json, key);
-  final DateTime parsed;
   try {
-    parsed = DateTime.parse(value);
-  } on FormatException catch (error) {
-    throw FormatException('Stored field $key is not an ISO-8601 timestamp.', value, error);
+    return DateTime.parse(value).toUtc();
+  } on FormatException {
+    throw FormatException('Stored field $key is not an ISO-8601 timestamp.');
   }
-  return parsed.toUtc();
 }
