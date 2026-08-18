@@ -1,0 +1,5 @@
+bucket       = "minapp-terraform-state-680837491161-us-west-2"
+key          = "tenants/504bc0e83022ac310ac3db4b52eebd98/terraform.tfstate"
+region       = "us-west-2"
+encrypt      = true
+use_lockfile = true

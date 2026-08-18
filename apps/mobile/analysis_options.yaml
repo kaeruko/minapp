@@ -6,6 +6,14 @@ analyzer:
   errors:
     dead_code: error
     unused_import: error
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
 
 linter:
   rules:

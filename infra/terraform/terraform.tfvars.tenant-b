@@ -1,0 +1,3 @@
+aws_region  = "us-west-2"
+environment = "dev"
+tenant_id   = "504bc0e83022ac310ac3db4b52eebd98"
