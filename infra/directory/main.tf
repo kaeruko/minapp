@@ -97,13 +97,13 @@ resource "aws_iam_role_policy" "directory_api_data" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = "dynamodb:GetItem"
+        Effect   = "Allow"
+        Action   = "dynamodb:GetItem"
         Resource = aws_dynamodb_table.directory.arn
       },
       {
-        Effect = "Allow"
-        Action = "dynamodb:UpdateItem"
+        Effect   = "Allow"
+        Action   = "dynamodb:UpdateItem"
         Resource = aws_dynamodb_table.directory.arn
         Condition = {
           "ForAllValues:StringLike" = {
