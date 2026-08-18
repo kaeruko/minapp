@@ -40,6 +40,7 @@ if (-not (Test-Path $webDir -PathType Container)) {
 $productionAssets = @(
     "index.html",
     "styles.css",
+    "preauth.css",
     "phase2.css",
     "phase4.css",
     "student_dashboard.css",
