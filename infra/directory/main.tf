@@ -1,6 +1,8 @@
 locals {
-  project_name = "minapp-directory"
-  name_prefix  = "${local.project_name}-${var.environment}"
+  project_name         = "minapp-directory"
+  name_prefix          = "${local.project_name}-${var.environment}"
+  portal_origin        = "https://minapp.cloxs.jp"
+  cors_allowed_origins = concat([local.portal_origin], var.local_development_cors_origins)
 }
 
 data "aws_caller_identity" "current" {}
@@ -149,6 +151,13 @@ resource "aws_lambda_function" "directory_api" {
 resource "aws_apigatewayv2_api" "directory" {
   name          = "${local.name_prefix}-api"
   protocol_type = "HTTP"
+
+  cors_configuration {
+    allow_origins = local.cors_allowed_origins
+    allow_methods = ["GET", "OPTIONS", "POST"]
+    allow_headers = ["content-type"]
+    max_age       = 600
+  }
 }
 
 resource "aws_apigatewayv2_integration" "directory_api" {
