@@ -184,10 +184,17 @@ void main() {
     await tester.tap(find.byKey(const Key('login-submit')));
     await tester.pumpAndSettle();
 
-    expect(find.text('みんなのアプリ'), findsOneWidget);
+    expect(find.text('クラスの公開アプリ (1)'), findsOneWidget);
     expect(find.text('ねんねぐみのじかんわり'), findsOneWidget);
-    expect(find.textContaining('ねんね組'), findsOneWidget);
-    expect(find.text('1個'), findsOneWidget);
+    expect(find.byKey(const Key('catalog-search')), findsOneWidget);
+    expect(find.byKey(const Key('catalog-refresh')), findsOneWidget);
+
+    await tester.tap(find.text('ねんねぐみのじかんわり'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('アプリの情報'), findsOneWidget);
+    expect(find.text('作成者：student-demo'), findsOneWidget);
+    expect(find.byKey(const Key('app-detail-launch')), findsOneWidget);
   });
 
   testWidgets('first setup resolves and verifies classroom before login', (
