@@ -6,11 +6,15 @@ import 'ui.dart';
 class LoginPage extends StatefulWidget {
   const LoginPage({
     required this.api,
+    required this.classroomName,
+    required this.onChangeClassroom,
     required this.onAuthenticated,
     super.key,
   });
 
   final MinAppApi api;
+  final String classroomName;
+  final Future<void> Function() onChangeClassroom;
   final ValueChanged<AuthenticatedSession> onAuthenticated;
 
   @override
@@ -102,6 +106,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final bool changingPassword = _challenge != null;
+    final ColorScheme colors = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('みんアプ'),
@@ -136,7 +141,36 @@ class _LoginPageState extends State<LoginPage> {
                             ? '10文字以上で、大文字・小文字・数字を含めてください。'
                             : 'メールアドレスや電話番号は使いません。',
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                        decoration: BoxDecoration(
+                          color: colors.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: <Widget>[
+                            const Icon(Icons.school_outlined, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                widget.classroomName,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            TextButton(
+                              key: const Key('login-change-classroom'),
+                              onPressed: _busy
+                                  ? null
+                                  : () async {
+                                      await widget.onChangeClassroom();
+                                    },
+                              child: const Text('変更'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
                       if (!changingPassword) ...<Widget>[
                         TextField(
                           key: const Key('login-id'),
@@ -189,7 +223,7 @@ class _LoginPageState extends State<LoginPage> {
                         const SizedBox(height: 14),
                         Text(
                           _error!,
-                          style: TextStyle(color: Theme.of(context).colorScheme.error),
+                          style: TextStyle(color: colors.error),
                         ),
                       ],
                       const SizedBox(height: 18),
