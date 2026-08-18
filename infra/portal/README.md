@@ -50,22 +50,69 @@ First create and validate an ACM certificate for `portal_domain` in `us-east-1`,
 
 After apply, point the external DNS record for `portal_domain` at the `cloudfront_domain_name` Terraform output. The stack intentionally does not guess or mutate an external DNS provider.
 
+## Guarded deployment
+
+Use `scripts/deploy-portal.ps1` rather than invoking `terraform apply` directly for normal operator deployment.
+
+The script:
+
+- verifies the AWS account before changing state or infrastructure
+- uses a separate portal backend key
+- requires an explicit `-CreateStateBucket` before creating a missing state bucket
+- enables versioning, encryption and public-access blocking on the state bucket
+- writes gitignored `terraform.tfvars` and `backend.hcl`
+- creates a saved Terraform plan
+- parses the plan and refuses every delete or replacement action
+- defaults to plan-only; `-Apply` is required to change AWS
+
+Example using a Route 53 zone:
+
+```powershell
+.\scripts\deploy-portal.ps1 `
+  -ExpectedAccountId "123456789012" `
+  -Profile "operator" `
+  -DirectoryApiBaseUrl "https://example.execute-api.us-west-2.amazonaws.com" `
+  -TenantApiOrigins @(
+    "https://tenant-a.execute-api.us-west-2.amazonaws.com",
+    "https://tenant-b.execute-api.us-west-2.amazonaws.com"
+  ) `
+  -Route53ZoneId "Z1234567890ABC"
+```
+
+Review the plan, then repeat the exact command with `-Apply`. If the deterministic portal state bucket does not exist yet, add `-CreateStateBucket` explicitly on the first run.
+
+For external DNS, replace `-Route53ZoneId` with a prevalidated `-CertificateArn` from `us-east-1`.
+
 ## Portal asset publishing
 
 Terraform manages `portal-config.json` so the Directory endpoint cannot silently diverge from infrastructure configuration.
 
-Publish the rest of `apps/web` to the `portal_bucket_name` output. When using `aws s3 sync --delete`, exclude `portal-config.json` because that object is Terraform-owned.
-
-Example after reviewing and applying the Terraform plan:
+After a successful portal apply, publish the browser application with:
 
 ```powershell
-$bucket = terraform -chdir=infra/portal output -raw portal_bucket_name
-$distribution = terraform -chdir=infra/portal output -raw cloudfront_distribution_id
-aws s3 sync apps/web "s3://$bucket" --delete --exclude "portal-config.json"
-aws cloudfront create-invalidation --distribution-id $distribution --paths "/*"
+.\scripts\publish-portal.ps1 `
+  -ExpectedAccountId "123456789012" `
+  -Profile "operator"
 ```
 
+The publisher fails closed unless Terraform outputs are available and `portal-config.json` already exists in the portal bucket. It stages and uploads only the production files referenced by `index.html`; test files such as `*.test.js` are not published. The final `aws s3 sync --delete` keeps `portal-config.json` explicitly excluded so Terraform remains its sole owner. A CloudFront `/*` invalidation is created only after a successful upload.
+
 The default CloudFront behavior deliberately uses the managed `CachingDisabled` policy for the MVP. This keeps `index.html`, JavaScript/CSS and `portal-config.json` immediately updateable; fingerprinted assets can receive long-lived caching later.
+
+## Phase 6E production rollout order
+
+Do not publish the portal before the direct-browser API boundaries are ready.
+
+1. apply the Directory CORS update
+2. apply the CORS update to every active tenant stack
+3. plan and apply this portal stack
+4. if DNS is external, point `portal_domain` at `cloudfront_domain_name`
+5. run `publish-portal.ps1`
+6. verify `https://minapp.cloxs.jp/portal-config.json`
+7. run the two-tenant browser E2E
+8. build Android with `MINAPP_CREATOR_PORTAL_BASE_URL=https://minapp.cloxs.jp`
+
+Review every Terraform plan before apply. Existing Directory or tenant stacks must not be replaced merely to add CORS.
 
 ## Security properties
 
