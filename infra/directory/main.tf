@@ -71,9 +71,9 @@ resource "aws_iam_role" "directory_api" {
   name = "${local.name_prefix}-api"
 
   assume_role_policy = jsonencode({
-    Version   = "2012-10-17"
+    Version = "2012-10-17"
     Statement = [{
-      Effect    = "Allow"
+      Effect = "Allow"
       Principal = {
         Service = "lambda.amazonaws.com"
       }
@@ -94,15 +94,24 @@ resource "aws_iam_role_policy" "directory_api_data" {
   role = aws_iam_role.directory_api.id
 
   policy = jsonencode({
-    Version   = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "dynamodb:GetItem",
-        "dynamodb:UpdateItem",
-      ]
-      Resource = aws_dynamodb_table.directory.arn
-    }]
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = "dynamodb:GetItem"
+        Resource = aws_dynamodb_table.directory.arn
+      },
+      {
+        Effect = "Allow"
+        Action = "dynamodb:UpdateItem"
+        Resource = aws_dynamodb_table.directory.arn
+        Condition = {
+          "ForAllValues:StringLike" = {
+            "dynamodb:LeadingKeys" = ["RATE#*"]
+          }
+        }
+      },
+    ]
   })
 }
 
@@ -181,7 +190,7 @@ resource "aws_apigatewayv2_stage" "default" {
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.directory_access.arn
-    format          = jsonencode({
+    format = jsonencode({
       requestId               = "$context.requestId"
       routeKey                = "$context.routeKey"
       status                  = "$context.status"
