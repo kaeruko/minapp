@@ -1,3 +1,7 @@
+.teacher-published-app-open { cursor: pointer; border-radius: 10px; }
+.teacher-published-app-open:hover strong { color: var(--teacher-blue); text-decoration: underline; }
+.teacher-published-app-open:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.22); outline-offset: -3px; }
+.teacher-published-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .teacher-unpublish-action:hover { color: #dc2626; }
 .teacher-unpublish-action:disabled { cursor: not-allowed; opacity: 0.55; }
 .teacher-reject-button { border-color: #fecaca; color: #b91c1c; }
