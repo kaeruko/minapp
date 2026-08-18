@@ -114,7 +114,9 @@ python tools\bootstrap_teacher.py `
 
 Cognito作成後にDynamoDB登録が失敗した場合、ツールは作成したCognitoユーザーを削除して停止する。削除にも失敗した場合は、その事実を含む例外で停止する。
 
-## WebポータルをPhase 1 APIにつなぐ
+## Webポータルをtenant APIにつなぐ
+
+### 単一tenantを明示して確認する
 
 deploy後のAPI URLを取得する。
 
@@ -134,9 +136,32 @@ python tools\dev_server.py --api-base-url $apiBaseUrl
 http://127.0.0.1:4173
 ```
 
-このモードでは `/api/*` を指定したHTTPS APIへproxyする。
+この固定tenantモードでは `/api/*` を指定したHTTPS APIへproxyする。特定tenantだけを切り分けたい開発・障害調査に使う。
 
-`--api-base-url` を省略した場合はローカルLambda handlerを使う。ローカルhandlerは `/health` の確認には使えるが、AWS環境変数・boto3を設定していない状態で認証APIを呼ぶと停止する。リモートAPIへ自動フォールバックはしない。
+### Directory経由で教室を選ぶ
+
+Phase 6の複数tenant動作を確認するときは、tenant API URLではなく中央Directoryだけを明示する。
+
+```powershell
+$directoryApi = "https://directory.example.com"
+python tools\dev_server.py --directory-api-base-url $directoryApi
+```
+
+このモードではWebポータルが最初に教室コードを求める。
+
+```text
+教室コード
+  -> 中央Directoryでtenant descriptorを解決
+  -> tenant_idを使ってWeb proxyの接続先を選択
+  -> /tenant-infoでtenant_id / protocol一致を検証
+  -> その教室のID + パスワードでログイン
+```
+
+ログイン画面とログイン後の画面には現在の教室名と「教室を変更」を表示する。教室変更時はAccess Token、初回パスワード変更challenge、ユーザー/グループ状態、tenantとのtoken紐付けを破棄してから別教室を選ばせる。旧tenantのAccess Tokenを新tenantへ持ち越さない。
+
+ブラウザから任意のtenant API URLを指定する機能は作らない。`/api/*` の実際の転送先は、HttpOnlyなtenant routing cookieの `tenant_id` を中央Directoryで再解決して決める。Directory descriptorの `api_base_url` はserver側で既存Directory validationと同等に検証し、未知field・tenant不一致・不正URL・未対応protocolはfail closedする。
+
+開発サーバは `--api-base-url` と `--directory-api-base-url` を同時指定できない。どちらも省略した場合だけローカルLambda handlerを使う。ローカルhandlerは `/health` の確認には使えるが、AWS環境変数・boto3を設定していない状態で認証APIを呼ぶと停止する。リモートAPIへ自動フォールバックはしない。
 
 WebポータルのPhase 1機能:
 
@@ -149,7 +174,7 @@ WebポータルのPhase 1機能:
 7. 生徒の所属解除
 8. 生徒自身もID + パスワードでログインして所属グループを確認
 
-ブラウザにはAccess Tokenだけを `sessionStorage` に保持する。ページ内に外部scriptを読み込まない。Refresh Tokenによる自動延長はPhase 1では実装せず、有効期限後は再ログインする。
+Access Tokenと選択済みtenant descriptorは `sessionStorage` に保持する。Access Tokenは選択中tenant IDにも紐付け、tenantが一致しない状態では認証付きAPIを送らない。教室コードそのものは保存しない。ページ内に外部scriptを読み込まない。Refresh Tokenによる自動延長はPhase 1では実装せず、有効期限後は再ログインする。
 
 ## Flutter
 
