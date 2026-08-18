@@ -17,6 +17,7 @@ class MinApp extends StatelessWidget {
     required this.directory,
     required this.tenantStore,
     required this.apiFactory,
+    this.officialJoinBaseUri,
     this.webViewDataClearer,
     super.key,
   });
@@ -24,6 +25,7 @@ class MinApp extends StatelessWidget {
   final MinAppDirectory directory;
   final TenantStore tenantStore;
   final MinAppApiFactory apiFactory;
+  final Uri? officialJoinBaseUri;
   final WebViewDataClearer? webViewDataClearer;
 
   @override
@@ -39,6 +41,7 @@ class MinApp extends StatelessWidget {
         directory: directory,
         tenantStore: tenantStore,
         apiFactory: apiFactory,
+        officialJoinBaseUri: officialJoinBaseUri,
         webViewDataClearer: webViewDataClearer ?? clearMinAppWebViewData,
       ),
     );
@@ -50,12 +53,14 @@ class _SessionRoot extends StatefulWidget {
     required this.directory,
     required this.tenantStore,
     required this.apiFactory,
+    required this.officialJoinBaseUri,
     required this.webViewDataClearer,
   });
 
   final MinAppDirectory directory;
   final TenantStore tenantStore;
   final MinAppApiFactory apiFactory;
+  final Uri? officialJoinBaseUri;
   final WebViewDataClearer webViewDataClearer;
 
   @override
@@ -184,6 +189,7 @@ class _SessionRootState extends State<_SessionRoot> {
       return ClassroomSetupPage(
         directory: widget.directory,
         tenantStore: widget.tenantStore,
+        officialJoinBaseUri: widget.officialJoinBaseUri,
         onConfigured: _onConfigured,
       );
     }
