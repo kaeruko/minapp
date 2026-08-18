@@ -3,9 +3,9 @@ import 'package:minapp_mobile/api.dart';
 
 void main() {
   Map<String, Object?> appJson({String? displayName}) => <String, Object?>{
-        'app_id': 'a' * 32,
-        'version_id': 'b' * 32,
-        'group_id': 'c' * 32,
+        'app_id': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'version_id': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        'group_id': 'cccccccccccccccccccccccccccccccc',
         'group_name': '火曜クラス',
         'owner_login_id': 'student-demo',
         if (displayName != null) 'owner_display_name': displayName,
