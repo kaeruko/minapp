@@ -18,8 +18,8 @@ from directory_store import DirectoryStore  # noqa: E402
 def _client(profile: str | None, region: str | None) -> Any:
     import boto3
 
-    session = boto3.Session(profile_name=profile, region_name=region)
-    return session.client("dynamodb")
+    session = boto3.Session(profile_name=profile)
+    return session.client("dynamodb", region_name=region)
 
 
 def _parser() -> argparse.ArgumentParser:
