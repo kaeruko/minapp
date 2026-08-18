@@ -64,11 +64,11 @@ resource "aws_cognito_user_pool" "main" {
   }
 
   password_policy {
-    minimum_length                   = 10
-    require_lowercase                = true
-    require_numbers                  = true
+    minimum_length                   = 6
+    require_lowercase                = false
+    require_numbers                  = false
     require_symbols                  = false
-    require_uppercase                = true
+    require_uppercase                = false
     temporary_password_validity_days = 7
   }
 

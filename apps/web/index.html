@@ -58,7 +58,7 @@
         </div>
         <form id="login-form" class="form-stack">
           <label>ID<input id="login-id" name="login_id" autocomplete="username" inputmode="text" pattern="[a-z0-9][a-z0-9-]{2,31}" required /></label>
-          <label>パスワード<input id="login-password" name="password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required /></label>
+          <label>パスワード<input id="login-password" name="password" type="password" autocomplete="current-password" minlength="6" maxlength="128" required /></label>
           <button class="button" type="submit">ログイン</button>
         </form>
         <p id="login-error" class="form-error hidden" role="alert"></p>
@@ -68,11 +68,11 @@
         <div>
           <p class="eyebrow">初回ログイン</p>
           <h2 id="password-title">自分のパスワードに変更</h2>
-          <p class="muted">10文字以上で、大文字・小文字・数字をそれぞれ含めてください。</p>
+          <p class="muted">6文字以上なら使えます。大文字・小文字・数字・記号の組み合わせ指定はありません。</p>
         </div>
         <form id="password-form" class="form-stack">
-          <label>新しいパスワード<input id="new-password" name="new_password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required /></label>
-          <label>新しいパスワード（確認）<input id="new-password-confirm" name="new_password_confirm" type="password" autocomplete="new-password" minlength="10" maxlength="128" required /></label>
+          <label>新しいパスワード<input id="new-password" name="new_password" type="password" autocomplete="new-password" minlength="6" maxlength="128" required /></label>
+          <label>新しいパスワード（確認）<input id="new-password-confirm" name="new_password_confirm" type="password" autocomplete="new-password" minlength="6" maxlength="128" required /></label>
           <button class="button" type="submit">変更してログイン</button>
         </form>
         <p id="password-error" class="form-error hidden" role="alert"></p>
