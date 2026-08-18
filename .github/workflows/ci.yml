@@ -37,6 +37,7 @@ jobs:
           node --check apps/web/phase2_transport.js
           node --check apps/web/phase2_transport.test.js
           node --check apps/web/phase4.js
+          node --check apps/web/student_dashboard.js
           node --check apps/web/teacher_dashboard.js
           node --check apps/web/moderation_actions.js
           node --check apps/web/display_names.js
