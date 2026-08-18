@@ -12,8 +12,8 @@ locals {
   }
   portal_config_json = jsonencode(local.portal_config)
 
-  csp_connect_sources     = join(" ", concat(["'self'", local.directory_api_origin], local.tenant_api_origins))
-  csp_frame_sources       = join(" ", local.tenant_api_origins)
+  csp_connect_sources = join(" ", concat(["'self'", local.directory_api_origin], local.tenant_api_origins))
+  csp_frame_sources   = join(" ", local.tenant_api_origins)
   content_security_policy = join("; ", [
     "default-src 'none'",
     "base-uri 'none'",
