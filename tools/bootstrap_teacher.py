@@ -4,17 +4,19 @@ import argparse
 import json
 import re
 import secrets
-import string
 import uuid
 from typing import Any
 
 _LOGIN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{2,31}$")
+_TEMPORARY_PASSWORD_ALPHABET = "23456789"
+_TEMPORARY_PASSWORD_LENGTH = 8
 
 
 def _new_temporary_password() -> str:
-    alphabet = string.ascii_letters + string.digits
-    random_tail = "".join(secrets.choice(alphabet) for _ in range(13))
-    return f"Ma1{random_tail}"
+    return "".join(
+        secrets.choice(_TEMPORARY_PASSWORD_ALPHABET)
+        for _ in range(_TEMPORARY_PASSWORD_LENGTH)
+    )
 
 
 def _s(value: str) -> dict[str, str]:
