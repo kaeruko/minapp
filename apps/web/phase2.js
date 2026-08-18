@@ -401,17 +401,6 @@ loadDashboard = async function loadDashboardWithPhase2() {
   await phase2Refresh();
 };
 
-const phase2DashboardObserver = new MutationObserver(() => {
-  if (!dashboard.classList.contains("hidden") && currentUser !== null) {
-    phase2Refresh().catch((error) => {
-      console.error(error);
-      if (currentUser?.role === "teacher") phase2SetMessage(reviewError, apiErrorMessage(error));
-      if (currentUser?.role === "student") phase2SetMessage(myAppError, apiErrorMessage(error));
-    });
-  }
-});
-phase2DashboardObserver.observe(dashboard, { attributes: true, attributeFilter: ["class"] });
-
 logoutButton.addEventListener("click", () => {
   previewFrame.removeAttribute("src");
   hide(previewPanel);
