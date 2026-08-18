@@ -36,8 +36,12 @@ variable "descriptor_ttl_seconds" {
   default     = 86400
 
   validation {
-    condition     = var.descriptor_ttl_seconds >= 60 && var.descriptor_ttl_seconds <= 604800
-    error_message = "descriptor_ttl_seconds must be between 60 and 604800 seconds."
+    condition = (
+      var.descriptor_ttl_seconds >= 60 &&
+      var.descriptor_ttl_seconds <= 604800 &&
+      floor(var.descriptor_ttl_seconds) == var.descriptor_ttl_seconds
+    )
+    error_message = "descriptor_ttl_seconds must be an integer between 60 and 604800 seconds."
   }
 }
 
@@ -47,8 +51,12 @@ variable "rate_limit_requests" {
   default     = 60
 
   validation {
-    condition     = var.rate_limit_requests >= 1 && var.rate_limit_requests <= 10000
-    error_message = "rate_limit_requests must be between 1 and 10000."
+    condition = (
+      var.rate_limit_requests >= 1 &&
+      var.rate_limit_requests <= 10000 &&
+      floor(var.rate_limit_requests) == var.rate_limit_requests
+    )
+    error_message = "rate_limit_requests must be an integer between 1 and 10000."
   }
 }
 
@@ -58,7 +66,11 @@ variable "rate_limit_window_seconds" {
   default     = 60
 
   validation {
-    condition     = var.rate_limit_window_seconds >= 1 && var.rate_limit_window_seconds <= 3600
-    error_message = "rate_limit_window_seconds must be between 1 and 3600 seconds."
+    condition = (
+      var.rate_limit_window_seconds >= 1 &&
+      var.rate_limit_window_seconds <= 3600 &&
+      floor(var.rate_limit_window_seconds) == var.rate_limit_window_seconds
+    )
+    error_message = "rate_limit_window_seconds must be an integer between 1 and 3600 seconds."
   }
 }
