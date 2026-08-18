@@ -81,8 +81,8 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => _error = '確認用パスワードが一致しません。');
       return;
     }
-    if (password.length < 10) {
-      setState(() => _error = '新しいパスワードは10文字以上にしてください。');
+    if (password.length < 6) {
+      setState(() => _error = '新しいパスワードは6文字以上にしてください。');
       return;
     }
     setState(() {
@@ -138,7 +138,7 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(height: 8),
                       Text(
                         changingPassword
-                            ? '10文字以上で、大文字・小文字・数字を含めてください。'
+                            ? '6文字以上なら使えます。文字の種類に決まりはありません。'
                             : 'メールアドレスや電話番号は使いません。',
                       ),
                       const SizedBox(height: 16),
