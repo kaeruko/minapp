@@ -2,7 +2,7 @@
 
 Flutter製のAndroidクライアント。
 
-Phase 3では、ID + パスワードでログインし、参加グループの承認済みWebアプリを一覧表示して、安全な短寿命URLをWebViewで起動する。
+Phase 6では、最初に中央Directoryへ教室コードを送ってtenant APIを解決し、`/tenant-info` で同じimmutable `tenant_id` を返すことを確認してから、既存のID + パスワードLogin / Catalog / Launchへ進む。
 
 ## 初回だけ: Androidプラットフォームを生成
 
@@ -14,7 +14,7 @@ PowerShellでリポジトリ直下から:
 .\scripts\bootstrap-mobile.ps1
 ```
 
-すでに `apps/mobile/android` がある場合は再生成せず、Phase 3で必要なINTERNET permissionだけ明示的に確認・追加する。
+すでに `apps/mobile/android` がある場合は再生成せず、必要なINTERNET permissionだけ明示的に確認・追加する。
 
 ```powershell
 .\scripts\configure-mobile-android.ps1
@@ -22,31 +22,53 @@ PowerShellでリポジトリ直下から:
 
 ## 実行
 
-AWSへPhase 3を反映したあと、リポジトリ直下でAPI URLを取得する。
+中央Directoryをdeploy済みにして、その固定URLをbuild-time defineで渡す。
 
 ```powershell
-$apiBaseUrl = terraform -chdir=infra/terraform output -raw api_base_url
+$directoryApi = terraform -chdir=infra/directory output -raw directory_api_base_url
 .\scripts\configure-mobile-android.ps1
 cd apps\mobile
 flutter pub get
 flutter analyze
 flutter test
-flutter run --dart-define=MINAPP_API_BASE_URL=$apiBaseUrl
+flutter run --dart-define=MINAPP_DIRECTORY_BASE_URL=$directoryApi
 ```
 
-`MINAPP_API_BASE_URL` が無い場合やHTTPSでない場合は起動時に停止する。別のAPIへ自動フォールバックしない。
+`MINAPP_DIRECTORY_BASE_URL` が無い場合や、public HTTPS base URLとして不正な場合は起動時に停止する。ユーザーへ任意API URLを入力させず、別Directoryやtenant APIへ自動フォールバックしない。
 
-## Phase 3の安全境界
+初回起動では先生から配布された教室コードを入力する。Directory descriptor受信後にtenant `/tenant-info` を検証し、成功したdescriptorだけを端末へ保存する。
 
+端末へ保存するのは次だけ:
+
+```text
+tenant_id
+display_name
+api_base_url
+api_protocol_version
+config_revision
+verified_at
+expires_at
+```
+
+パスワード、Cognito access token、launch tokenは保存しない。access tokenはこれまで通りmemory only。
+
+V1ではdescriptor TTLのclient許容上限を24時間とする。有効期限内のverified cacheはDirectory障害中でも利用できるが、期限切れ時はDirectory refreshと`/tenant-info`再検証が必須。失敗時にexpired cacheへsilent fallbackしない。
+
+通常のログアウトでは選択中の教室を維持する。「教室を変更」ではaccess token/pending login stateを破棄し、WebView cookie/localStorage/cacheと保存済みtenant descriptorを削除して教室コード入力へ戻る。
+
+## 安全境界
+
+- production buildのDirectory base URLはbuild時に固定する
+- classroom codeから任意URLを受け取らない
+- Directory responseのtenant URLをHTTPS/public DNS/default port/no pathとして再検証する
+- Directory descriptorとtenant `/tenant-info` の`tenant_id` / protocolが一致しない場合はLoginを開始しない
+- 未知のDirectory schema / tenant protocol / JSON fieldを推測して受理しない
 - AndroidはCognito access tokenをメモリだけに保持し、作品WebViewへ渡さない
-- 作品起動時にサーバーが10分だけ有効な高エントロピーURLを発行する
+- 作品起動時にサーバーが短寿命URLを発行する
 - published S3 bucketはprivateのまま
 - WebViewにJavaScript channel/native bridgeを作らない
 - WebViewは起動URLと同じhost・同じlaunch token配下へのnavigationだけ許可する
 - 作品を開く前にWebViewのcookie・localStorage・cacheを消し、別作品との共有状態を残さない
-- レスポンスCSPで外部通信、form送信、object埋め込みを拒否する
 - Android側からカメラ、位置情報、マイク等を作品へ公開しない
-
-MVPでは作品間の状態分離を優先するため、Android WebViewを閉じて別作品を開くとlocalStorage/cookieは保持されない。
 
 Google Play上のパッケージIDは `jp.cloxs.min` を使う。
