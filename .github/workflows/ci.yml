@@ -34,6 +34,8 @@ jobs:
         run: |
           node --check apps/web/app.js
           node --check apps/web/phase2.js
+          node --check apps/web/phase2_transport.js
+          node --check apps/web/phase2_transport.test.js
           node --check apps/web/phase4.js
           node --check apps/web/teacher_dashboard.js
           node --check apps/web/moderation_actions.js
@@ -41,7 +43,7 @@ jobs:
           node --check apps/web/portal_routing.js
           node --check apps/web/portal_routing.test.js
       - name: Test direct-browser routing
-        run: node --test apps/web/portal_routing.test.js
+        run: node --test apps/web/portal_routing.test.js apps/web/phase2_transport.test.js
 
   powershell:
     runs-on: ubuntu-latest
