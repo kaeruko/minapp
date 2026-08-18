@@ -3,11 +3,15 @@
 if (
   typeof apiRequest !== "function" ||
   typeof loadDashboard !== "function" ||
+  typeof studentPortalSetAccountName !== "function" ||
   typeof teacherPortalRefreshGroupData !== "function" ||
   typeof teacherPortalRenderMembers !== "function" ||
   typeof teacherPortalUpdateIdentity !== "function"
 ) {
-  throw new Error("Display-name UI requires the base and teacher dashboard scripts.");
+  throw new Error("Display-name UI requires the student and teacher dashboard scripts.");
+}
+if (!(studentProfileSlot instanceof HTMLElement)) {
+  throw new Error("Student profile slot was not found.");
 }
 
 const displayNameState = {
@@ -56,9 +60,7 @@ const displayNameStudentInput = displayNameStudentForm.querySelector("#display-n
 const displayNameStudentMessage = displayNameStudentForm.querySelector("#display-name-student-message");
 if (!(displayNameStudentInput instanceof HTMLInputElement)) throw new Error("Student display-name input is missing.");
 if (!(displayNameStudentMessage instanceof HTMLElement)) throw new Error("Student display-name message is missing.");
-const displayNameAccountPanel = dashboard.querySelector(".panel");
-if (!(displayNameAccountPanel instanceof HTMLElement)) throw new Error("Account panel was not found.");
-displayNameAccountPanel.append(displayNameStudentForm);
+studentProfileSlot.append(displayNameStudentForm);
 
 const displayNameTeacherSettingsCard = teacherPortalRoot.querySelector(".teacher-settings-card");
 if (!(displayNameTeacherSettingsCard instanceof HTMLElement)) throw new Error("Teacher settings card was not found.");
@@ -106,6 +108,7 @@ function displayNameApplySelf() {
   accountLabel.textContent = `${label} · ${currentUser.role === "teacher" ? "先生" : "生徒"}`;
   if (currentUser.role === "student") {
     displayNameStudentInput.value = displayNameState.selfName ?? "";
+    studentPortalSetAccountName(label);
     show(displayNameStudentForm);
     hide(displayNameTeacherForm);
   } else {
