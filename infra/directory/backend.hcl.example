@@ -1,0 +1,5 @@
+bucket       = "minapp-directory-terraform-state-123456789012-us-west-2"
+key          = "directory/dev/terraform.tfstate"
+region       = "us-west-2"
+encrypt      = true
+use_lockfile = true
