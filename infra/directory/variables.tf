@@ -74,3 +74,21 @@ variable "rate_limit_window_seconds" {
     error_message = "rate_limit_window_seconds must be an integer between 1 and 3600 seconds."
   }
 }
+
+variable "local_development_cors_origins" {
+  description = "Optional localhost origins for direct-browser development. Must remain empty in prod."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = (
+      length(distinct(var.local_development_cors_origins)) == length(var.local_development_cors_origins) &&
+      alltrue([
+        for origin in var.local_development_cors_origins :
+        can(regex("^http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(:[0-9]{1,5})?$", origin))
+      ]) &&
+      (var.environment != "prod" || length(var.local_development_cors_origins) == 0)
+    )
+    error_message = "local_development_cors_origins must contain unique http://localhost, http://127.0.0.1, or http://[::1] origins and must be empty in prod."
+  }
+}
