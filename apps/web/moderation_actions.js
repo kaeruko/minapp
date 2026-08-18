@@ -138,9 +138,26 @@ teacherPortalRenderPublishedApps = function moderationRenderPublishedApps() {
 
   rows.forEach((row, index) => {
     if (!(row instanceof HTMLElement)) throw new Error("Published app row is not an HTMLElement.");
+    const titleCell = row.firstElementChild;
     const actionCell = row.lastElementChild;
+    if (!(titleCell instanceof HTMLElement)) throw new Error("Published app title cell is missing.");
     if (!(actionCell instanceof HTMLElement)) throw new Error("Published app action cell is missing.");
     const app = teacherPortalState.publishedApps[index];
+
+    const openPreview = () => {
+      teacherPortalOpenPreview(app, false).catch((error) => teacherPortalHandleError(error));
+    };
+    titleCell.classList.add("teacher-published-app-open");
+    titleCell.setAttribute("role", "button");
+    titleCell.setAttribute("tabindex", "0");
+    titleCell.setAttribute("aria-label", `${app.title} をプレビュー`);
+    titleCell.addEventListener("click", openPreview);
+    titleCell.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openPreview();
+    });
+
     const stopButton = document.createElement("button");
     stopButton.type = "button";
     stopButton.className = "teacher-table-action teacher-unpublish-action";
@@ -148,6 +165,7 @@ teacherPortalRenderPublishedApps = function moderationRenderPublishedApps() {
     stopButton.addEventListener("click", () => {
       moderationUnpublishApp(app, stopButton).catch((error) => teacherPortalHandleError(error));
     });
-    actionCell.replaceChildren(stopButton);
+    actionCell.classList.add("teacher-published-actions");
+    actionCell.append(stopButton);
   });
 };
