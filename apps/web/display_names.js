@@ -90,6 +90,16 @@ function displayNameSetMessage(element, message, isError = false) {
   element.classList.toggle("display-name-message-ok", !isError && message !== null);
 }
 
+function displayNameResetState() {
+  displayNameState.selfName = null;
+  displayNameState.groupProfiles = new Map();
+  displayNameStudentInput.value = "";
+  displayNameTeacherInput.value = "";
+  displayNameSetMessage(displayNameStudentMessage, null);
+  displayNameSetMessage(displayNameTeacherMessage, null);
+  hide(displayNameStudentForm);
+}
+
 function displayNameApplySelf() {
   if (currentUser === null) return;
   const label = displayNameState.selfName ?? currentUser.login_id;
@@ -138,10 +148,10 @@ function displayNameDecorateTeacherState(profiles) {
 
   for (const app of [...teacherPortalState.reviewApps, ...teacherPortalState.publishedApps]) {
     const profile = displayNameState.groupProfiles.get(app.owner_user_id);
-    if (profile === undefined) throw new Error("アプリ作成者がクラスのメンバー一覧に存在しません。");
     app.owner_account_login_id = app.owner_login_id;
-    app.owner_display_name = profile.display_name;
-    if (profile.display_name !== null) app.owner_login_id = profile.display_name;
+    const displayName = profile?.display_name ?? (typeof app.owner_display_name === "string" ? app.owner_display_name : null);
+    app.owner_display_name = displayName;
+    if (displayName !== null) app.owner_login_id = displayName;
   }
 
   for (const member of teacherPortalState.members) {
@@ -266,6 +276,12 @@ displayNameTeacherForm.addEventListener("submit", (event) => {
     displayNameSetMessage(displayNameTeacherMessage, apiErrorMessage(error), true);
   });
 });
+
+const displayNameOriginalClearAuthentication = clearAuthentication;
+clearAuthentication = function displayNameClearAuthentication() {
+  displayNameResetState();
+  displayNameOriginalClearAuthentication();
+};
 
 const displayNameOriginalLoadDashboard = loadDashboard;
 loadDashboard = async function displayNameLoadDashboard() {
