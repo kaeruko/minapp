@@ -30,6 +30,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--user-pool-id", required=True)
     parser.add_argument("--table-name", required=True)
     parser.add_argument("--login-id", required=True)
+    parser.add_argument("--profile")
     parser.add_argument("--region", required=True)
     args = parser.parse_args()
 
@@ -67,9 +68,9 @@ def main() -> None:
             "`python -m pip install -r tools/requirements.txt`."
         ) from exc
 
-    session = boto3.session.Session(region_name=args.region)
-    cognito = session.client("cognito-idp")
-    dynamodb = session.client("dynamodb")
+    session = boto3.session.Session(profile_name=args.profile)
+    cognito = session.client("cognito-idp", region_name=args.region)
+    dynamodb = session.client("dynamodb", region_name=args.region)
 
     temporary_password = _new_temporary_password()
     user_id = uuid.uuid4().hex
