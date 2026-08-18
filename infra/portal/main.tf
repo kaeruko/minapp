@@ -1,19 +1,19 @@
 locals {
-  project_name        = "minapp-portal"
-  name_prefix         = "${local.project_name}-${var.environment}"
-  portal_domain       = trimspace(var.portal_domain)
+  project_name         = "minapp-portal"
+  name_prefix          = "${local.project_name}-${var.environment}"
+  portal_domain        = trimspace(var.portal_domain)
   directory_api_origin = trimspace(var.directory_api_base_url)
-  tenant_api_origins  = sort([for origin in var.tenant_api_origins : trimspace(origin)])
-  s3_origin_id        = "portal-s3"
+  tenant_api_origins   = sort([for origin in var.tenant_api_origins : trimspace(origin)])
+  s3_origin_id         = "portal-s3"
 
   portal_config = {
-    schema_version          = 1
+    schema_version         = 1
     directory_api_base_url = local.directory_api_origin
   }
   portal_config_json = jsonencode(local.portal_config)
 
-  csp_connect_sources = join(" ", concat(["'self'", local.directory_api_origin], local.tenant_api_origins))
-  csp_frame_sources   = join(" ", local.tenant_api_origins)
+  csp_connect_sources     = join(" ", concat(["'self'", local.directory_api_origin], local.tenant_api_origins))
+  csp_frame_sources       = join(" ", local.tenant_api_origins)
   content_security_policy = join("; ", [
     "default-src 'none'",
     "base-uri 'none'",
