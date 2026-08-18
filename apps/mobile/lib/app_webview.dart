@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+Future<void> clearMinAppWebViewData() async {
+  await WebViewCookieManager().clearCookies();
+  final WebViewController controller = WebViewController();
+  await controller.clearLocalStorage();
+  await controller.clearCache();
+}
+
 class AppWebViewPage extends StatefulWidget {
   const AppWebViewPage({
     required this.title,
