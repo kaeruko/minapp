@@ -46,6 +46,7 @@ $productionAssets = @(
     "teacher_dashboard.css",
     "moderation_actions.css",
     "display_names.css",
+    "portal_shell.css",
     "portal_routing.js",
     "app.js",
     "phase2.js",
@@ -54,7 +55,8 @@ $productionAssets = @(
     "student_dashboard.js",
     "teacher_dashboard.js",
     "moderation_actions.js",
-    "display_names.js"
+    "display_names.js",
+    "portal_shell.js"
 )
 
 foreach ($relativePath in $productionAssets) {
