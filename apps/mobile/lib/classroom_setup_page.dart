@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'classroom_join.dart';
 import 'directory.dart';
 import 'tenant_store.dart';
 import 'ui.dart';
@@ -9,12 +10,14 @@ class ClassroomSetupPage extends StatefulWidget {
     required this.directory,
     required this.tenantStore,
     required this.onConfigured,
+    this.officialJoinBaseUri,
     super.key,
   });
 
   final MinAppDirectory directory;
   final TenantStore tenantStore;
   final ValueChanged<ConfiguredTenant> onConfigured;
+  final Uri? officialJoinBaseUri;
 
   @override
   State<ClassroomSetupPage> createState() => _ClassroomSetupPageState();
@@ -32,17 +35,15 @@ class _ClassroomSetupPageState extends State<ClassroomSetupPage> {
   }
 
   Future<void> _configure() async {
-    final String classroomCode = _codeController.text;
-    if (classroomCode.isEmpty) {
-      setState(() => _error = '教室コードを入力してください。');
-      return;
-    }
-
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
+      final String classroomCode = normalizeClassroomJoinInput(
+        _codeController.text,
+        officialJoinBaseUri: widget.officialJoinBaseUri,
+      );
       final TenantDescriptor descriptor = await widget.directory.resolveClassroom(
         classroomCode,
       );
@@ -63,6 +64,7 @@ class _ClassroomSetupPageState extends State<ClassroomSetupPage> {
   @override
   Widget build(BuildContext context) {
     final ColorScheme colors = Theme.of(context).colorScheme;
+    final bool acceptsJoinLink = widget.officialJoinBaseUri != null;
     return Scaffold(
       appBar: AppBar(
         title: const Text('みんアプ'),
@@ -97,8 +99,10 @@ class _ClassroomSetupPageState extends State<ClassroomSetupPage> {
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        '先生からもらった教室コードを入力してください。教室を確認してからログイン画面を開きます。',
+                      Text(
+                        acceptsJoinLink
+                            ? '先生からもらった教室コード、または公式の教室リンクを入力してください。教室を確認してからログイン画面を開きます。'
+                            : '先生からもらった教室コードを入力してください。教室を確認してからログイン画面を開きます。',
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 24),
@@ -109,11 +113,11 @@ class _ClassroomSetupPageState extends State<ClassroomSetupPage> {
                         autocorrect: false,
                         enableSuggestions: false,
                         textCapitalization: TextCapitalization.characters,
-                        maxLength: 64,
-                        decoration: const InputDecoration(
-                          labelText: '教室コード',
+                        maxLength: 2048,
+                        decoration: InputDecoration(
+                          labelText: acceptsJoinLink ? '教室コード / 教室リンク' : '教室コード',
                           hintText: 'XXXX-XXXX-XXXX',
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
                         onSubmitted: (_) {
                           if (!_busy) _configure();

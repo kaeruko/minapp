@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'directory.dart';
+import 'endpoint_validation.dart';
 import 'session_app.dart';
 import 'tenant_store.dart';
 
@@ -18,12 +19,27 @@ void main() {
     );
   }
 
-  final Uri directoryBaseUri = Uri.parse(rawDirectoryBaseUrl);
+  final Uri directoryBaseUri = validatePublicHttpsBaseUri(
+    Uri.parse(rawDirectoryBaseUrl),
+    argumentName: 'MINAPP_DIRECTORY_BASE_URL',
+  );
+
+  const String rawJoinBaseUrl = String.fromEnvironment(
+    'MINAPP_JOIN_BASE_URL',
+  );
+  final Uri? joinBaseUri = rawJoinBaseUrl.isEmpty
+      ? null
+      : validatePublicHttpsBaseUri(
+          Uri.parse(rawJoinBaseUrl),
+          argumentName: 'MINAPP_JOIN_BASE_URL',
+        );
+
   runApp(
     MinApp(
       directory: MinAppDirectoryClient(baseUri: directoryBaseUri),
       tenantStore: SharedPreferencesTenantStore(),
       apiFactory: (Uri baseUri) => MinAppApiClient(baseUri: baseUri),
+      officialJoinBaseUri: joinBaseUri,
     ),
   );
 }
