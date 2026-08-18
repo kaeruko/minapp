@@ -4,7 +4,11 @@ param(
     [string]$ExpectedAccountId,
 
     [Parameter(Mandatory = $false)]
-    [string]$Profile
+    [string]$Profile,
+
+    [Parameter(Mandatory = $false)]
+    [ValidateNotNullOrEmpty()]
+    [string]$Region
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,6 +21,9 @@ if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
 $arguments = @("sts", "get-caller-identity", "--output", "json", "--no-cli-pager")
 if (-not [string]::IsNullOrWhiteSpace($Profile)) {
     $arguments += @("--profile", $Profile)
+}
+if (-not [string]::IsNullOrWhiteSpace($Region)) {
+    $arguments += @("--region", $Region)
 }
 
 $rawIdentity = & aws @arguments
@@ -42,7 +49,9 @@ if ([string]::IsNullOrWhiteSpace([string]$identity.Arn)) {
 }
 
 $profileLabel = if ([string]::IsNullOrWhiteSpace($Profile)) { "default credential chain" } else { "profile '$Profile'" }
+$regionLabel = if ([string]::IsNullOrWhiteSpace($Region)) { "credential/default configuration" } else { "explicit '$Region'" }
 Write-Host "AWS deploy target verified."
 Write-Host "  Account: $($identity.Account)"
 Write-Host "  Caller:  $($identity.Arn)"
 Write-Host "  Source:  $profileLabel"
+Write-Host "  Region:  $regionLabel"
