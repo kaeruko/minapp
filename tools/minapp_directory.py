@@ -37,6 +37,11 @@ def _parser() -> argparse.ArgumentParser:
     create = commands.add_parser("create")
     create.add_argument("--display-name", required=True)
 
+    register_existing = commands.add_parser("register-existing")
+    register_existing.add_argument("--tenant-id", required=True)
+    register_existing.add_argument("--display-name", required=True)
+    register_existing.add_argument("--api-base-url", required=True)
+
     activate = commands.add_parser("activate")
     activate.add_argument("--tenant-id", required=True)
 
@@ -63,6 +68,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "create":
         result = service.create_tenant(args.display_name)
+    elif args.command == "register-existing":
+        result = service.register_existing_tenant(
+            args.tenant_id,
+            args.display_name,
+            args.api_base_url,
+        )
     elif args.command == "activate":
         result = service.activate(args.tenant_id)
     elif args.command == "update-endpoint":
