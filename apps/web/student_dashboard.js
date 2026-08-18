@@ -66,6 +66,16 @@ studentPortalRoot.innerHTML = `
     </section>
 
     <div id="student-preview-slot"></div>
+
+    <section class="student-profile-card" aria-labelledby="student-profile-title">
+      <div class="student-section-heading">
+        <div>
+          <p class="student-kicker">プロフィール</p>
+          <h2 id="student-profile-title">表示する名前</h2>
+        </div>
+      </div>
+      <div id="student-profile-slot"></div>
+    </section>
   </main>
 `;
 document.body.append(studentPortalRoot);
@@ -77,6 +87,7 @@ const studentPortalChangeClassroom = requiredElement("student-change-classroom")
 const studentPortalLogout = requiredElement("student-logout");
 const studentUploadSlot = requiredElement("student-upload-slot");
 const studentPreviewSlot = requiredElement("student-preview-slot");
+const studentProfileSlot = requiredElement("student-profile-slot");
 
 if (!(studentPortalChangeClassroom instanceof HTMLButtonElement)) throw new Error("#student-change-classroom must be a button.");
 if (!(studentPortalLogout instanceof HTMLButtonElement)) throw new Error("#student-logout must be a button.");
@@ -86,16 +97,17 @@ studentPreviewSlot.append(previewPanel);
 phase2Student.classList.add("student-phase2-workspace");
 previewPanel.classList.add("student-preview-panel");
 
+function studentPortalSetAccountName(name) {
+  if (typeof name !== "string" || name.length === 0) throw new TypeError("Student account name must be a non-empty string.");
+  studentPortalAccountName.textContent = name;
+}
+
 function studentPortalUpdateIdentity() {
   if (currentUser === null || currentUser.role !== "student") {
     throw new Error("Student portal requires an authenticated student.");
   }
 
-  const displayName =
-    typeof currentUser.display_name === "string" && currentUser.display_name.length > 0
-      ? currentUser.display_name
-      : currentUser.login_id;
-  studentPortalAccountName.textContent = displayName;
+  studentPortalSetAccountName(currentUser.login_id);
   studentPortalClassroomName.textContent = currentTenant === null ? "みんアプ" : currentTenant.display_name;
 
   const groups = currentGroups.filter((group) => group.role === "student" && group.status === "active");
