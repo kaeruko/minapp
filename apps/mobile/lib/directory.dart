@@ -9,6 +9,33 @@ const int supportedDirectorySchemaVersion = 1;
 const int supportedTenantApiProtocolVersion = 1;
 const int maxDescriptorValidForSeconds = 86400;
 
+class AppUpdateRequiredException implements Exception {
+  const AppUpdateRequiredException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+class DirectoryConnectionException implements Exception {
+  const DirectoryConnectionException(this.cause);
+
+  final Object cause;
+
+  @override
+  String toString() => 'Directory connection failed: $cause';
+}
+
+class TenantConnectionException implements Exception {
+  const TenantConnectionException(this.cause);
+
+  final Object cause;
+
+  @override
+  String toString() => 'Tenant connection failed: $cause';
+}
+
 class TenantDescriptor {
   const TenantDescriptor({
     required this.tenantId,
@@ -39,7 +66,9 @@ class TenantDescriptor {
 
     final int schemaVersion = _requiredInt(json, 'schema_version');
     if (schemaVersion != supportedDirectorySchemaVersion) {
-      throw FormatException('Unsupported Directory schema_version: $schemaVersion');
+      throw AppUpdateRequiredException(
+        'Unsupported Directory schema_version: $schemaVersion',
+      );
     }
 
     final String tenantId = validateTenantId(_requiredString(json, 'tenant_id'));
@@ -50,7 +79,7 @@ class TenantDescriptor {
     );
     final int apiProtocolVersion = _requiredInt(json, 'api_protocol_version');
     if (apiProtocolVersion != supportedTenantApiProtocolVersion) {
-      throw FormatException(
+      throw AppUpdateRequiredException(
         'Unsupported tenant api_protocol_version: $apiProtocolVersion',
       );
     }
@@ -98,53 +127,81 @@ class MinAppDirectoryClient implements MinAppDirectory {
     if (classroomCode.isEmpty) {
       throw ArgumentError.value(classroomCode, 'classroomCode', 'must not be empty');
     }
-    final Map<String, Object?> payload = await _jsonRequest(
-      method: 'POST',
-      uri: _baseUri.resolve('/v1/classrooms/resolve'),
-      body: <String, Object?>{'code': classroomCode},
-    );
-    return TenantDescriptor.fromJson(payload);
+    try {
+      final Map<String, Object?> payload = await _jsonRequest(
+        method: 'POST',
+        uri: _baseUri.resolve('/v1/classrooms/resolve'),
+        body: <String, Object?>{'code': classroomCode},
+      );
+      return TenantDescriptor.fromJson(payload);
+    } on ApiException {
+      rethrow;
+    } on AppUpdateRequiredException {
+      rethrow;
+    } on FormatException {
+      rethrow;
+    } catch (error) {
+      throw DirectoryConnectionException(error);
+    }
   }
 
   @override
   Future<TenantDescriptor> refreshTenant(String tenantId) async {
     final String validatedTenantId = validateTenantId(tenantId);
-    final Map<String, Object?> payload = await _jsonRequest(
-      method: 'GET',
-      uri: _baseUri.resolve('/v1/tenants/$validatedTenantId'),
-    );
-    final TenantDescriptor descriptor = TenantDescriptor.fromJson(payload);
-    if (descriptor.tenantId != validatedTenantId) {
-      throw const FormatException('Directory returned a different tenant_id.');
+    try {
+      final Map<String, Object?> payload = await _jsonRequest(
+        method: 'GET',
+        uri: _baseUri.resolve('/v1/tenants/$validatedTenantId'),
+      );
+      final TenantDescriptor descriptor = TenantDescriptor.fromJson(payload);
+      if (descriptor.tenantId != validatedTenantId) {
+        throw const FormatException('Directory returned a different tenant_id.');
+      }
+      return descriptor;
+    } on ApiException {
+      rethrow;
+    } on AppUpdateRequiredException {
+      rethrow;
+    } on FormatException {
+      rethrow;
+    } catch (error) {
+      throw DirectoryConnectionException(error);
     }
-    return descriptor;
   }
 
   @override
   Future<void> verifyTenantEndpoint(TenantDescriptor descriptor) async {
-    final Map<String, Object?> payload = await _jsonRequest(
-      method: 'GET',
-      uri: descriptor.apiBaseUrl.resolve('/tenant-info'),
-    );
-    _requireExactFields(payload, const <String>{
-      'service',
-      'tenant_id',
-      'api_protocol_version',
-      'environment',
-    });
-    if (_requiredString(payload, 'service') != 'minapp-tenant-api') {
-      throw const FormatException('tenant-info service mismatch.');
-    }
-    if (validateTenantId(_requiredString(payload, 'tenant_id')) !=
-        descriptor.tenantId) {
-      throw const FormatException('tenant-info tenant_id mismatch.');
-    }
-    if (_requiredInt(payload, 'api_protocol_version') !=
-        descriptor.apiProtocolVersion) {
-      throw const FormatException('tenant-info api_protocol_version mismatch.');
-    }
-    if (_requiredString(payload, 'environment').isEmpty) {
-      throw const FormatException('tenant-info environment is invalid.');
+    try {
+      final Map<String, Object?> payload = await _jsonRequest(
+        method: 'GET',
+        uri: descriptor.apiBaseUrl.resolve('/tenant-info'),
+      );
+      _requireExactFields(payload, const <String>{
+        'service',
+        'tenant_id',
+        'api_protocol_version',
+        'environment',
+      });
+      if (_requiredString(payload, 'service') != 'minapp-tenant-api') {
+        throw const FormatException('tenant-info service mismatch.');
+      }
+      if (validateTenantId(_requiredString(payload, 'tenant_id')) !=
+          descriptor.tenantId) {
+        throw const FormatException('tenant-info tenant_id mismatch.');
+      }
+      if (_requiredInt(payload, 'api_protocol_version') !=
+          descriptor.apiProtocolVersion) {
+        throw const AppUpdateRequiredException(
+          'tenant-info api_protocol_version mismatch.',
+        );
+      }
+      if (_requiredString(payload, 'environment').isEmpty) {
+        throw const FormatException('tenant-info environment is invalid.');
+      }
+    } on AppUpdateRequiredException {
+      rethrow;
+    } catch (error) {
+      throw TenantConnectionException(error);
     }
   }
 
