@@ -18,9 +18,17 @@ class FakePhase2Backend:
     def __init__(self) -> None:
         self.last_call: tuple[Any, ...] | None = None
 
-    def upload_app(self, auth_subject: str, group_id: str, title: str, filename: str, zip_bytes: bytes) -> dict[str, Any]:
-        self.last_call = ("upload", auth_subject, group_id, title, filename, zip_bytes)
-        return {
+    def upload_app(
+        self,
+        auth_subject: str,
+        group_id: str,
+        title: str,
+        filename: str,
+        zip_bytes: bytes,
+        description: str | None = None,
+    ) -> dict[str, Any]:
+        self.last_call = ("upload", auth_subject, group_id, title, filename, zip_bytes, description)
+        payload: dict[str, Any] = {
             "app_id": "b" * 32,
             "version_id": "c" * 32,
             "group_id": group_id,
@@ -32,6 +40,9 @@ class FakePhase2Backend:
             "status": "draft",
             "created_at": "2026-08-18T00:00:00Z",
         }
+        if description is not None:
+            payload["description"] = description
+        return payload
 
     def list_my_apps(self, auth_subject: str) -> list[dict[str, Any]]:
         self.last_call = ("list_my_apps", auth_subject)
@@ -104,8 +115,58 @@ class Phase2HandlerTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 201)
         self.assertEqual(
             self.backend.last_call,
-            ("upload", "cognito-sub", group_id, "時間割", "timetable.zip", zip_bytes),
+            ("upload", "cognito-sub", group_id, "時間割", "timetable.zip", zip_bytes, None),
         )
+
+    def test_binary_zip_upload_accepts_optional_description(self) -> None:
+        group_id = "a" * 32
+        zip_bytes = b"PK-test"
+        description = "今日の時間割を確認する\nアプリです。"
+        context = _auth_context()
+        context["http"] = {"method": "POST"}
+        response = handler.lambda_handler(
+            {
+                "rawPath": f"/groups/{group_id}/apps",
+                "requestContext": context,
+                "queryStringParameters": {
+                    "title": "時間割",
+                    "filename": "timetable.zip",
+                    "description": description,
+                },
+                "headers": {"content-type": "application/zip"},
+                "body": base64.b64encode(zip_bytes).decode("ascii"),
+                "isBase64Encoded": True,
+            },
+            None,
+        )
+        self.assertEqual(response["statusCode"], 201)
+        self.assertEqual(
+            self.backend.last_call,
+            ("upload", "cognito-sub", group_id, "時間割", "timetable.zip", zip_bytes, description),
+        )
+        self.assertEqual(json.loads(response["body"])["description"], description)
+
+    def test_upload_rejects_empty_description_when_parameter_is_present(self) -> None:
+        group_id = "a" * 32
+        context = _auth_context()
+        context["http"] = {"method": "POST"}
+        response = handler.lambda_handler(
+            {
+                "rawPath": f"/groups/{group_id}/apps",
+                "requestContext": context,
+                "queryStringParameters": {
+                    "title": "時間割",
+                    "filename": "timetable.zip",
+                    "description": "",
+                },
+                "headers": {"content-type": "application/zip"},
+                "body": base64.b64encode(b"PK-test").decode("ascii"),
+                "isBase64Encoded": True,
+            },
+            None,
+        )
+        self.assertEqual(response["statusCode"], 400)
+        self.assertEqual(json.loads(response["body"])["error"], "invalid_request")
 
     def test_upload_rejects_non_base64_binary_transport(self) -> None:
         group_id = "a" * 32
