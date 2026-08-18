@@ -7,7 +7,7 @@ from typing import Any
 
 from aws_backend import _item_string, _string_attr
 from errors import ApiProblem
-from phase2_backend import _now_iso, _safe_zip_paths
+from phase2_backend import _now_iso, _optional_item_string, _safe_zip_paths
 from phase3_backend import Phase3AwsBackend
 
 
@@ -121,6 +121,10 @@ class Phase4AwsBackend(Phase3AwsBackend):
             "files_json": _string_attr(json.dumps(files, ensure_ascii=False, separators=(",", ":"))),
             "created_at": _string_attr(created_at),
         }
+        description = _optional_item_string(meta, "description")
+        if description is not None:
+            common["description"] = _string_attr(description)
+
         version = {"pk": _string_attr(f"APP#{app_id}"), "sk": _string_attr(f"VERSION#{version_id}"), **common}
         group_index = {"pk": _string_attr(f"GROUP#{group_id}"), "sk": _string_attr(f"APP#{app_id}#VERSION#{version_id}"), **common}
         user_index = {"pk": _string_attr(f"USER#{student.user_id}"), "sk": _string_attr(f"APP#{app_id}#VERSION#{version_id}"), **common}

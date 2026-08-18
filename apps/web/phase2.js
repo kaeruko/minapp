@@ -1,6 +1,7 @@
 "use strict";
 
 const PHASE2_MAX_ZIP_BYTES = 2 * 1024 * 1024;
+const PHASE2_MAX_DESCRIPTION_CHARS = 200;
 
 const phase2Panel = document.createElement("section");
 phase2Panel.id = "phase2-panel";
@@ -19,6 +20,11 @@ phase2Panel.innerHTML = `
       <h3>作品をアップロード</h3>
       <label>グループ<select id="app-upload-group" required></select></label>
       <label>作品名<input id="app-title" maxlength="80" placeholder="例: ねんね組の時間割" required /></label>
+      <label>
+        アプリの説明（任意）
+        <textarea id="app-description" maxlength="200" rows="4" placeholder="どんなアプリか、使い方などを書けます"></textarea>
+        <span class="field-help">200文字まで。入力した場合は公開アプリの詳細画面に表示されます。</span>
+      </label>
       <label>ZIPファイル<input id="app-zip" type="file" accept=".zip,application/zip" required /></label>
       <button class="button" type="submit">ZIPをアップロード</button>
       <p id="app-upload-error" class="form-error hidden" role="alert"></p>
@@ -59,6 +65,7 @@ const phase2Teacher = requiredElement("phase2-teacher");
 const uploadForm = requiredElement("app-upload-form");
 const uploadGroup = requiredElement("app-upload-group");
 const appTitleInput = requiredElement("app-title");
+const appDescriptionInput = requiredElement("app-description");
 const appZipInput = requiredElement("app-zip");
 const uploadError = requiredElement("app-upload-error");
 const uploadResult = requiredElement("app-upload-result");
@@ -77,6 +84,7 @@ const previewFrame = requiredElement("preview-frame");
 if (!(uploadForm instanceof HTMLFormElement)) throw new Error("#app-upload-form must be a form.");
 if (!(uploadGroup instanceof HTMLSelectElement)) throw new Error("#app-upload-group must be a select.");
 if (!(appTitleInput instanceof HTMLInputElement)) throw new Error("#app-title must be an input.");
+if (!(appDescriptionInput instanceof HTMLTextAreaElement)) throw new Error("#app-description must be a textarea.");
 if (!(appZipInput instanceof HTMLInputElement)) throw new Error("#app-zip must be an input.");
 if (!(reviewGroup instanceof HTMLSelectElement)) throw new Error("#review-group must be a select.");
 if (!(previewFrame instanceof HTMLIFrameElement)) throw new Error("#preview-frame must be an iframe.");
@@ -134,6 +142,14 @@ function phase2ValidateApp(item) {
     typeof item.created_at !== "string"
   ) {
     throw new Error("作品APIのレスポンス形式が不正です。");
+  }
+  if (
+    item.description !== undefined &&
+    (typeof item.description !== "string" ||
+      item.description.length < 1 ||
+      item.description.length > PHASE2_MAX_DESCRIPTION_CHARS)
+  ) {
+    throw new Error("作品APIの説明文形式が不正です。");
   }
   phase2StatusLabel(item.status);
 }
@@ -210,6 +226,17 @@ uploadForm.addEventListener("submit", async (event) => {
     phase2SetMessage(uploadError, "作品名は前後に空白を入れず、1〜80文字で入力してください。");
     return;
   }
+  const description = appDescriptionInput.value;
+  if (description.length > 0) {
+    if (description !== description.trim() || description.length > PHASE2_MAX_DESCRIPTION_CHARS) {
+      phase2SetMessage(uploadError, "アプリの説明は前後に空白を入れず、200文字以内で入力してください。");
+      return;
+    }
+    if ([...description].some((char) => (char.charCodeAt(0) < 0x20 && char !== "\n") || char.charCodeAt(0) === 0x7f)) {
+      phase2SetMessage(uploadError, "アプリの説明に使用できない制御文字が含まれています。");
+      return;
+    }
+  }
   if (appZipInput.files === null || appZipInput.files.length !== 1) {
     phase2SetMessage(uploadError, "ZIPファイルを1つ選んでください。");
     return;
@@ -229,9 +256,11 @@ uploadForm.addEventListener("submit", async (event) => {
   submitButton.disabled = true;
   try {
     const params = new URLSearchParams({ title, filename: file.name });
+    if (description.length > 0) params.set("description", description);
     const payload = await phase2BinaryUpload(`/groups/${groupId}/apps?${params.toString()}`, file);
     phase2ValidateApp(payload);
     appTitleInput.value = "";
+    appDescriptionInput.value = "";
     appZipInput.value = "";
     phase2SetMessage(uploadResult, "アップロードできました。内容を確認して「公開申請」を押してください。");
     await phase2LoadMyApps();
@@ -268,10 +297,17 @@ function phase2AppCard(app, teacherReview) {
   const meta = document.createElement("p");
   meta.className = "member-meta";
   meta.textContent = `${app.group_name} · ${app.owner_login_id} · ${phase2StatusLabel(app.status)}`;
+  main.append(title, meta);
+  if (typeof app.description === "string") {
+    const description = document.createElement("p");
+    description.className = "phase2-description";
+    description.textContent = app.description;
+    main.append(description);
+  }
   const filename = document.createElement("p");
   filename.className = "phase2-filename";
   filename.textContent = app.filename;
-  main.append(title, meta, filename);
+  main.append(filename);
 
   const actions = document.createElement("div");
   actions.className = "phase2-actions";

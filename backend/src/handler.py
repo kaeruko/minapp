@@ -41,6 +41,7 @@ class Backend(Protocol):
         title: str,
         filename: str,
         zip_bytes: bytes,
+        description: str | None = None,
     ) -> dict[str, Any]: ...
     def list_my_apps(self, auth_subject: str) -> list[dict[str, Any]]: ...
     def submit_app(
@@ -245,11 +246,13 @@ def _query_string(
     max_length: int,
 ) -> str:
     params = _query_parameters(event)
-    if set(params) != {"title", "filename"}:
-        missing = {"title", "filename"} - set(params)
-        unknown = set(params) - {"title", "filename"}
-        if missing:
-            raise ApiProblem(400, "invalid_request", f"Missing query parameter(s): {', '.join(sorted(missing))}.")
+    required = {"title", "filename"}
+    allowed = required | {"description"}
+    missing = required - set(params)
+    if missing:
+        raise ApiProblem(400, "invalid_request", f"Missing query parameter(s): {', '.join(sorted(missing))}.")
+    unknown = set(params) - allowed
+    if unknown:
         raise ApiProblem(400, "invalid_request", f"Unknown query parameter(s): {', '.join(sorted(unknown))}.")
     value = params[field]
     if len(value) < min_length or len(value) > max_length:
@@ -296,6 +299,20 @@ def _zip_filename(event: dict[str, Any]) -> str:
     value = _query_string(event, "filename", min_length=5, max_length=120)
     if value != value.strip() or "/" in value or "\\" in value or not value.lower().endswith(".zip"):
         raise ApiProblem(400, "invalid_request", "filename must be a simple .zip filename.")
+    return value
+
+
+def _app_description(event: dict[str, Any]) -> str | None:
+    params = _query_parameters(event)
+    value = params.get("description")
+    if value is None:
+        return None
+    if len(value) < 1 or len(value) > 200:
+        raise ApiProblem(400, "invalid_request", "description must be between 1 and 200 characters when provided.")
+    if value != value.strip():
+        raise ApiProblem(400, "invalid_request", "description must not have leading or trailing whitespace.")
+    if any((ord(char) < 0x20 and char != "\n") or ord(char) == 0x7F for char in value):
+        raise ApiProblem(400, "invalid_request", "description contains unsupported control characters.")
     return value
 
 
@@ -428,6 +445,7 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
             _app_title(event),
             _zip_filename(event),
             _zip_body(event),
+            _app_description(event),
         )
         return _json_response(201, result)
 

@@ -73,6 +73,7 @@ class _AppDetailPageState extends State<AppDetailPage> {
   Widget build(BuildContext context) {
     final PublishedApp app = widget.app;
     final AppVisual visual = appVisualFor(app);
+    final String? description = app.description;
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -170,17 +171,17 @@ class _AppDetailPageState extends State<AppDetailPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          const Row(
+                          Row(
                             children: <Widget>[
-                              Icon(
+                              const Icon(
                                 Icons.info_outline_rounded,
                                 size: 20,
                                 color: _brandBlue,
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Text(
-                                'アプリの情報',
-                                style: TextStyle(
+                                description == null ? 'アプリの情報' : 'アプリの説明',
+                                style: const TextStyle(
                                   color: _brandBlue,
                                   fontWeight: FontWeight.w900,
                                   fontSize: 16,
@@ -190,8 +191,9 @@ class _AppDetailPageState extends State<AppDetailPage> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            '「${app.title}」は ${app.groupName} で公開されているアプリです。'
-                            '${_dateLabel(app.reviewedAt)}に先生の承認を受けた最新版です。',
+                            description ??
+                                '「${app.title}」は ${app.groupName} で公開されているアプリです。'
+                                    '${_dateLabel(app.reviewedAt)}に先生の承認を受けた最新版です。',
                             style: const TextStyle(
                               color: Color(0xFF334155),
                               fontSize: 16,

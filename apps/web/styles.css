@@ -7,7 +7,7 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; min-height: 100vh; }
-button, input, select { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 
 .site-header {
@@ -45,8 +45,10 @@ h3 { margin-bottom: 12px; }
 .dashboard { display: grid; gap: 20px; }
 .form-stack { display: grid; gap: 16px; }
 label { display: grid; gap: 7px; color: #33405a; font-size: 0.92rem; font-weight: 700; }
-input, select { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #cfd7e5; border-radius: 11px; background: #fff; color: #182033; }
-input:focus, select:focus { outline: 3px solid rgba(55, 103, 200, 0.15); border-color: #3767c8; }
+input, select, textarea { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #cfd7e5; border-radius: 11px; background: #fff; color: #182033; }
+textarea { min-height: 108px; resize: vertical; line-height: 1.6; }
+input:focus, select:focus, textarea:focus { outline: 3px solid rgba(55, 103, 200, 0.15); border-color: #3767c8; }
+.field-help { color: #778297; font-size: 0.78rem; font-weight: 500; line-height: 1.5; }
 .button { min-height: 44px; padding: 10px 16px; border: 0; border-radius: 11px; background: #3767c8; color: #fff; font-weight: 800; }
 .button:hover { background: #2d58ad; }
 .button:disabled { cursor: not-allowed; opacity: 0.55; }
@@ -78,6 +80,7 @@ input:focus, select:focus { outline: 3px solid rgba(55, 103, 200, 0.15); border-
 .member-id { margin: 0 0 5px; overflow-wrap: anywhere; font-weight: 800; }
 .member-meta { margin: 0; color: #6a7589; font-size: 0.85rem; }
 .member-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.phase2-description { margin: 9px 0 0; color: #3f4c63; font-size: 0.9rem; line-height: 1.65; white-space: pre-wrap; }
 .hidden { display: none !important; }
 
 @media (max-width: 720px) {

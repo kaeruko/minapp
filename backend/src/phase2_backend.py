@@ -61,6 +61,18 @@ def _item_number(item: dict[str, Any], key: str) -> int:
         raise RuntimeError(f"DynamoDB attribute {key!r} is not an integer") from exc
 
 
+def _optional_item_string(item: dict[str, Any], key: str) -> str | None:
+    raw = item.get(key)
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise RuntimeError(f"DynamoDB item has invalid optional string attribute {key!r}")
+    value = raw.get("S")
+    if not isinstance(value, str) or not value:
+        raise RuntimeError(f"DynamoDB optional attribute {key!r} is not a non-empty string")
+    return value
+
+
 def _safe_zip_paths(data: bytes) -> list[str]:
     if not isinstance(data, bytes):
         raise TypeError("ZIP payload must be bytes")
@@ -196,11 +208,18 @@ class Phase2AwsBackend(AwsBackend):
         title: str,
         filename: str,
         zip_bytes: bytes,
+        description: str | None = None,
     ) -> dict[str, Any]:
         student = self._user_by_auth_subject(auth_subject)
         self._require_role(student, "student")
         group_name = self._require_active_membership(student.user_id, group_id, "student")
         files = _safe_zip_paths(zip_bytes)
+
+        if description is not None:
+            if not isinstance(description, str):
+                raise TypeError("description must be a string or None")
+            if len(description) < 1 or len(description) > 200:
+                raise ValueError("description must be between 1 and 200 characters")
 
         app_id = uuid.uuid4().hex
         version_id = uuid.uuid4().hex
@@ -239,6 +258,9 @@ class Phase2AwsBackend(AwsBackend):
             "files_json": _string_attr(json.dumps(files, ensure_ascii=False, separators=(",", ":"))),
             "created_at": _string_attr(created_at),
         }
+        if description is not None:
+            common["description"] = _string_attr(description)
+
         app_meta = {
             "pk": _string_attr(f"APP#{app_id}"),
             "sk": _string_attr("META"),
@@ -251,6 +273,9 @@ class Phase2AwsBackend(AwsBackend):
             "title": _string_attr(title),
             "created_at": _string_attr(created_at),
         }
+        if description is not None:
+            app_meta["description"] = _string_attr(description)
+
         version = {"pk": _string_attr(f"APP#{app_id}"), "sk": _string_attr(f"VERSION#{version_id}"), **common}
         group_index = {"pk": _string_attr(f"GROUP#{group_id}"), "sk": _string_attr(f"APP#{app_id}#VERSION#{version_id}"), **common}
         user_index = {"pk": _string_attr(f"USER#{student.user_id}"), "sk": _string_attr(f"APP#{app_id}#VERSION#{version_id}"), **common}
@@ -519,6 +544,9 @@ class Phase2AwsBackend(AwsBackend):
             "status": _item_string(item, "status"),
             "created_at": _item_string(item, "created_at"),
         }
+        description = _optional_item_string(item, "description")
+        if description is not None:
+            payload["description"] = description
         for key in ("submitted_at", "reviewed_at"):
             raw = item.get(key)
             if isinstance(raw, dict) and isinstance(raw.get("S"), str):

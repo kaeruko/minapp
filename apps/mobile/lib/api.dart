@@ -29,6 +29,7 @@ class PublishedApp {
     required this.ownerLoginId,
     required this.title,
     required this.reviewedAt,
+    this.description,
   });
 
   final String appId;
@@ -38,6 +39,7 @@ class PublishedApp {
   final String ownerLoginId;
   final String title;
   final DateTime reviewedAt;
+  final String? description;
 
   factory PublishedApp.fromJson(Map<String, Object?> json) {
     final String status = _requiredString(json, 'status');
@@ -52,6 +54,7 @@ class PublishedApp {
       ownerLoginId: _requiredString(json, 'owner_login_id'),
       title: _requiredString(json, 'title'),
       reviewedAt: DateTime.parse(_requiredString(json, 'reviewed_at')).toUtc(),
+      description: _optionalDescription(json),
     );
   }
 }
@@ -275,6 +278,17 @@ String _requiredString(Map<String, Object?> json, String key) {
   final Object? value = json[key];
   if (value is! String || value.isEmpty) {
     throw FormatException('JSON field $key must be a non-empty string.');
+  }
+  return value;
+}
+
+String? _optionalDescription(Map<String, Object?> json) {
+  final Object? value = json['description'];
+  if (value == null) return null;
+  if (value is! String || value.isEmpty || value.length > 200) {
+    throw const FormatException(
+      'JSON field description must be a non-empty string up to 200 characters when present.',
+    );
   }
   return value;
 }
