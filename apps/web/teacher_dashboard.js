@@ -107,9 +107,10 @@ teacherPortalRoot.innerHTML = `
             <p id="teacher-create-group-error" class="teacher-inline-error hidden" role="alert"></p>
           </form>
           <form id="teacher-create-student-form" class="teacher-management-card">
-            <h3>生徒IDを発行</h3>
-            <p class="teacher-management-note">現在選択しているクラスに、生徒IDと仮パスワードを1人分発行します。</p>
-            <button class="teacher-primary-button" type="submit">生徒IDを1人分発行</button>
+            <h3>生徒を追加</h3>
+            <label>ログインID<input id="teacher-student-login-id" maxlength="32" pattern="[a-z0-9][a-z0-9-]{2,31}" autocomplete="off" placeholder="例: yamada" required /></label>
+            <p class="teacher-management-note">英小文字・数字・ハイフンで3〜32文字。覚えやすいIDを決められます。本名でなくてもOKです。</p>
+            <button class="teacher-primary-button" type="submit">このIDで生徒を追加</button>
             <p id="teacher-create-student-error" class="teacher-inline-error hidden" role="alert"></p>
           </form>
         </div>
@@ -216,6 +217,7 @@ const teacherPortalCreateGroupForm = requiredElement("teacher-create-group-form"
 const teacherPortalGroupName = requiredElement("teacher-group-name");
 const teacherPortalCreateGroupError = requiredElement("teacher-create-group-error");
 const teacherPortalCreateStudentForm = requiredElement("teacher-create-student-form");
+const teacherPortalStudentLoginId = requiredElement("teacher-student-login-id");
 const teacherPortalCreateStudentError = requiredElement("teacher-create-student-error");
 const teacherPortalIssuedCredentials = requiredElement("teacher-issued-credentials");
 const teacherPortalIssuedLogin = requiredElement("teacher-issued-login");
@@ -243,6 +245,7 @@ if (!(teacherPortalClassSelect instanceof HTMLSelectElement)) throw new Error("#
 if (!(teacherPortalCreateGroupForm instanceof HTMLFormElement)) throw new Error("#teacher-create-group-form must be a form.");
 if (!(teacherPortalGroupName instanceof HTMLInputElement)) throw new Error("#teacher-group-name must be an input.");
 if (!(teacherPortalCreateStudentForm instanceof HTMLFormElement)) throw new Error("#teacher-create-student-form must be a form.");
+if (!(teacherPortalStudentLoginId instanceof HTMLInputElement)) throw new Error("#teacher-student-login-id must be an input.");
 if (!(teacherPortalPreviewFrame instanceof HTMLIFrameElement)) throw new Error("#teacher-preview-frame must be an iframe.");
 if (!(teacherPortalApproveButton instanceof HTMLButtonElement)) throw new Error("#teacher-approve-button must be a button.");
 
@@ -745,11 +748,21 @@ teacherPortalCreateStudentForm.addEventListener("submit", async (event) => {
     teacherPortalSetError(teacherPortalCreateStudentError, "生徒を追加するクラスを選んでください。");
     return;
   }
+  const loginId = teacherPortalStudentLoginId.value;
+  if (!/^[a-z0-9][a-z0-9-]{2,31}$/.test(loginId)) {
+    teacherPortalSetError(teacherPortalCreateStudentError, "IDは英小文字・数字・ハイフンで3〜32文字にしてください。");
+    return;
+  }
   const button = teacherPortalCreateStudentForm.querySelector("button[type='submit']");
   if (!(button instanceof HTMLButtonElement)) throw new Error("Create student submit button was not found.");
   button.disabled = true;
   try {
-    const payload = await apiRequest(`/groups/${group.group_id}/students`, { method: "POST", authenticated: true, body: {} });
+    const payload = await apiRequest(`/groups/${group.group_id}/students`, {
+      method: "POST",
+      authenticated: true,
+      body: { login_id: loginId },
+    });
+    teacherPortalStudentLoginId.value = "";
     teacherPortalShowCredentials(payload.login_id, payload.temporary_password);
     await teacherPortalRefreshGroupData();
   } catch (error) {
