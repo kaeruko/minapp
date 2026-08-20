@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import uuid
 from dataclasses import dataclass
@@ -43,8 +44,16 @@ def _aws_error_code(exc: Exception) -> str | None:
     return code if isinstance(code, str) else None
 
 
-def _new_login_id() -> str:
-    return f"student-{secrets.token_hex(4)}"
+_LOGIN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{2,31}$")
+
+
+def _validate_login_id(login_id: str) -> str:
+    if not isinstance(login_id, str) or _LOGIN_ID_RE.fullmatch(login_id) is None:
+        raise ValueError(
+            "login_id must be 3-32 lowercase ASCII letters, digits, or hyphens, "
+            "and must start with a letter or digit"
+        )
+    return login_id
 
 
 _TEMPORARY_PASSWORD_ALPHABET = "23456789"
@@ -294,11 +303,16 @@ class AwsBackend:
         members.sort(key=lambda member: (member["role"], member["login_id"]))
         return members
 
-    def create_student(self, auth_subject: str, group_id: str) -> dict[str, Any]:
+    def create_student(
+        self,
+        auth_subject: str,
+        group_id: str,
+        login_id: str,
+    ) -> dict[str, Any]:
         teacher = self._user_by_auth_subject(auth_subject)
         group_name = self._require_teacher_membership(teacher.user_id, group_id)
+        login_id = _validate_login_id(login_id)
 
-        login_id = _new_login_id()
         temporary_password = _new_temporary_password()
         user_id = uuid.uuid4().hex
 
@@ -315,7 +329,7 @@ class AwsBackend:
                 raise ApiProblem(
                     409,
                     "login_id_conflict",
-                    "生成したIDが既存ユーザーと衝突しました。処理は停止しました。",
+                    "そのIDはすでに使われています。別のIDを入力してください。",
                 ) from exc
             raise
 
