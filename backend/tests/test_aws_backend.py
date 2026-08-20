@@ -172,10 +172,10 @@ class AwsBackendTests(unittest.TestCase):
         groups = self.backend.list_groups(self.teacher_subject)
         self.assertEqual(groups, [{"group_id": group["group_id"], "name": "6年2組", "role": "teacher", "status": "active"}])
 
-    def test_teacher_can_create_student_reset_password_and_remove_membership(self) -> None:
+    def test_teacher_can_create_student_with_requested_id_reset_password_and_remove_membership(self) -> None:
         group = self.backend.create_group(self.teacher_subject, "プログラミング教室")
-        created = self.backend.create_student(self.teacher_subject, group["group_id"])
-        self.assertTrue(created["login_id"].startswith("student-"))
+        created = self.backend.create_student(self.teacher_subject, group["group_id"], "yamada")
+        self.assertEqual(created["login_id"], "yamada")
         members = self.backend.list_members(self.teacher_subject, group["group_id"])
         self.assertEqual({member["role"] for member in members}, {"teacher", "student"})
         reset = self.backend.reset_student_password(self.teacher_subject, created["user_id"])
@@ -185,9 +185,23 @@ class AwsBackendTests(unittest.TestCase):
         members_after = self.backend.list_members(self.teacher_subject, group["group_id"])
         self.assertEqual([member["role"] for member in members_after], ["teacher"])
 
+    def test_duplicate_requested_login_id_is_rejected(self) -> None:
+        group = self.backend.create_group(self.teacher_subject, "教室")
+        self.backend.create_student(self.teacher_subject, group["group_id"], "yamada")
+        with self.assertRaises(ApiProblem) as caught:
+            self.backend.create_student(self.teacher_subject, group["group_id"], "yamada")
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(caught.exception.error, "login_id_conflict")
+
+    def test_invalid_requested_login_id_fails_fast(self) -> None:
+        group = self.backend.create_group(self.teacher_subject, "教室")
+        with self.assertRaisesRegex(ValueError, "login_id"):
+            self.backend.create_student(self.teacher_subject, group["group_id"], "Yamada_01")
+        self.assertNotIn("Yamada_01", self.cognito.users)
+
     def test_student_cannot_create_group(self) -> None:
         group = self.backend.create_group(self.teacher_subject, "教室")
-        created = self.backend.create_student(self.teacher_subject, group["group_id"])
+        created = self.backend.create_student(self.teacher_subject, group["group_id"], "student-demo")
         student = self.backend._user_by_id(created["user_id"])
         with self.assertRaises(ApiProblem) as caught:
             self.backend.create_group(student.auth_subject, "勝手なグループ")
@@ -195,7 +209,7 @@ class AwsBackendTests(unittest.TestCase):
 
     def test_teacher_cannot_manage_student_from_unrelated_group(self) -> None:
         group = self.backend.create_group(self.teacher_subject, "教室A")
-        created = self.backend.create_student(self.teacher_subject, group["group_id"])
+        created = self.backend.create_student(self.teacher_subject, group["group_id"], "student-a")
         other_subject = self.cognito.add_user("teacher-other", "TeacherPass2", temporary=False)
         other_teacher = _User(user_id="2" * 32, auth_subject=other_subject, login_id="teacher-other", role="teacher", status="active")
         self.backend._transact_put_new([self.backend._auth_item(other_teacher), self.backend._user_item(other_teacher)])
