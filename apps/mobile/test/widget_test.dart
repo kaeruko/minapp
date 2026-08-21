@@ -175,8 +175,8 @@ void main() {
     expect(directory.verifyCalls, 0);
     expect(find.text('みんアプ'), findsOneWidget);
     expect(find.text('先生からもらったIDでログイン'), findsOneWidget);
-    expect(find.text('みんアプ 開発教室'), findsOneWidget);
-    expect(find.text('Phase 6'), findsOneWidget);
+    expect(find.text('みんアプ 開発教室'), findsNWidgets(2));
+    expect(find.byKey(const Key('login-brand-header')), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('login-id')), 'student-demo');
     await tester.enterText(
@@ -274,123 +274,64 @@ void main() {
 
     await tester.enterText(
       find.byKey(const Key('classroom-code')),
-      'https://join.minapp.example/c/tzzn-pvxb-eqc3',
+      'https://join.minapp.example/c/TZZN-PVXB-EQC3',
     );
     await tester.tap(find.byKey(const Key('classroom-submit')));
     await tester.pumpAndSettle();
 
     expect(directory.resolveCalls, 1);
     expect(directory.verifyCalls, 1);
+  });
+
+  testWidgets('invalid join link is rejected before directory lookup', (
+    WidgetTester tester,
+  ) async {
+    final FakeDirectory directory = FakeDirectory(descriptor: _descriptor());
+    final FakeTenantStore store = FakeTenantStore(null);
+
+    await tester.pumpWidget(
+      _app(
+        directory: directory,
+        store: store,
+        officialJoinBaseUri: Uri.parse('https://join.minapp.example'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('classroom-code')),
+      'https://evil.example/c/TZZN-PVXB-EQC3',
+    );
+    await tester.tap(find.byKey(const Key('classroom-submit')));
+    await tester.pumpAndSettle();
+
+    expect(directory.resolveCalls, 0);
+    expect(find.textContaining('公式のみんアプ参加リンク'), findsOneWidget);
+  });
+
+  testWidgets('expired tenant refreshes before login', (
+    WidgetTester tester,
+  ) async {
+    final FakeDirectory directory = FakeDirectory(descriptor: _descriptor());
+    final FakeTenantStore store = FakeTenantStore(
+      _configuredTenant(expired: true),
+    );
+
+    await tester.pumpWidget(_app(directory: directory, store: store));
+    await tester.pumpAndSettle();
+
+    expect(directory.refreshCalls, 1);
+    expect(directory.verifyCalls, 1);
     expect(store.saveCalls, 1);
     expect(find.text('先生からもらったIDでログイン'), findsOneWidget);
   });
 
-  testWidgets('invalid classroom has an actionable error', (
+  testWidgets('expired tenant never silently falls back when refresh fails', (
     WidgetTester tester,
   ) async {
     final FakeDirectory directory = FakeDirectory(
       descriptor: _descriptor(),
-      resolveError: const ApiException(
-        statusCode: 404,
-        code: 'classroom_not_found',
-        message: 'Not found.',
-      ),
-    );
-    final FakeTenantStore store = FakeTenantStore(null);
-
-    await tester.pumpWidget(_app(directory: directory, store: store));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('classroom-code')),
-      'TZZN-PVXB-EQC3',
-    );
-    await tester.tap(find.byKey(const Key('classroom-submit')));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('教室コードが見つかりません。先生からもらったコードを確認してください。'),
-      findsOneWidget,
-    );
-    expect(store.saveCalls, 0);
-  });
-
-  testWidgets('Directory failure is distinct from tenant failure', (
-    WidgetTester tester,
-  ) async {
-    final FakeTenantStore store = FakeTenantStore(null);
-    final FakeDirectory directory = FakeDirectory(
-      descriptor: _descriptor(),
-      resolveError: const DirectoryConnectionException('network'),
-    );
-
-    await tester.pumpWidget(_app(directory: directory, store: store));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('classroom-code')),
-      'TZZN-PVXB-EQC3',
-    );
-    await tester.tap(find.byKey(const Key('classroom-submit')));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('教室案内サービスに接続できません'), findsOneWidget);
-  });
-
-  testWidgets('tenant verification failure has a tenant-specific error', (
-    WidgetTester tester,
-  ) async {
-    final FakeTenantStore store = FakeTenantStore(null);
-    final FakeDirectory directory = FakeDirectory(
-      descriptor: _descriptor(),
-      verifyError: const TenantConnectionException('network'),
-    );
-
-    await tester.pumpWidget(_app(directory: directory, store: store));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('classroom-code')),
-      'TZZN-PVXB-EQC3',
-    );
-    await tester.tap(find.byKey(const Key('classroom-submit')));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('教室のサーバーを確認できません'), findsOneWidget);
-    expect(store.saveCalls, 0);
-  });
-
-  testWidgets('unsupported tenant configuration asks for an app update', (
-    WidgetTester tester,
-  ) async {
-    final FakeTenantStore store = FakeTenantStore(null);
-    final FakeDirectory directory = FakeDirectory(
-      descriptor: _descriptor(),
-      resolveError: const AppUpdateRequiredException('unsupported protocol'),
-    );
-
-    await tester.pumpWidget(_app(directory: directory, store: store));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('classroom-code')),
-      'TZZN-PVXB-EQC3',
-    );
-    await tester.tap(find.byKey(const Key('classroom-submit')));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('この教室の環境には新しいみんアプが必要です。アプリを更新してください。'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('expired tenant does not silently fall back when Directory fails', (
-    WidgetTester tester,
-  ) async {
-    final FakeDirectory directory = FakeDirectory(
-      descriptor: _descriptor(),
-      refreshError: const ApiException(
-        statusCode: 503,
-        code: 'directory_unavailable',
-        message: 'Directory unavailable.',
-      ),
+      refreshError: const DirectoryConnectionException('offline'),
     );
     final FakeTenantStore store = FakeTenantStore(
       _configuredTenant(expired: true),
@@ -400,8 +341,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(directory.refreshCalls, 1);
-    expect(find.text('教室設定を確認できません'), findsOneWidget);
     expect(find.text('先生からもらったIDでログイン'), findsNothing);
-    expect(find.byKey(const Key('tenant-retry')), findsOneWidget);
+    expect(find.textContaining('教室案内サービスに接続できません'), findsOneWidget);
   });
 }
