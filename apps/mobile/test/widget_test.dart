@@ -175,8 +175,8 @@ void main() {
     expect(directory.verifyCalls, 0);
     expect(find.text('みんアプ'), findsOneWidget);
     expect(find.text('先生からもらったIDでログイン'), findsOneWidget);
-    expect(find.text('みんアプ 開発教室'), findsOneWidget);
-    expect(find.text('Phase 6'), findsOneWidget);
+    expect(find.text('みんアプ 開発教室'), findsNWidgets(2));
+    expect(find.byKey(const Key('login-brand-header')), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('login-id')), 'student-demo');
     await tester.enterText(
