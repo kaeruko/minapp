@@ -1,0 +1,1019 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ごしゅじんどこわん</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Hiragino Maru Gothic ProN", "Yu Gothic", system-ui, sans-serif;
+      background: #fff8eb;
+      color: #5c3823;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+      overflow: hidden;
+      overscroll-behavior: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .game {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+      min-height: 520px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 13% 12%, #fff 0 3px, transparent 4px),
+        radial-gradient(circle at 82% 18%, #fff 0 4px, transparent 5px),
+        linear-gradient(#bce8ff 0 31%, #fff1cc 31% 78%, #d8a56d 78% 100%);
+    }
+
+    .game::before {
+      content: "";
+      position: absolute;
+      inset: 31% 0 auto;
+      height: 13px;
+      border-top: 4px solid #e8bc85;
+      background: #f7dcae;
+    }
+
+    .topbar {
+      position: absolute;
+      z-index: 40;
+      top: max(10px, env(safe-area-inset-top));
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .pill {
+      min-width: 88px;
+      padding: 8px 13px;
+      border: 3px solid #fff;
+      border-radius: 999px;
+      background: #fff8e8e8;
+      box-shadow: 0 4px 0 #c98653;
+      color: #7c3f20;
+      font-size: 14px;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .room-title {
+      position: absolute;
+      z-index: 12;
+      top: 64px;
+      left: 50%;
+      width: min(94%, 520px);
+      transform: translateX(-50%);
+      color: #7c4526;
+      font-size: clamp(24px, 7.5vw, 38px);
+      font-weight: 1000;
+      line-height: 1.08;
+      letter-spacing: .02em;
+      text-align: center;
+      text-shadow: 0 3px #fff;
+    }
+
+    .window {
+      position: absolute;
+      top: 106px;
+      left: 20px;
+      width: 84px;
+      height: 88px;
+      overflow: hidden;
+      border: 7px solid #fffdf5;
+      border-radius: 8px;
+      box-shadow: 0 4px 0 #c7966d;
+      background: #96d5ff;
+    }
+
+    .window::before,
+    .window::after {
+      content: "";
+      position: absolute;
+      z-index: 2;
+      background: #fffdf5;
+    }
+
+    .window::before {
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 5px;
+      transform: translateX(-50%);
+    }
+
+    .window::after {
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 5px;
+      transform: translateY(-50%);
+    }
+
+    .cloud {
+      position: absolute;
+      top: 15px;
+      left: 8px;
+      width: 38px;
+      height: 14px;
+      border-radius: 999px;
+      background: #fff;
+      box-shadow: 15px 8px 0 #fff;
+    }
+
+    .picture {
+      position: absolute;
+      top: 114px;
+      right: 25px;
+      width: 75px;
+      height: 62px;
+      display: grid;
+      place-items: center;
+      border: 7px solid #99613c;
+      border-radius: 8px;
+      background: #fff4b7;
+      box-shadow: 0 4px 0 #72452d;
+      font-size: 30px;
+      transform: rotate(2deg);
+    }
+
+    .spots {
+      position: absolute;
+      z-index: 10;
+      top: 200px;
+      left: 50%;
+      width: min(94%, 560px);
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 9px;
+      transform: translateX(-50%);
+    }
+
+    .spot {
+      position: relative;
+      min-width: 0;
+      height: 132px;
+      padding: 7px 5px 11px;
+      overflow: hidden;
+      border: 4px solid #fff;
+      border-radius: 18px;
+      background: #fffaf1;
+      box-shadow: 0 6px 0 #b97b4c;
+      color: #6f4228;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .spot:active:not(:disabled) {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 #b97b4c;
+    }
+
+    .spot:focus-visible {
+      outline: 4px solid #2563eb;
+      outline-offset: 2px;
+    }
+
+    .spot:disabled {
+      cursor: default;
+    }
+
+    .spot-icon {
+      display: block;
+      height: 79px;
+      font-size: 58px;
+      line-height: 79px;
+      filter: drop-shadow(0 3px 0 #7d4b2733);
+      transition: transform 180ms ease;
+    }
+
+    .spot-label {
+      display: block;
+      overflow: hidden;
+      font-size: clamp(11px, 3.3vw, 15px);
+      font-weight: 1000;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .spot.wrong {
+      opacity: .58;
+      filter: grayscale(.2);
+    }
+
+    .spot.wrong .spot-icon {
+      transform: rotate(-6deg) scale(.92);
+    }
+
+    .spot.found {
+      border-color: #fff1a8;
+      background: #fffbd8;
+      animation: found 600ms ease both;
+    }
+
+    .owner {
+      position: absolute;
+      z-index: 4;
+      top: 20px;
+      left: 50%;
+      display: none;
+      transform: translateX(-50%);
+      font-size: 59px;
+      line-height: 1;
+      filter: drop-shadow(0 3px #fff);
+    }
+
+    .spot.found .owner {
+      display: block;
+      animation: owner-pop 500ms cubic-bezier(.2, 1.5, .5, 1) both;
+    }
+
+    .spot.found .spot-icon {
+      opacity: .45;
+    }
+
+    @keyframes found {
+      0%, 100% { transform: rotate(0); }
+      30% { transform: rotate(-4deg) scale(1.04); }
+      65% { transform: rotate(4deg) scale(1.04); }
+    }
+
+    @keyframes owner-pop {
+      from { opacity: 0; transform: translate(-50%, 30px) scale(.4); }
+      to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    }
+
+    .speech {
+      position: absolute;
+      z-index: 25;
+      left: 50%;
+      bottom: 188px;
+      width: min(86%, 420px);
+      min-height: 55px;
+      display: grid;
+      place-items: center;
+      padding: 9px 18px;
+      transform: translateX(-50%);
+      border: 4px solid #fff;
+      border-radius: 22px;
+      background: #fff9e7f2;
+      box-shadow: 0 5px 0 #c17c4a;
+      color: #794122;
+      font-size: clamp(16px, 4.6vw, 22px);
+      font-weight: 1000;
+      line-height: 1.25;
+      text-align: center;
+    }
+
+    .speech::after {
+      content: "";
+      position: absolute;
+      bottom: -18px;
+      left: 58%;
+      width: 24px;
+      height: 24px;
+      border-right: 4px solid #fff;
+      border-bottom: 4px solid #fff;
+      background: #fff9e7;
+      transform: rotate(45deg);
+    }
+
+    .shiba {
+      position: absolute;
+      z-index: 20;
+      left: 50%;
+      bottom: 27px;
+      width: 142px;
+      height: 153px;
+      transform: translateX(-50%);
+      filter: drop-shadow(0 7px 2px #70442235);
+    }
+
+    .shiba-body {
+      position: absolute;
+      left: 31px;
+      bottom: 8px;
+      width: 88px;
+      height: 73px;
+      border: 4px solid #7a4326;
+      border-radius: 46% 48% 42% 42%;
+      background: #df8a3b;
+    }
+
+    .shiba-belly {
+      position: absolute;
+      left: 48px;
+      bottom: 7px;
+      width: 48px;
+      height: 53px;
+      border-radius: 50% 50% 42% 42%;
+      background: #fff0cd;
+    }
+
+    .shiba-leg {
+      position: absolute;
+      bottom: 0;
+      width: 29px;
+      height: 37px;
+      border: 4px solid #7a4326;
+      border-radius: 14px 14px 18px 18px;
+      background: #fff0cd;
+    }
+
+    .shiba-leg.left { left: 34px; }
+    .shiba-leg.right { right: 18px; }
+
+    .shiba-tail {
+      position: absolute;
+      right: -1px;
+      bottom: 46px;
+      width: 46px;
+      height: 46px;
+      border: 12px solid #d98236;
+      border-left-color: transparent;
+      border-radius: 50%;
+      transform: rotate(-19deg);
+      transform-origin: 8px 35px;
+    }
+
+    .shiba-head {
+      position: absolute;
+      z-index: 4;
+      top: 5px;
+      left: 17px;
+      width: 111px;
+      height: 101px;
+      border: 4px solid #7a4326;
+      border-radius: 46% 46% 50% 50%;
+      background: #e28b3c;
+    }
+
+    .shiba-ear {
+      position: absolute;
+      z-index: -1;
+      top: -20px;
+      width: 39px;
+      height: 49px;
+      border: 4px solid #7a4326;
+      background: #cc7130;
+      clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    }
+
+    .shiba-ear.left { left: 5px; transform: rotate(-10deg); }
+    .shiba-ear.right { right: 5px; transform: rotate(10deg); }
+
+    .shiba-eyebrow {
+      position: absolute;
+      top: 31px;
+      width: 20px;
+      height: 9px;
+      border-radius: 50%;
+      background: #fff0cd;
+    }
+
+    .shiba-eyebrow.left { left: 19px; transform: rotate(-7deg); }
+    .shiba-eyebrow.right { right: 19px; transform: rotate(7deg); }
+
+    .shiba-eye {
+      position: absolute;
+      top: 45px;
+      width: 10px;
+      height: 13px;
+      border-radius: 50%;
+      background: #3d281e;
+    }
+
+    .shiba-eye.left { left: 29px; }
+    .shiba-eye.right { right: 29px; }
+
+    .shiba-muzzle {
+      position: absolute;
+      left: 50%;
+      bottom: 8px;
+      width: 57px;
+      height: 38px;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: #fff0cd;
+    }
+
+    .shiba-nose {
+      position: absolute;
+      z-index: 3;
+      left: 50%;
+      bottom: 31px;
+      width: 14px;
+      height: 11px;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: #3d281e;
+    }
+
+    .shiba-mouth {
+      position: absolute;
+      z-index: 3;
+      left: 50%;
+      bottom: 17px;
+      width: 27px;
+      height: 13px;
+      transform: translateX(-50%);
+      border-bottom: 4px solid #3d281e;
+      border-radius: 0 0 50% 50%;
+    }
+
+    .shiba.sniffing {
+      animation: sniff 450ms ease 2;
+    }
+
+    .shiba.happy .shiba-tail,
+    .pet-shiba.happy .shiba-tail {
+      animation: wag 180ms ease-in-out infinite alternate;
+    }
+
+    .shiba.happy {
+      animation: happy-hop 450ms ease 2;
+    }
+
+    @keyframes sniff {
+      0%, 100% { transform: translateX(-50%) rotate(0); }
+      50% { transform: translateX(-50%) rotate(-5deg) translateY(4px); }
+    }
+
+    @keyframes happy-hop {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(-13px); }
+    }
+
+    @keyframes wag {
+      from { transform: rotate(-34deg); }
+      to { transform: rotate(17deg); }
+    }
+
+    .overlay {
+      position: absolute;
+      z-index: 100;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 22px;
+      background: #6d452d73;
+      backdrop-filter: blur(4px);
+    }
+
+    .card {
+      width: min(94%, 450px);
+      padding: 25px 20px;
+      border: 5px solid #fff;
+      border-radius: 28px;
+      background: #fff8df;
+      box-shadow: 0 10px 0 #bd7949, 0 22px 55px #51311f55;
+      text-align: center;
+    }
+
+    .card h1 {
+      margin: 0 0 10px;
+      color: #8a4723;
+      font-size: clamp(31px, 9vw, 48px);
+      line-height: 1.05;
+    }
+
+    .card p {
+      margin: 9px 0 20px;
+      font-size: clamp(15px, 4.2vw, 19px);
+      font-weight: 800;
+      line-height: 1.55;
+    }
+
+    .primary {
+      min-width: 170px;
+      min-height: 52px;
+      padding: 12px 25px;
+      border: 0;
+      border-radius: 999px;
+      background: #f07f3a;
+      box-shadow: 0 6px 0 #a84f25;
+      color: #fff;
+      font-size: 19px;
+      font-weight: 1000;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .primary:active {
+      transform: translateY(5px);
+      box-shadow: 0 1px 0 #a84f25;
+    }
+
+    .pet-card {
+      position: relative;
+      min-height: 430px;
+      overflow: hidden;
+      padding-top: 19px;
+      background: linear-gradient(#fff4d4, #ffe3c6);
+    }
+
+    .pet-card h2 {
+      position: relative;
+      z-index: 4;
+      margin: 0;
+      color: #82411f;
+      font-size: clamp(25px, 7.5vw, 36px);
+      line-height: 1.1;
+    }
+
+    .pet-hint {
+      position: relative;
+      z-index: 4;
+      margin: 7px 0 0;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .pet-zone {
+      position: relative;
+      height: 246px;
+      margin-top: 5px;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .pet-zone:active {
+      cursor: grabbing;
+    }
+
+    .pet-shiba {
+      position: absolute;
+      z-index: 3;
+      left: 50%;
+      top: 52px;
+      width: 142px;
+      height: 153px;
+      transform: translateX(-50%) scale(1.28);
+      transform-origin: center;
+      filter: drop-shadow(0 8px 2px #70442230);
+    }
+
+    .pet-shiba .shiba-eye {
+      height: 6px;
+      border-radius: 0 0 10px 10px;
+    }
+
+    .pet-shiba .shiba-mouth {
+      width: 32px;
+      height: 16px;
+    }
+
+    .meter {
+      position: relative;
+      z-index: 5;
+      height: 24px;
+      overflow: hidden;
+      border: 4px solid #fff;
+      border-radius: 999px;
+      background: #e7bd9b;
+      box-shadow: inset 0 2px 4px #6b3e2440;
+    }
+
+    .meter-fill {
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #ff7d8f, #ffb23f);
+      transition: width 100ms linear;
+    }
+
+    .heart-pop {
+      position: absolute;
+      z-index: 20;
+      pointer-events: none;
+      color: #f34c72;
+      font-size: 27px;
+      text-shadow: 0 2px #fff;
+      animation: heart-pop 850ms ease-out forwards;
+    }
+
+    @keyframes heart-pop {
+      from { opacity: 0; transform: translate(-50%, 5px) scale(.5) rotate(-8deg); }
+      25% { opacity: 1; transform: translate(-50%, -4px) scale(1.2) rotate(5deg); }
+      to { opacity: 0; transform: translate(-50%, -74px) scale(.9) rotate(-5deg); }
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-height: 620px) {
+      .game { min-height: 480px; }
+      .room-title { top: 53px; font-size: 25px; }
+      .window, .picture { display: none; }
+      .spots { top: 119px; }
+      .spot { height: 116px; }
+      .spot-icon { height: 69px; font-size: 50px; line-height: 69px; }
+      .speech { bottom: 166px; }
+      .shiba { bottom: 10px; transform: translateX(-50%) scale(.87); transform-origin: bottom; }
+      .shiba.sniffing { animation: none; }
+      .shiba.happy { animation: none; }
+      .pet-card { min-height: 405px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="game" id="game" aria-label="ごしゅじんどこわん">
+    <div class="topbar" aria-hidden="true">
+      <div class="pill">🐾 <span id="roundLabel">1 / 5</span></div>
+      <div class="pill">💗 <span id="foundLabel">0</span></div>
+    </div>
+
+    <div class="room-title">ごしゅじん どこわん？</div>
+    <div class="window"><div class="cloud"></div></div>
+    <div class="picture" aria-hidden="true">🐕</div>
+
+    <section class="spots" aria-label="さがす場所">
+      <button class="spot" type="button" data-index="0" aria-label="カーテンのうしろをさがす">
+        <span class="spot-icon" aria-hidden="true">🪟</span>
+        <span class="owner" aria-hidden="true">🙋</span>
+        <span class="spot-label">カーテン</span>
+      </button>
+      <button class="spot" type="button" data-index="1" aria-label="ソファのうしろをさがす">
+        <span class="spot-icon" aria-hidden="true">🛋️</span>
+        <span class="owner" aria-hidden="true">🙋</span>
+        <span class="spot-label">ソファ</span>
+      </button>
+      <button class="spot" type="button" data-index="2" aria-label="はこのうしろをさがす">
+        <span class="spot-icon" aria-hidden="true">📦</span>
+        <span class="owner" aria-hidden="true">🙋</span>
+        <span class="spot-label">はこ</span>
+      </button>
+    </section>
+
+    <div class="speech" id="message" role="status" aria-live="polite">く〜んく〜ん… さがすわん！</div>
+
+    <div class="shiba" id="searchShiba" aria-label="デフォルメされたしばちゃん">
+      <div class="shiba-tail"></div>
+      <div class="shiba-body"></div>
+      <div class="shiba-belly"></div>
+      <div class="shiba-leg left"></div>
+      <div class="shiba-leg right"></div>
+      <div class="shiba-head">
+        <div class="shiba-ear left"></div>
+        <div class="shiba-ear right"></div>
+        <div class="shiba-eyebrow left"></div>
+        <div class="shiba-eyebrow right"></div>
+        <div class="shiba-eye left"></div>
+        <div class="shiba-eye right"></div>
+        <div class="shiba-muzzle"></div>
+        <div class="shiba-nose"></div>
+        <div class="shiba-mouth"></div>
+      </div>
+    </div>
+
+    <section class="overlay" id="startOverlay">
+      <div class="card">
+        <h1>🐕💨</h1>
+        <h1>ごしゅじん<br>どこわん？</h1>
+        <p>おへやのどこかにいるごしゅじんを見つけて、<br>しばちゃんをいっぱいなでなでしよう！</p>
+        <button class="primary" id="startButton" type="button">さがしにいくわん！</button>
+      </div>
+    </section>
+
+    <section class="overlay hidden" id="petOverlay" aria-label="しばちゃんをなでなでする">
+      <div class="card pet-card">
+        <h2 id="petTitle">しばちゃん ここわん！</h2>
+        <p class="pet-hint" id="petHint">しばちゃんを指でなでなでしてわん♡</p>
+        <div class="pet-zone" id="petZone" aria-label="ここを指でなでてください">
+          <div class="pet-shiba happy" id="petShiba" aria-hidden="true">
+            <div class="shiba-tail"></div>
+            <div class="shiba-body"></div>
+            <div class="shiba-belly"></div>
+            <div class="shiba-leg left"></div>
+            <div class="shiba-leg right"></div>
+            <div class="shiba-head">
+              <div class="shiba-ear left"></div>
+              <div class="shiba-ear right"></div>
+              <div class="shiba-eyebrow left"></div>
+              <div class="shiba-eyebrow right"></div>
+              <div class="shiba-eye left"></div>
+              <div class="shiba-eye right"></div>
+              <div class="shiba-muzzle"></div>
+              <div class="shiba-nose"></div>
+              <div class="shiba-mouth"></div>
+            </div>
+          </div>
+        </div>
+        <div class="meter" role="progressbar" aria-label="なでなでメーター" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="meter-fill" id="meterFill"></div>
+        </div>
+        <button class="primary hidden" id="nextButton" type="button">つぎのおへやへ！</button>
+      </div>
+    </section>
+
+    <section class="overlay hidden" id="finishOverlay">
+      <div class="card">
+        <h1>💗🐕💗</h1>
+        <h1>ずっといっしょわん！</h1>
+        <p>ごしゅじんを <strong id="finishCount">5</strong>回見つけたわん！<br>なでなで、うれしいわん〜♡</p>
+        <button class="primary" id="retryButton" type="button">もういちどあそぶ！</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+
+    const totalRounds = 5;
+    const game = document.getElementById("game");
+    const roundLabel = document.getElementById("roundLabel");
+    const foundLabel = document.getElementById("foundLabel");
+    const message = document.getElementById("message");
+    const searchShiba = document.getElementById("searchShiba");
+    const startOverlay = document.getElementById("startOverlay");
+    const petOverlay = document.getElementById("petOverlay");
+    const finishOverlay = document.getElementById("finishOverlay");
+    const startButton = document.getElementById("startButton");
+    const nextButton = document.getElementById("nextButton");
+    const retryButton = document.getElementById("retryButton");
+    const petZone = document.getElementById("petZone");
+    const petTitle = document.getElementById("petTitle");
+    const petHint = document.getElementById("petHint");
+    const meter = document.querySelector(".meter");
+    const meterFill = document.getElementById("meterFill");
+    const finishCount = document.getElementById("finishCount");
+    const spots = Array.from(document.querySelectorAll(".spot"));
+
+    if (!game || !roundLabel || !foundLabel || !message || !searchShiba ||
+        !startOverlay || !petOverlay || !finishOverlay || !startButton ||
+        !nextButton || !retryButton || !petZone || !petTitle || !petHint ||
+        !meter || !meterFill || !finishCount || spots.length !== 3) {
+      throw new Error("Game initialization failed: required DOM element is missing.");
+    }
+
+    const state = {
+      phase: "idle",
+      round: 1,
+      found: 0,
+      ownerIndex: -1,
+      previousOwnerIndex: -1,
+      petProgress: 0,
+      petting: false,
+      lastPetX: null,
+      lastPetY: null
+    };
+
+    function requirePhase(expected) {
+      if (state.phase !== expected) {
+        throw new Error(`Invalid game phase: expected ${expected}, got ${state.phase}.`);
+      }
+    }
+
+    function updateHud() {
+      if (!Number.isInteger(state.round) || state.round < 1 || state.round > totalRounds ||
+          !Number.isInteger(state.found) || state.found < 0 || state.found > totalRounds) {
+        throw new RangeError(`Invalid HUD state: round=${state.round}, found=${state.found}.`);
+      }
+      roundLabel.textContent = `${state.round} / ${totalRounds}`;
+      foundLabel.textContent = String(state.found);
+    }
+
+    function chooseOwnerIndex() {
+      const candidates = spots
+        .map((_, index) => index)
+        .filter((index) => index !== state.previousOwnerIndex);
+      const expectedLength = state.previousOwnerIndex === -1
+        ? spots.length
+        : spots.length - 1;
+      if (candidates.length !== expectedLength) {
+        throw new Error("Owner candidate generation failed.");
+      }
+      const selected = candidates[Math.floor(Math.random() * candidates.length)];
+      if (!Number.isInteger(selected)) {
+        throw new Error("Owner location selection failed.");
+      }
+      return selected;
+    }
+
+    function resetSpots() {
+      for (const spot of spots) {
+        spot.disabled = false;
+        spot.classList.remove("wrong", "found");
+        spot.setAttribute("aria-pressed", "false");
+      }
+    }
+
+    function beginRound() {
+      if (state.round < 1 || state.round > totalRounds) {
+        throw new RangeError(`Cannot begin round ${state.round}.`);
+      }
+      state.phase = "searching";
+      state.ownerIndex = chooseOwnerIndex();
+      state.previousOwnerIndex = state.ownerIndex;
+      state.petProgress = 0;
+      state.petting = false;
+      state.lastPetX = null;
+      state.lastPetY = null;
+      resetSpots();
+      searchShiba.classList.remove("sniffing", "happy");
+      petOverlay.classList.add("hidden");
+      finishOverlay.classList.add("hidden");
+      nextButton.classList.add("hidden");
+      meterFill.style.width = "0%";
+      meter.setAttribute("aria-valuenow", "0");
+      petTitle.textContent = "しばちゃん ここわん！";
+      petHint.textContent = "しばちゃんを指でなでなでしてわん♡";
+      message.textContent = "く〜んく〜ん… ごしゅじん どこわん？";
+      updateHud();
+    }
+
+    function animateSearchShiba(className) {
+      if (className !== "sniffing" && className !== "happy") {
+        throw new TypeError(`Unsupported shiba animation: ${className}`);
+      }
+      searchShiba.classList.remove("sniffing", "happy");
+      void searchShiba.offsetWidth;
+      searchShiba.classList.add(className);
+    }
+
+    function searchSpot(index) {
+      requirePhase("searching");
+      if (!Number.isInteger(index) || index < 0 || index >= spots.length) {
+        throw new RangeError(`Invalid search spot index: ${index}.`);
+      }
+
+      const spot = spots[index];
+      if (spot.disabled) return;
+      spot.disabled = true;
+      spot.setAttribute("aria-pressed", "true");
+
+      if (index !== state.ownerIndex) {
+        spot.classList.add("wrong");
+        message.textContent = "ここじゃないわん… もっとくんくんするわん！";
+        animateSearchShiba("sniffing");
+        return;
+      }
+
+      state.phase = "found";
+      spot.classList.add("found");
+      for (const candidate of spots) {
+        candidate.disabled = true;
+      }
+      message.textContent = "ごしゅじん！ しばちゃん ここわん！";
+      animateSearchShiba("happy");
+      window.setTimeout(openPetting, 850);
+    }
+
+    function openPetting() {
+      requirePhase("found");
+      state.phase = "petting";
+      petOverlay.classList.remove("hidden");
+    }
+
+    function addHeart(clientX, clientY) {
+      if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
+        throw new TypeError(`Invalid heart position: ${clientX}, ${clientY}.`);
+      }
+      const rect = petZone.getBoundingClientRect();
+      const heart = document.createElement("span");
+      heart.className = "heart-pop";
+      heart.textContent = Math.random() < .5 ? "♥" : "♡";
+      heart.style.left = `${clientX - rect.left}px`;
+      heart.style.top = `${clientY - rect.top}px`;
+      petZone.appendChild(heart);
+      window.setTimeout(() => heart.remove(), 900);
+    }
+
+    function addPetProgress(amount, clientX, clientY) {
+      requirePhase("petting");
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new RangeError(`Invalid pet progress amount: ${amount}.`);
+      }
+      state.petProgress = Math.min(100, state.petProgress + amount);
+      meterFill.style.width = `${state.petProgress}%`;
+      meter.setAttribute("aria-valuenow", String(Math.round(state.petProgress)));
+      addHeart(clientX, clientY);
+
+      if (state.petProgress >= 100) {
+        completePetting();
+      }
+    }
+
+    function completePetting() {
+      requirePhase("petting");
+      state.phase = "roundComplete";
+      state.petting = false;
+      state.found += 1;
+      petTitle.textContent = "なでなでするわん〜♡";
+      petHint.textContent = "しっぽぶんぶん！ うれしいわん！";
+      nextButton.textContent = state.round === totalRounds
+        ? "いっしょにかえるわん！"
+        : "つぎのおへやへ！";
+      nextButton.classList.remove("hidden");
+      updateHud();
+    }
+
+    function finishRound() {
+      requirePhase("roundComplete");
+      if (state.round === totalRounds) {
+        state.phase = "finished";
+        finishCount.textContent = String(state.found);
+        petOverlay.classList.add("hidden");
+        finishOverlay.classList.remove("hidden");
+        return;
+      }
+      state.round += 1;
+      beginRound();
+    }
+
+    function startGame() {
+      if (state.phase !== "idle" && state.phase !== "finished") {
+        throw new Error(`Cannot start game during phase ${state.phase}.`);
+      }
+      state.round = 1;
+      state.found = 0;
+      state.previousOwnerIndex = -1;
+      startOverlay.classList.add("hidden");
+      finishOverlay.classList.add("hidden");
+      beginRound();
+    }
+
+    for (const spot of spots) {
+      spot.addEventListener("click", () => {
+        const rawIndex = spot.dataset.index;
+        if (rawIndex === undefined || !/^\d+$/.test(rawIndex)) {
+          throw new TypeError(`Invalid spot data-index: ${rawIndex}.`);
+        }
+        searchSpot(Number(rawIndex));
+      });
+    }
+
+    petZone.addEventListener("pointerdown", (event) => {
+      if (state.phase !== "petting") return;
+      event.preventDefault();
+      petZone.setPointerCapture(event.pointerId);
+      state.petting = true;
+      state.lastPetX = event.clientX;
+      state.lastPetY = event.clientY;
+      addPetProgress(9, event.clientX, event.clientY);
+    });
+
+    petZone.addEventListener("pointermove", (event) => {
+      if (!state.petting || state.phase !== "petting") return;
+      event.preventDefault();
+      if (state.lastPetX === null || state.lastPetY === null) {
+        throw new Error("Pet movement started without a previous pointer position.");
+      }
+      const distance = Math.hypot(
+        event.clientX - state.lastPetX,
+        event.clientY - state.lastPetY
+      );
+      if (distance < 13) return;
+      state.lastPetX = event.clientX;
+      state.lastPetY = event.clientY;
+      addPetProgress(Math.min(12, distance / 5), event.clientX, event.clientY);
+    });
+
+    function stopPetting() {
+      state.petting = false;
+      state.lastPetX = null;
+      state.lastPetY = null;
+    }
+
+    petZone.addEventListener("pointerup", stopPetting);
+    petZone.addEventListener("pointercancel", stopPetting);
+    petZone.addEventListener("lostpointercapture", stopPetting);
+    startButton.addEventListener("click", startGame);
+    retryButton.addEventListener("click", startGame);
+    nextButton.addEventListener("click", finishRound);
+
+    updateHud();
+  </script>
+</body>
+</html>

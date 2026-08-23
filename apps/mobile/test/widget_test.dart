@@ -190,6 +190,8 @@ void main() {
     expect(find.text('ねんねぐみのじかんわり'), findsOneWidget);
     expect(find.byKey(const Key('catalog-search')), findsOneWidget);
     expect(find.byKey(const Key('catalog-refresh')), findsOneWidget);
+    expect(find.byKey(const Key('builtin-shiba-game')), findsOneWidget);
+    expect(find.byKey(const Key('builtin-shiba-goshujin')), findsOneWidget);
 
     await tester.tap(find.text('ねんねぐみのじかんわり'));
     await tester.pumpAndSettle();
