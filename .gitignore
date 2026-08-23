@@ -9,6 +9,11 @@
 **/.gradle/
 **/local.properties
 
+# Android release signing
+apps/mobile/android/key.properties
+*.jks
+*.keystore
+
 # Python
 __pycache__/
 *.py[cod]
