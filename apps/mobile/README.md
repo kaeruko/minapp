@@ -103,3 +103,13 @@ V1ではdescriptor TTLのclient許容上限を24時間とする。有効期限�
 - Android側からカメラ、位置情報、マイク等を作品へ公開しない
 
 Google Play上のパッケージIDは `jp.cloxs.min` を使う。
+
+## ビルトインアプリ
+
+公式サンプルは `lib/builtin_apps.dart` の `builtInApps` にまとめて定義する。
+カタログはこの一覧を検索・反復表示するため、アプリごとの専用分岐は追加しない。
+
+各アプリは `assets/builtin/<asset_name>/index.html` の単一HTMLとして配置し、同じパスを
+`pubspec.yaml` にも明示する。命名規則に合わないパスと外部サイトへの遷移は
+`BuiltInWebViewPage` で拒否し、bundleに存在しないassetは別経路へフォールバックせず
+読み込みエラーとして表示する。
