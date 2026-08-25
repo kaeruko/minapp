@@ -41,9 +41,15 @@ class FakeBackend:
         self.last_call = ("members", auth_subject, group_id)
         return []
 
-    def create_student(self, auth_subject: str, group_id: str) -> dict[str, Any]:
-        self.last_call = ("create_student", auth_subject, group_id)
-        return {"user_id": "c" * 32, "login_id": "student-12345678", "temporary_password": "ExamplePassword1", "group_id": group_id, "role": "student"}
+    def create_student(
+        self,
+        auth_subject: str,
+        group_id: str,
+        login_id: str | None = None,
+    ) -> dict[str, Any]:
+        self.last_call = ("create_student", auth_subject, group_id, login_id)
+        resolved_login_id = login_id or "student-12345678"
+        return {"user_id": "c" * 32, "login_id": resolved_login_id, "temporary_password": "ExamplePassword1", "group_id": group_id, "role": "student"}
 
     def reset_student_password(self, auth_subject: str, user_id: str) -> dict[str, Any]:
         self.last_call = ("reset", auth_subject, user_id)
@@ -118,11 +124,25 @@ class HandlerTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 201)
         self.assertEqual(self.backend.last_call, ("create_group", "cognito-sub", "6年2組"))
 
-    def test_create_student_requires_empty_json_object(self) -> None:
+    def test_create_student_accepts_requested_login_id(self) -> None:
         group_id = "a" * 32
-        response = handler.lambda_handler(_event("POST", f"/groups/{group_id}/students", body={"login_id": "student-manual"}, subject="teacher-sub"), None)
+        response = handler.lambda_handler(_event("POST", f"/groups/{group_id}/students", body={"login_id": "yamada"}, subject="teacher-sub"), None)
+        self.assertEqual(response["statusCode"], 201)
+        payload = json.loads(response["body"])
+        self.assertEqual(payload["login_id"], "yamada")
+        self.assertEqual(self.backend.last_call, ("create_student", "teacher-sub", group_id, "yamada"))
+
+    def test_create_student_keeps_automatic_id_compatibility(self) -> None:
+        group_id = "a" * 32
+        response = handler.lambda_handler(_event("POST", f"/groups/{group_id}/students", body={}, subject="teacher-sub"), None)
+        self.assertEqual(response["statusCode"], 201)
+        self.assertEqual(self.backend.last_call, ("create_student", "teacher-sub", group_id, None))
+
+    def test_create_student_rejects_invalid_requested_login_id(self) -> None:
+        group_id = "a" * 32
+        response = handler.lambda_handler(_event("POST", f"/groups/{group_id}/students", body={"login_id": "Yamada"}, subject="teacher-sub"), None)
         self.assertEqual(response["statusCode"], 400)
-        self.assertIn("Unknown field", json.loads(response["body"])["message"])
+        self.assertIsNone(self.backend.last_call)
 
     def test_remove_member_returns_204(self) -> None:
         group_id = "a" * 32
