@@ -185,6 +185,25 @@ class AwsBackendTests(unittest.TestCase):
         members_after = self.backend.list_members(self.teacher_subject, group["group_id"])
         self.assertEqual([member["role"] for member in members_after], ["teacher"])
 
+    def test_teacher_can_create_student_with_requested_login_id(self) -> None:
+        group = self.backend.create_group(self.teacher_subject, "審査用クラス")
+        created = self.backend.create_student(self.teacher_subject, group["group_id"], "yamada")
+        self.assertEqual(created["login_id"], "yamada")
+        self.assertIn("yamada", self.cognito.users)
+        members = self.backend.list_members(self.teacher_subject, group["group_id"])
+        student = next(member for member in members if member["role"] == "student")
+        self.assertEqual(student["login_id"], "yamada")
+
+    def test_requested_login_id_conflict_stops_without_creating_student(self) -> None:
+        group = self.backend.create_group(self.teacher_subject, "教室")
+        self.cognito.add_user("yamada", "Existing1", temporary=False)
+        with self.assertRaises(ApiProblem) as caught:
+            self.backend.create_student(self.teacher_subject, group["group_id"], "yamada")
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(caught.exception.error, "login_id_conflict")
+        members = self.backend.list_members(self.teacher_subject, group["group_id"])
+        self.assertEqual([member["role"] for member in members], ["teacher"])
+
     def test_student_cannot_create_group(self) -> None:
         group = self.backend.create_group(self.teacher_subject, "教室")
         created = self.backend.create_student(self.teacher_subject, group["group_id"])
