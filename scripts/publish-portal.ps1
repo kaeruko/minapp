@@ -55,6 +55,7 @@ $productionAssets = @(
     "phase4.js",
     "student_dashboard.js",
     "teacher_dashboard.js",
+    "custom_student_login.js",
     "moderation_actions.js",
     "display_names.js",
     "portal_shell.js"

@@ -294,11 +294,22 @@ class AwsBackend:
         members.sort(key=lambda member: (member["role"], member["login_id"]))
         return members
 
-    def create_student(self, auth_subject: str, group_id: str) -> dict[str, Any]:
+    def create_student(
+        self,
+        auth_subject: str,
+        group_id: str,
+        login_id: str | None = None,
+    ) -> dict[str, Any]:
         teacher = self._user_by_auth_subject(auth_subject)
         group_name = self._require_teacher_membership(teacher.user_id, group_id)
 
-        login_id = _new_login_id()
+        if login_id is not None:
+            if not isinstance(login_id, str):
+                raise TypeError("login_id must be a string or None")
+            if not login_id:
+                raise ValueError("login_id must not be empty")
+        requested_login_id = login_id
+        login_id = _new_login_id() if login_id is None else login_id
         temporary_password = _new_temporary_password()
         user_id = uuid.uuid4().hex
 
@@ -312,11 +323,12 @@ class AwsBackend:
         except Exception as exc:
             code = _aws_error_code(exc)
             if code == "UsernameExistsException":
-                raise ApiProblem(
-                    409,
-                    "login_id_conflict",
-                    "生成したIDが既存ユーザーと衝突しました。処理は停止しました。",
-                ) from exc
+                message = (
+                    "指定したIDはすでに使われています。別のIDを入力してください。"
+                    if requested_login_id is not None
+                    else "生成したIDが既存ユーザーと衝突しました。処理は停止しました。"
+                )
+                raise ApiProblem(409, "login_id_conflict", message) from exc
             raise
 
         try:
