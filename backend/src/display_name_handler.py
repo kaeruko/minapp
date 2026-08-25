@@ -10,6 +10,7 @@ from handler import (
     _auth_subject,
     _json_body,
     _json_response,
+    _login_id,
     _raw_path,
     _request_method,
     _require_fields,
@@ -21,6 +22,7 @@ _BACKEND: DisplayNameAwsBackend | None = None
 _ID_RE = r"([0-9a-f]{32})"
 _GROUP_DISPLAY_NAMES_RE = re.compile(rf"^/groups/{_ID_RE}/display-names$")
 _USER_DISPLAY_NAME_RE = re.compile(rf"^/users/{_ID_RE}/display-name$")
+_USER_LOGIN_ID_RE = re.compile(rf"^/users/{_ID_RE}/login-id$")
 
 
 def _get_backend() -> DisplayNameAwsBackend:
@@ -74,6 +76,19 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
                 _auth_subject(event),
                 user_match.group(1),
                 _display_name(payload),
+            ),
+        )
+
+    login_match = _USER_LOGIN_ID_RE.fullmatch(path)
+    if method == "PATCH" and login_match is not None:
+        payload = _json_body(event)
+        _require_fields(payload, required={"login_id"})
+        return _json_response(
+            200,
+            _get_backend().change_student_login_id(
+                _auth_subject(event),
+                login_match.group(1),
+                _login_id(payload),
             ),
         )
 
