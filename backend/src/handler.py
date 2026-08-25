@@ -27,7 +27,9 @@ class Backend(Protocol):
     def list_groups(self, auth_subject: str) -> list[dict[str, Any]]: ...
     def create_group(self, auth_subject: str, name: str) -> dict[str, Any]: ...
     def list_members(self, auth_subject: str, group_id: str) -> list[dict[str, Any]]: ...
-    def create_student(self, auth_subject: str, group_id: str) -> dict[str, Any]: ...
+    def create_student(
+        self, auth_subject: str, group_id: str, login_id: str | None = None
+    ) -> dict[str, Any]: ...
     def reset_student_password(
         self, auth_subject: str, user_id: str
     ) -> dict[str, Any]: ...
@@ -431,10 +433,15 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
     students_match = _GROUP_STUDENTS_RE.fullmatch(path)
     if method == "POST" and students_match is not None:
         payload = _json_body(event)
-        _require_fields(payload, required=set())
+        _require_fields(payload, required=set(), optional={"login_id"})
+        requested_login_id = _login_id(payload) if "login_id" in payload else None
         return _json_response(
             201,
-            _get_backend().create_student(_auth_subject(event), students_match.group(1)),
+            _get_backend().create_student(
+                _auth_subject(event),
+                students_match.group(1),
+                requested_login_id,
+            ),
         )
 
     upload_match = _GROUP_APPS_RE.fullmatch(path)
