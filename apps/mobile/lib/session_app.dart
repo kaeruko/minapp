@@ -252,15 +252,7 @@ class _TenantBootErrorPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final ColorScheme colors = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('みんアプ'),
-        actions: const <Widget>[
-          Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: Center(child: PhaseBadge()),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('みんアプ')),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
