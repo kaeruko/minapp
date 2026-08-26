@@ -11,6 +11,24 @@ void main() {
     );
   });
 
+  test('accepts only DEMO as the reserved short classroom alias', () {
+    expect(normalizeClassroomJoinInput('  demo  '), 'DEMO');
+    expect(
+      () => normalizeClassroomJoinInput('ABCD'),
+      throwsA(isA<InvalidClassroomJoinInput>()),
+    );
+  });
+
+  test('accepts DEMO in an official join link', () {
+    expect(
+      normalizeClassroomJoinInput(
+        'https://join.minapp.example/c/demo',
+        officialJoinBaseUri: officialJoinBase,
+      ),
+      'DEMO',
+    );
+  });
+
   test('accepts only the configured official join origin', () {
     expect(
       normalizeClassroomJoinInput(
