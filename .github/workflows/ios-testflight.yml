@@ -27,6 +27,18 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Enable Swift Package Manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter config --enable-swift-package-manager
+          config_output="$(flutter config --list)"
+          printf '%s\n' "$config_output"
+          grep -Fq 'enable-swift-package-manager: true' <<< "$config_output" || {
+            echo "Flutter Swift Package Manager support is not enabled after explicit configuration" >&2
+            exit 1
+          }
+
       - name: Validate required secrets
         shell: bash
         env:
@@ -268,7 +280,6 @@ jobs:
             --dart-define="MINAPP_CREATOR_PORTAL_BASE_URL=${CREATOR_PORTAL_BASE_URL}"
 
           pushd ios >/dev/null
-          pod install
 
           build_settings_file="${RUNNER_TEMP}/Runner-Release-build-settings.txt"
           if ! xcodebuild \
