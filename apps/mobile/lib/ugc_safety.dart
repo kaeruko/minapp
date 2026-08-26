@@ -80,20 +80,27 @@ class SharedPreferencesCreatorSafetyStore implements CreatorSafetyStore {
   }
 }
 
-Future<void> openAppReportEmail(PublishedApp app) async {
+Future<void> openAppReportEmail({
+  required PublishedApp app,
+  required String reason,
+}) async {
+  if (reason.isEmpty || reason != reason.trim() || reason.length > 80) {
+    throw ArgumentError.value(reason, 'reason', 'must be 1-80 trimmed characters');
+  }
   final Uri uri = Uri(
     scheme: 'mailto',
     path: minAppSupportEmail,
     queryParameters: <String, String>{
       'subject': 'みんアプ 不適切な作品の報告',
       'body': <String>[
+        '報告理由: $reason',
         '作品名: ${app.title}',
         '作成者: ${app.ownerLoginId}',
         'app_id: ${app.appId}',
         'version_id: ${app.versionId}',
         'group_id: ${app.groupId}',
         '',
-        '報告理由や状況をご記入のうえ送信してください。',
+        '必要に応じて詳しい状況をご記入のうえ送信してください。',
       ].join('\n'),
     },
   );
