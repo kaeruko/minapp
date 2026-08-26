@@ -7,6 +7,7 @@ import 'classroom_setup_page.dart';
 import 'directory.dart';
 import 'login_page.dart';
 import 'tenant_store.dart';
+import 'ugc_safety.dart';
 import 'ui.dart';
 
 typedef MinAppApiFactory = MinAppApi Function(Uri baseUri);
@@ -20,6 +21,7 @@ class MinApp extends StatelessWidget {
     this.officialJoinBaseUri,
     this.creatorPortalBaseUri,
     this.webViewDataClearer,
+    this.creatorSafetyStore,
     super.key,
   });
 
@@ -29,6 +31,7 @@ class MinApp extends StatelessWidget {
   final Uri? officialJoinBaseUri;
   final Uri? creatorPortalBaseUri;
   final WebViewDataClearer? webViewDataClearer;
+  final CreatorSafetyStore? creatorSafetyStore;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +53,7 @@ class MinApp extends StatelessWidget {
         officialJoinBaseUri: officialJoinBaseUri,
         creatorPortalBaseUri: creatorPortalBaseUri,
         webViewDataClearer: webViewDataClearer ?? clearMinAppWebViewData,
+        creatorSafetyStore: creatorSafetyStore ?? MemoryCreatorSafetyStore(),
       ),
     );
   }
@@ -63,6 +67,7 @@ class _SessionRoot extends StatefulWidget {
     required this.officialJoinBaseUri,
     required this.creatorPortalBaseUri,
     required this.webViewDataClearer,
+    required this.creatorSafetyStore,
   });
 
   final MinAppDirectory directory;
@@ -71,6 +76,7 @@ class _SessionRoot extends StatefulWidget {
   final Uri? officialJoinBaseUri;
   final Uri? creatorPortalBaseUri;
   final WebViewDataClearer webViewDataClearer;
+  final CreatorSafetyStore creatorSafetyStore;
 
   @override
   State<_SessionRoot> createState() => _SessionRootState();
@@ -224,6 +230,7 @@ class _SessionRootState extends State<_SessionRoot> {
       session: session,
       classroomName: tenant.displayName,
       creatorPortalBaseUri: widget.creatorPortalBaseUri,
+      creatorSafetyStore: widget.creatorSafetyStore,
       onChangeClassroom: _changeClassroom,
       onLogout: _logout,
     );
