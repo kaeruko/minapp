@@ -34,6 +34,7 @@ Map<String, Object?> _publishedJson({Object? description}) => <String, Object?>{
       'version_id': 'b' * 32,
       'group_id': 'c' * 32,
       'group_name': 'ねんね組',
+      'owner_user_id': 'd' * 32,
       'owner_login_id': 'student-demo',
       'title': '時間割アプリ',
       'status': 'approved',
@@ -61,7 +62,7 @@ void main() {
     );
   });
 
-  testWidgets('detail page shows the author description when present', (
+  testWidgets('detail page shows the author description and safety actions', (
     WidgetTester tester,
   ) async {
     final PublishedApp app = PublishedApp.fromJson(
@@ -76,6 +77,7 @@ void main() {
             expiresIn: 3600,
           ),
           app: app,
+          onHideCreator: (_) async {},
           onLogout: () {},
         ),
       ),
@@ -83,5 +85,7 @@ void main() {
 
     expect(find.text('アプリの説明'), findsOneWidget);
     expect(find.text('毎日の予定をすぐ確認できるアプリです。'), findsOneWidget);
+    expect(find.byKey(const Key('app-detail-report')), findsOneWidget);
+    expect(find.byKey(const Key('app-detail-hide-creator')), findsOneWidget);
   });
 }
