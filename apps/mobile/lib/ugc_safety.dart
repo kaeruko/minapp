@@ -6,55 +6,55 @@ import 'api.dart';
 const String minAppSupportEmail = 'mail@cloxs.jp';
 
 abstract interface class CreatorSafetyStore {
-  Future<Set<String>> loadHiddenCreators();
+  Future<Set<String>> loadHiddenCreatorUserIds();
 
-  Future<void> hideCreator(String creatorLoginId);
+  Future<void> hideCreator(String creatorUserId);
 
-  Future<void> unhideCreator(String creatorLoginId);
+  Future<void> unhideCreator(String creatorUserId);
 }
 
 class MemoryCreatorSafetyStore implements CreatorSafetyStore {
   MemoryCreatorSafetyStore([Set<String>? initial])
-      : _hiddenCreators = <String>{...?initial};
+      : _hiddenCreatorUserIds = <String>{...?initial};
 
-  final Set<String> _hiddenCreators;
-
-  @override
-  Future<Set<String>> loadHiddenCreators() async =>
-      Set<String>.unmodifiable(_hiddenCreators);
+  final Set<String> _hiddenCreatorUserIds;
 
   @override
-  Future<void> hideCreator(String creatorLoginId) async {
-    _validateCreatorLoginId(creatorLoginId);
-    _hiddenCreators.add(creatorLoginId);
+  Future<Set<String>> loadHiddenCreatorUserIds() async =>
+      Set<String>.unmodifiable(_hiddenCreatorUserIds);
+
+  @override
+  Future<void> hideCreator(String creatorUserId) async {
+    _validateCreatorUserId(creatorUserId);
+    _hiddenCreatorUserIds.add(creatorUserId);
   }
 
   @override
-  Future<void> unhideCreator(String creatorLoginId) async {
-    _validateCreatorLoginId(creatorLoginId);
-    _hiddenCreators.remove(creatorLoginId);
+  Future<void> unhideCreator(String creatorUserId) async {
+    _validateCreatorUserId(creatorUserId);
+    _hiddenCreatorUserIds.remove(creatorUserId);
   }
 }
 
 class SharedPreferencesCreatorSafetyStore implements CreatorSafetyStore {
-  static const String _key = 'ugc_hidden_creators_v1';
+  static const String _key = 'ugc_hidden_creator_user_ids_v1';
 
   @override
-  Future<Set<String>> loadHiddenCreators() async {
+  Future<Set<String>> loadHiddenCreatorUserIds() async {
     final SharedPreferences preferences = await SharedPreferences.getInstance();
     final List<String> values = preferences.getStringList(_key) ?? <String>[];
     for (final String value in values) {
-      _validateCreatorLoginId(value);
+      _validateCreatorUserId(value);
     }
     return values.toSet();
   }
 
   @override
-  Future<void> hideCreator(String creatorLoginId) async {
-    _validateCreatorLoginId(creatorLoginId);
+  Future<void> hideCreator(String creatorUserId) async {
+    _validateCreatorUserId(creatorUserId);
     final SharedPreferences preferences = await SharedPreferences.getInstance();
     final Set<String> values = (preferences.getStringList(_key) ?? <String>[]).toSet();
-    values.add(creatorLoginId);
+    values.add(creatorUserId);
     final bool saved = await preferences.setStringList(
       _key,
       values.toList(growable: false)..sort(),
@@ -65,11 +65,11 @@ class SharedPreferencesCreatorSafetyStore implements CreatorSafetyStore {
   }
 
   @override
-  Future<void> unhideCreator(String creatorLoginId) async {
-    _validateCreatorLoginId(creatorLoginId);
+  Future<void> unhideCreator(String creatorUserId) async {
+    _validateCreatorUserId(creatorUserId);
     final SharedPreferences preferences = await SharedPreferences.getInstance();
     final Set<String> values = (preferences.getStringList(_key) ?? <String>[]).toSet();
-    values.remove(creatorLoginId);
+    values.remove(creatorUserId);
     final bool saved = await preferences.setStringList(
       _key,
       values.toList(growable: false)..sort(),
@@ -96,6 +96,7 @@ Future<void> openAppReportEmail({
         '報告理由: $reason',
         '作品名: ${app.title}',
         '作成者: ${app.ownerLoginId}',
+        'owner_user_id: ${app.ownerUserId}',
         'app_id: ${app.appId}',
         'version_id: ${app.versionId}',
         'group_id: ${app.groupId}',
@@ -113,26 +114,12 @@ Future<void> openAppReportEmail({
   }
 }
 
-void _validateCreatorLoginId(String value) {
-  if (value.isEmpty || value != value.trim()) {
+void _validateCreatorUserId(String value) {
+  if (!RegExp(r'^[0-9a-f]{32}$').hasMatch(value)) {
     throw ArgumentError.value(
       value,
-      'creatorLoginId',
-      'must be a non-empty string without surrounding whitespace',
-    );
-  }
-  if (value.length > 80) {
-    throw ArgumentError.value(
-      value,
-      'creatorLoginId',
-      'must be at most 80 characters',
-    );
-  }
-  if (value.runes.any((int rune) => rune < 0x20 || rune == 0x7f)) {
-    throw ArgumentError.value(
-      value,
-      'creatorLoginId',
-      'must not contain control characters',
+      'creatorUserId',
+      'must be a 32-character lowercase hexadecimal user id',
     );
   }
 }
