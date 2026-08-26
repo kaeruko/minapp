@@ -206,30 +206,6 @@ jobs:
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "$profile_path" "$HOME/Library/MobileDevice/Provisioning Profiles/${profile_uuid}.mobileprovision"
 
-          pbxproj="ios/Runner.xcodeproj/project.pbxproj"
-          python3 - "$pbxproj" "$team_id" "$profile_name" <<'PY'
-          from pathlib import Path
-          import sys
-
-          path = Path(sys.argv[1])
-          team_id = sys.argv[2]
-          profile_name = sys.argv[3]
-          text = path.read_text(encoding="utf-8")
-
-          marker = "CODE_SIGN_STYLE = Automatic;"
-          count = text.count(marker)
-          if count == 0:
-              raise RuntimeError("Generated Xcode project has no Automatic code-signing settings to replace")
-
-          replacement = (
-              "CODE_SIGN_STYLE = Manual;\n"
-              f"\t\t\t\tDEVELOPMENT_TEAM = {team_id};\n"
-              "\t\t\t\tCODE_SIGN_IDENTITY = \"Apple Distribution\";\n"
-              f"\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"{profile_name}\";"
-          )
-          path.write_text(text.replace(marker, replacement), encoding="utf-8")
-          PY
-
           export_options="${RUNNER_TEMP}/ExportOptions.plist"
           cat > "$export_options" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -266,6 +242,7 @@ jobs:
           DIRECTORY_API_BASE_URL: ${{ steps.directory.outputs.directory_api_base_url }}
           EXPORT_OPTIONS_PLIST: ${{ steps.signing.outputs.export_options }}
           PROFILE_NAME: ${{ steps.signing.outputs.profile_name }}
+          TEAM_ID: ${{ steps.signing.outputs.team_id }}
         run: |
           set -euo pipefail
 
@@ -276,6 +253,61 @@ jobs:
             --build-number "$GITHUB_RUN_NUMBER" \
             --dart-define="MINAPP_DIRECTORY_BASE_URL=${DIRECTORY_API_BASE_URL}" \
             --dart-define="MINAPP_CREATOR_PORTAL_BASE_URL=${CREATOR_PORTAL_BASE_URL}"
+
+          pbxproj="ios/Runner.xcodeproj/project.pbxproj"
+          python3 - "$pbxproj" "$IOS_BUNDLE_ID" "$TEAM_ID" "$PROFILE_NAME" <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          path = Path(sys.argv[1])
+          bundle_id = sys.argv[2]
+          team_id = sys.argv[3]
+          profile_name = sys.argv[4]
+          text = path.read_text(encoding="utf-8")
+
+          block_pattern = re.compile(r"buildSettings = \{\n(?P<body>.*?)\n\s*\};", re.DOTALL)
+          matched = 0
+
+          def patch_block(match):
+              global matched
+              body = match.group("body")
+              bundle_marker = f"PRODUCT_BUNDLE_IDENTIFIER = {bundle_id};"
+              if bundle_marker not in body:
+                  return match.group(0)
+
+              matched += 1
+              body = re.sub(
+                  r"^\s*(?:CODE_SIGN_STYLE|CODE_SIGN_IDENTITY|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER)\s*=.*;\n?",
+                  "",
+                  body,
+                  flags=re.MULTILINE,
+              )
+              product_match = re.search(
+                  rf"^(?P<indent>\s*)PRODUCT_BUNDLE_IDENTIFIER = {re.escape(bundle_id)};$",
+                  body,
+                  flags=re.MULTILINE,
+              )
+              if product_match is None:
+                  raise RuntimeError("Runner build settings block lost the expected bundle identifier")
+
+              indent = product_match.group("indent")
+              signing = (
+                  f'{indent}CODE_SIGN_IDENTITY = "Apple Distribution";\n'
+                  f"{indent}CODE_SIGN_STYLE = Manual;\n"
+                  f"{indent}DEVELOPMENT_TEAM = {team_id};\n"
+                  f'{indent}PROVISIONING_PROFILE_SPECIFIER = "{profile_name}";\n'
+              )
+              body = body[: product_match.start()] + signing + body[product_match.start() :]
+              return "buildSettings = {\n" + body + "\n\t\t\t};"
+
+          patched = block_pattern.sub(patch_block, text)
+          if matched != 3:
+              raise RuntimeError(
+                  f"Expected exactly 3 Runner build configuration blocks for {bundle_id}, found {matched}"
+              )
+          path.write_text(patched, encoding="utf-8")
+          PY
 
           pushd ios >/dev/null
 
@@ -297,11 +329,15 @@ jobs:
             exit 1
           }
           grep -Fq 'CODE_SIGN_STYLE = Manual' "$build_settings_file" || {
-            echo "Runner Release build settings are not using manual signing" >&2
+            echo "Runner Release build settings are not using manual signing after target-scoped patch" >&2
             exit 1
           }
           grep -Fq 'CODE_SIGN_IDENTITY = Apple Distribution' "$build_settings_file" || {
             echo "Runner Release build settings do not use Apple Distribution" >&2
+            exit 1
+          }
+          grep -Fq "DEVELOPMENT_TEAM = ${TEAM_ID}" "$build_settings_file" || {
+            echo "Runner Release build settings do not use the provisioning profile team" >&2
             exit 1
           }
           grep -Fq "PROVISIONING_PROFILE_SPECIFIER = ${PROFILE_NAME}" "$build_settings_file" || {
