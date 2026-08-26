@@ -31,6 +31,7 @@ class FakeApi implements MinAppApi {
         versionId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
         groupId: 'cccccccccccccccccccccccccccccccc',
         groupName: 'ねんね組',
+        ownerUserId: 'dddddddddddddddddddddddddddddddd',
         ownerLoginId: 'student-demo',
         title: 'ねんねぐみのじかんわり',
         reviewedAt: DateTime.utc(2026, 8, 17),
