@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'app_visual.dart';
 import 'app_webview.dart';
+import 'ugc_safety.dart';
 import 'ui.dart';
 
 const Color _brandBlue = Color(0xFF2563EB);
@@ -14,6 +15,7 @@ class AppDetailPage extends StatefulWidget {
     required this.api,
     required this.session,
     required this.app,
+    required this.onHideCreator,
     required this.onLogout,
     super.key,
   });
@@ -21,6 +23,7 @@ class AppDetailPage extends StatefulWidget {
   final MinAppApi api;
   final AuthenticatedSession session;
   final PublishedApp app;
+  final Future<void> Function(PublishedApp app) onHideCreator;
   final VoidCallback onLogout;
 
   @override
@@ -29,6 +32,7 @@ class AppDetailPage extends StatefulWidget {
 
 class _AppDetailPageState extends State<AppDetailPage> {
   bool _launching = false;
+  bool _safetyBusy = false;
   String? _error;
 
   Future<void> _launch() async {
@@ -61,6 +65,92 @@ class _AppDetailPageState extends State<AppDetailPage> {
       setState(() => _error = messageFor(error));
     } finally {
       if (mounted) setState(() => _launching = false);
+    }
+  }
+
+  Future<void> _reportApp() async {
+    if (_safetyBusy) return;
+    final String? reason = await showDialog<String>(
+      context: context,
+      builder: (BuildContext dialogContext) => SimpleDialog(
+        title: const Text('この作品を報告'),
+        children: <Widget>[
+          for (final String reason in <String>[
+            '不適切な表現・内容',
+            '嫌がらせ・いじめ',
+            '個人情報が含まれている',
+            '危険な内容',
+            'その他',
+          ])
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(dialogContext).pop(reason),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(reason),
+              ),
+            ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('キャンセル'),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (reason == null || !mounted) return;
+
+    setState(() {
+      _safetyBusy = true;
+      _error = null;
+    });
+    try {
+      await openAppReportEmail(app: widget.app, reason: reason);
+    } catch (error) {
+      if (mounted) setState(() => _error = messageFor(error));
+    } finally {
+      if (mounted) setState(() => _safetyBusy = false);
+    }
+  }
+
+  Future<void> _hideCreator() async {
+    if (_safetyBusy) return;
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('この作成者の作品を非表示'),
+        content: Text(
+          '「${widget.app.ownerLoginId}」さんの作品を、この端末の一覧から非表示にしますか？\n'
+          'あとでメニューから再表示できます。',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            key: const Key('confirm-hide-creator'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('非表示にする'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _safetyBusy = true;
+      _error = null;
+    });
+    try {
+      await widget.onHideCreator(widget.app);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (mounted) setState(() => _error = messageFor(error));
+    } finally {
+      if (mounted) setState(() => _safetyBusy = false);
     }
   }
 
@@ -204,6 +294,60 @@ class _AppDetailPageState extends State<AppDetailPage> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 18),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          const Row(
+                            children: <Widget>[
+                              Icon(
+                                Icons.shield_outlined,
+                                color: Color(0xFFB45309),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                '安全に使うために',
+                                style: TextStyle(
+                                  color: Color(0xFF92400E),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            '不適切な作品は運営へ報告できます。見たくない作成者の作品はこの端末で非表示にできます。',
+                            style: TextStyle(
+                              color: Color(0xFF78350F),
+                              height: 1.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          OutlinedButton.icon(
+                            key: const Key('app-detail-report'),
+                            onPressed: _safetyBusy ? null : _reportApp,
+                            icon: const Icon(Icons.flag_outlined),
+                            label: const Text('この作品を報告'),
+                          ),
+                          TextButton.icon(
+                            key: const Key('app-detail-hide-creator'),
+                            onPressed: _safetyBusy ? null : _hideCreator,
+                            icon: const Icon(Icons.visibility_off_outlined),
+                            label: const Text('この作成者の作品を非表示'),
+                          ),
+                        ],
+                      ),
+                    ),
                     if (_error != null) ...<Widget>[
                       const SizedBox(height: 18),
                       Container(
@@ -240,7 +384,7 @@ class _AppDetailPageState extends State<AppDetailPage> {
                 height: 62,
                 child: FilledButton.icon(
                   key: const Key('app-detail-launch'),
-                  onPressed: _launching ? null : _launch,
+                  onPressed: _launching || _safetyBusy ? null : _launch,
                   style: FilledButton.styleFrom(
                     backgroundColor: _brandBlue,
                     foregroundColor: Colors.white,
