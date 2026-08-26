@@ -11,6 +11,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $mobileDir = Join-Path $repoRoot "apps\mobile"
 $directoryTerraformDir = Join-Path $repoRoot "infra\directory"
 $configureAndroidScript = Join-Path $PSScriptRoot "configure-mobile-android.ps1"
+$awsDevScript = Join-Path $PSScriptRoot "aws-dev.ps1"
 
 if (-not (Test-Path -LiteralPath $mobileDir -PathType Container)) {
     throw "Mobile app directory not found: $mobileDir"
@@ -24,7 +25,16 @@ if (-not (Test-Path -LiteralPath $configureAndroidScript -PathType Leaf)) {
     throw "Android configuration script not found: $configureAndroidScript"
 }
 
-$directoryApi = terraform -chdir=$directoryTerraformDir output -raw directory_api_base_url
+if (-not (Test-Path -LiteralPath $awsDevScript -PathType Leaf)) {
+    throw "AWS setup script not found: $awsDevScript"
+}
+
+& $awsDevScript
+if ($LASTEXITCODE -ne 0) {
+    throw "AWS environment setup failed."
+}
+
+$directoryApi = & terraform "-chdir=$directoryTerraformDir" output -raw directory_api_base_url
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to get directory_api_base_url from Terraform."
 }
