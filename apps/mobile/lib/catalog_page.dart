@@ -6,6 +6,7 @@ import 'app_detail_page.dart';
 import 'app_visual.dart';
 import 'builtin_apps.dart';
 import 'builtin_webview.dart';
+import 'ugc_safety.dart';
 import 'ui.dart';
 
 const Color _brandBlue = Color(0xFF2563EB);
@@ -13,7 +14,12 @@ const Color _brandDark = Color(0xFF1E3A8A);
 const Color _brandAccent = Color(0xFFF59E0B);
 const Color _pageBackground = Color(0xFFF8FAFC);
 
-enum _CatalogMenuAction { creatorPortal, changeClassroom, logout }
+enum _CatalogMenuAction {
+  creatorPortal,
+  hiddenCreators,
+  changeClassroom,
+  logout,
+}
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({
@@ -21,6 +27,7 @@ class CatalogPage extends StatefulWidget {
     required this.session,
     required this.classroomName,
     this.creatorPortalBaseUri,
+    required this.creatorSafetyStore,
     required this.onChangeClassroom,
     required this.onLogout,
     super.key,
@@ -30,6 +37,7 @@ class CatalogPage extends StatefulWidget {
   final AuthenticatedSession session;
   final String classroomName;
   final Uri? creatorPortalBaseUri;
+  final CreatorSafetyStore creatorSafetyStore;
   final Future<void> Function() onChangeClassroom;
   final VoidCallback onLogout;
 
@@ -40,13 +48,15 @@ class CatalogPage extends StatefulWidget {
 class _CatalogPageState extends State<CatalogPage> {
   final TextEditingController _searchController = TextEditingController();
   List<PublishedApp>? _apps;
+  Set<String> _hiddenCreators = <String>{};
   String? _error;
   bool _refreshing = false;
+  bool _safetyReady = false;
 
   @override
   void initState() {
     super.initState();
-    _loadApps();
+    _initialize();
   }
 
   @override
@@ -55,7 +65,27 @@ class _CatalogPageState extends State<CatalogPage> {
     super.dispose();
   }
 
+  Future<void> _initialize() async {
+    try {
+      final Set<String> hiddenCreators =
+          await widget.creatorSafetyStore.loadHiddenCreators();
+      if (!mounted) return;
+      setState(() {
+        _hiddenCreators = hiddenCreators;
+        _safetyReady = true;
+        _error = null;
+      });
+      await _loadApps();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = messageFor(error));
+    }
+  }
+
   Future<void> _loadApps() async {
+    if (!_safetyReady) {
+      throw StateError('Creator safety preferences are not loaded.');
+    }
     if (_refreshing) return;
     setState(() {
       _refreshing = true;
@@ -78,6 +108,64 @@ class _CatalogPageState extends State<CatalogPage> {
     }
   }
 
+  Future<void> _hideCreator(PublishedApp app) async {
+    await widget.creatorSafetyStore.hideCreator(app.ownerLoginId);
+    if (!mounted) return;
+    setState(() => _hiddenCreators = <String>{
+          ..._hiddenCreators,
+          app.ownerLoginId,
+        });
+  }
+
+  Future<void> _showHiddenCreators() async {
+    final List<String> creators = _hiddenCreators.toList(growable: false)..sort();
+    if (creators.isEmpty) return;
+
+    final String? creator = await showDialog<String>(
+      context: context,
+      builder: (BuildContext dialogContext) => SimpleDialog(
+        title: const Text('非表示中の作成者'),
+        children: <Widget>[
+          for (final String creator in creators)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(dialogContext).pop(creator),
+              child: Row(
+                children: <Widget>[
+                  const Icon(Icons.person_off_outlined),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(creator)),
+                  const Text('再表示'),
+                ],
+              ),
+            ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('閉じる'),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (creator == null || !mounted) return;
+
+    try {
+      await widget.creatorSafetyStore.unhideCreator(creator);
+      if (!mounted) return;
+      setState(() {
+        final Set<String> next = <String>{..._hiddenCreators};
+        next.remove(creator);
+        _hiddenCreators = next;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('「$creator」さんの作品を再表示しました。')),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = messageFor(error));
+    }
+  }
+
   Future<void> _openDetails(PublishedApp app) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
@@ -85,6 +173,7 @@ class _CatalogPageState extends State<CatalogPage> {
           api: widget.api,
           session: widget.session,
           app: app,
+          onHideCreator: _hideCreator,
           onLogout: widget.onLogout,
         ),
       ),
@@ -142,13 +231,12 @@ class _CatalogPageState extends State<CatalogPage> {
               const SnackBar(content: Text('制作・提出ポータルを開けませんでした。')),
             );
           }
-        } catch (_) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('制作・提出ポータルを開けませんでした。')),
-            );
-          }
+        } catch (error) {
+          if (mounted) setState(() => _error = messageFor(error));
         }
+        return;
+      case _CatalogMenuAction.hiddenCreators:
+        await _showHiddenCreators();
         return;
       case _CatalogMenuAction.changeClassroom:
         await _confirmChangeClassroom();
@@ -160,9 +248,12 @@ class _CatalogPageState extends State<CatalogPage> {
   }
 
   List<PublishedApp> _filterApps(List<PublishedApp> apps) {
+    final List<PublishedApp> visibleApps = apps
+        .where((PublishedApp app) => !_hiddenCreators.contains(app.ownerLoginId))
+        .toList(growable: false);
     final String query = _searchController.text.trim().toLowerCase();
-    if (query.isEmpty) return apps;
-    return apps.where((PublishedApp app) {
+    if (query.isEmpty) return visibleApps;
+    return visibleApps.where((PublishedApp app) {
       return app.title.toLowerCase().contains(query) ||
           app.ownerLoginId.toLowerCase().contains(query) ||
           app.groupName.toLowerCase().contains(query);
@@ -188,7 +279,7 @@ class _CatalogPageState extends State<CatalogPage> {
       floatingActionButton: FloatingActionButton(
         key: const Key('catalog-refresh'),
         tooltip: '更新',
-        onPressed: _refreshing ? null : _loadApps,
+        onPressed: !_safetyReady || _refreshing ? null : _loadApps,
         backgroundColor: _brandAccent,
         foregroundColor: Colors.white,
         elevation: 5,
@@ -210,11 +301,12 @@ class _CatalogPageState extends State<CatalogPage> {
             searchController: _searchController,
             onSearchChanged: () => setState(() {}),
             showCreatorPortal: widget.creatorPortalBaseUri != null,
+            hiddenCreatorCount: _hiddenCreators.length,
             onMenuSelected: _handleMenuAction,
           ),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: _loadApps,
+              onRefresh: _safetyReady ? _loadApps : _initialize,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 110),
@@ -268,7 +360,14 @@ class _CatalogPageState extends State<CatalogPage> {
                     _ErrorCard(message: _error!),
                     const SizedBox(height: 14),
                   ],
-                  if (apps == null)
+                  if (!_safetyReady && _error == null)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 54),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (!_safetyReady)
+                    const SizedBox.shrink()
+                  else if (apps == null)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 54),
                       child: Center(child: CircularProgressIndicator()),
@@ -276,7 +375,9 @@ class _CatalogPageState extends State<CatalogPage> {
                   else if (apps.isEmpty)
                     const _EmptyCatalog()
                   else if (filteredApps!.isEmpty)
-                    const _NoSearchResults()
+                    _NoSearchResults(
+                      hiddenCreatorCount: _hiddenCreators.length,
+                    )
                   else ...<Widget>[
                     for (final PublishedApp app in filteredApps) ...<Widget>[
                       _AppCard(
@@ -317,6 +418,7 @@ class _CatalogHeader extends StatelessWidget {
     required this.searchController,
     required this.onSearchChanged,
     required this.showCreatorPortal,
+    required this.hiddenCreatorCount,
     required this.onMenuSelected,
   });
 
@@ -324,6 +426,7 @@ class _CatalogHeader extends StatelessWidget {
   final TextEditingController searchController;
   final VoidCallback onSearchChanged;
   final bool showCreatorPortal;
+  final int hiddenCreatorCount;
   final ValueChanged<_CatalogMenuAction> onMenuSelected;
 
   @override
@@ -394,6 +497,17 @@ class _CatalogHeader extends StatelessWidget {
                             leading: Icon(Icons.upload_file_rounded),
                             title: Text('アプリを作る・提出する'),
                             trailing: Icon(Icons.open_in_new_rounded, size: 18),
+                          ),
+                        ),
+                      if (hiddenCreatorCount > 0)
+                        PopupMenuItem<_CatalogMenuAction>(
+                          key: const Key('hidden-creators-menu-item'),
+                          value: _CatalogMenuAction.hiddenCreators,
+                          child: ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.visibility_off_outlined),
+                            title: const Text('非表示中の作成者'),
+                            trailing: Text('$hiddenCreatorCount人'),
                           ),
                         ),
                       const PopupMenuItem<_CatalogMenuAction>(
@@ -739,23 +853,33 @@ class _EmptyCatalog extends StatelessWidget {
 }
 
 class _NoSearchResults extends StatelessWidget {
-  const _NoSearchResults();
+  const _NoSearchResults({required this.hiddenCreatorCount});
+
+  final int hiddenCreatorCount;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 50),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 50),
       child: Column(
         children: <Widget>[
-          Icon(Icons.search_off_rounded, size: 44, color: Color(0xFF94A3B8)),
-          SizedBox(height: 12),
-          Text(
+          const Icon(Icons.search_off_rounded, size: 44, color: Color(0xFF94A3B8)),
+          const SizedBox(height: 12),
+          const Text(
             '一致するアプリがありません',
             style: TextStyle(
               color: Color(0xFF475569),
               fontWeight: FontWeight.w800,
             ),
           ),
+          if (hiddenCreatorCount > 0) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(
+              '非表示中の作成者が $hiddenCreatorCount 人います。右上のメニューから再表示できます。',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFF64748B)),
+            ),
+          ],
         ],
       ),
     );
@@ -781,7 +905,7 @@ class _SafetyNote extends StatelessWidget {
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              '作品にはログイン情報・カメラ・位置情報・マイクを渡しません。外部サイトへの移動も拒否します。',
+              '作品にはログイン情報・カメラ・位置情報・マイクを渡しません。外部サイトへの移動も拒否します。不適切な作品は詳細画面から報告・非表示にできます。',
               style: TextStyle(
                 color: Color(0xFF475569),
                 fontSize: 13,
