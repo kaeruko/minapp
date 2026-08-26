@@ -120,7 +120,7 @@ jobs:
           }
 
           iconset="ios/Runner/Assets.xcassets/AppIcon.appiconset"
-          python3 tool/install_ios_app_icon.py "$iconset"
+          python3 tool/install_ios_app_icon_shared_files.py "$iconset"
 
           info_plist="ios/Runner/Info.plist"
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName MinApp" "$info_plist"
