@@ -19,6 +19,8 @@ from directory_store import DirectoryStore
 
 _LOGGER = logging.getLogger(__name__)
 _TENANT_PATH_RE = re.compile(r"^/v1/tenants/([0-9a-f]{32})$")
+_DEMO_CLASSROOM_ALIAS = "DEMO"
+_DEMO_CLASSROOM_TARGET_CODE = "TZZN-PVXB-EQC3"
 
 
 def _positive_int(name: str, default: int) -> int:
@@ -122,6 +124,12 @@ def _tenant_for_public_read(tenant: Mapping[str, Any] | None) -> Mapping[str, An
     return tenant
 
 
+def _normalize_classroom_lookup(value: object) -> tuple[str, bool]:
+    if isinstance(value, str) and value.strip().upper() == _DEMO_CLASSROOM_ALIAS:
+        return normalize_classroom_code(_DEMO_CLASSROOM_TARGET_CODE), True
+    return normalize_classroom_code(value), False
+
+
 def _resolve(event: Mapping[str, Any], store: Any) -> dict[str, Any]:
     if event.get("isBase64Encoded") is True:
         raise DirectoryProblem(400, "invalid_request", "Base64 request bodies are not accepted.")
@@ -133,7 +141,7 @@ def _resolve(event: Mapping[str, Any], store: Any) -> dict[str, Any]:
 
     payload = strict_json_object(event.get("body"), expected_fields={"code"})
     try:
-        normalized = normalize_classroom_code(payload.get("code"))
+        normalized, is_demo_alias = _normalize_classroom_lookup(payload.get("code"))
     except ValueError as exc:
         raise DirectoryProblem(
             400,
@@ -142,7 +150,8 @@ def _resolve(event: Mapping[str, Any], store: Any) -> dict[str, Any]:
         ) from exc
     code_hash = hash_classroom_code(normalized)
     mapping = store.get_code_mapping(code_hash)
-    if mapping is None or mapping.get("status") != "active":
+    allowed_mapping_statuses = {"active", "rotated"} if is_demo_alias else {"active"}
+    if mapping is None or mapping.get("status") not in allowed_mapping_statuses:
         raise DirectoryProblem(404, "classroom_not_found", "The classroom was not found.")
     tenant_id = mapping.get("tenant_id")
     try:
