@@ -26,6 +26,7 @@ class PublishedApp {
     required this.versionId,
     required this.groupId,
     required this.groupName,
+    required this.ownerUserId,
     required this.ownerLoginId,
     required this.title,
     required this.reviewedAt,
@@ -36,6 +37,7 @@ class PublishedApp {
   final String versionId;
   final String groupId;
   final String groupName;
+  final String ownerUserId;
   // Kept as ownerLoginId for API compatibility; UI prefers owner_display_name when present.
   final String ownerLoginId;
   final String title;
@@ -52,6 +54,7 @@ class PublishedApp {
       versionId: _requiredString(json, 'version_id'),
       groupId: _requiredString(json, 'group_id'),
       groupName: _requiredString(json, 'group_name'),
+      ownerUserId: _requiredHexId(json, 'owner_user_id'),
       ownerLoginId:
           _optionalDisplayName(json) ?? _requiredString(json, 'owner_login_id'),
       title: _requiredString(json, 'title'),
@@ -280,6 +283,14 @@ String _requiredString(Map<String, Object?> json, String key) {
   final Object? value = json[key];
   if (value is! String || value.isEmpty) {
     throw FormatException('JSON field $key must be a non-empty string.');
+  }
+  return value;
+}
+
+String _requiredHexId(Map<String, Object?> json, String key) {
+  final String value = _requiredString(json, key);
+  if (!RegExp(r'^[0-9a-f]{32}$').hasMatch(value)) {
+    throw FormatException('JSON field $key must be a 32-character lowercase hexadecimal id.');
   }
   return value;
 }
