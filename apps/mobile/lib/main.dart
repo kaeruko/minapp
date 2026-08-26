@@ -5,6 +5,7 @@ import 'directory.dart';
 import 'endpoint_validation.dart';
 import 'session_app.dart';
 import 'tenant_store.dart';
+import 'ugc_safety.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,6 +52,7 @@ void main() {
       apiFactory: (Uri baseUri) => MinAppApiClient(baseUri: baseUri),
       officialJoinBaseUri: joinBaseUri,
       creatorPortalBaseUri: creatorPortalBaseUri,
+      creatorSafetyStore: SharedPreferencesCreatorSafetyStore(),
     ),
   );
 }
