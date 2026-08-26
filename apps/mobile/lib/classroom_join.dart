@@ -2,6 +2,7 @@ import 'endpoint_validation.dart';
 
 const String classroomCodeAlphabet = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
 const int classroomCodeLength = 12;
+const String demoClassroomAlias = 'DEMO';
 
 class InvalidClassroomJoinInput implements Exception {
   const InvalidClassroomJoinInput(this.message);
@@ -54,6 +55,9 @@ String normalizeClassroomCode(String rawCode) {
     throw const InvalidClassroomJoinInput('教室コードの形式が正しくありません。');
   }
   final String normalized = rawCode.replaceAll('-', '').toUpperCase();
+  if (normalized == demoClassroomAlias) {
+    return demoClassroomAlias;
+  }
   if (normalized.length != classroomCodeLength ||
       normalized.codeUnits.any(
         (int unit) => !classroomCodeAlphabet.contains(String.fromCharCode(unit)),
