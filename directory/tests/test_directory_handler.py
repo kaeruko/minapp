@@ -16,7 +16,7 @@ import directory_handler  # noqa: E402
 from directory_core import hash_classroom_code, normalize_classroom_code  # noqa: E402
 
 
-CODE = "7K2M-4Q9P-W6TX"
+CODE = "TZZN-PVXB-EQC3"
 TENANT_ID = "a" * 32
 
 
@@ -109,6 +109,31 @@ class DirectoryHandlerTests(unittest.TestCase):
         )
         self.assertIsNotNone(self.store.last_subject_hash)
         self.assertNotEqual(self.store.last_subject_hash, "203.0.113.25")
+
+    def test_demo_alias_resolves_to_development_classroom(self) -> None:
+        response = directory_handler.lambda_handler(
+            _event("POST", "/v1/classrooms/resolve", body=json.dumps({"code": "demo"})),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(json.loads(response["body"])["tenant_id"], TENANT_ID)
+
+    def test_demo_alias_survives_rotation_of_normal_classroom_code(self) -> None:
+        self.store.mapping["status"] = "rotated"
+        response = directory_handler.lambda_handler(
+            _event("POST", "/v1/classrooms/resolve", body=json.dumps({"code": "DEMO"})),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(json.loads(response["body"])["tenant_id"], TENANT_ID)
+
+    def test_other_short_alias_is_rejected(self) -> None:
+        response = directory_handler.lambda_handler(
+            _event("POST", "/v1/classrooms/resolve", body=json.dumps({"code": "ABCD"})),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 400)
+        self.assertEqual(json.loads(response["body"])["error"], "invalid_classroom_code")
 
     def test_unknown_request_field_is_rejected(self) -> None:
         response = directory_handler.lambda_handler(
