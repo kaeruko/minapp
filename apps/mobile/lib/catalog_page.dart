@@ -68,7 +68,7 @@ class _CatalogPageState extends State<CatalogPage> {
   Future<void> _initialize() async {
     try {
       final Set<String> hiddenCreators =
-          await widget.creatorSafetyStore.loadHiddenCreators();
+          await widget.creatorSafetyStore.loadHiddenCreatorUserIds();
       if (!mounted) return;
       setState(() {
         _hiddenCreators = hiddenCreators;
@@ -109,12 +109,22 @@ class _CatalogPageState extends State<CatalogPage> {
   }
 
   Future<void> _hideCreator(PublishedApp app) async {
-    await widget.creatorSafetyStore.hideCreator(app.ownerLoginId);
+    await widget.creatorSafetyStore.hideCreator(app.ownerUserId);
     if (!mounted) return;
     setState(() => _hiddenCreators = <String>{
           ..._hiddenCreators,
-          app.ownerLoginId,
+          app.ownerUserId,
         });
+  }
+
+  String _creatorLabel(String creatorUserId) {
+    final List<PublishedApp>? apps = _apps;
+    if (apps != null) {
+      for (final PublishedApp app in apps) {
+        if (app.ownerUserId == creatorUserId) return app.ownerLoginId;
+      }
+    }
+    return '${creatorUserId.substring(0, 8)}…';
   }
 
   Future<void> _showHiddenCreators() async {
@@ -133,7 +143,7 @@ class _CatalogPageState extends State<CatalogPage> {
                 children: <Widget>[
                   const Icon(Icons.person_off_outlined),
                   const SizedBox(width: 12),
-                  Expanded(child: Text(creator)),
+                  Expanded(child: Text(_creatorLabel(creator))),
                   const Text('再表示'),
                 ],
               ),
@@ -153,13 +163,14 @@ class _CatalogPageState extends State<CatalogPage> {
     try {
       await widget.creatorSafetyStore.unhideCreator(creator);
       if (!mounted) return;
+      final String label = _creatorLabel(creator);
       setState(() {
         final Set<String> next = <String>{..._hiddenCreators};
         next.remove(creator);
         _hiddenCreators = next;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('「$creator」さんの作品を再表示しました。')),
+        SnackBar(content: Text('「$label」さんの作品を再表示しました。')),
       );
     } catch (error) {
       if (mounted) setState(() => _error = messageFor(error));
@@ -249,7 +260,7 @@ class _CatalogPageState extends State<CatalogPage> {
 
   List<PublishedApp> _filterApps(List<PublishedApp> apps) {
     final List<PublishedApp> visibleApps = apps
-        .where((PublishedApp app) => !_hiddenCreators.contains(app.ownerLoginId))
+        .where((PublishedApp app) => !_hiddenCreators.contains(app.ownerUserId))
         .toList(growable: false);
     final String query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) return visibleApps;
