@@ -17,6 +17,7 @@ from handler import (
     _require_fields,
     _required_string,
 )
+from hosted_legal import legal_payload, validate_legal_versions
 
 API_VERSION = "0.3.0"
 _LOGGER = logging.getLogger(__name__)
@@ -38,7 +39,13 @@ _BUILTIN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,63}$")
 
 
 class Backend(Protocol):
-    def register(self, login_id: str, password: str) -> dict[str, Any]: ...
+    def register(
+        self,
+        login_id: str,
+        password: str,
+        terms_version: str,
+        privacy_version: str,
+    ) -> dict[str, Any]: ...
     def recover_account(
         self, login_id: str, recovery_code: str, new_password: str
     ) -> dict[str, Any]: ...
@@ -77,9 +84,9 @@ class Backend(Protocol):
 def _get_backend() -> Backend:
     global _BACKEND
     if _BACKEND is None:
-        from hosted_catalog_backend import HostedCatalogBackend
+        from hosted_legal_backend import HostedLegalBackend
 
-        _BACKEND = HostedCatalogBackend.from_environment()
+        _BACKEND = HostedLegalBackend.from_environment()
     return _BACKEND
 
 
@@ -89,6 +96,24 @@ def _invite_code(payload: dict[str, Any]) -> str:
 
 def _recovery_code(payload: dict[str, Any]) -> str:
     return _required_string(payload, "recovery_code", min_length=20, max_length=30)
+
+
+def _required_boolean(payload: dict[str, Any], field: str) -> bool:
+    value = payload.get(field)
+    if not isinstance(value, bool):
+        raise ApiProblem(400, "invalid_request", f"{field} must be a boolean.")
+    return value
+
+
+def _registration_legal_versions(payload: dict[str, Any]) -> tuple[str, str]:
+    terms_version = _required_string(payload, "terms_version", min_length=1, max_length=80)
+    privacy_version = _required_string(payload, "privacy_version", min_length=1, max_length=80)
+    if not _required_boolean(payload, "terms_accepted"):
+        raise ApiProblem(400, "terms_not_accepted", "利用規約への同意が必要です。")
+    if not _required_boolean(payload, "privacy_accepted"):
+        raise ApiProblem(400, "privacy_not_accepted", "プライバシーポリシーへの同意が必要です。")
+    validate_legal_versions(terms_version, privacy_version)
+    return terms_version, privacy_version
 
 
 def _user_id(payload: dict[str, Any]) -> str:
@@ -130,15 +155,34 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
             {"service": "minapp-hosted-api", "status": "ok", "version": API_VERSION},
         )
 
+    if method == "GET" and path == "/hosted/legal":
+        return _json_response(200, legal_payload())
+
     if method == "GET" and path == "/hosted/builtins":
         return _json_response(200, {"builtins": _get_backend().list_builtin_templates()})
 
     if method == "POST" and path == "/hosted/register":
         payload = _json_body(event)
-        _require_fields(payload, required={"login_id", "password"})
+        _require_fields(
+            payload,
+            required={
+                "login_id",
+                "password",
+                "terms_version",
+                "privacy_version",
+                "terms_accepted",
+                "privacy_accepted",
+            },
+        )
+        terms_version, privacy_version = _registration_legal_versions(payload)
         return _json_response(
             201,
-            _get_backend().register(_login_id(payload), _password(payload, "password")),
+            _get_backend().register(
+                _login_id(payload),
+                _password(payload, "password"),
+                terms_version,
+                privacy_version,
+            ),
         )
 
     if method == "POST" and path == "/hosted/recover":
