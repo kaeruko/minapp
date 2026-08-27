@@ -11,15 +11,32 @@ if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
 
 import hosted_handler  # noqa: E402
+from hosted_legal import PRIVACY_VERSION, TERMS_VERSION  # noqa: E402
 
 
 class FakeBackend:
     def __init__(self) -> None:
         self.calls: list[tuple[Any, ...]] = []
 
-    def register(self, login_id: str, password: str) -> dict[str, Any]:
-        self.calls.append(("register", login_id, password))
-        return {"user_id": "1" * 32, "login_id": login_id, "role": "user", "status": "active"}
+    def register(
+        self,
+        login_id: str,
+        password: str,
+        terms_version: str,
+        privacy_version: str,
+    ) -> dict[str, Any]:
+        self.calls.append(("register", login_id, password, terms_version, privacy_version))
+        return {
+            "user_id": "1" * 32,
+            "login_id": login_id,
+            "role": "user",
+            "status": "active",
+            "legal": {
+                "terms_version": terms_version,
+                "privacy_version": privacy_version,
+                "accepted_at": "2026-08-28T00:00:00Z",
+            },
+        }
 
     def me(self, auth_subject: str) -> dict[str, Any]:
         self.calls.append(("me", auth_subject))
@@ -70,6 +87,19 @@ def event(method: str, path: str, *, body: dict[str, Any] | None = None, auth: b
     return result
 
 
+def registration_body(**overrides: Any) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "login_id": "alice",
+        "password": "secret12",
+        "terms_version": TERMS_VERSION,
+        "privacy_version": PRIVACY_VERSION,
+        "terms_accepted": True,
+        "privacy_accepted": True,
+    }
+    body.update(overrides)
+    return body
+
+
 class HostedHandlerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.backend = FakeBackend()
@@ -78,20 +108,61 @@ class HostedHandlerTests(unittest.TestCase):
     def tearDown(self) -> None:
         hosted_handler._BACKEND = None
 
-    def test_register_is_public_and_validated(self) -> None:
+    def test_legal_documents_are_public_and_versioned(self) -> None:
+        response = hosted_handler.lambda_handler(event("GET", "/hosted/legal"), None)
+        self.assertEqual(response["statusCode"], 200)
+        payload = json.loads(response["body"])
+        self.assertEqual(payload["terms"]["version"], TERMS_VERSION)
+        self.assertEqual(payload["privacy"]["version"], PRIVACY_VERSION)
+        self.assertIn("zero tolerance", payload["terms"]["body"])
+        self.assertIn("Amazon Web Services", payload["privacy"]["body"])
+        self.assertEqual(self.backend.calls, [])
+
+    def test_register_requires_current_legal_consent(self) -> None:
+        response = hosted_handler.lambda_handler(
+            event("POST", "/hosted/register", body=registration_body()),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 201)
+        self.assertEqual(
+            self.backend.calls,
+            [("register", "alice", "secret12", TERMS_VERSION, PRIVACY_VERSION)],
+        )
+
+    def test_register_rejects_missing_legal_fields(self) -> None:
         response = hosted_handler.lambda_handler(
             event("POST", "/hosted/register", body={"login_id": "alice", "password": "secret12"}),
             None,
         )
-        self.assertEqual(response["statusCode"], 201)
-        self.assertEqual(self.backend.calls, [("register", "alice", "secret12")])
+        self.assertEqual(response["statusCode"], 400)
+        self.assertEqual(self.backend.calls, [])
+
+    def test_register_rejects_false_terms_acceptance(self) -> None:
+        response = hosted_handler.lambda_handler(
+            event("POST", "/hosted/register", body=registration_body(terms_accepted=False)),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 400)
+        payload = json.loads(response["body"])
+        self.assertEqual(payload["error"], "terms_not_accepted")
+        self.assertEqual(self.backend.calls, [])
+
+    def test_register_rejects_stale_terms_version(self) -> None:
+        response = hosted_handler.lambda_handler(
+            event("POST", "/hosted/register", body=registration_body(terms_version="old-terms")),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 409)
+        payload = json.loads(response["body"])
+        self.assertEqual(payload["error"], "terms_version_outdated")
+        self.assertEqual(self.backend.calls, [])
 
     def test_unknown_register_field_fails_closed(self) -> None:
         response = hosted_handler.lambda_handler(
             event(
                 "POST",
                 "/hosted/register",
-                body={"login_id": "alice", "password": "secret12", "email": "x@example.com"},
+                body=registration_body(email="x@example.com"),
             ),
             None,
         )

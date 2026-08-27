@@ -1,6 +1,7 @@
 locals {
   hosted_public_routes = toset([
     "GET /hosted/health",
+    "GET /hosted/legal",
     "GET /hosted/builtins",
     "POST /hosted/register",
     "POST /hosted/recover",
