@@ -105,6 +105,10 @@ jobs:
         run: terraform -chdir=infra/terraform init -backend=false -input=false
       - name: Validate tenant stack
         run: terraform -chdir=infra/terraform validate
+      - name: Init hosted tenant stack without remote backend
+        run: terraform -chdir=infra/hosted init -backend=false -input=false
+      - name: Validate hosted tenant stack
+        run: terraform -chdir=infra/hosted validate
       - name: Init Directory stack without remote backend
         run: terraform -chdir=infra/directory init -backend=false -input=false
       - name: Validate Directory stack
