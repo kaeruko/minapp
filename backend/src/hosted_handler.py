@@ -18,7 +18,7 @@ from handler import (
     _required_string,
 )
 
-API_VERSION = "0.1.0"
+API_VERSION = "0.2.0"
 _LOGGER = logging.getLogger(__name__)
 _BACKEND: "Backend | None" = None
 _ID_RE = r"([0-9a-f]{32})"
@@ -26,10 +26,19 @@ _GROUP_MEMBERS_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/members$")
 _GROUP_MEMBER_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/members/{_ID_RE}$")
 _GROUP_INVITE_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/invite$")
 _GROUP_MEMBERSHIP_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/membership$")
+_GROUP_OWNER_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/owner$")
+_GROUP_RE = re.compile(rf"^/hosted/groups/{_ID_RE}$")
+_RUNTIME_SESSION_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/runtime-session$")
+_RUNTIME_STATE_RE = re.compile(r"^/hosted/runtime/([A-Za-z0-9_-]{32,64})/state/([^/]{1,128})$")
 
 
 class Backend(Protocol):
     def register(self, login_id: str, password: str) -> dict[str, Any]: ...
+    def recover_account(
+        self, login_id: str, recovery_code: str, new_password: str
+    ) -> dict[str, Any]: ...
+    def rotate_recovery_code(self, auth_subject: str) -> dict[str, str]: ...
+    def delete_account(self, auth_subject: str) -> None: ...
     def me(self, auth_subject: str) -> dict[str, Any]: ...
     def list_groups(self, auth_subject: str) -> list[dict[str, Any]]: ...
     def create_group(self, auth_subject: str, name: str) -> dict[str, Any]: ...
@@ -39,19 +48,40 @@ class Backend(Protocol):
     def join_group(self, auth_subject: str, invite_code: str) -> dict[str, Any]: ...
     def leave_group(self, auth_subject: str, group_id: str) -> None: ...
     def remove_member(self, auth_subject: str, group_id: str, user_id: str) -> None: ...
+    def transfer_group_ownership(
+        self, auth_subject: str, group_id: str, new_owner_user_id: str
+    ) -> dict[str, str]: ...
+    def delete_group(self, auth_subject: str, group_id: str) -> None: ...
+    def create_runtime_session(
+        self, auth_subject: str, group_id: str, app_id: str
+    ) -> dict[str, Any]: ...
+    def get_runtime_state(self, token: str, key: str) -> dict[str, Any]: ...
+    def set_runtime_state(self, token: str, key: str, value: Any) -> dict[str, Any]: ...
+    def delete_runtime_state(self, token: str, key: str) -> None: ...
 
 
 def _get_backend() -> Backend:
     global _BACKEND
     if _BACKEND is None:
-        from hosted_backend import HostedAwsBackend
+        from hosted_platform_backend import HostedPlatformBackend
 
-        _BACKEND = HostedAwsBackend.from_environment()
+        _BACKEND = HostedPlatformBackend.from_environment()
     return _BACKEND
 
 
 def _invite_code(payload: dict[str, Any]) -> str:
     return _required_string(payload, "code", min_length=12, max_length=20)
+
+
+def _recovery_code(payload: dict[str, Any]) -> str:
+    return _required_string(payload, "recovery_code", min_length=20, max_length=30)
+
+
+def _user_id(payload: dict[str, Any]) -> str:
+    value = _required_string(payload, "user_id", min_length=32, max_length=32)
+    if re.fullmatch(r"[0-9a-f]{32}", value) is None:
+        raise ApiProblem(400, "invalid_request", "user_id must be a 32-character lowercase hexadecimal ID.")
+    return value
 
 
 def _empty_response() -> dict[str, Any]:
@@ -80,8 +110,45 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
             _get_backend().register(_login_id(payload), _password(payload, "password")),
         )
 
+    if method == "POST" and path == "/hosted/recover":
+        payload = _json_body(event)
+        _require_fields(payload, required={"login_id", "recovery_code", "new_password"})
+        return _json_response(
+            200,
+            _get_backend().recover_account(
+                _login_id(payload),
+                _recovery_code(payload),
+                _password(payload, "new_password"),
+            ),
+        )
+
+    runtime_state_match = _RUNTIME_STATE_RE.fullmatch(path)
+    if runtime_state_match is not None:
+        token, key = runtime_state_match.groups()
+        if method == "GET":
+            return _json_response(200, _get_backend().get_runtime_state(token, key))
+        if method == "POST":
+            payload = _json_body(event)
+            _require_fields(payload, required={"value"})
+            return _json_response(
+                200,
+                _get_backend().set_runtime_state(token, key, payload["value"]),
+            )
+        if method == "DELETE":
+            _get_backend().delete_runtime_state(token, key)
+            return _empty_response()
+
     if method == "GET" and path == "/hosted/me":
         return _json_response(200, _get_backend().me(_auth_subject(event)))
+
+    if method == "POST" and path == "/hosted/recovery-code":
+        payload = _json_body(event)
+        _require_fields(payload, required=set())
+        return _json_response(200, _get_backend().rotate_recovery_code(_auth_subject(event)))
+
+    if method == "DELETE" and path == "/hosted/account":
+        _get_backend().delete_account(_auth_subject(event))
+        return _empty_response()
 
     if method == "GET" and path == "/hosted/groups":
         return _json_response(
@@ -128,6 +195,27 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
         _get_backend().revoke_invite(_auth_subject(event), invite_match.group(1))
         return _empty_response()
 
+    ownership_match = _GROUP_OWNER_RE.fullmatch(path)
+    if ownership_match is not None and method == "POST":
+        payload = _json_body(event)
+        _require_fields(payload, required={"user_id"})
+        return _json_response(
+            200,
+            _get_backend().transfer_group_ownership(
+                _auth_subject(event), ownership_match.group(1), _user_id(payload)
+            ),
+        )
+
+    runtime_session_match = _RUNTIME_SESSION_RE.fullmatch(path)
+    if runtime_session_match is not None and method == "POST":
+        payload = _json_body(event)
+        _require_fields(payload, required=set())
+        group_id, app_id = runtime_session_match.groups()
+        return _json_response(
+            201,
+            _get_backend().create_runtime_session(_auth_subject(event), group_id, app_id),
+        )
+
     membership_match = _GROUP_MEMBERSHIP_RE.fullmatch(path)
     if membership_match is not None and method == "DELETE":
         _get_backend().leave_group(_auth_subject(event), membership_match.group(1))
@@ -137,6 +225,11 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
     if member_match is not None and method == "DELETE":
         group_id, user_id = member_match.groups()
         _get_backend().remove_member(_auth_subject(event), group_id, user_id)
+        return _empty_response()
+
+    group_match = _GROUP_RE.fullmatch(path)
+    if group_match is not None and method == "DELETE":
+        _get_backend().delete_group(_auth_subject(event), group_match.group(1))
         return _empty_response()
 
     return _json_response(
