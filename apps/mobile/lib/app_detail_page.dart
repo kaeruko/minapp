@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'app_visual.dart';
 import 'app_webview.dart';
-import 'ugc_safety.dart';
 import 'ui.dart';
 
 const Color _brandBlue = Color(0xFF2563EB);
@@ -106,9 +105,36 @@ class _AppDetailPageState extends State<AppDetailPage> {
       _error = null;
     });
     try {
-      await openAppReportEmail(app: widget.app, reason: reason);
+      await widget.api.reportApp(
+        widget.session.accessToken,
+        widget.app,
+        reason,
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (BuildContext dialogContext) => AlertDialog(
+          title: const Text('報告を受け付けました'),
+          content: const Text(
+            '運営が24時間以内に内容を確認します。規約違反が確認された場合は、作品を削除または公開停止し、違反したユーザーを利用停止します。',
+          ),
+          actions: <Widget>[
+            FilledButton(
+              key: const Key('report-complete-close'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('閉じる'),
+            ),
+          ],
+        ),
+      );
     } catch (error) {
-      if (mounted) setState(() => _error = messageFor(error));
+      if (!mounted) return;
+      if (error is ApiException && error.statusCode == 401) {
+        widget.onLogout();
+        Navigator.of(context).popUntil((Route<dynamic> route) => route.isFirst);
+        return;
+      }
+      setState(() => _error = messageFor(error));
     } finally {
       if (mounted) setState(() => _safetyBusy = false);
     }
@@ -119,10 +145,10 @@ class _AppDetailPageState extends State<AppDetailPage> {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('この作成者の作品を非表示'),
+        title: const Text('このユーザーをブロック'),
         content: Text(
-          '「${widget.app.ownerLoginId}」さんの作品を、この端末の一覧から非表示にしますか？\n'
-          'あとでメニューから再表示できます。',
+          '「${widget.app.ownerLoginId}」さんをブロックしますか？\n'
+          'このユーザーが公開した作品は、この端末の一覧に表示されなくなります。あとでメニューから解除できます。',
         ),
         actions: <Widget>[
           TextButton(
@@ -132,7 +158,7 @@ class _AppDetailPageState extends State<AppDetailPage> {
           FilledButton(
             key: const Key('confirm-hide-creator'),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('非表示にする'),
+            child: const Text('ブロックする'),
           ),
         ],
       ),
@@ -325,7 +351,7 @@ class _AppDetailPageState extends State<AppDetailPage> {
                           ),
                           const SizedBox(height: 12),
                           const Text(
-                            '不適切な作品は運営へ報告できます。見たくない作成者の作品はこの端末で非表示にできます。',
+                            '不適切な作品は運営へ報告できます。迷惑行為を行うユーザーはブロックできます。',
                             style: TextStyle(
                               color: Color(0xFF78350F),
                               height: 1.5,
@@ -342,8 +368,8 @@ class _AppDetailPageState extends State<AppDetailPage> {
                           TextButton.icon(
                             key: const Key('app-detail-hide-creator'),
                             onPressed: _safetyBusy ? null : _hideCreator,
-                            icon: const Icon(Icons.visibility_off_outlined),
-                            label: const Text('この作成者の作品を非表示'),
+                            icon: const Icon(Icons.block_outlined),
+                            label: const Text('このユーザーをブロック'),
                           ),
                         ],
                       ),
