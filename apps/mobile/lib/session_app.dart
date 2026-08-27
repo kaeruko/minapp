@@ -7,6 +7,7 @@ import 'classroom_setup_page.dart';
 import 'directory.dart';
 import 'login_page.dart';
 import 'tenant_store.dart';
+import 'terms_gate_page.dart';
 import 'ugc_safety.dart';
 import 'ui.dart';
 
@@ -216,13 +217,15 @@ class _SessionRootState extends State<_SessionRoot> {
 
     final AuthenticatedSession? session = _session;
     if (session == null) {
-      return LoginPage(
-        api: api,
-        classroomName: tenant.displayName,
-        onChangeClassroom: _changeClassroom,
-        onAuthenticated: (AuthenticatedSession value) {
-          setState(() => _session = value);
-        },
+      return TermsGatePage(
+        childBuilder: (BuildContext context) => LoginPage(
+          api: api,
+          classroomName: tenant.displayName,
+          onChangeClassroom: _changeClassroom,
+          onAuthenticated: (AuthenticatedSession value) {
+            setState(() => _session = value);
+          },
+        ),
       );
     }
     return CatalogPage(

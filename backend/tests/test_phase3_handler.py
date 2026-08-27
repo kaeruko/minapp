@@ -41,6 +41,20 @@ class FakeBackend:
         self.last_call = ("create_launch", auth_subject, app_id, version_id)
         return {"content_path": f"/launch/{LAUNCH_TOKEN}/index.html", "expires_in": 600}
 
+    def create_report(
+        self,
+        auth_subject: str,
+        app_id: str,
+        version_id: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        self.last_call = ("create_report", auth_subject, app_id, version_id, reason)
+        return {
+            "report_id": "e" * 32,
+            "status": "received",
+            "created_at": "2026-08-27T12:00:00Z",
+        }
+
     def get_launch_file(self, token: str, path: str) -> tuple[bytes, str]:
         self.last_call = ("get_launch_file", token, path)
         return b"<h1>ok</h1>", "text/html; charset=utf-8"
@@ -122,6 +136,49 @@ class Phase3HandlerTests(unittest.TestCase):
                 f"/mobile/apps/{'a' * 32}/versions/{'b' * 32}/launch",
                 subject="student-sub",
                 body={"unexpected": True},
+            ),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 400)
+
+    def test_report_persists_authenticated_reason(self) -> None:
+        app_id = "a" * 32
+        version_id = "b" * 32
+        response = phase3_handler.lambda_handler(
+            _event(
+                "POST",
+                f"/mobile/apps/{app_id}/versions/{version_id}/reports",
+                subject="student-sub",
+                body={"reason": "嫌がらせ・いじめ"},
+            ),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 201)
+        payload = json.loads(response["body"])
+        self.assertEqual(payload["status"], "received")
+        self.assertEqual(
+            self.backend.last_call,
+            ("create_report", "student-sub", app_id, version_id, "嫌がらせ・いじめ"),
+        )
+
+    def test_report_requires_authentication(self) -> None:
+        response = phase3_handler.lambda_handler(
+            _event(
+                "POST",
+                f"/mobile/apps/{'a' * 32}/versions/{'b' * 32}/reports",
+                body={"reason": "その他"},
+            ),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 401)
+
+    def test_report_rejects_unknown_fields(self) -> None:
+        response = phase3_handler.lambda_handler(
+            _event(
+                "POST",
+                f"/mobile/apps/{'a' * 32}/versions/{'b' * 32}/reports",
+                subject="student-sub",
+                body={"reason": "その他", "extra": True},
             ),
             None,
         )

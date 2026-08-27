@@ -15,11 +15,21 @@ from phase2_backend import (
     Phase2AwsBackend,
     _content_type,
     _item_number,
+    _now_iso,
     _number_attr,
     _safe_zip_paths,
 )
 
 LAUNCH_TTL_SECONDS = 10 * 60
+REPORT_REASONS = frozenset(
+    {
+        "不適切な表現・内容",
+        "嫌がらせ・いじめ",
+        "個人情報が含まれている",
+        "危険な内容",
+        "その他",
+    }
+)
 
 
 class Phase3AwsBackend(Phase2AwsBackend):
@@ -90,6 +100,47 @@ class Phase3AwsBackend(Phase2AwsBackend):
         return {
             "content_path": f"/launch/{token}/index.html",
             "expires_in": LAUNCH_TTL_SECONDS,
+        }
+
+    def create_report(
+        self,
+        auth_subject: str,
+        app_id: str,
+        version_id: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        if reason not in REPORT_REASONS:
+            raise ApiProblem(400, "invalid_report_reason", "報告理由が不正です。")
+
+        reporter = self._user_by_auth_subject(auth_subject)
+        version = self._version_item(app_id, version_id)
+        if _item_string(version, "status") != "approved":
+            raise ApiProblem(409, "app_not_published", "公開中の作品だけ報告できます。")
+
+        group_id = _item_string(version, "group_id")
+        self._require_active_membership(reporter.user_id, group_id, reporter.role)
+        owner_user_id = _item_string(version, "owner_user_id")
+        report_id = secrets.token_hex(16)
+        created_at = _now_iso()
+        item = {
+            "pk": _string_attr(f"REPORT#{report_id}"),
+            "sk": _string_attr("META"),
+            "entity": _string_attr("ugc_report"),
+            "report_id": _string_attr(report_id),
+            "app_id": _string_attr(app_id),
+            "version_id": _string_attr(version_id),
+            "group_id": _string_attr(group_id),
+            "reported_owner_user_id": _string_attr(owner_user_id),
+            "reported_by_user_id": _string_attr(reporter.user_id),
+            "reason": _string_attr(reason),
+            "status": _string_attr("open"),
+            "created_at": _string_attr(created_at),
+        }
+        self._transact_put_new([item])
+        return {
+            "report_id": report_id,
+            "status": "received",
+            "created_at": created_at,
         }
 
     def get_launch_file(self, token: str, path: str) -> tuple[bytes, str]:

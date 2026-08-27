@@ -27,6 +27,15 @@ class _UnusedApi implements MinAppApi {
   Future<LaunchGrant> createLaunch(String accessToken, PublishedApp app) {
     throw UnimplementedError();
   }
+
+  @override
+  Future<void> reportApp(
+    String accessToken,
+    PublishedApp app,
+    String reason,
+  ) {
+    throw UnimplementedError();
+  }
 }
 
 Map<String, Object?> _publishedJson({Object? description}) => <String, Object?>{
@@ -87,5 +96,6 @@ void main() {
     expect(find.text('毎日の予定をすぐ確認できるアプリです。'), findsOneWidget);
     expect(find.byKey(const Key('app-detail-report')), findsOneWidget);
     expect(find.byKey(const Key('app-detail-hide-creator')), findsOneWidget);
+    expect(find.text('このユーザーをブロック'), findsOneWidget);
   });
 }

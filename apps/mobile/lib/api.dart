@@ -98,6 +98,12 @@ abstract interface class MinAppApi {
   Future<List<PublishedApp>> listPublishedApps(String accessToken);
 
   Future<LaunchGrant> createLaunch(String accessToken, PublishedApp app);
+
+  Future<void> reportApp(
+    String accessToken,
+    PublishedApp app,
+    String reason,
+  );
 }
 
 class MinAppApiClient implements MinAppApi {
@@ -182,6 +188,27 @@ class MinAppApiClient implements MinAppApi {
       throw const FormatException('Launch URL has an unexpected path.');
     }
     return LaunchGrant(url: url, expiresIn: rawExpiresIn);
+  }
+
+  @override
+  Future<void> reportApp(
+    String accessToken,
+    PublishedApp app,
+    String reason,
+  ) async {
+    if (reason.isEmpty || reason != reason.trim() || reason.length > 80) {
+      throw ArgumentError.value(
+        reason,
+        'reason',
+        'must be 1-80 trimmed characters',
+      );
+    }
+    await _jsonRequest(
+      method: 'POST',
+      path: '/mobile/apps/${app.appId}/versions/${app.versionId}/reports',
+      accessToken: accessToken,
+      body: <String, Object?>{'reason': reason},
+    );
   }
 
   Future<Map<String, Object?>> _jsonRequest({
