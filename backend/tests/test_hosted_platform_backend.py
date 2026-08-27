@@ -45,6 +45,17 @@ class HostedPlatformBackendTests(unittest.TestCase):
             "app_id": _string_attr(app_id),
             "group_id": _string_attr(group_id),
         }
+        self.metadata.items[(f"GROUP#{group_id}", f"APP#{app_id}#VERSION#{'1' * 32}")] = {
+            "pk": _string_attr(f"GROUP#{group_id}"),
+            "sk": _string_attr(f"APP#{app_id}#VERSION#{'1' * 32}"),
+            "entity": _string_attr("app_version"),
+            "app_id": _string_attr(app_id),
+            "group_id": _string_attr(group_id),
+        }
+
+    def _remove_seeded_app(self, group_id: str, app_id: str) -> None:
+        del self.metadata.items[(f"APP#{app_id}", "META")]
+        del self.metadata.items[(f"GROUP#{group_id}", f"APP#{app_id}#VERSION#{'1' * 32}")]
 
     def test_registration_returns_one_time_recovery_code_and_recovery_rotates_it(self) -> None:
         _, recovery_code = self._register("alice")
@@ -107,7 +118,7 @@ class HostedPlatformBackendTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 409)
         self.assertEqual(caught.exception.error, "group_has_apps")
 
-        del self.metadata.items[(f"APP#{app_id}", "META")]
+        self._remove_seeded_app(group["group_id"], app_id)
         self.backend.delete_group(alice, group["group_id"])
         self.assertEqual(self.backend.list_groups(alice), [])
 
