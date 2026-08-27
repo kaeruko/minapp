@@ -18,7 +18,7 @@ from handler import (
     _required_string,
 )
 
-API_VERSION = "0.2.0"
+API_VERSION = "0.3.0"
 _LOGGER = logging.getLogger(__name__)
 _BACKEND: "Backend | None" = None
 _ID_RE = r"([0-9a-f]{32})"
@@ -28,8 +28,13 @@ _GROUP_INVITE_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/invite$")
 _GROUP_MEMBERSHIP_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/membership$")
 _GROUP_OWNER_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/owner$")
 _GROUP_RE = re.compile(rf"^/hosted/groups/{_ID_RE}$")
+_GROUP_APPS_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps$")
+_GROUP_APP_INSTALL_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/install$")
+_GROUP_APP_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}$")
+_GROUP_APP_FORK_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/fork$")
 _RUNTIME_SESSION_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/runtime-session$")
 _RUNTIME_STATE_RE = re.compile(r"^/hosted/runtime/([A-Za-z0-9_-]{32,64})/state/([^/]{1,128})$")
+_BUILTIN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,63}$")
 
 
 class Backend(Protocol):
@@ -52,6 +57,15 @@ class Backend(Protocol):
         self, auth_subject: str, group_id: str, new_owner_user_id: str
     ) -> dict[str, str]: ...
     def delete_group(self, auth_subject: str, group_id: str) -> None: ...
+    def list_builtin_templates(self) -> list[dict[str, Any]]: ...
+    def list_group_apps(self, auth_subject: str, group_id: str) -> list[dict[str, Any]]: ...
+    def install_builtin(
+        self, auth_subject: str, group_id: str, builtin_id: str
+    ) -> dict[str, Any]: ...
+    def fork_app(
+        self, auth_subject: str, group_id: str, app_id: str, title: str
+    ) -> dict[str, Any]: ...
+    def delete_hosted_app(self, auth_subject: str, group_id: str, app_id: str) -> None: ...
     def create_runtime_session(
         self, auth_subject: str, group_id: str, app_id: str
     ) -> dict[str, Any]: ...
@@ -63,9 +77,9 @@ class Backend(Protocol):
 def _get_backend() -> Backend:
     global _BACKEND
     if _BACKEND is None:
-        from hosted_platform_backend import HostedPlatformBackend
+        from hosted_catalog_backend import HostedCatalogBackend
 
-        _BACKEND = HostedPlatformBackend.from_environment()
+        _BACKEND = HostedCatalogBackend.from_environment()
     return _BACKEND
 
 
@@ -81,6 +95,20 @@ def _user_id(payload: dict[str, Any]) -> str:
     value = _required_string(payload, "user_id", min_length=32, max_length=32)
     if re.fullmatch(r"[0-9a-f]{32}", value) is None:
         raise ApiProblem(400, "invalid_request", "user_id must be a 32-character lowercase hexadecimal ID.")
+    return value
+
+
+def _builtin_id(payload: dict[str, Any]) -> str:
+    value = _required_string(payload, "builtin_id", min_length=2, max_length=64)
+    if _BUILTIN_ID_RE.fullmatch(value) is None:
+        raise ApiProblem(400, "invalid_request", "builtin_id has an invalid format.")
+    return value
+
+
+def _hosted_app_title(payload: dict[str, Any]) -> str:
+    value = _required_string(payload, "title", min_length=1, max_length=80)
+    if value != value.strip():
+        raise ApiProblem(400, "invalid_request", "title must not have leading or trailing whitespace.")
     return value
 
 
@@ -101,6 +129,9 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
             200,
             {"service": "minapp-hosted-api", "status": "ok", "version": API_VERSION},
         )
+
+    if method == "GET" and path == "/hosted/builtins":
+        return _json_response(200, {"builtins": _get_backend().list_builtin_templates()})
 
     if method == "POST" and path == "/hosted/register":
         payload = _json_body(event)
@@ -206,6 +237,36 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
             ),
         )
 
+    group_apps_match = _GROUP_APPS_RE.fullmatch(path)
+    if group_apps_match is not None and method == "GET":
+        return _json_response(
+            200,
+            {"apps": _get_backend().list_group_apps(_auth_subject(event), group_apps_match.group(1))},
+        )
+
+    app_install_match = _GROUP_APP_INSTALL_RE.fullmatch(path)
+    if app_install_match is not None and method == "POST":
+        payload = _json_body(event)
+        _require_fields(payload, required={"builtin_id"})
+        return _json_response(
+            201,
+            _get_backend().install_builtin(
+                _auth_subject(event), app_install_match.group(1), _builtin_id(payload)
+            ),
+        )
+
+    app_fork_match = _GROUP_APP_FORK_RE.fullmatch(path)
+    if app_fork_match is not None and method == "POST":
+        payload = _json_body(event)
+        _require_fields(payload, required={"title"})
+        group_id, app_id = app_fork_match.groups()
+        return _json_response(
+            201,
+            _get_backend().fork_app(
+                _auth_subject(event), group_id, app_id, _hosted_app_title(payload)
+            ),
+        )
+
     runtime_session_match = _RUNTIME_SESSION_RE.fullmatch(path)
     if runtime_session_match is not None and method == "POST":
         payload = _json_body(event)
@@ -215,6 +276,12 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
             201,
             _get_backend().create_runtime_session(_auth_subject(event), group_id, app_id),
         )
+
+    app_match = _GROUP_APP_RE.fullmatch(path)
+    if app_match is not None and method == "DELETE":
+        group_id, app_id = app_match.groups()
+        _get_backend().delete_hosted_app(_auth_subject(event), group_id, app_id)
+        return _empty_response()
 
     membership_match = _GROUP_MEMBERSHIP_RE.fullmatch(path)
     if membership_match is not None and method == "DELETE":
