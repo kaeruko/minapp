@@ -7,7 +7,15 @@ import handler
 import hosted_handler
 from abuse_guard import get_abuse_guard, source_ip_from_event
 from errors import ApiProblem
-from handler import _json_body, _json_response, _login_id, _password, _raw_path, _request_method, _require_fields
+from handler import (
+    _json_body,
+    _json_response,
+    _login_id,
+    _password,
+    _raw_path,
+    _request_method,
+    _require_fields,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,9 +34,20 @@ def _guard_login(event: dict[str, Any]) -> None:
 
 def _guard_register(event: dict[str, Any]) -> None:
     payload = _json_body(event)
-    _require_fields(payload, required={"login_id", "password"})
+    _require_fields(
+        payload,
+        required={
+            "login_id",
+            "password",
+            "terms_version",
+            "privacy_version",
+            "terms_accepted",
+            "privacy_accepted",
+        },
+    )
     login_id = _login_id(payload)
     _password(payload, "password")
+    hosted_handler._registration_legal_versions(payload)
     get_abuse_guard().check(
         "register",
         source_ip=source_ip_from_event(event),
