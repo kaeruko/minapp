@@ -29,7 +29,7 @@ Dedicated school tenants continue to use the existing Phase 6 design.
 - one private S3 upload bucket
 - one private S3 published bucket
 - current MinApp Web API Lambda and HTTP API Gateway foundation
-- Hosted platform Lambda for registration, group lifecycle, and scoped Runtime state
+- Hosted platform Lambda for registration, group lifecycle, built-in catalog and scoped Runtime state
 - public read-only `/tenant-info`
 - CloudWatch log groups
 
@@ -74,7 +74,48 @@ MVP hard guards:
 - ownership can only be transferred to an existing active member
 - group deletion is refused while app records still exist
 
-## Scoped Runtime state
+## Built-in catalog, install and fork
+
+Hosted has a server-side built-in template registry. The first registry entries mirror the two existing Flutter built-ins:
+
+- `shiba-game`
+- `shiba-goshujin`
+
+A built-in is a versioned template definition, not a new AWS deployment. Installing a template creates normal App metadata inside the target group and records its provenance:
+
+```text
+builtin template
+  builtin_id
+  version
+  asset_path
+       │
+       ▼ install
+App
+  source_kind = builtin
+  builtin_id
+  builtin_version
+  editable = false
+       │
+       ▼ fork
+App
+  source_kind = fork
+  parent_app_id
+  builtin_id
+  builtin_version
+  editable = true
+```
+
+Installing/forking never creates a new Lambda, table, bucket or User Pool. Only the group owner can install, fork or delete apps; active members can list/use them.
+
+The fork implemented here establishes identity/provenance and an editable app record. Copying/editing actual source files and connecting AI-generated source uploads is a later layer; do not treat `editable = true` as arbitrary server-code execution.
+
+Initial app guard:
+
+- maximum 20 app records per group, including forks
+- the same built-in template can only be installed once directly in a group; users can create separate forks
+- deleting an app also deletes its bounded Runtime key/value state
+
+## Scoped Runtime state and quotas
 
 The first Runtime/Data API is intentionally small: per-app JSON key/value state.
 
@@ -101,21 +142,27 @@ separate runtime DynamoDB table
 
 The runtime token is not a Cognito token. The server derives `group_id`, `app_id`, and `user_id` from the session record and re-checks current Membership plus app/group association on every state request. Removing a member therefore revokes an already-issued runtime token immediately.
 
-Initial Runtime limits:
+Initial Runtime hard guards:
 
 - session lifetime: 10 minutes
+- maximum 300 state operations per Runtime session; the counter is incremented with an atomic DynamoDB conditional update
 - state key: lowercase identifier, up to 64 characters
+- maximum 64 state keys per app
 - one JSON value: maximum 16 KiB
+- total JSON value storage: maximum 256 KiB per app
 - no arbitrary DynamoDB access
 - no arbitrary collection/table names
 - no external API proxy yet
 
-Runtime session records include a future TTL timestamp, but DynamoDB TTL cleanup is not yet enabled on the metadata table. Expired sessions are rejected by application logic regardless; enabling automatic physical cleanup is a deployment follow-up.
+The API Gateway also applies the Hosted stack's platform-wide default throttle of 25 requests/second with a burst of 50. The per-session Runtime budget is separate from that infrastructure throttle.
+
+Runtime session records include a future TTL timestamp, but DynamoDB TTL cleanup is not yet enabled on the metadata table. Expired sessions are rejected by application logic regardless; enabling automatic physical cleanup is still a deployment follow-up.
 
 ## Hosted routes
 
 ```text
 GET    /hosted/health                                      public
+GET    /hosted/builtins                                    public
 POST   /hosted/register                                    public
 POST   /hosted/recover                                     public
 
@@ -133,6 +180,11 @@ POST   /hosted/groups/{group_id}/owner                     owner; transfer owner
 DELETE /hosted/groups/{group_id}                           owner
 DELETE /hosted/groups/{group_id}/membership                member leaves self
 DELETE /hosted/groups/{group_id}/members/{user_id}         owner removes member
+
+GET    /hosted/groups/{group_id}/apps                      authenticated member
+POST   /hosted/groups/{group_id}/apps/install              owner
+POST   /hosted/groups/{group_id}/apps/{app_id}/fork        owner
+DELETE /hosted/groups/{group_id}/apps/{app_id}             owner
 POST   /hosted/groups/{group_id}/apps/{app_id}/runtime-session authenticated member
 
 GET    /hosted/runtime/{token}/state/{key}                 scoped runtime token
@@ -174,13 +226,14 @@ terraform -chdir=infra/hosted plan -out=tfplan
 
 Review the plan before apply. Do not automatically apply a plan created with an unexpected account, region, tenant ID, or environment.
 
-## Next steps before creative built-ins
+## Next steps before the first creative built-in
 
 1. registration/recovery rate limiting and terms/privacy acceptance
 2. automatic TTL cleanup for runtime-session metadata
-3. storage/request quota accounting per group
-4. built-in app installation/fork metadata
-5. media/file storage when the first novel/profile built-ins require it
-6. integrate the scoped Runtime token with actual app launch so app code receives only its runtime scope
+3. connect actual app launch to the scoped Runtime token
+4. add source-file/version metadata for editable forks and AI-generated HTML/CSS/JS uploads
+5. add media/file storage when the first novel/profile built-ins require images
+6. deploy the Hosted stack and exercise registration -> group -> invite -> install -> Runtime end-to-end
+7. build the first creative built-in (novel/profile/setting archive)
 
 This stack deliberately remains a constrained application platform, not an unrestricted PaaS.
