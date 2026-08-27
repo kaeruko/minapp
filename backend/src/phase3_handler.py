@@ -14,6 +14,7 @@ _LOGGER = logging.getLogger(__name__)
 _BACKEND: Phase3AwsBackend | None = None
 _ID_RE = r"([0-9a-f]{32})"
 _MOBILE_LAUNCH_RE = re.compile(rf"^/mobile/apps/{_ID_RE}/versions/{_ID_RE}/launch$")
+_MOBILE_REPORT_RE = re.compile(rf"^/mobile/apps/{_ID_RE}/versions/{_ID_RE}/reports$")
 _LAUNCH_CONTENT_RE = re.compile(r"^/launch/([A-Za-z0-9_-]{32,64})/(.+)$")
 MAX_JSON_BODY_BYTES = 16 * 1024
 
@@ -104,7 +105,7 @@ def _auth_subject(event: dict[str, Any]) -> str:
     return subject
 
 
-def _empty_json_body(event: dict[str, Any]) -> None:
+def _json_object_body(event: dict[str, Any]) -> dict[str, Any]:
     headers = event.get("headers")
     if not isinstance(headers, dict):
         raise ApiProblem(415, "unsupported_media_type", "Content-Type must be application/json.")
@@ -126,8 +127,29 @@ def _empty_json_body(event: dict[str, Any]) -> None:
         payload = json.loads(body)
     except json.JSONDecodeError as exc:
         raise ApiProblem(400, "invalid_json", "The request body is not valid JSON.") from exc
+    if not isinstance(payload, dict):
+        raise ApiProblem(400, "invalid_request", "The JSON request body must be an object.")
+    return payload
+
+
+def _empty_json_body(event: dict[str, Any]) -> None:
+    payload = _json_object_body(event)
     if payload != {}:
         raise ApiProblem(400, "invalid_request", "The JSON request body must be an empty object.")
+
+
+def _report_reason(event: dict[str, Any]) -> str:
+    payload = _json_object_body(event)
+    if set(payload) != {"reason"}:
+        raise ApiProblem(400, "invalid_request", "The JSON request body must contain only reason.")
+    reason = payload.get("reason")
+    if not isinstance(reason, str):
+        raise ApiProblem(400, "invalid_request", "reason must be a string.")
+    if len(reason) < 1 or len(reason) > 80 or reason != reason.strip():
+        raise ApiProblem(400, "invalid_request", "reason must be 1-80 trimmed characters.")
+    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in reason):
+        raise ApiProblem(400, "invalid_request", "reason must not contain control characters.")
+    return reason
 
 
 def _absolute_url(event: dict[str, Any], content_path: str) -> str:
@@ -180,6 +202,17 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
                 "expires_in": expires_in,
             },
         )
+
+    report_match = _MOBILE_REPORT_RE.fullmatch(path)
+    if method == "POST" and report_match is not None:
+        app_id, version_id = report_match.groups()
+        report = _get_backend().create_report(
+            _auth_subject(event),
+            app_id,
+            version_id,
+            _report_reason(event),
+        )
+        return _json_response(201, report)
 
     return _json_response(
         404,
