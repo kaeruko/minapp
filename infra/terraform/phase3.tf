@@ -2,6 +2,7 @@ locals {
   phase3_protected_routes = toset([
     "GET /mobile/apps",
     "POST /mobile/apps/{app_id}/versions/{version_id}/launch",
+    "POST /mobile/apps/{app_id}/versions/{version_id}/reports",
   ])
 }
 
