@@ -43,6 +43,15 @@ class FakeApi implements MinAppApi {
   Future<LaunchGrant> createLaunch(String accessToken, PublishedApp app) {
     throw UnimplementedError();
   }
+
+  @override
+  Future<void> reportApp(
+    String accessToken,
+    PublishedApp app,
+    String reason,
+  ) {
+    throw UnimplementedError();
+  }
 }
 
 class FakeDirectory implements MinAppDirectory {
@@ -160,8 +169,18 @@ MinApp _app({
       webViewDataClearer: () async {},
     );
 
+Future<void> _acceptTerms(WidgetTester tester) async {
+  expect(find.text('利用規約への同意'), findsOneWidget);
+  expect(find.text('先生からもらったIDでログイン'), findsNothing);
+  await tester.tap(find.byKey(const Key('terms-accept')));
+  await tester.pump();
+  await tester.tap(find.byKey(const Key('terms-continue')));
+  await tester.pumpAndSettle();
+  expect(find.text('先生からもらったIDでログイン'), findsOneWidget);
+}
+
 void main() {
-  testWidgets('cached verified tenant opens login and approved catalog', (
+  testWidgets('cached verified tenant requires terms before login and approved catalog', (
     WidgetTester tester,
   ) async {
     final FakeDirectory directory = FakeDirectory(descriptor: _descriptor());
@@ -174,8 +193,18 @@ void main() {
 
     expect(directory.refreshCalls, 0);
     expect(directory.verifyCalls, 0);
+    expect(find.text('利用規約への同意'), findsOneWidget);
+    expect(find.byKey(const Key('terms-open')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('terms-open')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('zero tolerance'), findsOneWidget);
+    expect(find.textContaining('24時間以内'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('terms-close')));
+    await tester.pumpAndSettle();
+
+    await _acceptTerms(tester);
     expect(find.text('みんアプ'), findsOneWidget);
-    expect(find.text('先生からもらったIDでログイン'), findsOneWidget);
     expect(find.text('みんアプ 開発教室'), findsNWidgets(2));
     expect(find.byKey(const Key('login-brand-header')), findsOneWidget);
 
@@ -200,6 +229,7 @@ void main() {
     expect(find.text('アプリの情報'), findsOneWidget);
     expect(find.text('作成者：student-demo'), findsOneWidget);
     expect(find.byKey(const Key('app-detail-launch')), findsOneWidget);
+    expect(find.text('このユーザーをブロック'), findsOneWidget);
   });
 
   testWidgets('catalog menu shows creator portal when configured', (
@@ -219,6 +249,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await _acceptTerms(tester);
     await tester.enterText(find.byKey(const Key('login-id')), 'student-demo');
     await tester.enterText(
       find.byKey(const Key('login-password')),
@@ -234,7 +265,7 @@ void main() {
     expect(find.byKey(const Key('creator-portal-menu-item')), findsOneWidget);
   });
 
-  testWidgets('first setup resolves and verifies classroom before login', (
+  testWidgets('first setup resolves and verifies classroom before terms', (
     WidgetTester tester,
   ) async {
     final FakeDirectory directory = FakeDirectory(descriptor: _descriptor());
@@ -257,7 +288,8 @@ void main() {
     expect(directory.verifyCalls, 1);
     expect(store.saveCalls, 1);
     expect(store.tenant?.tenantId, _descriptor().tenantId);
-    expect(find.text('先生からもらったIDでログイン'), findsOneWidget);
+    expect(find.text('利用規約への同意'), findsOneWidget);
+    expect(find.text('先生からもらったIDでログイン'), findsNothing);
   });
 
   testWidgets('official join link is reduced to a classroom code', (
@@ -285,7 +317,7 @@ void main() {
     expect(directory.resolveCalls, 1);
     expect(directory.verifyCalls, 1);
     expect(store.saveCalls, 1);
-    expect(find.text('先生からもらったIDでログイン'), findsOneWidget);
+    expect(find.text('利用規約への同意'), findsOneWidget);
   });
 
   testWidgets('invalid classroom has an actionable error', (
@@ -405,6 +437,7 @@ void main() {
     expect(directory.refreshCalls, 1);
     expect(find.text('教室設定を確認できません'), findsOneWidget);
     expect(find.text('先生からもらったIDでログイン'), findsNothing);
+    expect(find.text('利用規約への同意'), findsNothing);
     expect(find.byKey(const Key('tenant-retry')), findsOneWidget);
   });
 }
