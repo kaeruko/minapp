@@ -73,10 +73,10 @@ resource "aws_apigatewayv2_route" "hosted_protected" {
   for_each = local.hosted_protected_routes
 
   api_id             = aws_apigatewayv2_api.api.id
-  route_key           = each.value
-  target              = "integrations/${aws_apigatewayv2_integration.hosted_identity_api.id}"
+  route_key          = each.value
+  target             = "integrations/${aws_apigatewayv2_integration.hosted_identity_api.id}"
   authorization_type = "JWT"
-  authorizer_id       = aws_apigatewayv2_authorizer.cognito.id
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 resource "aws_lambda_permission" "hosted_identity_api_gateway" {
