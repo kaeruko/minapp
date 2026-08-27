@@ -41,6 +41,25 @@ resource "aws_iam_role_policy" "abuse_control" {
   })
 }
 
+resource "aws_iam_role_policy" "hosted_identity_api_abuse_control" {
+  name = "${local.name_prefix}-identity-api-abuse-control"
+  role = aws_iam_role.hosted_identity_api.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "HostedAbuseRateLimits"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:UpdateItem",
+        ]
+        Resource = aws_dynamodb_table.abuse_control.arn
+      },
+    ]
+  })
+}
+
 output "abuse_control_table_name" {
   description = "DynamoDB table containing short-lived hashed abuse-control counters."
   value       = aws_dynamodb_table.abuse_control.name

@@ -32,9 +32,79 @@ locals {
   ])
 }
 
+resource "aws_iam_role" "hosted_identity_api" {
+  name = "${local.name_prefix}-identity-api"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = "sts:AssumeRole"
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "hosted_identity_api_basic_execution" {
+  role       = aws_iam_role.hosted_identity_api.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "hosted_identity_api_application" {
+  name = "${local.name_prefix}-identity-api-application"
+  role = aws_iam_role.hosted_identity_api.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "HostedMetadata"
+        Effect = "Allow"
+        # DynamoDB authorizes every operation inside TransactWriteItems as its
+        # corresponding item action in addition to TransactWriteItems itself.
+        Action = [
+          "dynamodb:DeleteItem",
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:Query",
+          "dynamodb:TransactWriteItems",
+          "dynamodb:UpdateItem",
+        ]
+        Resource = aws_dynamodb_table.main.arn
+      },
+      {
+        Sid    = "HostedRuntimeData"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:DeleteItem",
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:Query",
+          "dynamodb:TransactWriteItems",
+          "dynamodb:UpdateItem",
+        ]
+        Resource = aws_dynamodb_table.runtime.arn
+      },
+      {
+        Sid    = "HostedUserAdministration"
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminDeleteUser",
+          "cognito-idp:AdminGetUser",
+          "cognito-idp:AdminSetUserPassword",
+        ]
+        Resource = aws_cognito_user_pool.main.arn
+      },
+    ]
+  })
+}
+
 resource "aws_lambda_function" "hosted_identity_api" {
   function_name = "${local.name_prefix}-identity-api"
-  role          = aws_iam_role.api.arn
+  role          = aws_iam_role.hosted_identity_api.arn
   handler       = "hosted_handler.lambda_handler"
   runtime       = "python3.12"
 
@@ -56,8 +126,9 @@ resource "aws_lambda_function" "hosted_identity_api" {
   }
 
   depends_on = [
-    aws_iam_role_policy_attachment.api_basic_execution,
-    aws_iam_role_policy.api_application,
+    aws_iam_role_policy_attachment.hosted_identity_api_basic_execution,
+    aws_iam_role_policy.hosted_identity_api_application,
+    aws_iam_role_policy.hosted_identity_api_abuse_control,
     terraform_data.account_guard,
     terraform_data.tenant_identity,
   ]

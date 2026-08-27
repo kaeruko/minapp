@@ -30,6 +30,7 @@ Dedicated school tenants continue to use the existing Phase 6 design.
 - one private S3 published bucket
 - current MinApp Web API Lambda and HTTP API Gateway foundation
 - Hosted platform Lambda for registration, group lifecycle, built-in catalog and scoped Runtime state
+- a dedicated least-privilege IAM role for the Hosted platform Lambda
 - public read-only `/tenant-info`
 - CloudWatch log groups
 
@@ -199,6 +200,32 @@ Login continues to use the existing `POST /auth/login` endpoint on the same Host
 The stack requires `expected_account_id`. Terraform fails before creating resources when the active AWS credentials point at a different account.
 
 The hosted tenant ID is immutable and must be a server-issued 32-character lowercase hexadecimal ID. Do not reuse a school tenant ID.
+
+The Lambda execution roles are deliberately separated:
+
+```text
+api                  -> general API role
+hosted_identity_api  -> dedicated Hosted identity/platform role
+tenant_info          -> read-only tenant-info role
+```
+
+The Hosted identity/platform role is limited to the metadata table, Runtime table, Hosted Cognito user pool, and abuse-control table. It has no S3 access. DynamoDB transactions require the item-level `PutItem`, `UpdateItem`, and `DeleteItem` actions in addition to `TransactWriteItems`, so all six table actions in the Hosted application policy are intentional.
+
+After applying a reviewed plan with zero destroys, run the IAM-specific smoke test. It verifies the deployed role and exact policy resources, creates a generated temporary account, exercises the one-user Runtime flow and rate limits, and removes the temporary account, group, app, and state data.
+
+```powershell
+./scripts/smoke-test-hosted-iam.ps1 `
+  -HostedApiBaseUrl $hostedApiBaseUrl `
+  -ExpectedTenantId $hostedTenantId `
+  -ExpectedAccountId $expectedAccountId `
+  -AwsRegion $awsRegion `
+  -AwsProfile $awsProfile `
+  -IdentityRoleName $identityRoleName `
+  -IdentityFunctionName $identityFunctionName `
+  -DataTableName $dataTableName `
+  -RuntimeTableName $runtimeTableName `
+  -UserPoolId $userPoolId
+```
 
 ## First-time setup
 
