@@ -97,10 +97,12 @@ class AbuseGuard:
             raise RuntimeError(
                 "boto3 is required outside the AWS Lambda runtime. Install the development requirements explicitly."
             ) from exc
+        data_table_name = _required_env("DATA_TABLE_NAME")
+        tenant_id = _required_env("TENANT_ID")
         return cls(
             dynamodb=boto3.client("dynamodb"),
-            table_name=_required_env("ABUSE_TABLE_NAME"),
-            hash_salt=_required_env("ABUSE_HASH_SALT"),
+            table_name=f"{data_table_name}-abuse",
+            hash_salt=tenant_id,
         )
 
     def check(self, action: str, *, source_ip: str, login_id: str | None = None) -> None:
