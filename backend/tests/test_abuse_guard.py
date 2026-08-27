@@ -15,6 +15,7 @@ import abuse_guard  # noqa: E402
 import handler  # noqa: E402
 import hosted_handler  # noqa: E402
 from errors import ApiProblem  # noqa: E402
+from hosted_legal import PRIVACY_VERSION, TERMS_VERSION  # noqa: E402
 
 
 class ConditionalFailure(Exception):
@@ -42,8 +43,14 @@ class FakeBackend:
         self.calls.append(("login", login_id, password))
         return {"state": "authenticated", "access_token": "token", "token_type": "Bearer", "expires_in": 3600}
 
-    def register(self, login_id: str, password: str) -> dict[str, Any]:
-        self.calls.append(("register", login_id, password))
+    def register(
+        self,
+        login_id: str,
+        password: str,
+        terms_version: str,
+        privacy_version: str,
+    ) -> dict[str, Any]:
+        self.calls.append(("register", login_id, password, terms_version, privacy_version))
         return {"user_id": "1" * 32, "login_id": login_id, "role": "user", "status": "active"}
 
     def recover_account(self, login_id: str, recovery_code: str, new_password: str) -> dict[str, Any]:
@@ -68,6 +75,17 @@ def event(method: str, path: str, body: dict[str, Any]) -> dict[str, Any]:
         "requestContext": {"http": {"method": method, "sourceIp": "203.0.113.10"}},
         "headers": {"content-type": "application/json"},
         "body": json.dumps(body),
+    }
+
+
+def registration_body() -> dict[str, Any]:
+    return {
+        "login_id": "alice",
+        "password": "secret12",
+        "terms_version": TERMS_VERSION,
+        "privacy_version": PRIVACY_VERSION,
+        "terms_accepted": True,
+        "privacy_accepted": True,
     }
 
 
@@ -136,12 +154,26 @@ class AbuseEntryTests(unittest.TestCase):
 
     def test_register_is_guarded_before_backend(self) -> None:
         response = abuse_entry.hosted_lambda_handler(
-            event("POST", "/hosted/register", {"login_id": "alice", "password": "secret12"}),
+            event("POST", "/hosted/register", registration_body()),
             None,
         )
         self.assertEqual(response["statusCode"], 201)
         self.assertEqual(self.guard.calls, [("register", "203.0.113.10", "alice")])
-        self.assertEqual(self.hosted_backend.calls, [("register", "alice", "secret12")])
+        self.assertEqual(
+            self.hosted_backend.calls,
+            [("register", "alice", "secret12", TERMS_VERSION, PRIVACY_VERSION)],
+        )
+
+    def test_invalid_legal_consent_does_not_consume_rate_limit(self) -> None:
+        body = registration_body()
+        body["terms_accepted"] = False
+        response = abuse_entry.hosted_lambda_handler(
+            event("POST", "/hosted/register", body),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 400)
+        self.assertEqual(self.guard.calls, [])
+        self.assertEqual(self.hosted_backend.calls, [])
 
     def test_recover_is_guarded_before_backend(self) -> None:
         response = abuse_entry.hosted_lambda_handler(
@@ -166,7 +198,7 @@ class AbuseEntryTests(unittest.TestCase):
     def test_rate_limit_stops_backend_call(self) -> None:
         self.guard.reject = True
         response = abuse_entry.hosted_lambda_handler(
-            event("POST", "/hosted/register", {"login_id": "alice", "password": "secret12"}),
+            event("POST", "/hosted/register", registration_body()),
             None,
         )
         self.assertEqual(response["statusCode"], 429)
