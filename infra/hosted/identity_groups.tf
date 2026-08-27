@@ -2,18 +2,27 @@ locals {
   hosted_public_routes = toset([
     "GET /hosted/health",
     "POST /hosted/register",
+    "POST /hosted/recover",
+    "GET /hosted/runtime/{token}/state/{key}",
+    "POST /hosted/runtime/{token}/state/{key}",
+    "DELETE /hosted/runtime/{token}/state/{key}",
   ])
 
   hosted_protected_routes = toset([
     "GET /hosted/me",
+    "POST /hosted/recovery-code",
+    "DELETE /hosted/account",
     "GET /hosted/groups",
     "POST /hosted/groups",
     "POST /hosted/groups/join",
     "GET /hosted/groups/{group_id}/members",
     "POST /hosted/groups/{group_id}/invite",
     "DELETE /hosted/groups/{group_id}/invite",
+    "POST /hosted/groups/{group_id}/owner",
+    "DELETE /hosted/groups/{group_id}",
     "DELETE /hosted/groups/{group_id}/membership",
     "DELETE /hosted/groups/{group_id}/members/{user_id}",
+    "POST /hosted/groups/{group_id}/apps/{app_id}/runtime-session",
   ])
 }
 
@@ -34,6 +43,7 @@ resource "aws_lambda_function" "hosted_identity_api" {
       ENVIRONMENT         = var.environment
       TENANT_ID           = var.hosted_tenant_id
       DATA_TABLE_NAME     = aws_dynamodb_table.main.name
+      RUNTIME_TABLE_NAME  = aws_dynamodb_table.runtime.name
       USER_POOL_ID        = aws_cognito_user_pool.main.id
       USER_POOL_CLIENT_ID = aws_cognito_user_pool_client.app.id
     }

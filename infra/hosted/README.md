@@ -24,41 +24,44 @@ Dedicated school tenants continue to use the existing Phase 6 design.
 ## Resources created
 
 - one Cognito User Pool and app client
-- one DynamoDB metadata table for users/groups/memberships/apps
-- one separate DynamoDB runtime table reserved for built-in/user-app state
+- one DynamoDB metadata table for users/groups/memberships/apps/runtime-session metadata
+- one separate DynamoDB runtime table for built-in/user-app state
 - one private S3 upload bucket
 - one private S3 published bucket
 - current MinApp Web API Lambda and HTTP API Gateway foundation
-- Hosted identity/group Lambda for registration and invite flows
+- Hosted platform Lambda for registration, group lifecycle, and scoped Runtime state
 - public read-only `/tenant-info`
 - CloudWatch log groups
 
-The runtime table is provisioned now but is not exposed directly to app JavaScript. A later Runtime/Data API must derive `tenant_id`, `group_id`, `app_id`, and `user_id` server-side from trusted authentication / launch context.
+App JavaScript never receives AWS credentials or a Cognito access token.
 
-## Registration does not enable native Cognito self-sign-up
+## Registration and recovery
 
-Keep `allow_self_signup = false`.
+Keep native Cognito self-sign-up disabled. Hosted users register through MinApp's `POST /hosted/register` endpoint. The Lambda validates the request and provisions the Cognito account itself.
 
-Hosted users register through MinApp's public `POST /hosted/register` endpoint. The Lambda validates the request and provisions the Cognito account with a permanent password. This keeps the registration boundary inside MinApp so later age gates, terms acceptance, per-source rate limits, abuse controls, or other registration policy can be added without exposing Cognito SignUp directly.
+Registration returns a recovery code once. Only its SHA-256 hash is stored. Because Hosted registration does not require email or phone, this recovery code is the MVP password-recovery credential and the UI must clearly ask the user to save it.
 
-Registration currently stores only:
+A successful password recovery automatically rotates the recovery code and returns the replacement. An authenticated user can also rotate it manually. Old recovery codes stop working immediately.
+
+Stored account fields remain intentionally small:
 
 - generated internal user ID
 - login ID
 - Cognito subject
 - role `user`
-- active status
+- account status
+- recovery-code hash
 
 Email address, phone number, real name, birthday, and school are not required by this foundation.
 
-Do not consider public Hosted launch ready until account deletion/recovery and the BtoC moderation/privacy requirements are implemented.
+Account deletion fails closed while the user owns a group. The owner must either transfer ownership or delete the group first. For a deletable account, membership rows are removed and the account is put into a non-active `deleting` state before Cognito deletion; this prevents an existing JWT from continuing to use the account if later cleanup fails.
 
 ## Hosted group model
 
 Global Hosted users have role `user`. A user's permissions inside a group live in Membership records:
 
-- `owner` — created the group and can rotate/revoke invites or remove members
-- `member` — joined using an invite and can leave voluntarily
+- `owner` — group administrator
+- `member` — invited participant
 
 MVP hard guards:
 
@@ -67,25 +70,77 @@ MVP hard guards:
 - one current invite code per group
 - invite lifetime: 7 days
 - creating a new invite immediately invalidates the previous code
-- owner cannot silently leave a group; ownership transfer/group deletion must be designed explicitly later
+- owner cannot silently leave a group
+- ownership can only be transferred to an existing active member
+- group deletion is refused while app records still exist
 
-Hosted routes:
+## Scoped Runtime state
+
+The first Runtime/Data API is intentionally small: per-app JSON key/value state.
+
+Flow:
 
 ```text
-POST   /hosted/register                         public
-GET    /hosted/health                           public
-GET    /hosted/me                               authenticated
-GET    /hosted/groups                           authenticated
-POST   /hosted/groups                           authenticated
-POST   /hosted/groups/join                      authenticated
-GET    /hosted/groups/{group_id}/members        authenticated member
-POST   /hosted/groups/{group_id}/invite         owner
-DELETE /hosted/groups/{group_id}/invite         owner
-DELETE /hosted/groups/{group_id}/membership     member leaves self
-DELETE /hosted/groups/{group_id}/members/{id}   owner removes member
+Authenticated MinApp client
+  POST /hosted/groups/{group_id}/apps/{app_id}/runtime-session
+        │
+        │ server verifies current group membership and app -> group relation
+        ▼
+10-minute opaque runtime token
+        │
+        ▼
+/hosted/runtime/{token}/state/{key}
+        │
+        ├─ GET
+        ├─ POST {"value": ...}
+        └─ DELETE
+        │
+        ▼
+separate runtime DynamoDB table
 ```
 
-Login continues to use the existing `POST /auth/login` endpoint on the same Hosted API Gateway. Hosted clients should call `/hosted/me` rather than the dedicated-school `/me` endpoint after login.
+The runtime token is not a Cognito token. The server derives `group_id`, `app_id`, and `user_id` from the session record and re-checks current Membership plus app/group association on every state request. Removing a member therefore revokes an already-issued runtime token immediately.
+
+Initial Runtime limits:
+
+- session lifetime: 10 minutes
+- state key: lowercase identifier, up to 64 characters
+- one JSON value: maximum 16 KiB
+- no arbitrary DynamoDB access
+- no arbitrary collection/table names
+- no external API proxy yet
+
+Runtime session records include a future TTL timestamp, but DynamoDB TTL cleanup is not yet enabled on the metadata table. Expired sessions are rejected by application logic regardless; enabling automatic physical cleanup is a deployment follow-up.
+
+## Hosted routes
+
+```text
+GET    /hosted/health                                      public
+POST   /hosted/register                                    public
+POST   /hosted/recover                                     public
+
+GET    /hosted/me                                          authenticated
+POST   /hosted/recovery-code                               authenticated
+DELETE /hosted/account                                     authenticated
+
+GET    /hosted/groups                                      authenticated
+POST   /hosted/groups                                      authenticated
+POST   /hosted/groups/join                                 authenticated
+GET    /hosted/groups/{group_id}/members                   authenticated member
+POST   /hosted/groups/{group_id}/invite                    owner
+DELETE /hosted/groups/{group_id}/invite                    owner
+POST   /hosted/groups/{group_id}/owner                     owner; transfer ownership
+DELETE /hosted/groups/{group_id}                           owner
+DELETE /hosted/groups/{group_id}/membership                member leaves self
+DELETE /hosted/groups/{group_id}/members/{user_id}         owner removes member
+POST   /hosted/groups/{group_id}/apps/{app_id}/runtime-session authenticated member
+
+GET    /hosted/runtime/{token}/state/{key}                 scoped runtime token
+POST   /hosted/runtime/{token}/state/{key}                 scoped runtime token
+DELETE /hosted/runtime/{token}/state/{key}                 scoped runtime token
+```
+
+Login continues to use the existing `POST /auth/login` endpoint on the same Hosted API Gateway. Hosted clients call `/hosted/me` rather than the dedicated-school `/me` endpoint after login.
 
 ## Deploy safety
 
@@ -119,17 +174,13 @@ terraform -chdir=infra/hosted plan -out=tfplan
 
 Review the plan before apply. Do not automatically apply a plan created with an unexpected account, region, tenant ID, or environment.
 
-## Next infrastructure/backend steps
+## Next steps before creative built-ins
 
-This foundation intentionally stops before built-in apps.
+1. registration/recovery rate limiting and terms/privacy acceptance
+2. automatic TTL cleanup for runtime-session metadata
+3. storage/request quota accounting per group
+4. built-in app installation/fork metadata
+5. media/file storage when the first novel/profile built-ins require it
+6. integrate the scoped Runtime token with actual app launch so app code receives only its runtime scope
 
-Next work should add, in order:
-
-1. account deletion / recovery and registration abuse controls
-2. group ownership transfer / group deletion
-3. scoped Runtime/Data API backed by the separate runtime table
-4. storage quota / request quota accounting per group
-5. built-in app installation/fork metadata
-6. media/file storage only when the first creative built-ins actually require it
-
-Keeping these steps separate avoids turning the hosted tenant into an unrestricted PaaS before the authorization model is ready.
+This stack deliberately remains a constrained application platform, not an unrestricted PaaS.
