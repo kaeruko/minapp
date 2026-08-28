@@ -39,6 +39,14 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$UserPoolId,
 
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string]$UploadBucketName,
+
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string]$PublishedBucketName,
+
     [ValidatePattern('^[a-z0-9][a-z0-9-]{1,63}$')]
     [string]$BuiltinId = 'shiba-game'
 )
@@ -101,7 +109,7 @@ function Assert-PolicyStatement {
         [string[]]$ExpectedActions,
 
         [Parameter(Mandatory = $true)]
-        [string]$ExpectedResource
+        [string[]]$ExpectedResources
     )
 
     $matches = @($PolicyDocument.Statement | Where-Object { [string]$_.Sid -eq $Sid })
@@ -116,7 +124,7 @@ function Assert-PolicyStatement {
         throw "IAM statement '$Sid' must not use NotAction or NotResource."
     }
     Assert-ExactSet -Actual @($statement.Action) -Expected $ExpectedActions -Context "IAM statement '$Sid' actions"
-    Assert-ExactSet -Actual @($statement.Resource) -Expected @($ExpectedResource) -Context "IAM statement '$Sid' resources"
+    Assert-ExactSet -Actual @($statement.Resource) -Expected $ExpectedResources -Context "IAM statement '$Sid' resources"
 }
 
 if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
@@ -171,7 +179,7 @@ Assert-PolicyStatement `
         'dynamodb:TransactWriteItems',
         'dynamodb:UpdateItem'
     ) `
-    -ExpectedResource $metadataTableArn
+    -ExpectedResources @($metadataTableArn)
 Assert-PolicyStatement `
     -PolicyDocument $application.PolicyDocument `
     -Sid 'HostedRuntimeData' `
@@ -183,7 +191,7 @@ Assert-PolicyStatement `
         'dynamodb:TransactWriteItems',
         'dynamodb:UpdateItem'
     ) `
-    -ExpectedResource $runtimeTableArn
+    -ExpectedResources @($runtimeTableArn)
 Assert-PolicyStatement `
     -PolicyDocument $application.PolicyDocument `
     -Sid 'HostedUserAdministration' `
@@ -193,10 +201,35 @@ Assert-PolicyStatement `
         'cognito-idp:AdminGetUser',
         'cognito-idp:AdminSetUserPassword'
     ) `
-    -ExpectedResource $userPoolArn
+    -ExpectedResources @($userPoolArn)
+Assert-PolicyStatement `
+    -PolicyDocument $application.PolicyDocument `
+    -Sid 'HostedBuiltinSourceTemplates' `
+    -ExpectedActions @('s3:GetObject') `
+    -ExpectedResources @(
+        "arn:aws:s3:::$UploadBucketName/hosted/templates/shiba-game/v1/source.zip",
+        "arn:aws:s3:::$UploadBucketName/hosted/templates/shiba-goshujin/v1/source.zip"
+    )
+Assert-PolicyStatement `
+    -PolicyDocument $application.PolicyDocument `
+    -Sid 'HostedDraftSourceObjects' `
+    -ExpectedActions @('s3:GetObject', 's3:PutObject', 's3:DeleteObject', 's3:DeleteObjectVersion') `
+    -ExpectedResources @("arn:aws:s3:::$UploadBucketName/hosted/drafts/*")
+Assert-PolicyStatement `
+    -PolicyDocument $application.PolicyDocument `
+    -Sid 'HostedPublishedSourceObjects' `
+    -ExpectedActions @('s3:GetObject', 's3:PutObject', 's3:DeleteObject', 's3:DeleteObjectVersion') `
+    -ExpectedResources @("arn:aws:s3:::$PublishedBucketName/hosted/published/*")
 Assert-ExactSet `
     -Actual @($application.PolicyDocument.Statement.Sid) `
-    -Expected @('HostedMetadata', 'HostedRuntimeData', 'HostedUserAdministration') `
+    -Expected @(
+        'HostedMetadata',
+        'HostedRuntimeData',
+        'HostedUserAdministration',
+        'HostedBuiltinSourceTemplates',
+        'HostedDraftSourceObjects',
+        'HostedPublishedSourceObjects'
+    ) `
     -Context 'Hosted application statement SIDs'
 
 $abuse = Invoke-AwsJson `
@@ -206,15 +239,15 @@ Assert-PolicyStatement `
     -PolicyDocument $abuse.PolicyDocument `
     -Sid 'HostedAbuseRateLimits' `
     -ExpectedActions @('dynamodb:UpdateItem') `
-    -ExpectedResource $abuseTableArn
+    -ExpectedResources @($abuseTableArn)
 Assert-ExactSet `
     -Actual @($abuse.PolicyDocument.Statement.Sid) `
     -Expected @('HostedAbuseRateLimits') `
     -Context 'Hosted abuse-control statement SIDs'
 
 $allActions = @($application.PolicyDocument.Statement.Action) + @($abuse.PolicyDocument.Statement.Action)
-if (@($allActions | ForEach-Object { @($_) } | Where-Object { $_ -like 's3:*' }).Count -ne 0) {
-    throw 'Hosted identity role unexpectedly contains an S3 action.'
+if (@($allActions | ForEach-Object { @($_) } | Where-Object { $_ -in @('s3:ListBucket', 's3:*') }).Count -ne 0) {
+    throw 'Hosted identity role unexpectedly contains an S3 list or wildcard action.'
 }
 
 Write-Host '[4/5] Run one-user Hosted and Runtime flow with a generated temporary account'
@@ -234,4 +267,4 @@ Write-Host '[5/5] Run abuse-control limit and cleanup flow'
 
 Write-Host ''
 Write-Host 'Hosted IAM AWS smoke test passed.'
-Write-Host 'Verified: dedicated role boundary -> exact DynamoDB/Cognito resources -> no S3 -> one-user Runtime -> abuse control -> cleanup.'
+Write-Host 'Verified: dedicated role boundary -> exact DynamoDB/Cognito/S3 prefixes -> no S3 list/wildcard -> one-user Runtime -> abuse control -> cleanup.'

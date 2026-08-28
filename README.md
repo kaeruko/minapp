@@ -77,6 +77,7 @@ scripts/           開発スクリプト
 - 外部通信・フォーム送信・カメラ・マイク・位置情報を作品へ公開しない
 
 Phase 2の詳細は [docs/PHASE2.md](docs/PHASE2.md)、Phase 3のAWS反映・Android実行手順は [docs/PHASE3.md](docs/PHASE3.md) を参照。
+Hosted BtoCのfork source / edit / immutable publishは [docs/HOSTED_SOURCE_PUBLISH.md](docs/HOSTED_SOURCE_PUBLISH.md) を参照。
 開発・認証・最初の先生アカウント作成手順は [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) を参照。
 
 ## MVPの大原則

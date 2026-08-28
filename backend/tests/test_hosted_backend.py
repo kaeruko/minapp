@@ -163,6 +163,28 @@ class FakeDynamoDb:
                 key = (self._s(request["Key"]["pk"]), self._s(request["Key"]["sk"]))
                 if request.get("ConditionExpression") == "attribute_exists(pk)" and key not in self.items:
                     raise FakeAwsError("TransactionCanceledException")
+            elif "Update" in operation:
+                request = operation["Update"]
+                key = (self._s(request["Key"]["pk"]), self._s(request["Key"]["sk"]))
+                item = self.items.get(key)
+                if item is None:
+                    raise FakeAwsError("TransactionCanceledException")
+                condition = request.get("ConditionExpression", "")
+                values = request.get("ExpressionAttributeValues", {})
+                if "attribute_not_exists(deletion_state)" in condition and "deletion_state" in item:
+                    raise FakeAwsError("TransactionCanceledException")
+                if "source_revision = :expected_revision" in condition and (
+                    item.get("source_revision") != values[":expected_revision"]
+                ):
+                    raise FakeAwsError("TransactionCanceledException")
+                if "editable = :editable" in condition and item.get("editable") != values[":editable"]:
+                    raise FakeAwsError("TransactionCanceledException")
+                if "attribute_not_exists(published_version)" in condition and "published_version" in item:
+                    raise FakeAwsError("TransactionCanceledException")
+                if "published_version = :previous_version" in condition and (
+                    item.get("published_version") != values[":previous_version"]
+                ):
+                    raise FakeAwsError("TransactionCanceledException")
             else:
                 raise AssertionError(operation)
 
@@ -171,10 +193,20 @@ class FakeDynamoDb:
                 item = operation["Put"]["Item"]
                 key = (self._s(item["pk"]), self._s(item["sk"]))
                 self.items[key] = item
-            else:
+            elif "Delete" in operation:
                 request = operation["Delete"]
                 key = (self._s(request["Key"]["pk"]), self._s(request["Key"]["sk"]))
-                del self.items[key]
+                self.items.pop(key, None)
+            else:
+                request = operation["Update"]
+                key = (self._s(request["Key"]["pk"]), self._s(request["Key"]["sk"]))
+                replacement = dict(self.items[key])
+                assignments = request["UpdateExpression"].removeprefix("SET ").split(", ")
+                values = request["ExpressionAttributeValues"]
+                for assignment in assignments:
+                    field, value_name = assignment.split(" = ", 1)
+                    replacement[field] = values[value_name]
+                self.items[key] = replacement
 
 
 class HostedBackendTests(unittest.TestCase):

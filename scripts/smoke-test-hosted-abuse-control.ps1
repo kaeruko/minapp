@@ -102,6 +102,7 @@ $recoverLoginId = 'recover' + [Guid]::NewGuid().ToString('N').Substring(0, 10)
 $loginProbeId = 'login' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
 $fakeRecoveryCode = '2345-6789-ABCD-EFGH-JKLM'
 $tempCreated = $false
+$registrationBody = $null
 
 try {
     Write-Host '[1/8] Verify Hosted health and tenant identity'
@@ -112,6 +113,20 @@ try {
     $tenantInfo = Invoke-JsonApi -Method GET -Uri "$base/tenant-info" -Headers $publicHeaders -Body $null -Context 'tenant-info'
     if ($tenantInfo.tenant_id -ne $ExpectedTenantId) {
         throw "tenant-info tenant mismatch. Expected $ExpectedTenantId but received $($tenantInfo.tenant_id)."
+    }
+    $legal = Invoke-JsonApi -Method GET -Uri "$base/hosted/legal" -Headers $publicHeaders -Body $null -Context 'Hosted legal documents'
+    $termsVersion = [string]$legal.terms.version
+    $privacyVersion = [string]$legal.privacy.version
+    if ($termsVersion -notmatch '^hosted-terms-' -or $privacyVersion -notmatch '^hosted-privacy-') {
+        throw 'Hosted legal endpoint returned invalid version identifiers.'
+    }
+    $registrationBody = @{
+        login_id = $tempLoginId
+        password = $tempPassword
+        terms_version = $termsVersion
+        privacy_version = $privacyVersion
+        terms_accepted = $true
+        privacy_accepted = $true
     }
 
     Write-Host '[2/8] Verify abuse-control DynamoDB table and TTL'
@@ -143,7 +158,7 @@ try {
         -Method POST `
         -Uri "$base/hosted/register" `
         -Headers $publicHeaders `
-        -Body @{ login_id = $tempLoginId; password = $tempPassword } `
+        -Body $registrationBody `
         -Context 'Temporary registration'
     if ($registration.login_id -ne $tempLoginId) {
         throw 'Temporary registration returned a different login_id.'
@@ -157,7 +172,7 @@ try {
             -Method POST `
             -Uri "$base/hosted/register" `
             -Headers $publicHeaders `
-            -Body @{ login_id = $tempLoginId; password = $tempPassword } `
+            -Body $registrationBody `
             -ExpectedStatus 409 `
             -Context "Duplicate registration attempt $attempt" | Out-Null
     }
@@ -165,7 +180,7 @@ try {
         -Method POST `
         -Uri "$base/hosted/register" `
         -Headers $publicHeaders `
-        -Body @{ login_id = $tempLoginId; password = $tempPassword } `
+        -Body $registrationBody `
         -ExpectedStatus 429 `
         -Context 'Registration rate limit'
     $registerPayload = $limitedRegister.Content | ConvertFrom-Json
@@ -246,6 +261,7 @@ try {
     Write-Host 'Verified: abuse table TTL -> register 429 -> recover 429 -> login 429 -> temporary account cleanup.'
 }
 finally {
+    $registrationBody = $null
     $tempPassword = $null
     if ($tempCreated) {
         Write-Warning 'The abuse-control smoke test stopped before temporary account cleanup completed.'
