@@ -12,6 +12,10 @@ param(
     [string]$AwsRegion,
 
     [Parameter(Mandatory = $true)]
+    [ValidatePattern('^[a-z][a-z0-9-]{1,15}$')]
+    [string]$Environment,
+
+    [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]
     [string]$AwsProfile,
 
@@ -133,7 +137,7 @@ try {
         -Arguments @("-chdir=$hostedDir", 'validate') `
         -Context 'Hosted Terraform validate'
 
-    Write-Host '[4/6] Create a saved plan with explicit account, tenant and region'
+    Write-Host '[4/6] Create a saved plan with explicit account, tenant, region and environment'
     Invoke-External `
         -FilePath 'terraform' `
         -Arguments @(
@@ -142,7 +146,8 @@ try {
             '-out', $planPath,
             '-var', "expected_account_id=$ExpectedAwsAccountId",
             '-var', "hosted_tenant_id=$HostedTenantId",
-            '-var', "aws_region=$AwsRegion"
+            '-var', "aws_region=$AwsRegion",
+            '-var', "environment=$Environment"
         ) `
         -Context 'Hosted Terraform plan'
 
@@ -189,7 +194,7 @@ try {
     Write-Host '[6/6] Finish'
     if (-not $Apply) {
         Write-Host '  Plan verified. Nothing was applied because -Apply was not specified.'
-        Write-Host "  Re-run the same command with -Apply after reviewing account, backend, tenant and region."
+        Write-Host '  Re-run the same command with -Apply after reviewing account, backend, tenant, region and environment.'
         return
     }
 
