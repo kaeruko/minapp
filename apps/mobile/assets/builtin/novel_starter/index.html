@@ -59,29 +59,19 @@
     .portrait {
       width: min(74vw, 290px);
       aspect-ratio: 4 / 5;
-      display: grid;
-      place-items: center;
       position: relative;
       overflow: hidden;
       border: 5px solid white;
       border-radius: 26px;
-      background: linear-gradient(145deg, #fff5ff, #d7c4ea);
+      background: #f7f2f5;
       box-shadow: 0 16px 36px #35284b55;
-      font-size: 80px;
     }
 
-    .portrait small {
-      position: absolute;
-      left: 14px;
-      right: 14px;
-      bottom: 13px;
-      padding: 7px;
-      border-radius: 999px;
-      background: #ffffffe6;
-      color: #725b82;
-      font-size: 11px;
-      font-weight: 700;
-      text-align: center;
+    .portrait img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
     }
 
     .dialogue {
@@ -145,10 +135,8 @@
     </header>
 
     <section class="portrait-wrap" aria-label="キャラクター">
-      <!-- 顔絵がある人は、この中身を <img src="face.png" alt="ミオ"> に変えるだけでもOK -->
       <div class="portrait">
-        <span id="face" aria-hidden="true">☺</span>
-        <small>ここを顔イラスト1枚に変えてOK</small>
+        <img src="face.jpg" alt="ミオの顔">
       </div>
     </section>
 
@@ -167,10 +155,10 @@
     // AIで改造するなら、まずここだけ変えればお話を作れます。
     // title: タイトル
     // speaker: 話している人
-    // face: 顔の代わりの記号（画像に変えてもOK）
     // text: セリフ
     // choices: 選択肢。to に移動先の scene 名を書く
     // end: true ならエンディング
+    // 顔画像は同じフォルダの face.jpg を差し替えてください。
     // ============================================================
     const GAME_TITLE = 'ひみつの放課後';
     const SAVE_KEY = 'novel_progress';
@@ -178,7 +166,6 @@
     const SCENES = {
       start: {
         speaker: 'ミオ',
-        face: '☺',
         text: 'ねえ。\n今日、ちょっとだけ寄り道していかない？',
         choices: [
           { label: '「どうしたの？」', to: 'rooftop' },
@@ -187,7 +174,6 @@
       },
       rooftop: {
         speaker: 'ミオ',
-        face: '☻',
         text: '屋上の空、すごくきれいだったから。\nきみに見せたかったんだ。',
         choices: [
           { label: 'となりに座る', to: 'together' },
@@ -196,21 +182,18 @@
       },
       together: {
         speaker: 'ミオ',
-        face: '♥',
         text: '……えへへ。\nこの場所、ふたりだけの秘密にしようね。',
         choices: [],
         end: true,
       },
       photo: {
         speaker: 'ミオ',
-        face: '★',
         text: 'じゃあ同じ空を持って帰れるね。\n明日も、ここで会おう。',
         choices: [],
         end: true,
       },
       leave: {
         speaker: 'ミオ',
-        face: '・',
         text: 'そっか。じゃあ、また明日。\n次はちゃんと誘うからね。',
         choices: [],
         end: true,
@@ -223,7 +206,6 @@
     const title = document.getElementById('title');
     const speaker = document.getElementById('speaker');
     const text = document.getElementById('text');
-    const face = document.getElementById('face');
     const choices = document.getElementById('choices');
     const end = document.getElementById('end');
     const saveStatus = document.getElementById('save-status');
@@ -252,7 +234,6 @@
       currentScene = sceneId;
       speaker.textContent = scene.speaker;
       text.textContent = scene.text;
-      face.textContent = scene.face;
       end.hidden = scene.end !== true;
       choices.replaceChildren();
 

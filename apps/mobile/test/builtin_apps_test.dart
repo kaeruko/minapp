@@ -64,10 +64,16 @@ void main() {
     final String html = await rootBundle.loadString(novel.assetPath);
 
     expect(html, contains('AIで改造するなら'));
+    expect(html, contains('<img src="face.jpg" alt="ミオの顔">'));
     expect(html, contains("const SAVE_KEY = 'novel_progress';"));
     expect(html, contains('window.minapp.state.get(SAVE_KEY)'));
     expect(html, contains('window.minapp.state.set(SAVE_KEY'));
     expect(html, contains('window.minapp.state.delete(SAVE_KEY)'));
     expect(html, contains('この環境はセーブなし'));
+
+    final ByteData portrait = await rootBundle.load(
+      'assets/builtin/novel_starter/face.jpg',
+    );
+    expect(portrait.lengthInBytes, greaterThan(0));
   });
 }

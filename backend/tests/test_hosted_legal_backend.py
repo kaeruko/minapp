@@ -24,8 +24,8 @@ class HostedLegalBackendTests(unittest.TestCase):
         self.dynamo = FakeDynamoDb()
         self.s3 = FakeS3()
         self.s3.objects[
-            ("uploads", "hosted/templates/novel-starter/v1/source.zip")
-        ] = source_zip("<!doctype html><h1>novel-v1</h1>")
+            ("uploads", "hosted/templates/novel-starter/v2/source.zip")
+        ] = source_zip("<!doctype html><h1>novel-v2</h1>")
         self.backend = HostedLegalBackend(
             cognito=self.cognito,
             dynamodb=self.dynamo,
@@ -64,7 +64,7 @@ class HostedLegalBackendTests(unittest.TestCase):
             item for item in builtins if item["builtin_id"] == "novel-starter"
         )
         self.assertEqual(novel["title"], "ひみつの放課後")
-        self.assertEqual(novel["version"], 1)
+        self.assertEqual(novel["version"], 2)
         self.assertNotIn("source_key", novel)
         self.assertEqual(BUILTIN_TEMPLATES, core_before)
         self.assertNotIn("novel-starter", BUILTIN_TEMPLATES)
@@ -79,7 +79,7 @@ class HostedLegalBackendTests(unittest.TestCase):
             "novel-starter",
         )
         self.assertEqual(installed["builtin_id"], "novel-starter")
-        self.assertEqual(installed["builtin_version"], 1)
+        self.assertEqual(installed["builtin_version"], 2)
         self.assertFalse(installed["editable"])
 
         forked = self.backend.fork_app(
@@ -89,7 +89,7 @@ class HostedLegalBackendTests(unittest.TestCase):
             "わたしの物語",
         )
         self.assertEqual(forked["builtin_id"], "novel-starter")
-        self.assertEqual(forked["builtin_version"], 1)
+        self.assertEqual(forked["builtin_version"], 2)
         self.assertEqual(forked["source_revision"], 1)
         self.assertTrue(forked["editable"])
 
@@ -101,7 +101,7 @@ class HostedLegalBackendTests(unittest.TestCase):
         with zipfile.ZipFile(io.BytesIO(source_bytes)) as archive:
             self.assertEqual(
                 archive.read("index.html"),
-                b"<!doctype html><h1>novel-v1</h1>",
+                b"<!doctype html><h1>novel-v2</h1>",
             )
         self.assertEqual(metadata["revision"], 1)
 

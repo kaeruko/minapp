@@ -8,10 +8,10 @@ from typing import Any, Mapping
 CREATIVE_BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = {
     "novel-starter": {
         "builtin_id": "novel-starter",
-        "version": 1,
+        "version": 2,
         "title": "ひみつの放課後",
         "asset_path": "assets/builtin/novel_starter/index.html",
-        "source_key": "hosted/templates/novel-starter/v1/source.zip",
+        "source_key": "hosted/templates/novel-starter/v2/source.zip",
     },
 }
 
