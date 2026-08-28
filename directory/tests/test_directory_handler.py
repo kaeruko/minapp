@@ -18,6 +18,7 @@ from directory_core import hash_classroom_code, normalize_classroom_code  # noqa
 
 CODE = "TZZN-PVXB-EQC3"
 TENANT_ID = "a" * 32
+DEMO_TENANT_ID = directory_handler._DEMO_TENANT_ID
 
 
 def _event(method: str, path: str, *, body: str | None = None) -> dict[str, Any]:
@@ -39,7 +40,7 @@ def _event(method: str, path: str, *, body: str | None = None) -> dict[str, Any]
 class FakeStore:
     def __init__(self) -> None:
         self.allowed = True
-        self.mapping = {
+        self.mapping: dict[str, Any] | None = {
             "tenant_id": TENANT_ID,
             "status": "active",
         }
@@ -52,7 +53,17 @@ class FakeStore:
             "api_protocol_version": 1,
             "config_revision": 2,
         }
+        self.demo_tenant = {
+            "schema_version": 1,
+            "tenant_id": DEMO_TENANT_ID,
+            "display_name": "みんアプ 開発教室",
+            "status": "active",
+            "api_base_url": "https://demo-tenant.example.com",
+            "api_protocol_version": 1,
+            "config_revision": 7,
+        }
         self.last_subject_hash: str | None = None
+        self.code_mapping_calls = 0
 
     def now_epoch(self) -> int:
         return 1_700_000_000
@@ -62,11 +73,16 @@ class FakeStore:
         return self.allowed
 
     def get_code_mapping(self, code_hash: str) -> dict[str, Any] | None:
+        self.code_mapping_calls += 1
         expected = hash_classroom_code(normalize_classroom_code(CODE))
         return self.mapping if code_hash == expected else None
 
     def get_tenant(self, tenant_id: str) -> dict[str, Any] | None:
-        return self.tenant if tenant_id == TENANT_ID else None
+        if tenant_id == TENANT_ID:
+            return self.tenant
+        if tenant_id == DEMO_TENANT_ID:
+            return self.demo_tenant
+        return None
 
 
 class DirectoryHandlerTests(unittest.TestCase):
@@ -110,22 +126,26 @@ class DirectoryHandlerTests(unittest.TestCase):
         self.assertIsNotNone(self.store.last_subject_hash)
         self.assertNotEqual(self.store.last_subject_hash, "203.0.113.25")
 
-    def test_demo_alias_resolves_to_development_classroom(self) -> None:
+    def test_demo_alias_resolves_directly_to_development_tenant(self) -> None:
         response = directory_handler.lambda_handler(
             _event("POST", "/v1/classrooms/resolve", body=json.dumps({"code": "demo"})),
             None,
         )
         self.assertEqual(response["statusCode"], 200)
-        self.assertEqual(json.loads(response["body"])["tenant_id"], TENANT_ID)
+        body = json.loads(response["body"])
+        self.assertEqual(body["tenant_id"], DEMO_TENANT_ID)
+        self.assertEqual(body["display_name"], "みんアプ 開発教室")
+        self.assertEqual(self.store.code_mapping_calls, 0)
 
-    def test_demo_alias_survives_rotation_of_normal_classroom_code(self) -> None:
-        self.store.mapping["status"] = "rotated"
+    def test_demo_alias_does_not_depend_on_classroom_code_mapping(self) -> None:
+        self.store.mapping = None
         response = directory_handler.lambda_handler(
             _event("POST", "/v1/classrooms/resolve", body=json.dumps({"code": "DEMO"})),
             None,
         )
         self.assertEqual(response["statusCode"], 200)
-        self.assertEqual(json.loads(response["body"])["tenant_id"], TENANT_ID)
+        self.assertEqual(json.loads(response["body"])["tenant_id"], DEMO_TENANT_ID)
+        self.assertEqual(self.store.code_mapping_calls, 0)
 
     def test_other_short_alias_is_rejected(self) -> None:
         response = directory_handler.lambda_handler(
@@ -156,6 +176,7 @@ class DirectoryHandlerTests(unittest.TestCase):
         self.assertEqual(json.loads(response["body"])["error"], "invalid_classroom_code")
 
     def test_rotated_code_is_not_resolved(self) -> None:
+        assert self.store.mapping is not None
         self.store.mapping["status"] = "rotated"
         response = directory_handler.lambda_handler(
             _event("POST", "/v1/classrooms/resolve", body=json.dumps({"code": CODE})),

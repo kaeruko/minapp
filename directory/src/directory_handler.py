@@ -20,7 +20,7 @@ from directory_store import DirectoryStore
 _LOGGER = logging.getLogger(__name__)
 _TENANT_PATH_RE = re.compile(r"^/v1/tenants/([0-9a-f]{32})$")
 _DEMO_CLASSROOM_ALIAS = "DEMO"
-_DEMO_CLASSROOM_TARGET_CODE = "TZZN-PVXB-EQC3"
+_DEMO_TENANT_ID = "35cbf2c880cf41dab580d47b25ba7f0e"
 
 
 def _positive_int(name: str, default: int) -> int:
@@ -124,10 +124,8 @@ def _tenant_for_public_read(tenant: Mapping[str, Any] | None) -> Mapping[str, An
     return tenant
 
 
-def _normalize_classroom_lookup(value: object) -> tuple[str, bool]:
-    if isinstance(value, str) and value.strip().upper() == _DEMO_CLASSROOM_ALIAS:
-        return normalize_classroom_code(_DEMO_CLASSROOM_TARGET_CODE), True
-    return normalize_classroom_code(value), False
+def _is_demo_alias(value: object) -> bool:
+    return isinstance(value, str) and value.strip().upper() == _DEMO_CLASSROOM_ALIAS
 
 
 def _resolve(event: Mapping[str, Any], store: Any) -> dict[str, Any]:
@@ -140,8 +138,23 @@ def _resolve(event: Mapping[str, Any], store: Any) -> dict[str, Any]:
         raise DirectoryProblem(400, "invalid_request", "Content-Type must be application/json.")
 
     payload = strict_json_object(event.get("body"), expected_fields={"code"})
+    raw_code = payload.get("code")
+
+    # DEMO is a reserved review/sales alias. Resolve it by immutable tenant ID,
+    # not through the mutable classroom-code mapping, so code rotation or
+    # cleanup cannot accidentally break the alias.
+    if _is_demo_alias(raw_code):
+        tenant_id = validate_tenant_id(_DEMO_TENANT_ID)
+        tenant = _tenant_for_public_read(store.get_tenant(tenant_id))
+        descriptor = descriptor_from_tenant(
+            tenant,
+            valid_for_seconds=_positive_int("DESCRIPTOR_TTL_SECONDS", 86400),
+        )
+        _LOGGER.info("reserved classroom alias resolved tenant_id=%s", tenant_id)
+        return _response(200, descriptor)
+
     try:
-        normalized, is_demo_alias = _normalize_classroom_lookup(payload.get("code"))
+        normalized = normalize_classroom_code(raw_code)
     except ValueError as exc:
         raise DirectoryProblem(
             400,
@@ -150,8 +163,7 @@ def _resolve(event: Mapping[str, Any], store: Any) -> dict[str, Any]:
         ) from exc
     code_hash = hash_classroom_code(normalized)
     mapping = store.get_code_mapping(code_hash)
-    allowed_mapping_statuses = {"active", "rotated"} if is_demo_alias else {"active"}
-    if mapping is None or mapping.get("status") not in allowed_mapping_statuses:
+    if mapping is None or mapping.get("status") != "active":
         raise DirectoryProblem(404, "classroom_not_found", "The classroom was not found.")
     tenant_id = mapping.get("tenant_id")
     try:
