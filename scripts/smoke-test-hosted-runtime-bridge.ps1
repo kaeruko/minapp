@@ -231,9 +231,20 @@ function Remove-CapabilityMetadata {
             pk = @{ S = "$Prefix#$tokenHash" }
             sk = @{ S = 'META' }
         } | ConvertTo-Json -Depth 5 -Compress
-        [void](Invoke-AwsJson `
-            -Arguments @('dynamodb', 'delete-item', '--table-name', $DataTableName, '--key', $key) `
-            -Context $Context)
+        $arguments = @(
+            'dynamodb', 'delete-item',
+            '--table-name', $DataTableName,
+            '--key', $key,
+            '--profile', $AwsProfile,
+            '--region', $AwsRegion,
+            '--no-cli-pager'
+        )
+        $output = @(& aws @arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+            $text = ($output | ForEach-Object { [string]$_ }) -join "`n"
+            throw "$Context failed with AWS CLI exit code $exitCode`: $text"
+        }
         return $true
     }
     catch {
@@ -454,6 +465,7 @@ try {
     [void](Invoke-NoContentDelete -Uri "$base/hosted/groups/$groupId/members/$memberUserId" -Headers $ownerHeaders -Context 'Member removal')
     $memberJoined = $false
     [void](Invoke-ExpectedJsonError -Method GET -Uri "$base/hosted/runtime/$runtimeToken/state/revocation" -Headers $publicHeaders -Body $null -ExpectedStatus 403 -ExpectedError 'forbidden' -Context 'Revoked Runtime capability')
+    [void](Invoke-ExpectedJsonError -Method GET -Uri "$base$($launch.content_path)" -Headers $publicHeaders -Body $null -ExpectedStatus 403 -ExpectedError 'forbidden' -Context 'Revoked published content capability')
 
     Write-Host '[9/13] Prove removed member cannot relaunch and owner can create an independent scope'
     [void](Invoke-ExpectedJsonError -Method POST -Uri "$base/hosted/groups/$groupId/apps/$forkedAppId/launch-session" -Headers $memberHeaders -Body @{} -ExpectedStatus 403 -ExpectedError 'forbidden' -Context 'Removed member relaunch')
@@ -470,10 +482,7 @@ try {
     Write-Host '[10/13] Delete the app and prove existing content/Runtime capabilities are revoked'
     [void](Invoke-NoContentDelete -Uri "$base/hosted/groups/$groupId/apps/$forkedAppId" -Headers $ownerHeaders -Context 'Fork deletion')
     $forkedAppId = $null
-    $oldContent = Invoke-WebRequest -Method Get -Uri "$base$($launch.content_path)" -TimeoutSec 20 -SkipHttpErrorCheck
-    if ([int]$oldContent.StatusCode -ne 404) {
-        throw "Deleted app content returned HTTP $([int]$oldContent.StatusCode); expected 404."
-    }
+    [void](Invoke-ExpectedJsonError -Method GET -Uri "$base$($ownerLaunch.content_path)" -Headers $publicHeaders -Body $null -ExpectedStatus 404 -ExpectedError 'app_not_found' -Context 'Deleted app published content capability')
     [void](Invoke-ExpectedJsonError -Method GET -Uri "$base/hosted/runtime/$ownerRuntimeToken/state/app_delete" -Headers $publicHeaders -Body $null -ExpectedStatus 404 -ExpectedError 'app_not_found' -Context 'Deleted app Runtime capability')
     [void](Invoke-NoContentDelete -Uri "$base/hosted/groups/$groupId/apps/$installedAppId" -Headers $ownerHeaders -Context 'Built-in deletion')
     $installedAppId = $null
