@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 import handler
+import hosted_entry
 import hosted_handler
 from abuse_guard import get_abuse_guard, source_ip_from_event
 from errors import ApiProblem
@@ -95,7 +96,11 @@ def hosted_lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]
             _guard_register(event)
         elif method == "POST" and path == "/hosted/recover":
             _guard_recover(event)
-        return hosted_handler.lambda_handler(event, context)
+        # Terraform's abuse_handlers_override.tf makes this function the real
+        # Hosted Lambda entrypoint. Delegate through hosted_entry so the new
+        # launch-session interception is reachable without bypassing the
+        # existing register/recover abuse guards.
+        return hosted_entry.lambda_handler(event, context)
     except ApiProblem as exc:
         _LOGGER.info(
             "hosted_abuse_api_problem status=%s error=%s path=%s",
