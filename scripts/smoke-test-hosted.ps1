@@ -7,9 +7,12 @@ param(
     [ValidatePattern('^[0-9a-f]{32}$')]
     [string]$ExpectedTenantId,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = 'ExistingUser')]
     [ValidatePattern('^[a-z0-9][a-z0-9-]{2,31}$')]
     [string]$LoginId,
+
+    [Parameter(Mandatory = $true, ParameterSetName = 'TemporaryUser')]
+    [switch]$TemporaryUser,
 
     [ValidatePattern('^[a-z0-9][a-z0-9-]{1,63}$')]
     [string]$BuiltinId = 'shiba-game'
@@ -138,7 +141,7 @@ $baseUri = Get-StrictHttpsBaseUri -Value $HostedApiBaseUrl -Name 'HostedApiBaseU
 $base = $baseUri.AbsoluteUri.TrimEnd('/')
 $publicHeaders = @{ Accept = 'application/json' }
 
-Write-Host '[1/12] Verify Hosted health and tenant identity'
+Write-Host '[1/15] Verify Hosted health and tenant identity'
 $health = Invoke-JsonApi -Method GET -Uri "$base/hosted/health" -Headers $publicHeaders -Body $null -Context 'Hosted health'
 if ($health.service -ne 'minapp-hosted-api' -or $health.status -ne 'ok') {
     throw "Hosted health response is invalid. service='$($health.service)' status='$($health.status)'."
@@ -155,7 +158,7 @@ if ([int]$tenantInfo.api_protocol_version -ne 1) {
     throw "tenant-info protocol mismatch: $($tenantInfo.api_protocol_version)"
 }
 
-$securePassword = Read-Host "Password for $LoginId" -AsSecureString
+$securePassword = $null
 $passwordPointer = [IntPtr]::Zero
 $password = $null
 $accessToken = $null
@@ -164,15 +167,50 @@ $groupId = $null
 $installedAppId = $null
 $forkedAppId = $null
 $runtimeToken = $null
+$temporaryAccountCreated = $false
 
 try {
-    $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
-    $password = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
-    if ([string]::IsNullOrEmpty($password)) {
-        throw 'Password must not be empty.'
+    Write-Host '[2/15] Verify Hosted legal documents'
+    $legal = Invoke-JsonApi -Method GET -Uri "$base/hosted/legal" -Headers $publicHeaders -Body $null -Context 'Hosted legal documents'
+    $termsVersion = [string]$legal.terms.version
+    $privacyVersion = [string]$legal.privacy.version
+    if ($termsVersion -notmatch '^hosted-terms-' -or $privacyVersion -notmatch '^hosted-privacy-') {
+        throw 'Hosted legal endpoint returned invalid version identifiers.'
     }
 
-    Write-Host '[2/12] Login'
+    Write-Host '[3/15] Prepare smoke-test account'
+    if ($TemporaryUser.IsPresent) {
+        $LoginId = 'iamsmoke' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
+        $password = 'T9' + [Guid]::NewGuid().ToString('N')
+        $registration = Invoke-JsonApi `
+            -Method POST `
+            -Uri "$base/hosted/register" `
+            -Headers $publicHeaders `
+            -Body @{
+                login_id = $LoginId
+                password = $password
+                terms_version = $termsVersion
+                privacy_version = $privacyVersion
+                terms_accepted = $true
+                privacy_accepted = $true
+            } `
+            -Context 'Temporary Hosted registration'
+        $temporaryAccountCreated = $true
+        if ($registration.login_id -ne $LoginId -or $registration.status -ne 'active') {
+            throw 'Temporary Hosted registration returned an invalid user.'
+        }
+        $registration = $null
+    }
+    else {
+        $securePassword = Read-Host "Password for $LoginId" -AsSecureString
+        $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+        $password = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
+        if ([string]::IsNullOrEmpty($password)) {
+            throw 'Password must not be empty.'
+        }
+    }
+
+    Write-Host '[4/15] Login'
     $login = Invoke-JsonApi `
         -Method POST `
         -Uri "$base/auth/login" `
@@ -192,7 +230,7 @@ try {
         Authorization = "Bearer $accessToken"
     }
 
-    Write-Host '[3/12] Verify /hosted/me'
+    Write-Host '[5/15] Verify /hosted/me'
     $me = Invoke-JsonApi -Method GET -Uri "$base/hosted/me" -Headers $authHeaders -Body $null -Context 'Hosted /me'
     if ($null -eq $me.user) {
         throw 'Hosted /me returned no user object.'
@@ -205,7 +243,7 @@ try {
     $runId = [DateTimeOffset]::UtcNow.ToString('yyyyMMdd-HHmmss')
     $groupName = "Hosted E2E $runId"
 
-    Write-Host '[4/12] Create group'
+    Write-Host '[6/15] Create group'
     $group = Invoke-JsonApi `
         -Method POST `
         -Uri "$base/hosted/groups" `
@@ -220,14 +258,14 @@ try {
     }
     Write-Host "  group_id=$groupId"
 
-    Write-Host '[5/12] Verify group listing'
+    Write-Host '[7/15] Verify group listing'
     $groupsResponse = Invoke-JsonApi -Method GET -Uri "$base/hosted/groups" -Headers $authHeaders -Body $null -Context 'Hosted group listing'
     $matchingGroups = @($groupsResponse.groups | Where-Object { $_.group_id -eq $groupId })
     if ($matchingGroups.Count -ne 1) {
         throw "Expected exactly one listed group with id $groupId but found $($matchingGroups.Count)."
     }
 
-    Write-Host "[6/12] Install builtin '$BuiltinId'"
+    Write-Host "[8/15] Install builtin '$BuiltinId'"
     $installed = Invoke-JsonApi `
         -Method POST `
         -Uri "$base/hosted/groups/$groupId/apps/install" `
@@ -242,14 +280,14 @@ try {
     }
     Write-Host "  app_id=$installedAppId"
 
-    Write-Host '[7/12] Verify group app listing'
+    Write-Host '[9/15] Verify group app listing'
     $appsResponse = Invoke-JsonApi -Method GET -Uri "$base/hosted/groups/$groupId/apps" -Headers $authHeaders -Body $null -Context 'Hosted app listing'
     $matchingApps = @($appsResponse.apps | Where-Object { $_.app_id -eq $installedAppId })
     if ($matchingApps.Count -ne 1) {
         throw "Expected exactly one listed app with id $installedAppId but found $($matchingApps.Count)."
     }
 
-    Write-Host '[8/12] Create Runtime session'
+    Write-Host '[10/15] Create Runtime session'
     $session = Invoke-JsonApi `
         -Method POST `
         -Uri "$base/hosted/groups/$groupId/apps/$installedAppId/runtime-session" `
@@ -265,7 +303,7 @@ try {
         throw "Runtime session returned invalid expires_in: $($session.expires_in)"
     }
 
-    Write-Host '[9/12] Runtime state POST / GET / DELETE'
+    Write-Host '[11/15] Runtime state POST / GET / DELETE'
     $stateKey = 'smoke.value'
     $stateValue = @{
         run_id = $runId
@@ -290,7 +328,7 @@ try {
 
     Invoke-NoContentDelete -Uri $stateUri -Headers $publicHeaders -Context 'Runtime state DELETE'
 
-    Write-Host '[10/12] Fork app and verify listing'
+    Write-Host '[12/15] Fork app and verify listing'
     $forkTitle = "Hosted E2E fork $runId"
     $forked = Invoke-JsonApi `
         -Method POST `
@@ -312,7 +350,7 @@ try {
         }
     }
 
-    Write-Host '[11/12] Delete fork and installed app'
+    Write-Host '[13/15] Delete fork and installed app'
     Invoke-NoContentDelete -Uri "$base/hosted/groups/$groupId/apps/$forkedAppId" -Headers $authHeaders -Context 'Fork deletion'
     $forkedAppId = $null
     Invoke-NoContentDelete -Uri "$base/hosted/groups/$groupId/apps/$installedAppId" -Headers $authHeaders -Context 'Installed app deletion'
@@ -323,7 +361,7 @@ try {
         throw "Expected no apps after cleanup but found $(@($appsAfterDelete.apps).Count)."
     }
 
-    Write-Host '[12/12] Delete group and verify it disappeared'
+    Write-Host '[14/15] Delete group and verify it disappeared'
     Invoke-NoContentDelete -Uri "$base/hosted/groups/$groupId" -Headers $authHeaders -Context 'Hosted group deletion'
     $deletedGroupId = $groupId
     $groupId = $null
@@ -334,9 +372,19 @@ try {
         throw "Deleted group $deletedGroupId is still listed."
     }
 
+    if ($TemporaryUser.IsPresent) {
+        Write-Host '[15/15] Clean up temporary account'
+        Invoke-NoContentDelete -Uri "$base/hosted/account" -Headers $authHeaders -Context 'Temporary account deletion'
+        $temporaryAccountCreated = $false
+    }
+    else {
+        Write-Host '[15/15] Preserve existing account'
+    }
+
     Write-Host ''
     Write-Host 'Hosted AWS smoke test passed.'
-    Write-Host 'Verified: /hosted/me -> group -> builtin -> Runtime POST/GET/DELETE -> fork -> app delete -> group delete.'
+    $accountResult = if ($TemporaryUser.IsPresent) { 'temporary-account cleanup' } else { 'existing account preserved' }
+    Write-Host "Verified: health/legal -> /hosted/me -> group -> builtin -> Runtime POST/GET/DELETE -> fork -> app delete -> group delete -> $accountResult."
 }
 finally {
     $login = $null
@@ -349,8 +397,11 @@ finally {
         [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
     }
 
-    if ($null -ne $forkedAppId -or $null -ne $installedAppId -or $null -ne $groupId) {
+    if ($temporaryAccountCreated -or $null -ne $forkedAppId -or $null -ne $installedAppId -or $null -ne $groupId) {
         Write-Warning 'The smoke test stopped before cleanup completed. Test resources may remain for diagnosis.'
+        if ($temporaryAccountCreated) {
+            Write-Warning "temporary_login_id=$LoginId"
+        }
         if ($null -ne $groupId) {
             Write-Warning "group_id=$groupId"
         }
@@ -360,5 +411,6 @@ finally {
         if ($null -ne $forkedAppId) {
             Write-Warning "forked_app_id=$forkedAppId"
         }
+        Write-Warning 'No password or recovery code is printed.'
     }
 }

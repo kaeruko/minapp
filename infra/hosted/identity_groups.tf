@@ -8,6 +8,7 @@ locals {
     "GET /hosted/runtime/{token}/state/{key}",
     "POST /hosted/runtime/{token}/state/{key}",
     "DELETE /hosted/runtime/{token}/state/{key}",
+    "GET /hosted/content/{token}/{proxy+}",
   ])
 
   hosted_protected_routes = toset([
@@ -27,6 +28,10 @@ locals {
     "GET /hosted/groups/{group_id}/apps",
     "POST /hosted/groups/{group_id}/apps/install",
     "POST /hosted/groups/{group_id}/apps/{app_id}/fork",
+    "GET /hosted/groups/{group_id}/apps/{app_id}/source",
+    "POST /hosted/groups/{group_id}/apps/{app_id}/source",
+    "POST /hosted/groups/{group_id}/apps/{app_id}/publish",
+    "POST /hosted/groups/{group_id}/apps/{app_id}/published-session",
     "DELETE /hosted/groups/{group_id}/apps/{app_id}",
     "POST /hosted/groups/{group_id}/apps/{app_id}/runtime-session",
   ])
@@ -98,6 +103,34 @@ resource "aws_iam_role_policy" "hosted_identity_api_application" {
         ]
         Resource = aws_cognito_user_pool.main.arn
       },
+      {
+        Sid      = "HostedBuiltinSourceTemplates"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
+        Resource = [for source in aws_s3_object.hosted_builtin_source : "${aws_s3_bucket.uploads.arn}/${source.key}"]
+      },
+      {
+        Sid    = "HostedDraftSourceObjects"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:DeleteObjectVersion",
+        ]
+        Resource = "${aws_s3_bucket.uploads.arn}/hosted/drafts/*"
+      },
+      {
+        Sid    = "HostedPublishedSourceObjects"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:DeleteObjectVersion",
+        ]
+        Resource = "${aws_s3_bucket.published.arn}/hosted/published/*"
+      },
     ]
   })
 }
@@ -122,6 +155,9 @@ resource "aws_lambda_function" "hosted_identity_api" {
       RUNTIME_TABLE_NAME  = aws_dynamodb_table.runtime.name
       USER_POOL_ID        = aws_cognito_user_pool.main.id
       USER_POOL_CLIENT_ID = aws_cognito_user_pool_client.app.id
+      UPLOAD_BUCKET       = aws_s3_bucket.uploads.bucket
+      PUBLISHED_BUCKET    = aws_s3_bucket.published.bucket
+      PORTAL_ORIGIN       = local.portal_origin
     }
   }
 

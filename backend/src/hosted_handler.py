@@ -1,25 +1,30 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import Any, Protocol
+from urllib.parse import unquote
 
 from errors import ApiProblem
 from handler import (
     _auth_subject,
+    _content_response,
     _group_name,
     _json_body,
     _json_response,
     _login_id,
     _password,
+    _query_parameters,
     _raw_path,
     _request_method,
     _require_fields,
     _required_string,
+    _zip_body,
 )
 from hosted_legal import legal_payload, validate_legal_versions
 
-API_VERSION = "0.3.0"
+API_VERSION = "0.4.0"
 _LOGGER = logging.getLogger(__name__)
 _BACKEND: "Backend | None" = None
 _ID_RE = r"([0-9a-f]{32})"
@@ -33,6 +38,12 @@ _GROUP_APPS_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps$")
 _GROUP_APP_INSTALL_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/install$")
 _GROUP_APP_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}$")
 _GROUP_APP_FORK_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/fork$")
+_GROUP_APP_SOURCE_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/source$")
+_GROUP_APP_PUBLISH_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/publish$")
+_GROUP_APP_PUBLISHED_SESSION_RE = re.compile(
+    rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/published-session$"
+)
+_PUBLISHED_CONTENT_RE = re.compile(r"^/hosted/content/([A-Za-z0-9_-]{32,128})/(.+)$")
 _RUNTIME_SESSION_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/runtime-session$")
 _RUNTIME_STATE_RE = re.compile(r"^/hosted/runtime/([A-Za-z0-9_-]{32,64})/state/([^/]{1,128})$")
 _BUILTIN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,63}$")
@@ -72,6 +83,28 @@ class Backend(Protocol):
     def fork_app(
         self, auth_subject: str, group_id: str, app_id: str, title: str
     ) -> dict[str, Any]: ...
+    def get_editable_source(
+        self, auth_subject: str, group_id: str, app_id: str
+    ) -> tuple[bytes, dict[str, Any]]: ...
+    def update_editable_source(
+        self,
+        auth_subject: str,
+        group_id: str,
+        app_id: str,
+        expected_revision: int,
+        zip_bytes: bytes,
+    ) -> dict[str, Any]: ...
+    def publish_app(
+        self,
+        auth_subject: str,
+        group_id: str,
+        app_id: str,
+        expected_revision: int,
+    ) -> dict[str, Any]: ...
+    def create_published_session(
+        self, auth_subject: str, group_id: str, app_id: str
+    ) -> dict[str, Any]: ...
+    def get_published_file(self, token: str, path: str) -> tuple[bytes, str]: ...
     def delete_hosted_app(self, auth_subject: str, group_id: str, app_id: str) -> None: ...
     def create_runtime_session(
         self, auth_subject: str, group_id: str, app_id: str
@@ -135,6 +168,52 @@ def _hosted_app_title(payload: dict[str, Any]) -> str:
     if value != value.strip():
         raise ApiProblem(400, "invalid_request", "title must not have leading or trailing whitespace.")
     return value
+
+
+def _positive_revision(value: Any) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise ApiProblem(400, "invalid_source_revision", "revision must be a positive integer.")
+    return value
+
+
+def _query_revision(event: dict[str, Any]) -> int:
+    parameters = _query_parameters(event)
+    if set(parameters) != {"revision"}:
+        raise ApiProblem(
+            400,
+            "invalid_source_revision",
+            "The source update requires exactly one revision query parameter.",
+        )
+    try:
+        revision = int(parameters["revision"])
+    except ValueError as exc:
+        raise ApiProblem(
+            400, "invalid_source_revision", "revision must be a positive integer."
+        ) from exc
+    return _positive_revision(revision)
+
+
+def _source_response(data: bytes, app_id: str, metadata: dict[str, Any]) -> dict[str, Any]:
+    response = _content_response(data, "application/zip")
+    response["headers"].update(
+        {
+            "content-disposition": f'attachment; filename="{app_id}-source.zip"',
+            "x-minapp-source-revision": str(metadata["revision"]),
+            "x-minapp-source-sha256": str(metadata["sha256"]),
+        }
+    )
+    return response
+
+
+def _published_content_response(data: bytes, content_type: str) -> dict[str, Any]:
+    response = _content_response(data, content_type)
+    portal_origin = os.environ.get("PORTAL_ORIGIN")
+    if portal_origin is not None and re.fullmatch(r"https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?", portal_origin):
+        frame_ancestors = f"'self' {portal_origin}"
+    else:
+        frame_ancestors = "'none'"
+    response["headers"]["content-security-policy"] += f"; frame-ancestors {frame_ancestors}"
+    return response
 
 
 def _empty_response() -> dict[str, Any]:
@@ -212,6 +291,12 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
         if method == "DELETE":
             _get_backend().delete_runtime_state(token, key)
             return _empty_response()
+
+    published_content_match = _PUBLISHED_CONTENT_RE.fullmatch(path)
+    if published_content_match is not None and method == "GET":
+        token, encoded_path = published_content_match.groups()
+        data, content_type = _get_backend().get_published_file(token, unquote(encoded_path))
+        return _published_content_response(data, content_type)
 
     if method == "GET" and path == "/hosted/me":
         return _json_response(200, _get_backend().me(_auth_subject(event)))
@@ -308,6 +393,48 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
             201,
             _get_backend().fork_app(
                 _auth_subject(event), group_id, app_id, _hosted_app_title(payload)
+            ),
+        )
+
+    app_source_match = _GROUP_APP_SOURCE_RE.fullmatch(path)
+    if app_source_match is not None:
+        group_id, app_id = app_source_match.groups()
+        if method == "GET":
+            data, metadata = _get_backend().get_editable_source(
+                _auth_subject(event), group_id, app_id
+            )
+            return _source_response(data, app_id, metadata)
+        if method == "POST":
+            result = _get_backend().update_editable_source(
+                _auth_subject(event),
+                group_id,
+                app_id,
+                _query_revision(event),
+                _zip_body(event),
+            )
+            return _json_response(200, result)
+
+    app_publish_match = _GROUP_APP_PUBLISH_RE.fullmatch(path)
+    if app_publish_match is not None and method == "POST":
+        payload = _json_body(event)
+        _require_fields(payload, required={"revision"})
+        group_id, app_id = app_publish_match.groups()
+        return _json_response(
+            201,
+            _get_backend().publish_app(
+                _auth_subject(event), group_id, app_id, _positive_revision(payload["revision"])
+            ),
+        )
+
+    published_session_match = _GROUP_APP_PUBLISHED_SESSION_RE.fullmatch(path)
+    if published_session_match is not None and method == "POST":
+        payload = _json_body(event)
+        _require_fields(payload, required=set())
+        group_id, app_id = published_session_match.groups()
+        return _json_response(
+            201,
+            _get_backend().create_published_session(
+                _auth_subject(event), group_id, app_id
             ),
         )
 

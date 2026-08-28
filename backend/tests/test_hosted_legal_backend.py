@@ -11,6 +11,7 @@ if str(BACKEND_SRC) not in sys.path:
 from errors import ApiProblem  # noqa: E402
 from hosted_legal import PRIVACY_VERSION, TERMS_VERSION  # noqa: E402
 from hosted_legal_backend import HostedLegalBackend  # noqa: E402
+from test_hosted_catalog_backend import FakeS3  # noqa: E402
 from test_hosted_backend import FakeCognito, FakeDynamoDb  # noqa: E402
 
 
@@ -22,10 +23,13 @@ class HostedLegalBackendTests(unittest.TestCase):
             cognito=self.cognito,
             dynamodb=self.dynamo,
             runtime_dynamodb=self.dynamo,
+            s3=FakeS3(),
             user_pool_id="pool",
             app_client_id="client",
             table_name="table",
             runtime_table_name="runtime-table",
+            upload_bucket="uploads",
+            published_bucket="published",
         )
 
     def test_registration_persists_versions_and_server_timestamp(self) -> None:
