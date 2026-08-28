@@ -6,9 +6,11 @@ import time
 import uuid
 from typing import Any
 
-from aws_backend import _User, _aws_error_code, _string_attr
+from aws_backend import _User, _aws_error_code, _item_string, _string_attr
 from errors import ApiProblem
+from hosted_builtin_registry import merged_builtin_templates
 from hosted_catalog_backend import (
+    BUILTIN_TEMPLATES,
     HOSTED_CONTENT_SESSION_SECONDS,
     HOSTED_CONTENT_TTL_GRACE_SECONDS,
     HostedCatalogBackend,
@@ -29,6 +31,93 @@ from hosted_platform_backend import (
 
 class HostedLegalBackend(HostedCatalogBackend):
     """Hosted catalog backend with auditable registration consent records."""
+
+    @staticmethod
+    def _hosted_builtin_templates() -> dict[str, dict[str, Any]]:
+        return merged_builtin_templates(BUILTIN_TEMPLATES)
+
+    def list_builtin_templates(self) -> list[dict[str, Any]]:
+        templates = self._hosted_builtin_templates()
+        return [
+            {
+                field: value
+                for field, value in templates[builtin_id].items()
+                if field != "source_key"
+            }
+            for builtin_id in sorted(templates)
+        ]
+
+    def install_builtin(
+        self,
+        auth_subject: str,
+        group_id: str,
+        builtin_id: str,
+    ) -> dict[str, Any]:
+        owner = self._user_by_auth_subject(auth_subject)
+        self._require_owner_group(owner.user_id, group_id)
+        template = self._hosted_builtin_templates().get(builtin_id)
+        if template is None:
+            raise ApiProblem(404, "builtin_not_found", "指定されたビルトインアプリはありません。")
+        self._require_app_capacity(group_id)
+
+        for item in self._group_app_items(group_id):
+            if (
+                item.get("builtin_id", {}).get("S") == builtin_id
+                and item.get("source_kind", {}).get("S") == "builtin"
+            ):
+                raise ApiProblem(
+                    409,
+                    "builtin_already_installed",
+                    "このビルトインアプリはすでに入っています。",
+                )
+
+        app_id = uuid.uuid4().hex
+        created_at = _now_iso()
+        common = {
+            "entity": _string_attr("app"),
+            "app_id": _string_attr(app_id),
+            "group_id": _string_attr(group_id),
+            "title": _string_attr(str(template["title"])),
+            "owner_user_id": _string_attr(owner.user_id),
+            "source_kind": _string_attr("builtin"),
+            "builtin_id": _string_attr(builtin_id),
+            "builtin_version": _number_attr(int(template["version"])),
+            "builtin_asset_path": _string_attr(str(template["asset_path"])),
+            "editable": {"BOOL": False},
+            "created_at": _string_attr(created_at),
+        }
+        app_meta = {
+            "pk": _string_attr(f"APP#{app_id}"),
+            "sk": _string_attr("META"),
+            **common,
+        }
+        group_index = {
+            "pk": _string_attr(f"GROUP#{group_id}"),
+            "sk": _string_attr(f"APP#{app_id}"),
+            **common,
+        }
+        self._transact_put_new([app_meta, group_index])
+        return self._public_hosted_app(app_meta)
+
+    def _read_parent_source(
+        self, parent: dict[str, Any]
+    ) -> tuple[bytes, list[str], str]:
+        if _item_string(parent, "source_kind") != "builtin":
+            return super()._read_parent_source(parent)
+
+        builtin_id = _item_string(parent, "builtin_id")
+        template = self._hosted_builtin_templates().get(builtin_id)
+        if (
+            template is None
+            or _optional_number(parent, "builtin_version") != template["version"]
+        ):
+            raise RuntimeError(
+                "Installed built-in references an unsupported template version"
+            )
+        return self._read_zip_object(
+            bucket=self._upload_bucket,
+            key=str(template["source_key"]),
+        )
 
     def register(
         self,
@@ -150,7 +239,9 @@ class HostedLegalBackend(HostedCatalogBackend):
             "published_sha256": _string_attr(published_sha256),
             "published_files_json": _string_attr(_files_json(files)),
             "expires_at_epoch": _number_attr(content_expires_at),
-            "ttl_epoch": _number_attr(content_expires_at + HOSTED_CONTENT_TTL_GRACE_SECONDS),
+            "ttl_epoch": _number_attr(
+                content_expires_at + HOSTED_CONTENT_TTL_GRACE_SECONDS
+            ),
         }
         runtime_session = {
             "pk": _string_attr(f"RUNTIMESESSION#{runtime_token_hash}"),
