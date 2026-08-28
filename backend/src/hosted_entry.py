@@ -13,6 +13,8 @@ from handler import (
     _request_method,
     _require_fields,
 )
+from hosted_builtin_registry import register_creative_builtin_templates
+from hosted_catalog_backend import BUILTIN_TEMPLATES
 import hosted_handler
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,6 +77,11 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             exc.status_code,
             {"error": exc.error, "message": exc.message},
         )
+
+    # Creative starter templates extend the core catalog idempotently. Register
+    # them only on the Hosted path before normal routing; launch-session itself
+    # does not need catalog mutation.
+    register_creative_builtin_templates(BUILTIN_TEMPLATES)
 
     # Existing Hosted and dedicated/school behavior stays in its current handler.
     # This entrypoint only intercepts the new Hosted launch-session route.
