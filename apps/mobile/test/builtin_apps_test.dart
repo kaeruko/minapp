@@ -43,6 +43,14 @@ void main() {
       'novel-starter',
     );
     expect(
+      filterBuiltInApps('女子向け').single.id,
+      'novel-starter',
+    );
+    expect(
+      filterBuiltInApps('男子').single.id,
+      'novel-starter',
+    );
+    expect(
       filterBuiltInApps('イラスト').single.id,
       'novel-starter',
     );
@@ -64,7 +72,9 @@ void main() {
     final String html = await rootBundle.loadString(novel.assetPath);
 
     expect(html, contains('AIで改造するなら'));
-    expect(html, contains('<img src="face.jpg" alt="ミオの顔">'));
+    expect(html, contains('aria-label="白髪の男子キャラクター"'));
+    expect(html, contains('<img src="face.jpg" alt="レンの顔">'));
+    expect(html, contains("speaker: 'レン'"));
     expect(html, contains("const SAVE_KEY = 'novel_progress';"));
     expect(html, contains('window.minapp.state.get(SAVE_KEY)'));
     expect(html, contains('window.minapp.state.set(SAVE_KEY'));
