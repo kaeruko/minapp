@@ -10,7 +10,7 @@ if str(BACKEND_SRC) not in sys.path:
 
 from hosted_builtin_registry import (  # noqa: E402
     CREATIVE_BUILTIN_TEMPLATES,
-    register_creative_builtin_templates,
+    merged_builtin_templates,
 )
 
 
@@ -29,19 +29,30 @@ class HostedBuiltinRegistryTests(unittest.TestCase):
             "hosted/templates/novel-starter/v1/source.zip",
         )
 
-    def test_registration_is_idempotent_and_does_not_alias_template(self) -> None:
-        target: dict[str, dict[str, object]] = {}
-        register_creative_builtin_templates(target)
-        register_creative_builtin_templates(target)
+    def test_merge_keeps_input_unchanged_and_returns_copies(self) -> None:
+        core = {
+            "core-demo": {
+                "builtin_id": "core-demo",
+                "version": 1,
+                "title": "core",
+            }
+        }
+        before = {key: dict(value) for key, value in core.items()}
 
-        self.assertEqual(set(target), {"novel-starter"})
-        self.assertEqual(target["novel-starter"], CREATIVE_BUILTIN_TEMPLATES["novel-starter"])
-        self.assertIsNot(target["novel-starter"], CREATIVE_BUILTIN_TEMPLATES["novel-starter"])
+        merged = merged_builtin_templates(core)
 
-    def test_registration_fails_on_conflicting_id(self) -> None:
-        target = {"novel-starter": {"builtin_id": "novel-starter", "version": 999}}
+        self.assertEqual(core, before)
+        self.assertEqual(set(merged), {"core-demo", "novel-starter"})
+        self.assertIsNot(merged["core-demo"], core["core-demo"])
+        self.assertIsNot(
+            merged["novel-starter"],
+            CREATIVE_BUILTIN_TEMPLATES["novel-starter"],
+        )
+
+    def test_merge_fails_on_conflicting_id(self) -> None:
+        core = {"novel-starter": {"builtin_id": "novel-starter", "version": 999}}
         with self.assertRaisesRegex(RuntimeError, "conflicts with the core catalog"):
-            register_creative_builtin_templates(target)
+            merged_builtin_templates(core)
 
 
 if __name__ == "__main__":
