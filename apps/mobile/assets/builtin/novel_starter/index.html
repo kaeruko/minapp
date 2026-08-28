@@ -134,14 +134,14 @@
       <div id="save-status" aria-live="polite">セーブ確認中</div>
     </header>
 
-    <section class="portrait-wrap" aria-label="キャラクター">
+    <section class="portrait-wrap" aria-label="白髪の男子キャラクター">
       <div class="portrait">
-        <img src="face.jpg" alt="ミオの顔">
+        <img src="face.jpg" alt="レンの顔">
       </div>
     </section>
 
     <section class="dialogue" aria-live="polite">
-      <div id="speaker">ミオ</div>
+      <div id="speaker">レン</div>
       <p id="text"></p>
       <div id="end" hidden>END</div>
       <div id="choices"></div>
@@ -165,15 +165,15 @@
 
     const SCENES = {
       start: {
-        speaker: 'ミオ',
-        text: 'ねえ。\n今日、ちょっとだけ寄り道していかない？',
+        speaker: 'レン',
+        text: 'なあ。\n今日、ちょっとだけ寄り道していかない？',
         choices: [
           { label: '「どうしたの？」', to: 'rooftop' },
           { label: '「今日は帰るね」', to: 'leave' },
         ],
       },
       rooftop: {
-        speaker: 'ミオ',
+        speaker: 'レン',
         text: '屋上の空、すごくきれいだったから。\nきみに見せたかったんだ。',
         choices: [
           { label: 'となりに座る', to: 'together' },
@@ -181,20 +181,20 @@
         ],
       },
       together: {
-        speaker: 'ミオ',
-        text: '……えへへ。\nこの場所、ふたりだけの秘密にしようね。',
+        speaker: 'レン',
+        text: '……よかった。\nこの場所、ふたりだけの秘密にしよう。',
         choices: [],
         end: true,
       },
       photo: {
-        speaker: 'ミオ',
+        speaker: 'レン',
         text: 'じゃあ同じ空を持って帰れるね。\n明日も、ここで会おう。',
         choices: [],
         end: true,
       },
       leave: {
-        speaker: 'ミオ',
-        text: 'そっか。じゃあ、また明日。\n次はちゃんと誘うからね。',
+        speaker: 'レン',
+        text: 'そっか。じゃあ、また明日。\n次はちゃんと誘うから。',
         choices: [],
         end: true,
       },
