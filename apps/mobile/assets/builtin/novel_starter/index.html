@@ -6,234 +6,157 @@
   <title>ひみつの放課後</title>
   <style>
     :root {
-      color-scheme: light;
       font-family: "Hiragino Maru Gothic ProN", "Yu Gothic", system-ui, sans-serif;
-      background: #f5f0ff;
-      color: #34264f;
+      color: #35284b;
+      background: #8877b6;
     }
 
     * { box-sizing: border-box; }
-
-    html,
-    body {
-      min-height: 100%;
-      margin: 0;
-    }
-
-    body {
-      min-height: 100vh;
-      min-height: 100dvh;
-      background:
-        radial-gradient(circle at 18% 16%, #fff 0 2px, transparent 3px),
-        radial-gradient(circle at 83% 10%, #fff 0 3px, transparent 4px),
-        linear-gradient(180deg, #7773b9 0%, #bda5d7 46%, #f7c9d7 100%);
-    }
-
+    html, body { min-height: 100%; margin: 0; }
     button { font: inherit; }
 
-    .game {
-      width: min(100%, 560px);
+    body {
       min-height: 100vh;
       min-height: 100dvh;
-      margin: 0 auto;
+      background: linear-gradient(#7770ae, #c9a6cf 55%, #f4c5d4);
+    }
+
+    .game {
+      width: min(100%, 520px);
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: auto;
       display: grid;
       grid-template-rows: auto 1fr auto;
-      padding:
-        max(18px, env(safe-area-inset-top))
-        16px
-        max(18px, env(safe-area-inset-bottom));
-    }
-
-    .titlebar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
       gap: 12px;
-      color: #fff;
-      text-shadow: 0 2px 8px #3d315c88;
+      padding: max(16px, env(safe-area-inset-top)) 14px max(16px, env(safe-area-inset-bottom));
     }
 
-    .titlebar h1 {
-      margin: 0;
-      font-size: clamp(22px, 6vw, 30px);
-      letter-spacing: .04em;
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      color: white;
     }
 
-    .save-status {
-      min-width: 92px;
-      padding: 6px 10px;
-      border: 1px solid #ffffff70;
+    h1 { margin: 0; font-size: 24px; }
+
+    #save-status {
+      padding: 6px 9px;
       border-radius: 999px;
-      background: #36284f55;
+      background: #3e315d66;
       font-size: 11px;
       text-align: center;
     }
 
-    .stage {
-      min-height: 0;
+    .portrait-wrap {
       display: grid;
       place-items: center;
-      padding: 18px 0 12px;
+      min-height: 0;
     }
 
-    .portrait-card {
-      width: min(78vw, 330px);
+    .portrait {
+      width: min(74vw, 290px);
       aspect-ratio: 4 / 5;
+      display: grid;
+      place-items: center;
       position: relative;
       overflow: hidden;
-      display: grid;
-      place-items: center;
-      border: 5px solid #fff;
-      border-radius: 28px;
-      background:
-        radial-gradient(circle at 50% 42%, #ffe6d8 0 22%, transparent 23%),
-        radial-gradient(circle at 42% 40%, #3e3154 0 2%, transparent 2.5%),
-        radial-gradient(circle at 58% 40%, #3e3154 0 2%, transparent 2.5%),
-        linear-gradient(155deg, #fef4ff 0%, #eadbf7 60%, #c6b0e4 100%);
-      box-shadow: 0 18px 45px #34264f55;
+      border: 5px solid white;
+      border-radius: 26px;
+      background: linear-gradient(145deg, #fff5ff, #d7c4ea);
+      box-shadow: 0 16px 36px #35284b55;
+      font-size: 80px;
     }
 
-    .portrait-card::before {
-      content: "";
+    .portrait small {
       position: absolute;
-      width: 52%;
-      height: 50%;
-      top: 11%;
-      left: 24%;
-      border-radius: 52% 52% 46% 46%;
-      background: #5b466f;
-      clip-path: polygon(0 0, 100% 0, 93% 62%, 80% 35%, 68% 70%, 50% 34%, 35% 66%, 20% 34%, 5% 63%);
-      opacity: .92;
-    }
-
-    .portrait-card::after {
-      content: "ここを顔イラスト1枚に変えてOK";
-      position: absolute;
-      left: 16px;
-      right: 16px;
-      bottom: 15px;
-      padding: 7px 10px;
+      left: 14px;
+      right: 14px;
+      bottom: 13px;
+      padding: 7px;
       border-radius: 999px;
-      background: #ffffffd9;
-      color: #695078;
+      background: #ffffffe6;
+      color: #725b82;
       font-size: 11px;
       font-weight: 700;
       text-align: center;
     }
 
-    .face-mark {
-      position: relative;
-      z-index: 2;
-      margin-top: 12%;
-      font-size: clamp(48px, 17vw, 82px);
-      filter: drop-shadow(0 4px 8px #6f4d7150);
-    }
-
     .dialogue {
-      border: 4px solid #fff;
-      border-radius: 24px;
-      background: #fffdf7f2;
-      box-shadow: 0 10px 28px #34264f45;
       overflow: hidden;
+      border: 4px solid white;
+      border-radius: 22px;
+      background: #fffdf8f2;
+      box-shadow: 0 10px 28px #35284b40;
     }
 
-    .speaker {
+    #speaker {
       display: inline-block;
-      margin: 0 0 0 18px;
-      padding: 7px 15px;
-      border-radius: 14px 14px 0 0;
-      background: #664c83;
-      color: #fff;
+      padding: 7px 14px;
+      background: #6d5288;
+      color: white;
       font-size: 14px;
       font-weight: 800;
-      transform: translateY(-1px);
     }
 
-    .text {
-      min-height: 84px;
+    #text {
+      min-height: 78px;
       margin: 0;
-      padding: 16px 18px 12px;
-      font-size: clamp(16px, 4.5vw, 20px);
+      padding: 14px 16px 10px;
+      font-size: 18px;
       font-weight: 650;
-      line-height: 1.65;
+      line-height: 1.6;
       white-space: pre-line;
     }
 
-    .choices {
+    #choices {
       display: grid;
-      gap: 9px;
-      padding: 0 14px 15px;
+      gap: 8px;
+      padding: 0 12px 13px;
     }
 
-    .choice,
-    .restart {
-      width: 100%;
-      min-height: 48px;
+    .choice, .restart {
+      min-height: 46px;
       border: 0;
-      border-radius: 16px;
-      background: #7a5a99;
-      box-shadow: 0 4px 0 #4f3969;
-      color: #fff;
+      border-radius: 14px;
+      background: #785a96;
+      box-shadow: 0 4px 0 #503d67;
+      color: white;
       font-weight: 800;
       cursor: pointer;
-      touch-action: manipulation;
     }
 
-    .choice:active,
-    .restart:active {
+    .choice:active, .restart:active {
       transform: translateY(3px);
-      box-shadow: 0 1px 0 #4f3969;
+      box-shadow: 0 1px 0 #503d67;
     }
 
-    .choice:focus-visible,
-    .restart:focus-visible {
-      outline: 4px solid #fff;
-      outline-offset: 2px;
-    }
-
-    .restart {
-      background: #a06b83;
-      box-shadow: 0 4px 0 #74495d;
-    }
-
-    .end-mark {
-      padding: 0 14px 11px;
-      color: #8a6a78;
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: .12em;
-      text-align: center;
-    }
-
-    @media (min-width: 700px) {
-      .game { padding-left: 24px; padding-right: 24px; }
-      .portrait-card { width: 300px; }
-    }
+    .restart { background: #a36e85; }
+    #end { padding-bottom: 8px; text-align: center; font-size: 12px; font-weight: 800; }
   </style>
 </head>
 <body>
   <main class="game">
-    <header class="titlebar">
-      <h1 id="game-title">ひみつの放課後</h1>
-      <div id="save-status" class="save-status" aria-live="polite">セーブ確認中</div>
+    <header>
+      <h1 id="title">ひみつの放課後</h1>
+      <div id="save-status" aria-live="polite">セーブ確認中</div>
     </header>
 
-    <section class="stage" aria-label="キャラクター">
-      <!--
-        AIで改造するとき:
-        この portrait-card の中身を <img src="face.png" alt="ミオ"> に変えるだけでもOK。
-        顔イラスト1枚だけで画面が成立するようにしてあります。
-      -->
-      <div class="portrait-card" id="portrait">
-        <div class="face-mark" id="face-mark" aria-hidden="true">☺</div>
+    <section class="portrait-wrap" aria-label="キャラクター">
+      <!-- 顔絵がある人は、この中身を <img src="face.png" alt="ミオ"> に変えるだけでもOK -->
+      <div class="portrait">
+        <span id="face" aria-hidden="true">☺</span>
+        <small>ここを顔イラスト1枚に変えてOK</small>
       </div>
     </section>
 
     <section class="dialogue" aria-live="polite">
-      <div id="speaker" class="speaker">ミオ</div>
-      <p id="text" class="text"></p>
-      <div id="end-mark" class="end-mark" hidden>END</div>
-      <div id="choices" class="choices"></div>
+      <div id="speaker">ミオ</div>
+      <p id="text"></p>
+      <div id="end" hidden>END</div>
+      <div id="choices"></div>
     </section>
   </main>
 
@@ -250,6 +173,7 @@
     // end: true ならエンディング
     // ============================================================
     const GAME_TITLE = 'ひみつの放課後';
+    const SAVE_KEY = 'novel_progress';
 
     const SCENES = {
       start: {
@@ -293,19 +217,18 @@
       },
     };
 
-    const SAVE_KEY = 'novel_progress';
     let currentScene = 'start';
     let bridgeReadyHandled = false;
 
-    const titleElement = document.getElementById('game-title');
-    const speakerElement = document.getElementById('speaker');
-    const textElement = document.getElementById('text');
-    const faceElement = document.getElementById('face-mark');
-    const choicesElement = document.getElementById('choices');
-    const endMarkElement = document.getElementById('end-mark');
-    const saveStatusElement = document.getElementById('save-status');
+    const title = document.getElementById('title');
+    const speaker = document.getElementById('speaker');
+    const text = document.getElementById('text');
+    const face = document.getElementById('face');
+    const choices = document.getElementById('choices');
+    const end = document.getElementById('end');
+    const saveStatus = document.getElementById('save-status');
 
-    titleElement.textContent = GAME_TITLE;
+    title.textContent = GAME_TITLE;
 
     function hasMinAppState() {
       return Boolean(
@@ -318,103 +241,91 @@
       );
     }
 
-    function setSaveStatus(text) {
-      saveStatusElement.textContent = text;
+    function status(message) {
+      saveStatus.textContent = message;
     }
 
-    function renderScene(sceneId) {
+    function render(sceneId) {
       const scene = SCENES[sceneId];
-      if (!scene) {
-        throw new Error(`Unknown scene: ${sceneId}`);
-      }
+      if (!scene) throw new Error(`Unknown scene: ${sceneId}`);
 
       currentScene = sceneId;
-      speakerElement.textContent = scene.speaker;
-      textElement.textContent = scene.text;
-      faceElement.textContent = scene.face;
-      endMarkElement.hidden = scene.end !== true;
-      choicesElement.replaceChildren();
+      speaker.textContent = scene.speaker;
+      text.textContent = scene.text;
+      face.textContent = scene.face;
+      end.hidden = scene.end !== true;
+      choices.replaceChildren();
 
-      for (const choice of scene.choices) {
+      for (const item of scene.choices) {
         const button = document.createElement('button');
-        button.type = 'button';
         button.className = 'choice';
-        button.textContent = choice.label;
-        button.addEventListener('click', () => choose(choice.to));
-        choicesElement.appendChild(button);
+        button.textContent = item.label;
+        button.addEventListener('click', async () => {
+          render(item.to);
+          await saveProgress();
+        });
+        choices.appendChild(button);
       }
 
       if (scene.end === true) {
-        const restart = document.createElement('button');
-        restart.type = 'button';
-        restart.className = 'restart';
-        restart.textContent = 'はじめから読む';
-        restart.addEventListener('click', restartStory);
-        choicesElement.appendChild(restart);
+        const button = document.createElement('button');
+        button.className = 'restart';
+        button.textContent = 'はじめから読む';
+        button.addEventListener('click', restartStory);
+        choices.appendChild(button);
       }
-    }
-
-    async function choose(nextScene) {
-      renderScene(nextScene);
-      await saveProgress();
     }
 
     async function saveProgress() {
       if (!hasMinAppState()) {
-        setSaveStatus('この環境はセーブなし');
+        status('この環境はセーブなし');
         return;
       }
-
       try {
         await window.minapp.state.set(SAVE_KEY, { scene: currentScene });
-        setSaveStatus('セーブしました');
+        status('セーブしました');
       } catch (error) {
-        const code = error && typeof error.code === 'string' ? error.code : 'unknown_error';
-        setSaveStatus(`保存失敗: ${code}`);
+        status(`保存失敗: ${error && error.code ? error.code : 'unknown_error'}`);
       }
     }
 
     async function restoreProgress() {
       if (!hasMinAppState()) {
-        setSaveStatus('この環境はセーブなし');
+        status('この環境はセーブなし');
         return;
       }
-
       try {
         const saved = await window.minapp.state.get(SAVE_KEY);
         if (saved && typeof saved.scene === 'string' && SCENES[saved.scene]) {
-          renderScene(saved.scene);
-          setSaveStatus('つづきから');
-          return;
+          render(saved.scene);
+          status('つづきから');
+        } else {
+          status('はじめから');
         }
-        setSaveStatus('はじめから');
       } catch (error) {
         if (error && error.code === 'state_not_found') {
-          setSaveStatus('はじめから');
+          status('はじめから');
           return;
         }
-        const code = error && typeof error.code === 'string' ? error.code : 'unknown_error';
-        setSaveStatus(`読込失敗: ${code}`);
+        status(`読込失敗: ${error && error.code ? error.code : 'unknown_error'}`);
       }
     }
 
     async function restartStory() {
-      renderScene('start');
+      render('start');
       if (!hasMinAppState()) {
-        setSaveStatus('この環境はセーブなし');
+        status('この環境はセーブなし');
         return;
       }
-
       try {
         await window.minapp.state.delete(SAVE_KEY);
-        setSaveStatus('はじめから');
+        status('はじめから');
       } catch (error) {
         if (error && error.code === 'state_not_found') {
-          setSaveStatus('はじめから');
+          status('はじめから');
           return;
         }
-        const code = error && typeof error.code === 'string' ? error.code : 'unknown_error';
-        setSaveStatus(`削除失敗: ${code}`);
+        status(`削除失敗: ${error && error.code ? error.code : 'unknown_error'}`);
       }
     }
 
@@ -425,12 +336,12 @@
     }
 
     window.addEventListener('minappready', onMinAppReady);
+    render('start');
 
-    renderScene('start');
     if (hasMinAppState()) {
       onMinAppReady();
     } else {
-      setSaveStatus('この環境はセーブなし');
+      status('この環境はセーブなし');
     }
   </script>
 </body>
