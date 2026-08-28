@@ -18,7 +18,7 @@ class HostedBuiltinRegistryTests(unittest.TestCase):
     def test_novel_starter_contract(self) -> None:
         template = CREATIVE_BUILTIN_TEMPLATES["novel-starter"]
         self.assertEqual(template["builtin_id"], "novel-starter")
-        self.assertEqual(template["version"], 2)
+        self.assertEqual(template["version"], 3)
         self.assertEqual(template["title"], "ひみつの放課後")
         self.assertEqual(
             template["asset_path"],
@@ -26,7 +26,7 @@ class HostedBuiltinRegistryTests(unittest.TestCase):
         )
         self.assertEqual(
             template["source_key"],
-            "hosted/templates/novel-starter/v2/source.zip",
+            "hosted/templates/novel-starter/v3/source.zip",
         )
 
     def test_merge_keeps_input_unchanged_and_returns_copies(self) -> None:
