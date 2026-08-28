@@ -63,7 +63,7 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     title: 'ひみつの放課後',
     assetPath: 'assets/builtin/novel_starter/index.html',
     searchableText:
-        'ひみつの放課後 ノベルゲーム 小説 ストーリー 選択肢 キャラクター 顔 イラスト AI 改造 スターター みんアプ公式 サンプル',
+        'ひみつの放課後 ノベルゲーム 女子向け 恋愛 男子 白髪 イケメン レン 小説 ストーリー 選択肢 キャラクター 顔 イラスト AI 改造 スターター みんアプ公式 サンプル',
     icon: Icons.auto_stories_rounded,
     cardColor: Color(0xFFF5F3FF),
     iconBackgroundColor: Color(0xFFE9D5FF),
