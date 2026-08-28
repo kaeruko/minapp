@@ -10,6 +10,7 @@ BACKEND_SRC = Path(__file__).resolve().parents[1] / "src"
 if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
 
+import abuse_entry  # noqa: E402
 import hosted_entry  # noqa: E402
 
 
@@ -77,6 +78,25 @@ class HostedEntryTests(unittest.TestCase):
         self.assertNotIn("access_token", payload)
         self.assertNotIn("refresh_token", payload)
         self.assertNotIn("aws_access_key_id", payload)
+        self.assertEqual(
+            self.backend.calls,
+            [("sub-member", group_id, app_id)],
+        )
+
+    def test_deployed_abuse_entry_reaches_launch_session(self) -> None:
+        group_id = "4" * 32
+        app_id = "5" * 32
+        response = abuse_entry.hosted_lambda_handler(
+            event(
+                "POST",
+                f"/hosted/groups/{group_id}/apps/{app_id}/launch-session",
+                body={},
+                auth=True,
+            ),
+            None,
+        )
+
+        self.assertEqual(response["statusCode"], 201)
         self.assertEqual(
             self.backend.calls,
             [("sub-member", group_id, app_id)],
