@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import io
 import sys
 import unittest
+import zipfile
 from pathlib import Path
 
 BACKEND_SRC = Path(__file__).resolve().parents[1] / "src"
@@ -91,13 +93,16 @@ class HostedLegalBackendTests(unittest.TestCase):
         self.assertEqual(forked["source_revision"], 1)
         self.assertTrue(forked["editable"])
 
-        source = self.backend.get_editable_source(
+        source_bytes, metadata = self.backend.get_editable_source(
             subject,
             group["group_id"],
             forked["app_id"],
         )
-        source_bytes, metadata = source
-        self.assertIn(b"novel-v1", source_bytes)
+        with zipfile.ZipFile(io.BytesIO(source_bytes)) as archive:
+            self.assertEqual(
+                archive.read("index.html"),
+                b"<!doctype html><h1>novel-v1</h1>",
+            )
         self.assertEqual(metadata["revision"], 1)
 
     def test_registration_persists_versions_and_server_timestamp(self) -> None:
