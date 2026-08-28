@@ -139,7 +139,7 @@ resource "aws_iam_role_policy" "hosted_identity_api_application" {
 resource "aws_lambda_function" "hosted_identity_api" {
   function_name = "${local.name_prefix}-identity-api"
   role          = aws_iam_role.hosted_identity_api.arn
-  handler       = "hosted_entry.lambda_handler"
+  handler       = "hosted_handler.lambda_handler"
   runtime       = "python3.12"
 
   filename         = data.archive_file.api.output_path
