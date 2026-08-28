@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Hosted Runtime bridge fixture</title>
+<pre id="result">waiting</pre>
+<script>
+window.addEventListener('minappready', async () => {
+  const result = document.getElementById('result');
+  try {
+    await minapp.state.set('bridge_fixture', { page: 3 });
+    const value = await minapp.state.get('bridge_fixture');
+    if (!value || value.page !== 3) {
+      throw new Error('Unexpected Runtime value');
+    }
+    await minapp.state.delete('bridge_fixture');
+    result.textContent = 'ok';
+  } catch (error) {
+    result.textContent = `${error.name}:${error.status}:${error.code}:${error.message}`;
+    throw error;
+  }
+});
+</script>

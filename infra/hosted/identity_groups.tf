@@ -32,6 +32,7 @@ locals {
     "POST /hosted/groups/{group_id}/apps/{app_id}/source",
     "POST /hosted/groups/{group_id}/apps/{app_id}/publish",
     "POST /hosted/groups/{group_id}/apps/{app_id}/published-session",
+    "POST /hosted/groups/{group_id}/apps/{app_id}/launch-session",
     "DELETE /hosted/groups/{group_id}/apps/{app_id}",
     "POST /hosted/groups/{group_id}/apps/{app_id}/runtime-session",
   ])
