@@ -1,5 +1,17 @@
 [CmdletBinding()]
 param(
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string]$AwsProfile,
+
+    [Parameter(Mandatory = $true)]
+    [ValidatePattern('^[0-9]{12}$')]
+    [string]$ExpectedAwsAccountId,
+
+    [Parameter(Mandatory = $false)]
+    [ValidateNotNullOrEmpty()]
+    [string]$AwsRegion = "us-west-2",
+
     [string]$DeviceId = "HA2B7883",
     [string]$CreatorPortalBaseUrl = "https://minapp.cloxs.jp"
 )
@@ -29,7 +41,11 @@ if (-not (Test-Path -LiteralPath $awsDevScript -PathType Leaf)) {
     throw "AWS setup script not found: $awsDevScript"
 }
 
-& $awsDevScript
+& $awsDevScript `
+    -Profile $AwsProfile `
+    -ExpectedAccountId $ExpectedAwsAccountId `
+    -Region $AwsRegion
+
 if ($LASTEXITCODE -ne 0) {
     throw "AWS environment setup failed."
 }
