@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ひみつの放課後</title>
+  <style>
+    :root {
+      font-family: "Hiragino Maru Gothic ProN", "Yu Gothic", system-ui, sans-serif;
+      color: #35284b;
+      background: #8877b6;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; }
+    button { font: inherit; }
+
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      background: linear-gradient(#7770ae, #c9a6cf 55%, #f4c5d4);
+    }
+
+    .game {
+      width: min(100%, 520px);
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: auto;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 12px;
+      padding: max(16px, env(safe-area-inset-top)) 14px max(16px, env(safe-area-inset-bottom));
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      color: white;
+    }
+
+    h1 { margin: 0; font-size: 24px; }
+
+    #save-status {
+      padding: 6px 9px;
+      border-radius: 999px;
+      background: #3e315d66;
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .portrait-wrap {
+      display: grid;
+      place-items: center;
+      min-height: 0;
+    }
+
+    .portrait {
+      width: min(74vw, 290px);
+      aspect-ratio: 4 / 5;
+      display: grid;
+      place-items: center;
+      position: relative;
+      overflow: hidden;
+      border: 5px solid white;
+      border-radius: 26px;
+      background: linear-gradient(145deg, #fff5ff, #d7c4ea);
+      box-shadow: 0 16px 36px #35284b55;
+      font-size: 80px;
+    }
+
+    .portrait small {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 13px;
+      padding: 7px;
+      border-radius: 999px;
+      background: #ffffffe6;
+      color: #725b82;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .dialogue {
+      overflow: hidden;
+      border: 4px solid white;
+      border-radius: 22px;
+      background: #fffdf8f2;
+      box-shadow: 0 10px 28px #35284b40;
+    }
+
+    #speaker {
+      display: inline-block;
+      padding: 7px 14px;
+      background: #6d5288;
+      color: white;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    #text {
+      min-height: 78px;
+      margin: 0;
+      padding: 14px 16px 10px;
+      font-size: 18px;
+      font-weight: 650;
+      line-height: 1.6;
+      white-space: pre-line;
+    }
+
+    #choices {
+      display: grid;
+      gap: 8px;
+      padding: 0 12px 13px;
+    }
+
+    .choice, .restart {
+      min-height: 46px;
+      border: 0;
+      border-radius: 14px;
+      background: #785a96;
+      box-shadow: 0 4px 0 #503d67;
+      color: white;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .choice:active, .restart:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #503d67;
+    }
+
+    .restart { background: #a36e85; }
+    #end { padding-bottom: 8px; text-align: center; font-size: 12px; font-weight: 800; }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <header>
+      <h1 id="title">ひみつの放課後</h1>
+      <div id="save-status" aria-live="polite">セーブ確認中</div>
+    </header>
+
+    <section class="portrait-wrap" aria-label="キャラクター">
+      <!-- 顔絵がある人は、この中身を <img src="face.png" alt="ミオ"> に変えるだけでもOK -->
+      <div class="portrait">
+        <span id="face" aria-hidden="true">☺</span>
+        <small>ここを顔イラスト1枚に変えてOK</small>
+      </div>
+    </section>
+
+    <section class="dialogue" aria-live="polite">
+      <div id="speaker">ミオ</div>
+      <p id="text"></p>
+      <div id="end" hidden>END</div>
+      <div id="choices"></div>
+    </section>
+  </main>
+
+  <script>
+    'use strict';
+
+    // ============================================================
+    // AIで改造するなら、まずここだけ変えればお話を作れます。
+    // title: タイトル
+    // speaker: 話している人
+    // face: 顔の代わりの記号（画像に変えてもOK）
+    // text: セリフ
+    // choices: 選択肢。to に移動先の scene 名を書く
+    // end: true ならエンディング
+    // ============================================================
+    const GAME_TITLE = 'ひみつの放課後';
+    const SAVE_KEY = 'novel_progress';
+
+    const SCENES = {
+      start: {
+        speaker: 'ミオ',
+        face: '☺',
+        text: 'ねえ。\n今日、ちょっとだけ寄り道していかない？',
+        choices: [
+          { label: '「どうしたの？」', to: 'rooftop' },
+          { label: '「今日は帰るね」', to: 'leave' },
+        ],
+      },
+      rooftop: {
+        speaker: 'ミオ',
+        face: '☻',
+        text: '屋上の空、すごくきれいだったから。\nきみに見せたかったんだ。',
+        choices: [
+          { label: 'となりに座る', to: 'together' },
+          { label: '空の写真を撮る', to: 'photo' },
+        ],
+      },
+      together: {
+        speaker: 'ミオ',
+        face: '♥',
+        text: '……えへへ。\nこの場所、ふたりだけの秘密にしようね。',
+        choices: [],
+        end: true,
+      },
+      photo: {
+        speaker: 'ミオ',
+        face: '★',
+        text: 'じゃあ同じ空を持って帰れるね。\n明日も、ここで会おう。',
+        choices: [],
+        end: true,
+      },
+      leave: {
+        speaker: 'ミオ',
+        face: '・',
+        text: 'そっか。じゃあ、また明日。\n次はちゃんと誘うからね。',
+        choices: [],
+        end: true,
+      },
+    };
+
+    let currentScene = 'start';
+    let bridgeReadyHandled = false;
+
+    const title = document.getElementById('title');
+    const speaker = document.getElementById('speaker');
+    const text = document.getElementById('text');
+    const face = document.getElementById('face');
+    const choices = document.getElementById('choices');
+    const end = document.getElementById('end');
+    const saveStatus = document.getElementById('save-status');
+
+    title.textContent = GAME_TITLE;
+
+    function hasMinAppState() {
+      return Boolean(
+        window.minapp &&
+        window.minapp.version === 1 &&
+        window.minapp.state &&
+        typeof window.minapp.state.get === 'function' &&
+        typeof window.minapp.state.set === 'function' &&
+        typeof window.minapp.state.delete === 'function'
+      );
+    }
+
+    function status(message) {
+      saveStatus.textContent = message;
+    }
+
+    function render(sceneId) {
+      const scene = SCENES[sceneId];
+      if (!scene) throw new Error(`Unknown scene: ${sceneId}`);
+
+      currentScene = sceneId;
+      speaker.textContent = scene.speaker;
+      text.textContent = scene.text;
+      face.textContent = scene.face;
+      end.hidden = scene.end !== true;
+      choices.replaceChildren();
+
+      for (const item of scene.choices) {
+        const button = document.createElement('button');
+        button.className = 'choice';
+        button.textContent = item.label;
+        button.addEventListener('click', async () => {
+          render(item.to);
+          await saveProgress();
+        });
+        choices.appendChild(button);
+      }
+
+      if (scene.end === true) {
+        const button = document.createElement('button');
+        button.className = 'restart';
+        button.textContent = 'はじめから読む';
+        button.addEventListener('click', restartStory);
+        choices.appendChild(button);
+      }
+    }
+
+    async function saveProgress() {
+      if (!hasMinAppState()) {
+        status('この環境はセーブなし');
+        return;
+      }
+      try {
+        await window.minapp.state.set(SAVE_KEY, { scene: currentScene });
+        status('セーブしました');
+      } catch (error) {
+        status(`保存失敗: ${error && error.code ? error.code : 'unknown_error'}`);
+      }
+    }
+
+    async function restoreProgress() {
+      if (!hasMinAppState()) {
+        status('この環境はセーブなし');
+        return;
+      }
+      try {
+        const saved = await window.minapp.state.get(SAVE_KEY);
+        if (saved && typeof saved.scene === 'string' && SCENES[saved.scene]) {
+          render(saved.scene);
+          status('つづきから');
+        } else {
+          status('はじめから');
+        }
+      } catch (error) {
+        if (error && error.code === 'state_not_found') {
+          status('はじめから');
+          return;
+        }
+        status(`読込失敗: ${error && error.code ? error.code : 'unknown_error'}`);
+      }
+    }
+
+    async function restartStory() {
+      render('start');
+      if (!hasMinAppState()) {
+        status('この環境はセーブなし');
+        return;
+      }
+      try {
+        await window.minapp.state.delete(SAVE_KEY);
+        status('はじめから');
+      } catch (error) {
+        if (error && error.code === 'state_not_found') {
+          status('はじめから');
+          return;
+        }
+        status(`削除失敗: ${error && error.code ? error.code : 'unknown_error'}`);
+      }
+    }
+
+    async function onMinAppReady() {
+      if (bridgeReadyHandled) return;
+      bridgeReadyHandled = true;
+      await restoreProgress();
+    }
+
+    window.addEventListener('minappready', onMinAppReady);
+    render('start');
+
+    if (hasMinAppState()) {
+      onMinAppReady();
+    } else {
+      status('この環境はセーブなし');
+    }
+  </script>
+</body>
+</html>

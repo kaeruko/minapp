@@ -216,12 +216,18 @@ void main() {
     await tester.tap(find.byKey(const Key('login-submit')));
     await tester.pumpAndSettle();
 
-    expect(find.text('クラスの公開アプリ (1)'), findsOneWidget);
-    expect(find.text('ねんねぐみのじかんわり'), findsOneWidget);
     expect(find.byKey(const Key('catalog-search')), findsOneWidget);
     expect(find.byKey(const Key('catalog-refresh')), findsOneWidget);
     expect(find.byKey(const Key('builtin-shiba-game')), findsOneWidget);
     expect(find.byKey(const Key('builtin-shiba-goshujin')), findsOneWidget);
+
+    // The official catalog is a scrollable list. Adding more built-ins must not
+    // make this regression test assume the class app is still in the first viewport.
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.pumpAndSettle();
+
+    expect(find.text('クラスの公開アプリ (1)'), findsOneWidget);
+    expect(find.text('ねんねぐみのじかんわり'), findsOneWidget);
 
     await tester.tap(find.text('ねんねぐみのじかんわり'));
     await tester.pumpAndSettle();

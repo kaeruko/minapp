@@ -8,6 +8,10 @@ locals {
       version    = 1
       source_dir = abspath("${path.module}/../../apps/mobile/assets/builtin/shiba_goshujin")
     }
+    novel-starter = {
+      version    = 1
+      source_dir = abspath("${path.module}/../../apps/mobile/assets/builtin/novel_starter")
+    }
   }
 }
 

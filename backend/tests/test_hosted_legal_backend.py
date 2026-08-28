@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import io
 import sys
 import unittest
+import zipfile
 from pathlib import Path
 
 BACKEND_SRC = Path(__file__).resolve().parents[1] / "src"
@@ -9,9 +11,10 @@ if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
 
 from errors import ApiProblem  # noqa: E402
+from hosted_catalog_backend import BUILTIN_TEMPLATES  # noqa: E402
 from hosted_legal import PRIVACY_VERSION, TERMS_VERSION  # noqa: E402
 from hosted_legal_backend import HostedLegalBackend  # noqa: E402
-from test_hosted_catalog_backend import FakeS3  # noqa: E402
+from test_hosted_catalog_backend import FakeS3, source_zip  # noqa: E402
 from test_hosted_backend import FakeCognito, FakeDynamoDb  # noqa: E402
 
 
@@ -19,11 +22,15 @@ class HostedLegalBackendTests(unittest.TestCase):
     def setUp(self) -> None:
         self.cognito = FakeCognito()
         self.dynamo = FakeDynamoDb()
+        self.s3 = FakeS3()
+        self.s3.objects[
+            ("uploads", "hosted/templates/novel-starter/v1/source.zip")
+        ] = source_zip("<!doctype html><h1>novel-v1</h1>")
         self.backend = HostedLegalBackend(
             cognito=self.cognito,
             dynamodb=self.dynamo,
             runtime_dynamodb=self.dynamo,
-            s3=FakeS3(),
+            s3=self.s3,
             user_pool_id="pool",
             app_client_id="client",
             table_name="table",
@@ -31,6 +38,72 @@ class HostedLegalBackendTests(unittest.TestCase):
             upload_bucket="uploads",
             published_bucket="published",
         )
+
+    def _register(self, login_id: str) -> str:
+        self.backend.register(
+            login_id,
+            "secret12",
+            TERMS_VERSION,
+            PRIVACY_VERSION,
+        )
+        return self.cognito.users[login_id]["sub"]
+
+    def test_hosted_catalog_adds_novel_without_mutating_core_catalog(self) -> None:
+        core_before = {
+            builtin_id: dict(template)
+            for builtin_id, template in BUILTIN_TEMPLATES.items()
+        }
+
+        builtins = self.backend.list_builtin_templates()
+
+        self.assertEqual(
+            {item["builtin_id"] for item in builtins},
+            {"shiba-game", "shiba-goshujin", "novel-starter"},
+        )
+        novel = next(
+            item for item in builtins if item["builtin_id"] == "novel-starter"
+        )
+        self.assertEqual(novel["title"], "ひみつの放課後")
+        self.assertEqual(novel["version"], 1)
+        self.assertNotIn("source_key", novel)
+        self.assertEqual(BUILTIN_TEMPLATES, core_before)
+        self.assertNotIn("novel-starter", BUILTIN_TEMPLATES)
+
+    def test_owner_can_install_and_fork_novel_starter_source(self) -> None:
+        subject = self._register("novel-owner")
+        group = self.backend.create_group(subject, "物語部")
+
+        installed = self.backend.install_builtin(
+            subject,
+            group["group_id"],
+            "novel-starter",
+        )
+        self.assertEqual(installed["builtin_id"], "novel-starter")
+        self.assertEqual(installed["builtin_version"], 1)
+        self.assertFalse(installed["editable"])
+
+        forked = self.backend.fork_app(
+            subject,
+            group["group_id"],
+            installed["app_id"],
+            "わたしの物語",
+        )
+        self.assertEqual(forked["builtin_id"], "novel-starter")
+        self.assertEqual(forked["builtin_version"], 1)
+        self.assertEqual(forked["source_revision"], 1)
+        self.assertTrue(forked["editable"])
+
+        source_bytes, metadata = self.backend.get_editable_source(
+            subject,
+            group["group_id"],
+            forked["app_id"],
+        )
+        with zipfile.ZipFile(io.BytesIO(source_bytes)) as archive:
+            self.assertEqual(
+                archive.read("index.html"),
+                b"<!doctype html><h1>novel-v1</h1>",
+            )
+        self.assertEqual(metadata["revision"], 1)
 
     def test_registration_persists_versions_and_server_timestamp(self) -> None:
         result = self.backend.register(
