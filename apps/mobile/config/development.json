@@ -1,3 +1,4 @@
 {
-  "MINAPP_DIRECTORY_BASE_URL": "https://y0oyi359w2.execute-api.us-west-2.amazonaws.com"
+  "MINAPP_DIRECTORY_BASE_URL": "https://y0oyi359w2.execute-api.us-west-2.amazonaws.com",
+  "MINAPP_CREATOR_PORTAL_BASE_URL": "https://minapp.cloxs.jp"
 }
