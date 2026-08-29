@@ -940,6 +940,7 @@
     const JUMP_DURATION_MS = 690;
     const JUMP_HEIGHT_PX = 122;
     const HIT_INVINCIBLE_MS = 950;
+    const OBSTACLE_HITBOX_INSET_PX = 10;
 
     const state = {
       phase: "idle",
@@ -1088,8 +1089,25 @@
       player.style.transform = `translate3d(0, ${-y}px, 0)`;
     }
 
-    function rectanglesOverlap(a, b) {
-      return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    function rectanglesOverlap(a, b, inset = 0) {
+      if (!Number.isFinite(inset) || inset < 0) {
+        throw new RangeError(`Collision inset must be a finite non-negative number; got ${inset}.`);
+      }
+
+      const aLeft = a.left + inset;
+      const aRight = a.right - inset;
+      const aTop = a.top + inset;
+      const aBottom = a.bottom - inset;
+      const bLeft = b.left + inset;
+      const bRight = b.right - inset;
+      const bTop = b.top + inset;
+      const bBottom = b.bottom - inset;
+
+      if (aLeft >= aRight || aTop >= aBottom || bLeft >= bRight || bTop >= bBottom) {
+        throw new RangeError(`Collision inset ${inset} is too large for the supplied rectangles.`);
+      }
+
+      return aLeft < bRight && aRight > bLeft && aTop < bBottom && aBottom > bTop;
     }
 
     function registerHit(now, obstacle) {
@@ -1120,7 +1138,7 @@
           continue;
         }
         const obstacleRect = obstacle.getBoundingClientRect();
-        if (!rectanglesOverlap(playerRect, obstacleRect)) {
+        if (!rectanglesOverlap(playerRect, obstacleRect, OBSTACLE_HITBOX_INSET_PX)) {
           continue;
         }
         registerHit(now, obstacle);
