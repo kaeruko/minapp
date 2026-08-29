@@ -59,6 +59,18 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     iconColor: Color(0xFFC2410C),
   ),
   BuiltInApp(
+    id: 'shopping-town',
+    title: 'おかいもの いくわよ',
+    assetPath: 'assets/builtin/shopping_town/index.html',
+    searchableText:
+        'おかいもの いくわよ お買い物 奥さん 横スクロール ランナー ジャンプ しゃがむ 町 スーパー ゲーム みんアプ公式 サンプル',
+    icon: Icons.shopping_bag_rounded,
+    cardColor: Color(0xFFFFF7ED),
+    iconBackgroundColor: Color(0xFFFED7AA),
+    iconBorderColor: Color(0xFFFB923C),
+    iconColor: Color(0xFFC2410C),
+  ),
+  BuiltInApp(
     id: 'novel-starter',
     title: 'ひみつの放課後',
     assetPath: 'assets/builtin/novel_starter/index.html',
