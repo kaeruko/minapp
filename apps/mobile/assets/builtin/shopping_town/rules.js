@@ -4,7 +4,7 @@ if (typeof state === "undefined" || typeof obstacles === "undefined" ||
     typeof player === "undefined" || typeof coinElements === "undefined" ||
     typeof rectanglesOverlap !== "function" || typeof registerHit !== "function" ||
     typeof duckButton === "undefined" || typeof jumpButton === "undefined" ||
-    typeof resetGameState !== "function") {
+    typeof resetGameState !== "function" || typeof updateJump !== "function") {
   throw new Error("Shopping town rules initialization failed: required game globals are missing.");
 }
 
@@ -18,6 +18,7 @@ for (const obstacle of obstacles) {
 const DUCK_BUTTON_LABEL = "↘ しゃがむ";
 const STAND_BUTTON_LABEL = "↑ たつ";
 const POINTER_CLICK_DEDUP_MS = 500;
+const JUMP_DURATION_OVERRIDE_MS = 900;
 let lastDuckPointerToggleAt = Number.NEGATIVE_INFINITY;
 
 const duckStyle = document.createElement("style");
@@ -129,6 +130,34 @@ resetGameState = function resetGameStateWithDuckVisualReset() {
   duckButton.textContent = DUCK_BUTTON_LABEL;
   player.style.removeProperty("transform");
   player.style.transform = "translate3d(0, 0, 0)";
+};
+
+updateJump = function updateJumpWithLongerAirtime(now) {
+  if (!state.jumping) {
+    if (!state.ducking) {
+      player.style.transform = "translate3d(0, 0, 0)";
+    }
+    return;
+  }
+
+  if (state.jumpStartedAt === null) {
+    state.jumpStartedAt = now;
+  }
+  const elapsed = now - state.jumpStartedAt;
+  const t = elapsed / JUMP_DURATION_OVERRIDE_MS;
+  if (t >= 1) {
+    state.jumping = false;
+    state.jumpStartedAt = null;
+    player.style.transform = "translate3d(0, 0, 0)";
+    hint.textContent = "しょうがいぶつを よけて スーパーへ！";
+    return;
+  }
+
+  if (t < 0) {
+    throw new RangeError(`Jump elapsed time cannot be negative: ${elapsed}.`);
+  }
+  const y = 4 * JUMP_HEIGHT_PX * t * (1 - t);
+  player.style.transform = `translate3d(0, ${-y}px, 0)`;
 };
 
 checkCollisions = function checkCollisionsWithActions(now) {
