@@ -6,7 +6,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('built-in app registry has unique valid entries', () {
-    expect(builtInApps, hasLength(3));
+    expect(builtInApps, hasLength(4));
     expect(
       builtInApps.map((BuiltInApp app) => app.id).toSet(),
       hasLength(builtInApps.length),
@@ -28,7 +28,7 @@ void main() {
   });
 
   test('built-in app search filters every registered app', () {
-    expect(filterBuiltInApps(''), hasLength(3));
+    expect(filterBuiltInApps(''), hasLength(4));
     expect(filterBuiltInApps('しばちゃん'), hasLength(2));
     expect(
       filterBuiltInApps('どんぐり').single.id,
@@ -37,6 +37,14 @@ void main() {
     expect(
       filterBuiltInApps('なでなで').single.id,
       'shiba-goshujin',
+    );
+    expect(
+      filterBuiltInApps('横スクロール').single.id,
+      'shopping-town',
+    );
+    expect(
+      filterBuiltInApps('奥さん').single.id,
+      'shopping-town',
     );
     expect(
       filterBuiltInApps('ノベルゲーム').single.id,
@@ -63,6 +71,19 @@ void main() {
       expect(html, startsWith('<!doctype html>'));
       expect(html, contains('<title>${app.title}</title>'));
     }
+  });
+
+  test('shopping town exposes touch controls and fail-fast initialization', () async {
+    final BuiltInApp shoppingTown = builtInApps.singleWhere(
+      (BuiltInApp app) => app.id == 'shopping-town',
+    );
+    final String html = await rootBundle.loadString(shoppingTown.assetPath);
+
+    expect(html, contains('id="duckButton"'));
+    expect(html, contains('id="jumpButton"'));
+    expect(html, contains('Game initialization failed: required DOM element is missing.'));
+    expect(html, contains('requestAnimationFrame(frame)'));
+    expect(html, contains('しょうがいぶつを よけて スーパーへ！'));
   });
 
   test('novel starter documents AI edit points and optional Hosted save', () async {
