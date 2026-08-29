@@ -1,19 +1,6 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
-    [ValidateNotNullOrEmpty()]
-    [string]$AwsProfile,
-
-    [Parameter(Mandatory = $true)]
-    [ValidatePattern('^[0-9]{12}$')]
-    [string]$ExpectedAwsAccountId,
-
-    [Parameter(Mandatory = $false)]
-    [ValidateNotNullOrEmpty()]
-    [string]$AwsRegion = "us-west-2",
-
-    [string]$DeviceId = "HA2B7883",
-    [string]$CreatorPortalBaseUrl = "https://minapp.cloxs.jp"
+    [string]$DeviceId
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,43 +8,34 @@ Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $mobileDir = Join-Path $repoRoot "apps\mobile"
-$directoryTerraformDir = Join-Path $repoRoot "infra\directory"
+$configPath = Join-Path $mobileDir "config\development.json"
 $configureAndroidScript = Join-Path $PSScriptRoot "configure-mobile-android.ps1"
-$awsDevScript = Join-Path $PSScriptRoot "aws-dev.ps1"
 
 if (-not (Test-Path -LiteralPath $mobileDir -PathType Container)) {
     throw "Mobile app directory not found: $mobileDir"
 }
-
-if (-not (Test-Path -LiteralPath $directoryTerraformDir -PathType Container)) {
-    throw "Directory Terraform directory not found: $directoryTerraformDir"
+if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
+    throw "Mobile development config not found: $configPath"
 }
-
 if (-not (Test-Path -LiteralPath $configureAndroidScript -PathType Leaf)) {
     throw "Android configuration script not found: $configureAndroidScript"
 }
-
-if (-not (Test-Path -LiteralPath $awsDevScript -PathType Leaf)) {
-    throw "AWS setup script not found: $awsDevScript"
+if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) {
+    throw "flutter was not found in PATH."
 }
 
-& $awsDevScript `
-    -Profile $AwsProfile `
-    -ExpectedAccountId $ExpectedAwsAccountId `
-    -Region $AwsRegion
-
-if ($LASTEXITCODE -ne 0) {
-    throw "AWS environment setup failed."
+$config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+$directoryBaseUrl = $config.MINAPP_DIRECTORY_BASE_URL
+if ($directoryBaseUrl -isnot [string] -or [string]::IsNullOrWhiteSpace($directoryBaseUrl)) {
+    throw "MINAPP_DIRECTORY_BASE_URL is missing or empty in $configPath"
 }
 
-$directoryApi = & terraform "-chdir=$directoryTerraformDir" output -raw directory_api_base_url
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to get directory_api_base_url from Terraform."
+$directoryUri = $null
+if (-not [Uri]::TryCreate($directoryBaseUrl, [UriKind]::Absolute, [ref]$directoryUri)) {
+    throw "MINAPP_DIRECTORY_BASE_URL is not an absolute URI: $directoryBaseUrl"
 }
-
-$directoryApi = $directoryApi.Trim()
-if ([string]::IsNullOrWhiteSpace($directoryApi)) {
-    throw "Terraform returned an empty directory_api_base_url."
+if ($directoryUri.Scheme -ne "https") {
+    throw "MINAPP_DIRECTORY_BASE_URL must use https: $directoryBaseUrl"
 }
 
 & $configureAndroidScript
@@ -72,11 +50,15 @@ try {
         throw "flutter pub get failed."
     }
 
-    flutter run `
-        -d $DeviceId `
-        --dart-define="MINAPP_DIRECTORY_BASE_URL=$directoryApi" `
-        --dart-define="MINAPP_CREATOR_PORTAL_BASE_URL=$CreatorPortalBaseUrl"
+    $flutterArgs = @(
+        "run",
+        "--dart-define-from-file=$configPath"
+    )
+    if (-not [string]::IsNullOrWhiteSpace($DeviceId)) {
+        $flutterArgs += @("-d", $DeviceId)
+    }
 
+    & flutter @flutterArgs
     if ($LASTEXITCODE -ne 0) {
         throw "flutter run failed. DeviceId=$DeviceId"
     }
