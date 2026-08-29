@@ -71,6 +71,18 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     iconColor: Color(0xFFC2410C),
   ),
   BuiltInApp(
+    id: 'ol-home',
+    title: 'OLさん おうちにかえる',
+    assetPath: 'assets/builtin/ol_home/index.html',
+    searchableText:
+        'OLさん おうちにかえる 帰宅 会社員 マンション 窓 明かり 4つ 同じ色 近道 横スクロール ゲーム みんアプ公式 サンプル',
+    icon: Icons.apartment_rounded,
+    cardColor: Color(0xFFF5F3FF),
+    iconBackgroundColor: Color(0xFFE0E7FF),
+    iconBorderColor: Color(0xFF818CF8),
+    iconColor: Color(0xFF4338CA),
+  ),
+  BuiltInApp(
     id: 'novel-starter',
     title: 'ひみつの放課後',
     assetPath: 'assets/builtin/novel_starter/index.html',
