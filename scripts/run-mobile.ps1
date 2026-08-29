@@ -13,7 +13,7 @@ param(
     [string]$AwsRegion = "us-west-2",
 
     [string]$DeviceId = "HA2B7883",
-    [string]$CreatorPortalBaseUrl = "https://portal.cloxs.jp"
+    [string]$CreatorPortalBaseUrl = "https://minapp.cloxs.jp"
 )
 
 $ErrorActionPreference = "Stop"
