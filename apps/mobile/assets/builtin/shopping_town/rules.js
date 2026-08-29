@@ -3,7 +3,8 @@
 if (typeof state === "undefined" || typeof obstacles === "undefined" ||
     typeof player === "undefined" || typeof coinElements === "undefined" ||
     typeof rectanglesOverlap !== "function" || typeof registerHit !== "function" ||
-    typeof duckButton === "undefined" || typeof jumpButton === "undefined") {
+    typeof duckButton === "undefined" || typeof jumpButton === "undefined" ||
+    typeof resetGameState !== "function") {
   throw new Error("Shopping town rules initialization failed: required game globals are missing.");
 }
 
@@ -14,11 +15,16 @@ for (const obstacle of obstacles) {
   }
 }
 
+const DUCK_BUTTON_LABEL = "↘ しゃがむ";
+const STAND_BUTTON_LABEL = "↑ たつ";
+const POINTER_CLICK_DEDUP_MS = 500;
+let lastDuckPointerToggleAt = Number.NEGATIVE_INFINITY;
+
 const duckStyle = document.createElement("style");
 duckStyle.textContent = `
   .player.ducking {
     height: 79px !important;
-    transform: translate3d(0, 4px, 0) scaleY(.78) !important;
+    transform: translate3d(0, 18px, 0) scaleY(.62) !important;
   }
 `;
 document.head.appendChild(duckStyle);
@@ -37,18 +43,38 @@ function applyDuckState(ducking) {
   state.ducking = ducking;
   player.classList.toggle("ducking", ducking);
   duckButton.classList.toggle("active", ducking);
+  duckButton.textContent = ducking ? STAND_BUTTON_LABEL : DUCK_BUTTON_LABEL;
+
+  if (ducking) {
+    player.style.setProperty(
+      "transform",
+      "translate3d(0, 18px, 0) scaleY(.62)",
+      "important"
+    );
+  } else {
+    player.style.removeProperty("transform");
+    if (!state.jumping) {
+      player.style.transform = "translate3d(0, 0, 0)";
+    }
+  }
+
   hint.textContent = ducking
     ? "しゃがんで よけるよ！"
     : "しょうがいぶつを よけて スーパーへ！";
 }
 
-function toggleDuckFromButton(event) {
-  event.preventDefault();
-  event.stopImmediatePropagation();
+function toggleDuck() {
   if (state.phase !== "running") {
     return;
   }
   applyDuckState(!state.ducking);
+}
+
+function onDuckPointerDown(event) {
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  toggleDuck();
+  lastDuckPointerToggleAt = performance.now();
 }
 
 function suppressOriginalDuckPointerHandler(event) {
@@ -56,10 +82,19 @@ function suppressOriginalDuckPointerHandler(event) {
   event.stopImmediatePropagation();
 }
 
-duckButton.addEventListener("pointerdown", toggleDuckFromButton, true);
+function onDuckClick(event) {
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const elapsedSincePointerToggle = performance.now() - lastDuckPointerToggleAt;
+  if (elapsedSincePointerToggle > POINTER_CLICK_DEDUP_MS) {
+    toggleDuck();
+  }
+}
+
+duckButton.addEventListener("pointerdown", onDuckPointerDown, true);
 duckButton.addEventListener("pointerup", suppressOriginalDuckPointerHandler, true);
 duckButton.addEventListener("pointercancel", suppressOriginalDuckPointerHandler, true);
-duckButton.addEventListener("click", suppressOriginalDuckPointerHandler, true);
+duckButton.addEventListener("click", onDuckClick, true);
 
 jumpButton.addEventListener("click", () => {
   if (state.ducking) {
@@ -72,7 +107,7 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     event.stopImmediatePropagation();
     if (!event.repeat) {
-      applyDuckState(!state.ducking);
+      toggleDuck();
     }
     return;
   }
@@ -87,6 +122,14 @@ window.addEventListener("keyup", (event) => {
     event.stopImmediatePropagation();
   }
 }, true);
+
+const originalResetGameState = resetGameState;
+resetGameState = function resetGameStateWithDuckVisualReset() {
+  originalResetGameState();
+  duckButton.textContent = DUCK_BUTTON_LABEL;
+  player.style.removeProperty("transform");
+  player.style.transform = "translate3d(0, 0, 0)";
+};
 
 checkCollisions = function checkCollisionsWithActions(now) {
   if (state.phase !== "running") {
