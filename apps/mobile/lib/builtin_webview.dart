@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class BuiltInWebViewPage extends StatefulWidget {
@@ -24,6 +25,11 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
     r'^assets/builtin/[a-z0-9_-]+/index\.html$',
   );
 
+  static const String _shoppingTownAssetPath =
+      'assets/builtin/shopping_town/index.html';
+  static const String _shoppingTownRulesAssetPath =
+      'assets/builtin/shopping_town/rules.js';
+
   @override
   void initState() {
     super.initState();
@@ -41,15 +47,48 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
     }
   }
 
+  Future<String?> _loadExtraJavaScript() async {
+    if (widget.assetPath != _shoppingTownAssetPath) {
+      return null;
+    }
+
+    final String script = await rootBundle.loadString(_shoppingTownRulesAssetPath);
+    if (script.trim().isEmpty) {
+      throw StateError(
+        'Shopping town rules asset is empty: $_shoppingTownRulesAssetPath',
+      );
+    }
+    return script;
+  }
+
   Future<void> _prepareWebView() async {
     try {
-      final WebViewController controller = WebViewController()
+      final String? extraJavaScript = await _loadExtraJavaScript();
+      bool extraJavaScriptApplied = extraJavaScript == null;
+
+      late final WebViewController controller;
+      controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setNavigationDelegate(
           NavigationDelegate(
             onProgress: (int progress) {
               if (mounted) {
                 setState(() => _progress = progress);
+              }
+            },
+            onPageFinished: (String _) async {
+              if (extraJavaScriptApplied || extraJavaScript == null) {
+                return;
+              }
+              try {
+                await controller.runJavaScript(extraJavaScript);
+                extraJavaScriptApplied = true;
+              } catch (error) {
+                if (!mounted) return;
+                setState(
+                  () => _error =
+                      'ビルトインアプリのルールを読み込めませんでした: $error',
+                );
               }
             },
             onNavigationRequest: (NavigationRequest request) {
