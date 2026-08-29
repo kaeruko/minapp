@@ -2,7 +2,8 @@
 
 if (typeof state === "undefined" || typeof obstacles === "undefined" ||
     typeof player === "undefined" || typeof coinElements === "undefined" ||
-    typeof rectanglesOverlap !== "function" || typeof registerHit !== "function") {
+    typeof rectanglesOverlap !== "function" || typeof registerHit !== "function" ||
+    typeof duckButton === "undefined" || typeof jumpButton === "undefined") {
   throw new Error("Shopping town rules initialization failed: required game globals are missing.");
 }
 
@@ -12,6 +13,80 @@ for (const obstacle of obstacles) {
     throw new Error(`Unknown obstacle kind: ${kind}.`);
   }
 }
+
+const duckStyle = document.createElement("style");
+duckStyle.textContent = `
+  .player.ducking {
+    height: 79px !important;
+    transform: translate3d(0, 4px, 0) scaleY(.78) !important;
+  }
+`;
+document.head.appendChild(duckStyle);
+
+function applyDuckState(ducking) {
+  if (typeof ducking !== "boolean") {
+    throw new TypeError(`ducking must be boolean; got ${typeof ducking}.`);
+  }
+  if (state.phase !== "running") {
+    return;
+  }
+  if (ducking && state.jumping) {
+    return;
+  }
+
+  state.ducking = ducking;
+  player.classList.toggle("ducking", ducking);
+  duckButton.classList.toggle("active", ducking);
+  hint.textContent = ducking
+    ? "しゃがんで よけるよ！"
+    : "しょうがいぶつを よけて スーパーへ！";
+}
+
+function toggleDuckFromButton(event) {
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (state.phase !== "running") {
+    return;
+  }
+  applyDuckState(!state.ducking);
+}
+
+function suppressOriginalDuckPointerHandler(event) {
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}
+
+duckButton.addEventListener("pointerdown", toggleDuckFromButton, true);
+duckButton.addEventListener("pointerup", suppressOriginalDuckPointerHandler, true);
+duckButton.addEventListener("pointercancel", suppressOriginalDuckPointerHandler, true);
+duckButton.addEventListener("click", suppressOriginalDuckPointerHandler, true);
+
+jumpButton.addEventListener("click", () => {
+  if (state.ducking) {
+    applyDuckState(false);
+  }
+}, true);
+
+window.addEventListener("keydown", (event) => {
+  if (event.code === "ArrowDown") {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (!event.repeat) {
+      applyDuckState(!state.ducking);
+    }
+    return;
+  }
+  if ((event.code === "Space" || event.code === "ArrowUp") && state.ducking) {
+    applyDuckState(false);
+  }
+}, true);
+
+window.addEventListener("keyup", (event) => {
+  if (event.code === "ArrowDown") {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+}, true);
 
 checkCollisions = function checkCollisionsWithActions(now) {
   if (state.phase !== "running") {
