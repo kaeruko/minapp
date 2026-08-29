@@ -23,5 +23,6 @@ flutter:
   assets:
     - assets/builtin/shiba_donguri/index.html
     - assets/builtin/shiba_goshujin/index.html
+    - assets/builtin/shopping_town/index.html
     - assets/builtin/novel_starter/index.html
     - assets/builtin/novel_starter/face.jpg
