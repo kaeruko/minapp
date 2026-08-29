@@ -29,6 +29,10 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
       'assets/builtin/shopping_town/index.html';
   static const String _shoppingTownRulesAssetPath =
       'assets/builtin/shopping_town/rules.js';
+  static const String _olHomeAssetPath =
+      'assets/builtin/ol_home/index.html';
+  static const String _olHomeEffectsAssetPath =
+      'assets/builtin/ol_home/effects.js';
 
   @override
   void initState() {
@@ -48,15 +52,18 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
   }
 
   Future<String?> _loadExtraJavaScript() async {
-    if (widget.assetPath != _shoppingTownAssetPath) {
+    final String? extraAssetPath = switch (widget.assetPath) {
+      _shoppingTownAssetPath => _shoppingTownRulesAssetPath,
+      _olHomeAssetPath => _olHomeEffectsAssetPath,
+      _ => null,
+    };
+    if (extraAssetPath == null) {
       return null;
     }
 
-    final String script = await rootBundle.loadString(_shoppingTownRulesAssetPath);
+    final String script = await rootBundle.loadString(extraAssetPath);
     if (script.trim().isEmpty) {
-      throw StateError(
-        'Shopping town rules asset is empty: $_shoppingTownRulesAssetPath',
-      );
+      throw StateError('Built-in JavaScript asset is empty: $extraAssetPath');
     }
     return script;
   }
@@ -87,7 +94,7 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
                 if (!mounted) return;
                 setState(
                   () => _error =
-                      'ビルトインアプリのルールを読み込めませんでした: $error',
+                      'ビルトインアプリの追加処理を読み込めませんでした: $error',
                 );
               }
             },
