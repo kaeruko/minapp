@@ -948,7 +948,7 @@
       lives: 3,
       coins: 0,
       jumping: false,
-      jumpStartedAt: 0,
+      jumpStartedAt: null,
       ducking: false,
       invincibleUntil: 0,
       lastFrameAt: 0,
@@ -1008,7 +1008,7 @@
       state.lives = 3;
       state.coins = 0;
       state.jumping = false;
-      state.jumpStartedAt = 0;
+      state.jumpStartedAt = null;
       state.ducking = false;
       state.invincibleUntil = 0;
       state.lastFrameAt = 0;
@@ -1038,7 +1038,7 @@
         return;
       }
       state.jumping = true;
-      state.jumpStartedAt = performance.now();
+      state.jumpStartedAt = null;
       hint.textContent = "ぴょん！";
     }
 
@@ -1068,10 +1068,14 @@
         return;
       }
 
+      if (state.jumpStartedAt === null) {
+        state.jumpStartedAt = now;
+      }
       const elapsed = now - state.jumpStartedAt;
       const t = elapsed / JUMP_DURATION_MS;
       if (t >= 1) {
         state.jumping = false;
+        state.jumpStartedAt = null;
         player.style.transform = "translate3d(0, 0, 0)";
         hint.textContent = "しょうがいぶつを よけて スーパーへ！";
         return;
