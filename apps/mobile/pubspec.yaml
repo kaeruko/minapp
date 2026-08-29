@@ -26,5 +26,6 @@ flutter:
     - assets/builtin/shopping_town/index.html
     - assets/builtin/shopping_town/rules.js
     - assets/builtin/ol_home/index.html
+    - assets/builtin/ol_home/effects.js
     - assets/builtin/novel_starter/index.html
     - assets/builtin/novel_starter/face.jpg
