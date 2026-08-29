@@ -47,6 +47,29 @@ variable "portal_domain" {
   }
 }
 
+variable "legacy_portal_domain" {
+  description = "Legacy HTTPS hostname retained as a CloudFront alias for older clients during migration."
+  type        = string
+  default     = "portal.cloxs.jp"
+
+  validation {
+    condition = (
+      can(regex("^[a-z0-9][a-z0-9.-]*[a-z0-9]$", trimspace(var.legacy_portal_domain))) &&
+      strcontains(trimspace(var.legacy_portal_domain), ".") &&
+      !strcontains(trimspace(var.legacy_portal_domain), "..") &&
+      !strcontains(trimspace(var.legacy_portal_domain), ".-") &&
+      !strcontains(trimspace(var.legacy_portal_domain), "-.")
+    )
+    error_message = "legacy_portal_domain must be a lowercase DNS hostname without scheme, path, query, fragment, or trailing dot."
+  }
+}
+
+variable "activate_canonical_domain" {
+  description = "Add portal_domain to CloudFront and create its Route 53 A/AAAA aliases. Keep false until cross-account alias ownership has been moved."
+  type        = bool
+  default     = true
+}
+
 variable "directory_api_base_url" {
   description = "Public HTTPS origin of the central Directory API, also published in portal-config.json."
   type        = string

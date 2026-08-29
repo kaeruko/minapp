@@ -9,8 +9,8 @@ permissions:
 env:
   IOS_BUNDLE_ID: jp.cloxs.minapp
   APP_STORE_CONNECT_API_KEY_ID: X7N54636NV
-  PORTAL_CONFIG_URL: https://portal.cloxs.jp/portal-config.json
-  CREATOR_PORTAL_BASE_URL: https://portal.cloxs.jp
+  PORTAL_CONFIG_URL: https://minapp.cloxs.jp/portal-config.json
+  CREATOR_PORTAL_BASE_URL: https://minapp.cloxs.jp
 
 jobs:
   build-and-upload:

@@ -27,6 +27,13 @@ param(
     [string]$PortalDomain = "minapp.cloxs.jp",
 
     [Parameter(Mandatory = $false)]
+    [ValidatePattern('^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$')]
+    [string]$LegacyPortalDomain = "portal.cloxs.jp",
+
+    [Parameter(Mandatory = $false)]
+    [bool]$ActivateCanonicalDomain = $true,
+
+    [Parameter(Mandatory = $false)]
     [string]$StateBucket,
 
     [Parameter(Mandatory = $false)]
@@ -104,6 +111,8 @@ Write-Host "  Profile:       $Profile"
 Write-Host "  Region:        $Region"
 Write-Host "  Environment:   $Environment"
 Write-Host "  PortalDomain:  $PortalDomain"
+Write-Host "  LegacyDomain:  $LegacyPortalDomain"
+Write-Host "  CanonicalLive: $ActivateCanonicalDomain"
 Write-Host "  Directory API: $DirectoryApiBaseUrl"
 Write-Host "  Tenant origins:"
 $TenantApiOrigins | ForEach-Object { Write-Host "    $_" }
@@ -186,6 +195,8 @@ aws_region             = "$Region"
 environment            = "$Environment"
 operator_account_id    = "$ExpectedAccountId"
 portal_domain          = "$PortalDomain"
+legacy_portal_domain   = "$LegacyPortalDomain"
+activate_canonical_domain = $($ActivateCanonicalDomain.ToString().ToLowerInvariant())
 directory_api_base_url = "$DirectoryApiBaseUrl"
 tenant_api_origins = [
 $tenantOriginsHcl

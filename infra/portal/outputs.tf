@@ -3,6 +3,11 @@ output "portal_url" {
   value       = "https://${local.portal_domain}"
 }
 
+output "legacy_portal_url" {
+  description = "Legacy Web portal URL retained for older clients."
+  value       = "https://${local.legacy_portal_domain}"
+}
+
 output "portal_bucket_name" {
   description = "Private S3 bucket containing the Web portal assets."
   value       = aws_s3_bucket.portal.bucket

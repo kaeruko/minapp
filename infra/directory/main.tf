@@ -1,7 +1,7 @@
 locals {
   project_name         = "minapp-directory"
   name_prefix          = "${local.project_name}-${var.environment}"
-  portal_origin        = "https://portal.cloxs.jp"
+  portal_origin        = "https://minapp.cloxs.jp"
   cors_allowed_origins = concat([local.portal_origin], var.local_development_cors_origins)
 }
 

@@ -19,6 +19,8 @@ It does **not** proxy tenant API requests. Browser login, ZIP upload, review and
 operator_account_id      = "123456789012"
 environment              = "prod"
 portal_domain            = "minapp.cloxs.jp"
+legacy_portal_domain     = "portal.cloxs.jp"
+activate_canonical_domain = true
 directory_api_base_url   = "https://example.execute-api.us-west-2.amazonaws.com"
 tenant_api_origins       = [
   "https://tenant-a.execute-api.us-west-2.amazonaws.com",
@@ -40,7 +42,15 @@ Terraform then:
 2. creates its DNS validation record
 3. waits for ACM validation
 4. creates CloudFront
-5. creates A and AAAA Route 53 aliases for `portal_domain`
+5. retains `legacy_portal_domain` as an alias for older clients
+6. creates A and AAAA Route 53 aliases for `portal_domain`
+
+When moving `portal_domain` from a different AWS account, first plan and apply
+with `activate_canonical_domain = false`. This prepares and attaches the dual-name
+certificate and creates the `_portal_domain` ownership TXT record without changing
+traffic. Move the domain association using the current AWS CloudFront procedure,
+then plan and apply again with `activate_canonical_domain = true`. Never activate
+DNS before the target distribution owns the alias.
 
 ### External authoritative DNS
 
