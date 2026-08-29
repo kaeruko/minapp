@@ -9,7 +9,7 @@ permissions:
 env:
   IOS_BUNDLE_ID: jp.cloxs.minapp
   APP_STORE_CONNECT_API_KEY_ID: X7N54636NV
-  PORTAL_CONFIG_URL: https://minapp.cloxs.jp/portal-config.json
+  DIRECTORY_CONFIG_DRIVE_FILE_ID: 1mNyZWD5utMMkBhvGKhWPloTVOoE05W9u
   CREATOR_PORTAL_BASE_URL: https://minapp.cloxs.jp
 
 jobs:
@@ -53,27 +53,54 @@ jobs:
           [[ -n "$IOS_DISTRIBUTION_CERTIFICATE_BASE64" ]] || { echo "Missing secret: IOS_DISTRIBUTION_CERTIFICATE_BASE64" >&2; exit 1; }
           [[ -n "$IOS_PROVISIONING_PROFILE_BASE64" ]] || { echo "Missing secret: IOS_PROVISIONING_PROFILE_BASE64" >&2; exit 1; }
 
-      - name: Resolve production Directory endpoint
-        id: directory
+      - name: Validate public Directory runtime config
         shell: bash
         run: |
           set -euo pipefail
-          config_file="${RUNNER_TEMP}/portal-config.json"
-          curl --fail --silent --show-error "$PORTAL_CONFIG_URL" -o "$config_file"
+          config_file="${RUNNER_TEMP}/minapp-directory-api.txt"
+          cache_buster="$(python3 -c 'import time; print(int(time.time() * 1000))')"
+          config_url="https://drive.google.com/uc?export=download&id=${DIRECTORY_CONFIG_DRIVE_FILE_ID}&t=${cache_buster}"
+          curl --location --fail --silent --show-error "$config_url" -o "$config_file"
 
-          schema_version="$(jq -er '.schema_version' "$config_file")"
-          [[ "$schema_version" == "1" ]] || {
-            echo "Unsupported portal-config schema_version: $schema_version" >&2
-            exit 1
-          }
+          python3 - "$config_file" <<'PY'
+          import ipaddress
+          from pathlib import Path
+          import re
+          import sys
+          from urllib.parse import urlsplit
 
-          directory_api_base_url="$(jq -er '.directory_api_base_url | select(type == "string" and length > 0)' "$config_file")"
-          [[ "$directory_api_base_url" == https://* ]] || {
-            echo "directory_api_base_url is not HTTPS: $directory_api_base_url" >&2
-            exit 1
-          }
+          path = Path(sys.argv[1])
+          lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+          if len(lines) != 1:
+              raise SystemExit("Google Drive Directory config must contain exactly one non-empty line")
 
-          echo "directory_api_base_url=$directory_api_base_url" >> "$GITHUB_OUTPUT"
+          value = lines[0]
+          parsed = urlsplit(value)
+          if parsed.scheme != "https" or not parsed.hostname:
+              raise SystemExit("Google Drive Directory config is not an absolute HTTPS URL")
+          if parsed.username is not None or parsed.password is not None:
+              raise SystemExit("Google Drive Directory config must not contain credentials")
+          if parsed.query or parsed.fragment or parsed.path not in ("", "/"):
+              raise SystemExit("Google Drive Directory config must be a base URL without path, query, or fragment")
+          if parsed.port not in (None, 443):
+              raise SystemExit("Google Drive Directory config must use the default HTTPS port")
+
+          host = parsed.hostname.rstrip(".").lower()
+          if not host or "." not in host:
+              raise SystemExit("Google Drive Directory config host must be a public DNS name")
+          try:
+              ipaddress.ip_address(host)
+          except ValueError:
+              pass
+          else:
+              raise SystemExit("Google Drive Directory config must not use an IP literal")
+
+          if host == "localhost" or host.endswith((".localhost", ".local", ".internal", ".lan", ".home")):
+              raise SystemExit("Google Drive Directory config host is not public")
+          label = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+          if any(not label.fullmatch(part) for part in host.split(".")):
+              raise SystemExit("Google Drive Directory config host is malformed")
+          PY
 
       - name: Resolve packages and test
         shell: bash
@@ -242,7 +269,6 @@ jobs:
         id: build
         shell: bash
         env:
-          DIRECTORY_API_BASE_URL: ${{ steps.directory.outputs.directory_api_base_url }}
           EXPORT_OPTIONS_PLIST: ${{ steps.signing.outputs.export_options }}
           PROFILE_NAME: ${{ steps.signing.outputs.profile_name }}
           TEAM_ID: ${{ steps.signing.outputs.team_id }}
@@ -254,7 +280,6 @@ jobs:
             --config-only \
             --no-codesign \
             --build-number "$GITHUB_RUN_NUMBER" \
-            --dart-define="MINAPP_DIRECTORY_BASE_URL=${DIRECTORY_API_BASE_URL}" \
             --dart-define="MINAPP_CREATOR_PORTAL_BASE_URL=${CREATOR_PORTAL_BASE_URL}"
 
           pbxproj="ios/Runner.xcodeproj/project.pbxproj"
