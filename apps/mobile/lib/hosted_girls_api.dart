@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'api.dart';
 import 'hosted_runtime_bridge.dart';
 
+const int maxHostedGroupNameLength = 60;
+
 final RegExp _hostedHexIdPattern = RegExp(r'^[0-9a-f]{32}$');
 final RegExp _inviteCodePattern = RegExp(
   r'^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}-?[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}-?[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$',
@@ -87,6 +89,7 @@ class HostedRegistrationResult {
       },
       'Hosted registration response',
     );
+    final String userId = _requireHexId(json, 'user_id');
     final String role = _requiredString(json, 'role');
     final String status = _requiredString(json, 'status');
     if (role != 'user' || status != 'active') {
@@ -94,7 +97,6 @@ class HostedRegistrationResult {
         'Hosted registration returned unexpected role/status: $role/$status.',
       );
     }
-    _requireHexId(json, 'user_id');
     final Map<String, Object?> legal = _requiredObject(json, 'legal');
     _requireExactFields(
       legal,
@@ -105,7 +107,7 @@ class HostedRegistrationResult {
     _requiredString(legal, 'privacy_version');
     _requiredString(legal, 'accepted_at');
     return HostedRegistrationResult(
-      userId: _requiredString(json, 'user_id'),
+      userId: userId,
       loginId: _requiredString(json, 'login_id'),
       recoveryCode: _requiredString(json, 'recovery_code'),
     );
@@ -134,17 +136,16 @@ class HostedGroup {
       optional: const <String>{'visibility'},
       context: 'Hosted group',
     );
-    final String groupId = _requireHexId(json, 'group_id');
     final String role = _requiredString(json, 'role');
+    final String status = _requiredString(json, 'status');
     if (role != 'owner' && role != 'member') {
       throw FormatException('Hosted group returned unsupported role: $role.');
     }
-    final String status = _requiredString(json, 'status');
     if (status != 'active') {
       throw FormatException('Hosted group returned unsupported status: $status.');
     }
     return HostedGroup(
-      groupId: groupId,
+      groupId: _requireHexId(json, 'group_id'),
       name: _requiredString(json, 'name'),
       role: role,
       status: status,
@@ -175,15 +176,15 @@ class HostedInvite {
     if (!_inviteCodePattern.hasMatch(code.toUpperCase())) {
       throw const FormatException('Hosted invite returned an invalid group code.');
     }
-    final Object? rawSeconds = json['valid_for_seconds'];
-    if (rawSeconds is! int || rawSeconds <= 0) {
+    final Object? rawValidForSeconds = json['valid_for_seconds'];
+    if (rawValidForSeconds is! int || rawValidForSeconds <= 0) {
       throw const FormatException('Hosted invite has invalid valid_for_seconds.');
     }
     return HostedInvite(
       groupId: _requireHexId(json, 'group_id'),
       code: code,
       expiresAt: DateTime.parse(_requiredString(json, 'expires_at')).toUtc(),
-      validForSeconds: rawSeconds,
+      validForSeconds: rawValidForSeconds,
     );
   }
 }
@@ -231,26 +232,30 @@ class HostedGroupApp {
       'published_version',
       'editable',
     };
-    final Set<String> unexpected = json.keys.toSet().difference(allowed);
+    final Set<String> actual = json.keys.toSet();
+    final Set<String> unexpected = actual.difference(allowed);
     if (unexpected.isNotEmpty) {
       throw FormatException(
         'Hosted group app contained unexpected fields: ${unexpected.join(', ')}.',
       );
     }
-    for (final String field in <String>[
+    for (final String key in const <String>[
       'app_id',
       'group_id',
       'title',
       'source_kind',
       'created_at',
     ]) {
-      if (!json.containsKey(field)) {
-        throw FormatException('Hosted group app is missing field: $field.');
+      if (!actual.contains(key)) {
+        throw FormatException('Hosted group app is missing field: $key.');
       }
     }
-    final Object? rawPublished = json['published_version'];
-    if (rawPublished != null && (rawPublished is! int || rawPublished < 1)) {
-      throw const FormatException('Hosted group app has invalid published_version.');
+    final Object? rawPublishedVersion = json['published_version'];
+    if (rawPublishedVersion != null &&
+        (rawPublishedVersion is! int || rawPublishedVersion < 1)) {
+      throw const FormatException(
+        'Hosted group app has invalid published_version.',
+      );
     }
     return HostedGroupApp(
       appId: _requireHexId(json, 'app_id'),
@@ -258,7 +263,7 @@ class HostedGroupApp {
       title: _requiredString(json, 'title'),
       sourceKind: _requiredString(json, 'source_kind'),
       createdAt: DateTime.parse(_requiredString(json, 'created_at')).toUtc(),
-      publishedVersion: rawPublished as int?,
+      publishedVersion: rawPublishedVersion as int?,
       builtinId: _optionalString(json, 'builtin_id'),
       builtinAssetPath: _optionalString(json, 'builtin_asset_path'),
     );
@@ -267,13 +272,19 @@ class HostedGroupApp {
 
 class HostedGirlsApi {
   factory HostedGirlsApi({required Uri baseUri, http.Client? client}) {
-    final Uri validated = _validateBaseUri(baseUri);
+    final Uri validatedBaseUri = _validateBaseUri(baseUri);
     final http.Client sharedClient = client ?? http.Client();
     return HostedGirlsApi._(
-      baseUri: validated,
+      baseUri: validatedBaseUri,
       client: sharedClient,
-      authClient: MinAppApiClient(baseUri: validated, client: sharedClient),
-      runtimeClient: HostedApiClient(baseUri: validated, client: sharedClient),
+      authClient: MinAppApiClient(
+        baseUri: validatedBaseUri,
+        client: sharedClient,
+      ),
+      runtimeClient: HostedApiClient(
+        baseUri: validatedBaseUri,
+        client: sharedClient,
+      ),
     );
   }
 
@@ -331,16 +342,22 @@ class HostedGirlsApi {
       path: '/hosted/groups',
       accessToken: accessToken,
     );
-    _requireExactFields(payload, const <String>{'groups'}, 'Hosted groups response');
+    _requireExactFields(
+      payload,
+      const <String>{'groups'},
+      'Hosted groups response',
+    );
     final Object? rawGroups = payload['groups'];
     if (rawGroups is! List<Object?>) {
       throw const FormatException('Hosted groups response has no groups list.');
     }
-    return rawGroups.map((Object? raw) {
-      if (raw is! Map<String, Object?>) {
-        throw const FormatException('Hosted groups response contains a non-object group.');
+    return rawGroups.map((Object? rawGroup) {
+      if (rawGroup is! Map<String, Object?>) {
+        throw const FormatException(
+          'Hosted groups response contains a non-object group.',
+        );
       }
-      return HostedGroup.fromJson(raw);
+      return HostedGroup.fromJson(rawGroup);
     }).toList(growable: false);
   }
 
@@ -348,12 +365,13 @@ class HostedGirlsApi {
     required String accessToken,
     required String name,
   }) async {
-    final String trimmed = name.trim();
-    if (trimmed.isEmpty || trimmed.length > 80 || trimmed != name) {
+    if (name.isEmpty ||
+        name != name.trim() ||
+        name.length > maxHostedGroupNameLength) {
       throw ArgumentError.value(
         name,
         'name',
-        'must be a trimmed non-empty group name up to 80 characters',
+        'must be a trimmed non-empty group name up to $maxHostedGroupNameLength characters',
       );
     }
     final Map<String, Object?> payload = await _jsonRequest(
@@ -369,15 +387,19 @@ class HostedGirlsApi {
     required String accessToken,
     required String code,
   }) async {
-    final String normalized = code.trim().toUpperCase();
-    if (!_inviteCodePattern.hasMatch(normalized)) {
-      throw ArgumentError.value(code, 'code', 'group ID has an invalid format');
+    final String normalizedCode = code.trim().toUpperCase();
+    if (!_inviteCodePattern.hasMatch(normalizedCode)) {
+      throw ArgumentError.value(
+        code,
+        'code',
+        'group ID has an invalid format',
+      );
     }
     final Map<String, Object?> payload = await _jsonRequest(
       method: 'POST',
       path: '/hosted/groups/join',
       accessToken: accessToken,
-      body: <String, Object?>{'code': normalized},
+      body: <String, Object?>{'code': normalizedCode},
     );
     return HostedGroup.fromJson(payload);
   }
@@ -406,16 +428,24 @@ class HostedGirlsApi {
       path: '/hosted/groups/$groupId/apps',
       accessToken: accessToken,
     );
-    _requireExactFields(payload, const <String>{'apps'}, 'Hosted group apps response');
+    _requireExactFields(
+      payload,
+      const <String>{'apps'},
+      'Hosted group apps response',
+    );
     final Object? rawApps = payload['apps'];
     if (rawApps is! List<Object?>) {
-      throw const FormatException('Hosted group apps response has no apps list.');
+      throw const FormatException(
+        'Hosted group apps response has no apps list.',
+      );
     }
-    return rawApps.map((Object? raw) {
-      if (raw is! Map<String, Object?>) {
-        throw const FormatException('Hosted group apps response contains a non-object app.');
+    return rawApps.map((Object? rawApp) {
+      if (rawApp is! Map<String, Object?>) {
+        throw const FormatException(
+          'Hosted group apps response contains a non-object app.',
+        );
       }
-      return HostedGroupApp.fromJson(raw);
+      return HostedGroupApp.fromJson(rawApp);
     }).toList(growable: false);
   }
 
@@ -440,10 +470,16 @@ class HostedGirlsApi {
     if (!path.startsWith('/')) {
       throw ArgumentError.value(path, 'path', 'API path must start with /.');
     }
-    final Map<String, String> headers = <String, String>{'Accept': 'application/json'};
+    final Map<String, String> headers = <String, String>{
+      'Accept': 'application/json',
+    };
     if (accessToken != null) {
       if (accessToken.isEmpty) {
-        throw ArgumentError.value(accessToken, 'accessToken', 'must not be empty');
+        throw ArgumentError.value(
+          accessToken,
+          'accessToken',
+          'must not be empty',
+        );
       }
       headers['Authorization'] = 'Bearer $accessToken';
     }
@@ -453,19 +489,24 @@ class HostedGirlsApi {
 
     final Uri uri = _baseUri.resolve(path);
     late final http.Response response;
-    if (method == 'GET') {
-      if (body != null) {
-        throw ArgumentError('GET request must not contain a body.');
-      }
-      response = await _client.get(uri, headers: headers);
-    } else if (method == 'POST') {
-      response = await _client.post(
-        uri,
-        headers: headers,
-        body: body == null ? null : jsonEncode(body),
-      );
-    } else {
-      throw ArgumentError.value(method, 'method', 'Unsupported HTTP method.');
+    switch (method) {
+      case 'GET':
+        if (body != null) {
+          throw ArgumentError('GET request must not contain a body.');
+        }
+        response = await _client.get(uri, headers: headers);
+      case 'POST':
+        response = await _client.post(
+          uri,
+          headers: headers,
+          body: body == null ? null : jsonEncode(body),
+        );
+      default:
+        throw ArgumentError.value(
+          method,
+          'method',
+          'Unsupported HTTP method.',
+        );
     }
 
     final String? contentType = response.headers['content-type'];
@@ -477,13 +518,20 @@ class HostedGirlsApi {
     }
     final Object? decoded = jsonDecode(response.body);
     if (decoded is! Map<String, Object?>) {
-      throw const FormatException('API returned an unexpected JSON payload.');
+      throw const FormatException(
+        'API returned an unexpected JSON payload.',
+      );
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final Object? rawCode = decoded['error'];
       final Object? rawMessage = decoded['message'];
-      if (rawCode is! String || rawCode.isEmpty || rawMessage is! String || rawMessage.isEmpty) {
-        throw const FormatException('API error response is missing error or message.');
+      if (rawCode is! String ||
+          rawCode.isEmpty ||
+          rawMessage is! String ||
+          rawMessage.isEmpty) {
+        throw const FormatException(
+          'API error response is missing error or message.',
+        );
       }
       throw ApiException(
         statusCode: response.statusCode,
@@ -512,14 +560,20 @@ class HostedGirlsApi {
 
 void _validateHostedId(String value, String label) {
   if (!_hostedHexIdPattern.hasMatch(value)) {
-    throw ArgumentError.value(value, label, 'must be a 32-character lowercase hexadecimal ID');
+    throw ArgumentError.value(
+      value,
+      label,
+      'must be a 32-character lowercase hexadecimal ID',
+    );
   }
 }
 
 String _requireHexId(Map<String, Object?> json, String key) {
   final String value = _requiredString(json, key);
   if (!_hostedHexIdPattern.hasMatch(value)) {
-    throw FormatException('JSON field $key must be a 32-character lowercase hexadecimal ID.');
+    throw FormatException(
+      'JSON field $key must be a 32-character lowercase hexadecimal ID.',
+    );
   }
   return value;
 }
@@ -536,7 +590,9 @@ String? _optionalString(Map<String, Object?> json, String key) {
   final Object? value = json[key];
   if (value == null) return null;
   if (value is! String || value.isEmpty) {
-    throw FormatException('JSON field $key must be a non-empty string when present.');
+    throw FormatException(
+      'JSON field $key must be a non-empty string when present.',
+    );
   }
   return value;
 }
