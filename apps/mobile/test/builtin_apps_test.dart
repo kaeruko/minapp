@@ -6,7 +6,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('built-in app registry has unique valid entries', () {
-    expect(builtInApps, hasLength(4));
+    expect(builtInApps, hasLength(5));
     expect(
       builtInApps.map((BuiltInApp app) => app.id).toSet(),
       hasLength(builtInApps.length),
@@ -28,7 +28,7 @@ void main() {
   });
 
   test('built-in app search filters every registered app', () {
-    expect(filterBuiltInApps(''), hasLength(4));
+    expect(filterBuiltInApps(''), hasLength(builtInApps.length));
     expect(filterBuiltInApps('しばちゃん'), hasLength(2));
     expect(
       filterBuiltInApps('どんぐり').single.id,
