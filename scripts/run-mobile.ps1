@@ -24,20 +24,6 @@ if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) {
     throw "flutter was not found in PATH."
 }
 
-$config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
-$directoryBaseUrl = $config.MINAPP_DIRECTORY_BASE_URL
-if ($directoryBaseUrl -isnot [string] -or [string]::IsNullOrWhiteSpace($directoryBaseUrl)) {
-    throw "MINAPP_DIRECTORY_BASE_URL is missing or empty in $configPath"
-}
-
-$directoryUri = $null
-if (-not [Uri]::TryCreate($directoryBaseUrl, [UriKind]::Absolute, [ref]$directoryUri)) {
-    throw "MINAPP_DIRECTORY_BASE_URL is not an absolute URI: $directoryBaseUrl"
-}
-if ($directoryUri.Scheme -ne "https") {
-    throw "MINAPP_DIRECTORY_BASE_URL must use https: $directoryBaseUrl"
-}
-
 & $configureAndroidScript
 if ($LASTEXITCODE -ne 0) {
     throw "Android configuration failed."
