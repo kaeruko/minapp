@@ -2,28 +2,16 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'directory.dart';
+import 'directory_endpoint_source.dart';
 import 'endpoint_validation.dart';
 import 'session_app.dart';
 import 'tenant_store.dart';
 import 'ugc_safety.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  const String rawDirectoryBaseUrl = String.fromEnvironment(
-    'MINAPP_DIRECTORY_BASE_URL',
-  );
-  if (rawDirectoryBaseUrl.isEmpty) {
-    throw StateError(
-      'MINAPP_DIRECTORY_BASE_URL is required. Run with '
-      '--dart-define=MINAPP_DIRECTORY_BASE_URL=https://...',
-    );
-  }
-
-  final Uri directoryBaseUri = validatePublicHttpsBaseUri(
-    Uri.parse(rawDirectoryBaseUrl),
-    argumentName: 'MINAPP_DIRECTORY_BASE_URL',
-  );
+  final Uri directoryBaseUri = await loadDirectoryBaseUriFromGoogleDrive();
 
   const String rawJoinBaseUrl = String.fromEnvironment(
     'MINAPP_JOIN_BASE_URL',
