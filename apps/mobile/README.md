@@ -20,21 +20,42 @@ PowerShellでリポジトリ直下から:
 .\scripts\configure-mobile-android.ps1
 ```
 
+## Directory endpoint
+
+起動時に公開Google Driveファイル `minapp_api.txt` を取得し、その唯一の非空行を中央Directoryのbase URLとして使う。
+
+Google Drive file ID:
+
+```text
+1mNyZWD5utMMkBhvGKhWPloTVOoE05W9u
+```
+
+現在の内容:
+
+```text
+https://y0oyi359w2.execute-api.us-west-2.amazonaws.com
+```
+
+取得は12秒でtimeoutし、HTTP 200以外、空ファイル、複数の非空行、不正なURI、public HTTPS base URLとして不正な値はすべて起動失敗にする。埋め込みURL、古いURL、別Directory、tenant APIへの自動フォールバックは行わない。
+
+Directory APIを移行する場合は、Google Drive上の `minapp_api.txt` の1行だけを新しいURLへ更新する。ストアbuildへDirectory URLを埋め込まない。
+
 ## 実行
 
-中央Directoryをdeploy済みにして、その固定URLをbuild-time defineで渡す。
-
 ```powershell
-$directoryApi = terraform -chdir=infra/directory output -raw directory_api_base_url
 .\scripts\configure-mobile-android.ps1
 cd apps\mobile
 flutter pub get
 flutter analyze
 flutter test
-flutter run --dart-define=MINAPP_DIRECTORY_BASE_URL=$directoryApi
+flutter run
 ```
 
-`MINAPP_DIRECTORY_BASE_URL` が無い場合や、public HTTPS base URLとして不正な場合は起動時に停止する。ユーザーへ任意API URLを入力させず、別Directoryやtenant APIへ自動フォールバックしない。
+制作・提出ポータルなどの任意のbuild-time設定も使う場合は、リポジトリ直下から次を使える。
+
+```powershell
+.\scripts\run-mobile.ps1
+```
 
 初回起動では先生から配布された教室コードを入力する。Directory descriptor受信後にtenant `/tenant-info` を検証し、成功したdescriptorだけを端末へ保存する。
 
@@ -44,7 +65,6 @@ flutter run --dart-define=MINAPP_DIRECTORY_BASE_URL=$directoryApi
 
 ```powershell
 flutter run `
-  --dart-define=MINAPP_DIRECTORY_BASE_URL=$directoryApi `
   --dart-define=MINAPP_JOIN_BASE_URL=https://<official-join-domain>
 ```
 
@@ -62,7 +82,6 @@ join linkから使うのはclassroom codeだけで、URLをtenant APIとして�
 
 ```powershell
 flutter run `
-  --dart-define=MINAPP_DIRECTORY_BASE_URL=$directoryApi `
   --dart-define=MINAPP_CREATOR_PORTAL_BASE_URL=https://<creator-portal-domain>
 ```
 
@@ -88,7 +107,8 @@ V1ではdescriptor TTLのclient許容上限を24時間とする。有効期限�
 
 ## 安全境界
 
-- production buildのDirectory base URLはbuild時に固定する
+- production buildのDirectory base URLは公開Google Driveファイルから起動時に取得する
+- Google Drive取得または内容検証に失敗した場合は別経路へフォールバックしない
 - classroom codeやjoin linkから任意tenant URLを受け取らない
 - 公式join originを使う場合もbuild時に固定し、`/c/{code}` 以外を拒否する
 - Directory responseのtenant URLをHTTPS/public DNS/default port/no pathとして再検証する
