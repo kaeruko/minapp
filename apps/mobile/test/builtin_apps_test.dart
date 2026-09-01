@@ -38,13 +38,19 @@ void main() {
       filterBuiltInApps('なでなで').single.id,
       'shiba-goshujin',
     );
-    expect(
-      filterBuiltInApps('横スクロール').single.id,
-      'shopping-town',
-    );
+
+    final Set<String> sideScrollerIds = filterBuiltInApps('横スクロール')
+        .map((BuiltInApp app) => app.id)
+        .toSet();
+    expect(sideScrollerIds, <String>{'shopping-town', 'ol-home'});
+
     expect(
       filterBuiltInApps('奥さん').single.id,
       'shopping-town',
+    );
+    expect(
+      filterBuiltInApps('マンション').single.id,
+      'ol-home',
     );
     expect(
       filterBuiltInApps('ノベルゲーム').single.id,
