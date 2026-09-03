@@ -529,7 +529,7 @@ class _GirlsAuthPageState extends State<_GirlsAuthPage> {
                             autocorrect: false,
                             enableSuggestions: false,
                             decoration: _fieldDecoration(
-                              label: 'Login ID / ユーザー名',
+                              label: 'ユーザー名',
                               icon: Icons.key_rounded,
                               iconColor: _lavender,
                             ),
