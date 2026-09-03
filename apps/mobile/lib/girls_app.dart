@@ -17,6 +17,8 @@ const Color _blue = Color(0xFFC9E5FF);
 const Color _text = Color(0xFF5D4037);
 
 const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
+const String _girlsLoginHeroBackgroundAsset =
+    'assets/girls/generated/login_hero_bg.png';
 
 const Set<String> _girlsBuiltinIds = <String>{
   'ol-home',
@@ -145,6 +147,79 @@ class _GirlsMascot extends StatelessWidget {
       height: height,
       fit: BoxFit.contain,
       semanticsLabel: semanticsLabel,
+    );
+  }
+}
+
+class _GirlsLoginHero extends StatelessWidget {
+  const _GirlsLoginHero();
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(30),
+      child: SizedBox(
+        height: 300,
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            Image.asset(
+              _girlsLoginHeroBackgroundAsset,
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+            ),
+            const Positioned(
+              left: 20,
+              right: 20,
+              bottom: 34,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: _GirlsMascot(
+                  assetName: _mascotPairAsset,
+                  width: 215,
+                  height: 118,
+                  semanticsLabel: 'みんアプ Girls のふたりのマスコット',
+                ),
+              ),
+            ),
+            Positioned(
+              right: 22,
+              bottom: 104,
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 125),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .92),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFFE7B5C8),
+                    width: 1.3,
+                  ),
+                  boxShadow: const <BoxShadow>[
+                    BoxShadow(
+                      color: Color(0x22A36B8A),
+                      blurRadius: 8,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Text(
+                  'おかえりなさい ♡',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _lavenderDark,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -406,15 +481,8 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                 constraints: const BoxConstraints(maxWidth: 520),
                 child: Column(
                   children: <Widget>[
-                    const _GirlsMascot(
-                      assetName: _mascotPairAsset,
-                      width: 220,
-                      height: 112,
-                      semanticsLabel: 'みんアプ Girls のふたりのマスコット',
-                    ),
-                    const SizedBox(height: 8),
-                    const _GirlsLogo(),
-                    const SizedBox(height: 8),
+                    const _GirlsLoginHero(),
+                    const SizedBox(height: 16),
                     const Text(
                       'かわいいアプリを、友達といっしょに。',
                       style: TextStyle(
@@ -422,7 +490,7 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                     _PastelPanel(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
