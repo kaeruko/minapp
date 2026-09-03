@@ -1,0 +1,33 @@
+name: Apply Girls login art
+
+on:
+  push:
+    branches:
+      - feature/girls-login-kawaii-ui
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message != 'Apply generated Girls login UI'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/girls-login-kawaii-ui
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Apply fail-fast Girls login UI patch
+        run: python scripts/apply-girls-login-ui.py
+      - name: Commit generated UI
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/mobile/lib/girls_app.dart apps/mobile/pubspec.yaml apps/mobile/test/girls_login_art_assets_test.dart
+          git rm scripts/apply-girls-login-ui.py .github/workflows/apply-girls-login-ui.yml
+          git diff --cached --check
+          git commit -m "Apply generated Girls login UI"
+          git push
