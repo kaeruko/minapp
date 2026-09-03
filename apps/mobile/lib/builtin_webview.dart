@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class BuiltInWebViewPage extends StatefulWidget {
@@ -33,6 +36,8 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
       'assets/builtin/ol_home/index.html';
   static const String _olHomeEffectsAssetPath =
       'assets/builtin/ol_home/effects.js';
+  static const String _singAlongAssetPath =
+      'assets/builtin/sing_along/index.html';
 
   @override
   void initState() {
@@ -66,6 +71,34 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
       throw StateError('Built-in JavaScript asset is empty: $extraAssetPath');
     }
     return script;
+  }
+
+  Future<void> _handleWebPermissionRequest(
+    PlatformWebViewPermissionRequest request,
+  ) async {
+    final bool isSingAlong = widget.assetPath == _singAlongAssetPath;
+    final bool isMicrophoneOnly = request.types.length == 1 &&
+        request.types.contains(WebViewPermissionResourceType.microphone);
+
+    if (!isSingAlong || !isMicrophoneOnly) {
+      await request.deny();
+      return;
+    }
+
+    try {
+      final PermissionStatus status = await Permission.microphone.request();
+      if (!status.isGranted) {
+        await request.deny();
+        return;
+      }
+      await request.grant();
+    } catch (error) {
+      await request.deny();
+      if (!mounted) return;
+      setState(
+        () => _error = 'マイクの使用許可を確認できませんでした: $error',
+      );
+    }
   }
 
   Future<void> _prepareWebView() async {
@@ -107,6 +140,12 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
             },
           ),
         );
+
+      await controller.platform.setOnPlatformPermissionRequest(
+        (PlatformWebViewPermissionRequest request) {
+          unawaited(_handleWebPermissionRequest(request));
+        },
+      );
 
       await controller.clearLocalStorage();
       await controller.clearCache();
