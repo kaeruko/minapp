@@ -16,6 +16,8 @@ const Color _blue = Color(0xFFC9E5FF);
 const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
 const String _girlsLogoAsset =
     'assets/girls/generated/minapp_girls_logo.png';
+const String _girlsLaceAsset =
+    'assets/girls/generated/border_lace_heart.png';
 
 /// Girls group selection page using the reusable five-hill footer.
 ///
@@ -312,39 +314,41 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
         bottom: false,
         child: Column(
           children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 12, 10, 8),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Image.asset(
-                        _girlsLogoAsset,
-                        width: 112,
-                        height: 52,
-                        fit: BoxFit.contain,
-                        semanticLabel: 'みんアプ Girls',
+            _GirlsLaceHeader(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 6, 10, 6),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Image.asset(
+                          _girlsLogoAsset,
+                          width: 112,
+                          height: 52,
+                          fit: BoxFit.contain,
+                          semanticLabel: 'みんアプ Girls',
+                        ),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: '更新',
-                    onPressed: _busy ? null : _loadGroups,
-                    icon: const Icon(
-                      Icons.refresh_rounded,
-                      color: _lavenderDark,
+                    IconButton(
+                      tooltip: '更新',
+                      onPressed: _busy ? null : _loadGroups,
+                      icon: const Icon(
+                        Icons.refresh_rounded,
+                        color: _lavenderDark,
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'ログアウト',
-                    onPressed: _busy ? null : widget.onLogout,
-                    icon: const Icon(
-                      Icons.logout_rounded,
-                      color: _lavenderDark,
+                    IconButton(
+                      tooltip: 'ログアウト',
+                      onPressed: _busy ? null : widget.onLogout,
+                      icon: const Icon(
+                        Icons.logout_rounded,
+                        color: _lavenderDark,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             Expanded(
@@ -461,6 +465,50 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
         child: GirlsFooterNav(
           selectedTab: GirlsFooterTab.groups,
           enabledTabs: <GirlsFooterTab>{GirlsFooterTab.groups},
+        ),
+      ),
+    );
+  }
+}
+
+class _GirlsLaceHeader extends StatelessWidget {
+  const _GirlsLaceHeader({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xFFFFE9F1),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const _GirlsLaceStrip(),
+          child,
+          const Transform.flip(
+            flipY: true,
+            child: _GirlsLaceStrip(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GirlsLaceStrip extends StatelessWidget {
+  const _GirlsLaceStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 34,
+      child: ClipRect(
+        child: Image.asset(
+          _girlsLaceAsset,
+          width: double.infinity,
+          fit: BoxFit.fitWidth,
+          alignment: Alignment.topCenter,
         ),
       ),
     );
