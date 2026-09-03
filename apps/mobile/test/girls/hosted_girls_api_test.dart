@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:minapp_mobile/hosted_girls_api.dart';
+import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
 void main() {
   final Uri baseUri = Uri.parse('https://girls-api.example.com');
