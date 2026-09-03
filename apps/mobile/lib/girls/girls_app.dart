@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import 'api.dart';
 import 'girls_app_core.dart' as core;
+import 'girls_groups_page.dart';
 import 'hosted_girls_api.dart';
 
 export 'girls_app_core.dart' hide GirlsApp;
@@ -88,7 +89,7 @@ class _GirlsSessionRootState extends State<_GirlsSessionRoot> {
         },
       );
     }
-    return core.GirlsGroupsPage(
+    return GirlsGroupsPage(
       api: widget.api,
       session: session,
       onLogout: () => setState(() => _session = null),
