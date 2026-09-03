@@ -1,0 +1,1 @@
+Restored the last CI-green Girls implementation after the PNG hero integration removed the mascot asset constant. This marker exists only to trigger PR CI and must be removed before merge.
