@@ -18,7 +18,7 @@ const Color _text = Color(0xFF5D4037);
 
 const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
 const String _girlsLoginHeroBackgroundAsset =
-    'assets/girls/generated/login_hero_bg.png';
+    'assets/girls/generated/login_hero_bg.svg';
 
 const Set<String> _girlsBuiltinIds = <String>{
   'ol-home',
@@ -163,10 +163,16 @@ class _GirlsLoginHero extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: <Widget>[
-            Image.asset(
+            SvgPicture.asset(
               _girlsLoginHeroBackgroundAsset,
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
+            ),
+            const Positioned(
+              top: 52,
+              left: 20,
+              right: 20,
+              child: Center(child: _GirlsLogo()),
             ),
             const Positioned(
               left: 20,

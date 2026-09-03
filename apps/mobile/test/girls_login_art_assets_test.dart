@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 void main() {
   testWidgets('Girls login hero background asset renders', (
@@ -8,8 +9,8 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: Image.asset(
-            'assets/girls/generated/login_hero_bg.png',
+          body: SvgPicture.asset(
+            'assets/girls/generated/login_hero_bg.svg',
             width: 360,
             height: 220,
             fit: BoxFit.cover,
