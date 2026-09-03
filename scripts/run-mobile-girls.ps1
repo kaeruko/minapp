@@ -24,8 +24,15 @@ if (-not (Test-Path -LiteralPath $girlsEntrypoint -PathType Leaf)) {
 if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) {
     throw "flutter was not found in PATH."
 }
+
 if ([string]::IsNullOrWhiteSpace($HostedApiBaseUrl)) {
-    throw "Hosted API base URL is required. Pass -HostedApiBaseUrl or set MINAPP_HOSTED_API_BASE_URL."
+    $HostedApiBaseUrl = [Environment]::GetEnvironmentVariable(
+        "MINAPP_HOSTED_API_BASE_URL",
+        [EnvironmentVariableTarget]::User
+    )
+}
+if ([string]::IsNullOrWhiteSpace($HostedApiBaseUrl)) {
+    throw "Hosted API base URL is required. Pass -HostedApiBaseUrl or set the MINAPP_HOSTED_API_BASE_URL user environment variable."
 }
 
 $parsedHostedApiBaseUrl = $null
