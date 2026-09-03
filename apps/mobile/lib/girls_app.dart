@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'api.dart';
 import 'builtin_apps.dart';
@@ -14,6 +15,8 @@ const Color _cream = Color(0xFFFFF5E1);
 const Color _mint = Color(0xFFC8F3D0);
 const Color _blue = Color(0xFFC9E5FF);
 const Color _text = Color(0xFF5D4037);
+
+const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
 
 const Set<String> _girlsBuiltinIds = <String>{
   'ol-home',
@@ -117,6 +120,31 @@ class _GirlsBackground extends StatelessWidget {
         ),
       ),
       child: child,
+    );
+  }
+}
+
+class _GirlsMascot extends StatelessWidget {
+  const _GirlsMascot({
+    required this.assetName,
+    required this.width,
+    required this.height,
+    required this.semanticsLabel,
+  });
+
+  final String assetName;
+  final double width;
+  final double height;
+  final String semanticsLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return SvgPicture.asset(
+      assetName,
+      width: width,
+      height: height,
+      fit: BoxFit.contain,
+      semanticsLabel: semanticsLabel,
     );
   }
 }
@@ -378,6 +406,13 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                 constraints: const BoxConstraints(maxWidth: 520),
                 child: Column(
                   children: <Widget>[
+                    const _GirlsMascot(
+                      assetName: _mascotPairAsset,
+                      width: 220,
+                      height: 112,
+                      semanticsLabel: 'みんアプ Girls のふたりのマスコット',
+                    ),
+                    const SizedBox(height: 8),
                     const _GirlsLogo(),
                     const SizedBox(height: 8),
                     const Text(
@@ -873,14 +908,11 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
                           _PastelPanel(
                             child: Row(
                               children: <Widget>[
-                                const CircleAvatar(
-                                  radius: 28,
-                                  backgroundColor: _pink,
-                                  child: Icon(
-                                    Icons.groups_rounded,
-                                    color: Colors.white,
-                                    size: 31,
-                                  ),
+                                const _GirlsMascot(
+                                  assetName: _mascotPairAsset,
+                                  width: 92,
+                                  height: 76,
+                                  semanticsLabel: 'みんアプ Girls のふたりのマスコット',
                                 ),
                                 const SizedBox(width: 15),
                                 const Expanded(
