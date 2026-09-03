@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'endpoint_validation.dart';
-import 'girls_app.dart';
-import 'hosted_girls_api.dart';
+import 'girls/girls_app.dart';
+import 'girls/hosted_girls_api.dart';
 
 void main() {
   const String rawHostedApiBaseUrl = String.fromEnvironment(
