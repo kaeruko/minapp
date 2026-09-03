@@ -314,41 +314,39 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
         bottom: false,
         child: Column(
           children: <Widget>[
-            _GirlsLaceHeader(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 6, 10, 6),
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Image.asset(
-                          _girlsLogoAsset,
-                          width: 112,
-                          height: 52,
-                          fit: BoxFit.contain,
-                          semanticLabel: 'みんアプ Girls',
-                        ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 12, 10, 8),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Image.asset(
+                        _girlsLogoAsset,
+                        width: 112,
+                        height: 52,
+                        fit: BoxFit.contain,
+                        semanticLabel: 'みんアプ Girls',
                       ),
                     ),
-                    IconButton(
-                      tooltip: '更新',
-                      onPressed: _busy ? null : _loadGroups,
-                      icon: const Icon(
-                        Icons.refresh_rounded,
-                        color: _lavenderDark,
-                      ),
+                  ),
+                  IconButton(
+                    tooltip: '更新',
+                    onPressed: _busy ? null : _loadGroups,
+                    icon: const Icon(
+                      Icons.refresh_rounded,
+                      color: _lavenderDark,
                     ),
-                    IconButton(
-                      tooltip: 'ログアウト',
-                      onPressed: _busy ? null : widget.onLogout,
-                      icon: const Icon(
-                        Icons.logout_rounded,
-                        color: _lavenderDark,
-                      ),
+                  ),
+                  IconButton(
+                    tooltip: 'ログアウト',
+                    onPressed: _busy ? null : widget.onLogout,
+                    icon: const Icon(
+                      Icons.logout_rounded,
+                      color: _lavenderDark,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
             Expanded(
@@ -360,35 +358,37 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
-                        _PastelPanel(
-                          child: Row(
-                            children: <Widget>[
-                              SvgPicture.asset(
-                                _mascotPairAsset,
-                                width: 92,
-                                height: 76,
-                                fit: BoxFit.contain,
-                                semanticsLabel: 'みんアプ Girls のふたりのマスコット',
-                              ),
-                              const SizedBox(width: 15),
-                              const Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    Text(
-                                      'どのグループで遊ぶ？',
-                                      style: TextStyle(
-                                        color: _lavenderDark,
-                                        fontSize: 21,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text('友達のIDで参加するか、自分のグループをつくれるよ。'),
-                                  ],
+                        _GirlsLaceFrame(
+                          child: _PastelPanel(
+                            child: Row(
+                              children: <Widget>[
+                                SvgPicture.asset(
+                                  _mascotPairAsset,
+                                  width: 92,
+                                  height: 76,
+                                  fit: BoxFit.contain,
+                                  semanticsLabel: 'みんアプ Girls のふたりのマスコット',
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 15),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Text(
+                                        'どのグループで遊ぶ？',
+                                        style: TextStyle(
+                                          color: _lavenderDark,
+                                          fontSize: 21,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text('友達のIDで参加するか、自分のグループをつくれるよ。'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -471,26 +471,23 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
   }
 }
 
-class _GirlsLaceHeader extends StatelessWidget {
-  const _GirlsLaceHeader({required this.child});
+class _GirlsLaceFrame extends StatelessWidget {
+  const _GirlsLaceFrame({required this.child});
 
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0xFFFFE9F1),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const _GirlsLaceStrip(),
-          child,
-          Transform.flip(
-            flipY: true,
-            child: const _GirlsLaceStrip(),
-          ),
-        ],
-      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        const _GirlsLaceStrip(),
+        child,
+        Transform.flip(
+          flipY: true,
+          child: const _GirlsLaceStrip(),
+        ),
+      ],
     );
   }
 }
