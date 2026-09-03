@@ -11,7 +11,6 @@ import 'hosted_girls_api.dart';
 const Color _lavender = Color(0xFFB39DDB);
 const Color _lavenderDark = Color(0xFF745B9E);
 const Color _pink = Color(0xFFFFC4D6);
-const Color _cream = Color(0xFFFFF5E1);
 const Color _mint = Color(0xFFC8F3D0);
 const Color _blue = Color(0xFFC9E5FF);
 const Color _text = Color(0xFF5D4037);
@@ -116,8 +115,8 @@ class _GirlsBackground extends StatelessWidget {
           end: Alignment.bottomCenter,
           colors: <Color>[
             Color(0xFFFFEDF5),
-            Color(0xFFF6F0FF),
-            _cream,
+            Color(0xFFFFF4E6),
+            Color(0xFFFFF8EE),
           ],
         ),
       ),
@@ -157,7 +156,7 @@ class _GirlsLoginHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(30),
+      borderRadius: BorderRadius.zero,
       child: SizedBox(
         height: 300,
         child: Stack(
