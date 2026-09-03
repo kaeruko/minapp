@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   http: ">=1.2.0 <2.0.0"
+  flutter_svg: 2.0.10+1
   shared_preferences: ">=2.5.3 <3.0.0"
   url_launcher: 6.3.1
   webview_flutter: ">=4.8.0 <5.0.0"
@@ -29,3 +30,6 @@ flutter:
     - assets/builtin/ol_home/effects.js
     - assets/builtin/novel_starter/index.html
     - assets/builtin/novel_starter/face.jpg
+    - assets/girls/mascot_pair.svg
+    - assets/girls/mascot_white.svg
+    - assets/girls/mascot_black.svg
