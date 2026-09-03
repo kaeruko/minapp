@@ -116,8 +116,8 @@ class _GirlsBackground extends StatelessWidget {
           end: Alignment.bottomCenter,
           colors: <Color>[
             Color(0xFFFFEDF5),
-            Color(0xFFF6F0FF),
-            _cream,
+            Color(0xFFFFF4E6),
+            Color(0xFFFFF8EE),
           ],
         ),
       ),
@@ -157,7 +157,7 @@ class _GirlsLoginHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(30),
+      borderRadius: BorderRadius.zero,
       child: SizedBox(
         height: 300,
         child: Stack(
