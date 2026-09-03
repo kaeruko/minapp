@@ -1,0 +1,21 @@
+{
+  "Comment": "Preserve existing cloxs.jp Google TXT records",
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "cloxs.jp",
+        "Type": "TXT",
+        "TTL": 300,
+        "ResourceRecords": [
+          {
+            "Value": "\"google-site-verification=2ria-dkxp0DPwzXQeVMmspkunSMCeOydoVoBgbU-mW4\""
+          },
+          {
+            "Value": "\"v=spf1 include:_spf.google.com ~all\""
+          }
+        ]
+      }
+    }
+  ]
+}

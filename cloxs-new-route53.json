@@ -1,0 +1,99 @@
+{
+  "Comment": "Restore cloxs.jp DNS before AWS account cutover",
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "cloxs.jp",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "160.16.209.231" }
+        ]
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "www.cloxs.jp",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "160.16.209.231" }
+        ]
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "*.cloxs.jp",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "160.16.209.231" }
+        ]
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "mx1.cloxs.jp",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "160.16.209.231" }
+        ]
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "v4.cloxs.jp",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "160.16.209.231" }
+        ]
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "google416f4bb319488611.cloxs.jp",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "cloxs.jp." }
+        ]
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "cloxs.jp",
+        "Type": "MX",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "10 aspmx.l.google.com." },
+          { "Value": "20 alt1.aspmx.l.google.com." },
+          { "Value": "20 alt2.aspmx.l.google.com." },
+          { "Value": "30 aspmx2.googlemail.com." },
+          { "Value": "30 aspmx3.googlemail.com." },
+          { "Value": "30 aspmx4.googlemail.com." },
+          { "Value": "30 aspmx5.googlemail.com." }
+        ]
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "cloxs.jp",
+        "Type": "TXT",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "\"v=spf1 include:aspmx.googlemail.com ~all\"" }
+        ]
+      }
+    }
+  ]
+}

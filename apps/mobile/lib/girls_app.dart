@@ -212,7 +212,7 @@ class _GirlsLoginHero extends StatelessWidget {
                   ],
                 ),
                 child: const Text(
-                  'おかえりなさい ♡',
+                  'みんなでアプリをつくろう！',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: _lavenderDark,
@@ -562,7 +562,7 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                             enabled: !_busy,
                             obscureText: true,
                             decoration: InputDecoration(
-                              labelText: 'Password / パスワード',
+                              labelText: 'パスワード',
                               floatingLabelBehavior: FloatingLabelBehavior.always,
                               prefixIcon: const Icon(
                                 Icons.favorite_border_rounded,
@@ -606,7 +606,7 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                               enabled: !_busy,
                               obscureText: true,
                               decoration: InputDecoration(
-                                labelText: 'Password again / もう一度',
+                                labelText: 'パスワードをもう一度入力してください',
                                 floatingLabelBehavior: FloatingLabelBehavior.always,
                                 prefixIcon: const Icon(
                                   Icons.favorite_rounded,
