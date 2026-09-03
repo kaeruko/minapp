@@ -1,0 +1,65 @@
+name: Patch Girls page cream
+
+on:
+  push:
+    branches:
+      - fix/girls-real-lace-border
+    paths:
+      - .github/workflows/patch-girls-page-cream.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/girls-real-lace-border
+
+      - name: Make page cream single-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/mobile/lib/girls_app.dart')
+          text = path.read_text(encoding='utf-8')
+          old = '''      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[
+            Color(0xFFFFEDF5),
+            Color(0xFFFFF4E6),
+            Color(0xFFFFF8EE),
+          ],
+        ),
+      ),'''
+          new = '''      decoration: const BoxDecoration(
+        color: Color(0xFFFFF8EE),
+      ),'''
+
+          count = text.count(old)
+          if count != 1:
+              raise RuntimeError(
+                  f'Expected exactly one Girls background block, found {count}. '
+                  'Refusing to modify girls_app.dart.'
+              )
+
+          path.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+          PY
+
+      - name: Commit exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/patch-girls-page-cream.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/mobile/lib/girls_app.dart .github/workflows/patch-girls-page-cream.yml
+          git diff --cached --quiet && { echo 'Expected cream patch produced no changes.' >&2; exit 1; }
+          git commit -m "Use one cream background under Girls lace"
+          git push origin HEAD:fix/girls-real-lace-border
