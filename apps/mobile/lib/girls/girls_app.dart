@@ -37,7 +37,7 @@ class GirlsApp extends StatelessWidget {
           secondary: const Color(0xFFE987A8),
           surface: const Color(0xFFFFFBFD),
         ),
-        scaffoldBackgroundColor: const Color(0xFFFFF8FB),
+        scaffoldBackgroundColor: const Color(0xFFFDF9EE),
         textTheme: ThemeData.light().textTheme.apply(
               bodyColor: _text,
               displayColor: _text,
@@ -102,18 +102,8 @@ class _GirlsBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[
-            Color(0xFFFFEDF5),
-            Color(0xFFFFF4E6),
-            Color(0xFFFFF8EE),
-          ],
-        ),
-      ),
+    return ColoredBox(
+      color: const Color(0xFFFDF9EE),
       child: child,
     );
   }
