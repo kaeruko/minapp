@@ -1,9 +1,19 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import 'hosted_runtime_bridge.dart';
+
+bool isHostedMicrophoneOnlyPermissionRequest(
+  Set<WebViewPermissionResourceType> types,
+) {
+  return types.length == 1 &&
+      types.contains(WebViewPermissionResourceType.microphone);
+}
 
 class HostedAppWebViewPage extends StatefulWidget {
   const HostedAppWebViewPage({
@@ -22,10 +32,15 @@ class HostedAppWebViewPage extends StatefulWidget {
 }
 
 class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
+  static const MethodChannel _hostPermissionChannel = MethodChannel(
+    'jp.cloxs.min/host_permissions',
+  );
+
   WebViewController? _controller;
   String? _error;
   int _progress = 0;
   bool _bridgeFailed = false;
+  bool _permissionPromptActive = false;
 
   late final HostedContentNavigationPolicy _navigationPolicy;
   late final HostedBridgeSession _bridgeSession;
@@ -45,7 +60,11 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
   Future<void> _prepareWebView() async {
     try {
       await WebViewCookieManager().clearCookies();
-      final WebViewController controller = WebViewController()
+      final WebViewController controller = WebViewController(
+        onPermissionRequest: (WebViewPermissionRequest request) {
+          unawaited(_handleWebPermissionRequest(request));
+        },
+      )
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..addJavaScriptChannel(
           'MinAppNativeBridge',
@@ -83,6 +102,106 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
         error: error,
         stackTrace: stackTrace,
       );
+    }
+  }
+
+  Future<void> _handleWebPermissionRequest(
+    WebViewPermissionRequest request,
+  ) async {
+    if (!isHostedMicrophoneOnlyPermissionRequest(request.types)) {
+      await request.deny();
+      return;
+    }
+    if (!mounted || _bridgeFailed || _permissionPromptActive) {
+      await request.deny();
+      return;
+    }
+
+    _permissionPromptActive = true;
+    try {
+      final bool approved = await _confirmMicrophoneAccess();
+      if (!approved || !mounted) {
+        await request.deny();
+        return;
+      }
+
+      final bool hostPermissionGranted = await _requestHostMicrophonePermission();
+      if (!hostPermissionGranted) {
+        await request.deny();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('マイクの使用が許可されていないため、録音できません。'),
+            ),
+          );
+        }
+        return;
+      }
+
+      await request.grant();
+    } catch (error, stackTrace) {
+      try {
+        await request.deny();
+      } catch (_) {
+        // Keep the original permission-handling failure as the primary error.
+      }
+      _failBridgeOrPage(
+        context: 'Hosted microphone permission handling failed.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _permissionPromptActive = false;
+    }
+  }
+
+  Future<bool> _confirmMicrophoneAccess() async {
+    final bool? approved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('🎤 マイクを使いますか？'),
+        content: Text(
+          '「${widget.title}」が録音のためにマイクを使おうとしています。\n\n'
+          '許可した場合だけ、この作品からマイクを利用できます。',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('許可しない'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('マイクを許可'),
+          ),
+        ],
+      ),
+    );
+    return approved == true;
+  }
+
+  Future<bool> _requestHostMicrophonePermission() async {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        final bool? granted = await _hostPermissionChannel.invokeMethod<bool>(
+          'requestMicrophonePermission',
+        );
+        if (granted == null) {
+          throw StateError(
+            'Android microphone permission channel returned null.',
+          );
+        }
+        return granted;
+      case TargetPlatform.iOS:
+        // WKWebView triggers the iOS system microphone prompt after the
+        // WebView permission request is granted. Info.plist is configured by
+        // the TestFlight workflow.
+        return true;
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.linux:
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+        return false;
     }
   }
 
