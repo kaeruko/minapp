@@ -26,6 +26,7 @@ locals {
     "DELETE /hosted/groups/{group_id}/membership",
     "DELETE /hosted/groups/{group_id}/members/{user_id}",
     "GET /hosted/groups/{group_id}/apps",
+    "POST /hosted/groups/{group_id}/apps/upload",
     "POST /hosted/groups/{group_id}/apps/install",
     "POST /hosted/groups/{group_id}/apps/{app_id}/fork",
     "GET /hosted/groups/{group_id}/apps/{app_id}/source",
