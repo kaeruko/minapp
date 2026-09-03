@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="413" viewBox="0 0 720 413">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe6f0"/>
+      <stop offset="1" stop-color="#fff5d9"/>
+    </linearGradient>
+    <pattern id="motif" width="144" height="112" patternUnits="userSpaceOnUse">
+      <path d="M18 24 C12 17 2 22 6 31 C10 39 18 43 18 43 C18 43 27 38 30 30 C34 21 23 17 18 24Z" fill="#f7b8cb" stroke="#e78da9" stroke-width="1"/>
+      <polygon points="104,22 108,31 118,32 110,39 112,49 104,44 96,49 98,39 90,32 100,31" fill="#ffe38a" stroke="#e4bd4b" stroke-width="1"/>
+      <g transform="translate(55 68)">
+        <circle cx="0" cy="-7" r="7" fill="#c7d7ff" stroke="#95a9df"/>
+        <circle cx="7" cy="0" r="7" fill="#c7d7ff" stroke="#95a9df"/>
+        <circle cx="0" cy="7" r="7" fill="#c7d7ff" stroke="#95a9df"/>
+        <circle cx="-7" cy="0" r="7" fill="#c7d7ff" stroke="#95a9df"/>
+        <circle cx="0" cy="0" r="4" fill="#fff7c9"/>
+        <path d="M0 10 V26 M0 19 C-8 13 -12 18 -7 23 M0 21 C7 15 12 19 7 25" stroke="#9fc49c" stroke-width="3" fill="none" stroke-linecap="round"/>
+      </g>
+      <path d="M126 72 C123 68 116 70 118 76 C120 81 126 84 126 84 C126 84 132 81 134 76 C136 70 129 68 126 72Z" fill="#d9c8ee"/>
+      <circle cx="78" cy="21" r="3" fill="#fff0a5"/>
+      <circle cx="31" cy="91" r="3" fill="#f5c8d7"/>
+    </pattern>
+  </defs>
+
+  <rect width="720" height="413" rx="28" fill="url(#bg)"/>
+  <rect x="10" y="14" width="700" height="385" rx="24" fill="url(#motif)" opacity="0.8"/>
+
+  <g fill="#fffaf6" stroke="#efbfd0" stroke-width="2">
+    <rect x="8" y="8" width="704" height="35" rx="16"/>
+    <circle cx="36" cy="43" r="25"/><circle cx="84" cy="43" r="25"/><circle cx="132" cy="43" r="25"/>
+    <circle cx="180" cy="43" r="25"/><circle cx="228" cy="43" r="25"/><circle cx="276" cy="43" r="25"/>
+    <circle cx="324" cy="43" r="25"/><circle cx="372" cy="43" r="25"/><circle cx="420" cy="43" r="25"/>
+    <circle cx="468" cy="43" r="25"/><circle cx="516" cy="43" r="25"/><circle cx="564" cy="43" r="25"/>
+    <circle cx="612" cy="43" r="25"/><circle cx="660" cy="43" r="25"/><circle cx="708" cy="43" r="25"/>
+  </g>
+  <g fill="#f7b8cb" opacity="0.65">
+    <circle cx="36" cy="28" r="4"/><circle cx="84" cy="28" r="4"/><circle cx="132" cy="28" r="4"/>
+    <circle cx="180" cy="28" r="4"/><circle cx="228" cy="28" r="4"/><circle cx="276" cy="28" r="4"/>
+    <circle cx="324" cy="28" r="4"/><circle cx="372" cy="28" r="4"/><circle cx="420" cy="28" r="4"/>
+    <circle cx="468" cy="28" r="4"/><circle cx="516" cy="28" r="4"/><circle cx="564" cy="28" r="4"/>
+    <circle cx="612" cy="28" r="4"/><circle cx="660" cy="28" r="4"/><circle cx="708" cy="28" r="4"/>
+  </g>
+
+  <g transform="translate(0 347)" fill="#fffaf6" stroke="#efbfd0" stroke-width="2">
+    <circle cx="36" cy="32" r="28"/><circle cx="88" cy="32" r="28"/><circle cx="140" cy="32" r="28"/>
+    <circle cx="192" cy="32" r="28"/><circle cx="244" cy="32" r="28"/><circle cx="296" cy="32" r="28"/>
+    <circle cx="348" cy="32" r="28"/><circle cx="400" cy="32" r="28"/><circle cx="452" cy="32" r="28"/>
+    <circle cx="504" cy="32" r="28"/><circle cx="556" cy="32" r="28"/><circle cx="608" cy="32" r="28"/>
+    <circle cx="660" cy="32" r="28"/><circle cx="712" cy="32" r="28"/>
+    <rect x="8" y="30" width="704" height="38"/>
+  </g>
+  <g transform="translate(0 347)" fill="#f7b8cb" opacity="0.65">
+    <path d="M36 22 C31 16 22 20 25 28 C28 34 36 38 36 38 C36 38 44 34 47 28 C50 20 41 16 36 22Z"/>
+    <path d="M140 22 C135 16 126 20 129 28 C132 34 140 38 140 38 C140 38 148 34 151 28 C154 20 145 16 140 22Z"/>
+    <path d="M244 22 C239 16 230 20 233 28 C236 34 244 38 244 38 C244 38 252 34 255 28 C258 20 249 16 244 22Z"/>
+    <path d="M348 22 C343 16 334 20 337 28 C340 34 348 38 348 38 C348 38 356 34 359 28 C362 20 353 16 348 22Z"/>
+    <path d="M452 22 C447 16 438 20 441 28 C444 34 452 38 452 38 C452 38 460 34 463 28 C466 20 457 16 452 22Z"/>
+    <path d="M556 22 C551 16 542 20 545 28 C548 34 556 38 556 38 C556 38 564 34 567 28 C570 20 561 16 556 22Z"/>
+    <path d="M660 22 C655 16 646 20 649 28 C652 34 660 38 660 38 C660 38 668 34 671 28 C674 20 665 16 660 22Z"/>
+  </g>
+</svg>
