@@ -3,11 +3,46 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import plistlib
 import subprocess
 import sys
 import tempfile
 
 import install_ios_app_icon as base
+
+MICROPHONE_USAGE_DESCRIPTION = (
+    "みんアプショップの作品で録音機能を使うためにマイクを使用します。"
+)
+
+
+def configure_runner_info_plist(iconset_dir: Path) -> None:
+    runner_dir = iconset_dir.parent.parent
+    info_plist_path = runner_dir / "Info.plist"
+    if not info_plist_path.is_file():
+        base.fail(f"Generated Runner Info.plist does not exist: {info_plist_path}")
+
+    with info_plist_path.open("rb") as source:
+        info = plistlib.load(source)
+    if not isinstance(info, dict):
+        base.fail(f"Generated Runner Info.plist root is not a dictionary: {info_plist_path}")
+
+    existing = info.get("NSMicrophoneUsageDescription")
+    if existing is not None and existing != MICROPHONE_USAGE_DESCRIPTION:
+        base.fail(
+            "Generated Runner Info.plist already contains an unexpected "
+            f"NSMicrophoneUsageDescription: {existing!r}"
+        )
+
+    info["NSMicrophoneUsageDescription"] = MICROPHONE_USAGE_DESCRIPTION
+    with info_plist_path.open("wb") as destination:
+        plistlib.dump(info, destination, fmt=plistlib.FMT_XML, sort_keys=False)
+
+    with info_plist_path.open("rb") as source:
+        written = plistlib.load(source)
+    if written.get("NSMicrophoneUsageDescription") != MICROPHONE_USAGE_DESCRIPTION:
+        base.fail(
+            "Failed to persist NSMicrophoneUsageDescription in generated Runner Info.plist"
+        )
 
 
 def main() -> None:
@@ -69,11 +104,13 @@ def main() -> None:
                 base.fail(f"sips completed without creating expected icon: {target}")
             base.validate_opaque_square(target, pixel_size)
 
+    configure_runner_info_plist(iconset_dir)
+
     shared_references = len(images) - len(target_sizes)
     print(
         "Installed MinApp icon into "
         f"{len(target_sizes)} unique AppIcon files referenced by {len(images)} entries "
-        f"({shared_references} shared filename references)"
+        f"({shared_references} shared filename references) and configured microphone usage"
     )
 
 
