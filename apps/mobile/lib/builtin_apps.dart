@@ -94,6 +94,18 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     iconBorderColor: Color(0xFFA78BFA),
     iconColor: Color(0xFF6D28D9),
   ),
+  BuiltInApp(
+    id: 'sing-along',
+    title: 'うたってみよう',
+    assetPath: 'assets/builtin/sing_along/index.html',
+    searchableText:
+        'うたってみよう 歌 カラオケ 録音 ろくおん マイク BGM 伴奏 音楽 Girls 女子向け みんアプ公式 サンプル',
+    icon: Icons.mic_rounded,
+    cardColor: Color(0xFFFFF0F6),
+    iconBackgroundColor: Color(0xFFFFD5E5),
+    iconBorderColor: Color(0xFFF59DBD),
+    iconColor: Color(0xFFB94775),
+  ),
 ];
 
 List<BuiltInApp> filterBuiltInApps(String query) {
