@@ -12,6 +12,13 @@ void main() {
             children: <Widget>[
               Image(
                 image: AssetImage(
+                  'assets/girls/generated/minapp_girls_logo.png',
+                ),
+                width: 150,
+                fit: BoxFit.contain,
+              ),
+              Image(
+                image: AssetImage(
                   'assets/girls/generated/bg_pastel_pattern.png',
                 ),
                 width: 360,
