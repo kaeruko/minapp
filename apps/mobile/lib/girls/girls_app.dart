@@ -10,7 +10,6 @@ export 'girls_app_core.dart' hide GirlsApp;
 
 const Color _lavender = Color(0xFFB39DDB);
 const Color _lavenderDark = Color(0xFF745B9E);
-const Color _pink = Color(0xFFFFC4D6);
 const Color _text = Color(0xFF5D4037);
 
 const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
@@ -18,6 +17,8 @@ const String _girlsLoginHeroPatternAsset =
     'assets/girls/generated/bg_pastel_pattern.png';
 const String _girlsLoginHeroLaceAsset =
     'assets/girls/generated/border_lace_heart.png';
+const String _girlsLogoAsset =
+    'assets/girls/generated/minapp_girls_logo.png';
 
 class GirlsApp extends StatelessWidget {
   const GirlsApp({required this.api, super.key});
@@ -243,42 +244,12 @@ class _GirlsLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: _pink,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 3),
-            boxShadow: const <BoxShadow>[
-              BoxShadow(
-                color: Color(0x33B39DDB),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          alignment: Alignment.center,
-          child: const Icon(
-            Icons.favorite_rounded,
-            color: Colors.white,
-            size: 28,
-          ),
-        ),
-        const SizedBox(width: 12),
-        const Text(
-          'みんアプ Girls',
-          style: TextStyle(
-            color: _lavenderDark,
-            fontSize: 29,
-            fontWeight: FontWeight.w900,
-            letterSpacing: .4,
-          ),
-        ),
-      ],
+    return Image.asset(
+      _girlsLogoAsset,
+      width: 150,
+      height: 86,
+      fit: BoxFit.contain,
+      semanticLabel: 'みんアプ Girls',
     );
   }
 }
