@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_footer_nav.dart';
+import 'girls_zip_upload_page.dart';
 import 'hosted_girls_api.dart';
 
 const Color _lavender = Color(0xFFB39DDB);
@@ -225,6 +226,32 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
     }
   }
 
+  Future<void> _openZipUpload() async {
+    final List<HostedGroup>? groups = _groups;
+    if (groups == null) return;
+    final List<HostedGroup> ownerGroups = groups
+        .where((HostedGroup group) => group.isOwner)
+        .toList(growable: false);
+    if (ownerGroups.isEmpty) {
+      setState(() => _error = 'ZIPを追加するには、自分がオーナーのグループが必要です。');
+      return;
+    }
+    final bool? uploaded = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (BuildContext context) => GirlsZipUploadPage(
+          api: widget.api,
+          session: widget.session,
+          ownerGroups: ownerGroups,
+        ),
+      ),
+    );
+    if (uploaded == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ZIPアプリを追加して公開しました。')),
+      );
+    }
+  }
+
   Future<void> _showGroupId(HostedInvite invite) async {
     await showDialog<void>(
       context: context,
@@ -381,6 +408,13 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 12),
+                        _GroupActionCard(
+                          color: const Color(0xFFE8D8FF),
+                          icon: Icons.folder_zip_rounded,
+                          title: 'ZIPからアプリを追加',
+                          onTap: _busy || groups == null ? null : _openZipUpload,
                         ),
                         if (_error != null) ...<Widget>[
                           const SizedBox(height: 14),
