@@ -6,7 +6,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('built-in app registry has unique valid entries', () {
-    expect(builtInApps, hasLength(5));
+    expect(builtInApps, hasLength(6));
     expect(
       builtInApps.map((BuiltInApp app) => app.id).toSet(),
       hasLength(builtInApps.length),
@@ -57,8 +57,8 @@ void main() {
       'novel-starter',
     );
     expect(
-      filterBuiltInApps('女子向け').single.id,
-      'novel-starter',
+      filterBuiltInApps('女子向け').map((BuiltInApp app) => app.id).toSet(),
+      <String>{'novel-starter', 'sing-along'},
     );
     expect(
       filterBuiltInApps('男子').single.id,
@@ -67,6 +67,10 @@ void main() {
     expect(
       filterBuiltInApps('イラスト').single.id,
       'novel-starter',
+    );
+    expect(
+      filterBuiltInApps('カラオケ').single.id,
+      'sing-along',
     );
     expect(filterBuiltInApps('じかんわり'), isEmpty);
   });
@@ -112,5 +116,20 @@ void main() {
       'assets/builtin/novel_starter/face.jpg',
     );
     expect(portrait.lengthInBytes, greaterThan(0));
+  });
+
+  test('sing along records microphone audio and generates local BGM', () async {
+    final BuiltInApp singAlong = builtInApps.singleWhere(
+      (BuiltInApp app) => app.id == 'sing-along',
+    );
+    final String html = await rootBundle.loadString(singAlong.assetPath);
+
+    expect(html, contains('navigator.mediaDevices.getUserMedia'));
+    expect(html, contains('new MediaRecorder(mediaStream)'));
+    expect(html, contains('きらきらポップ'));
+    expect(html, contains('放課後バラード'));
+    expect(html, contains('アイドルステップ'));
+    expect(html, contains('new Blob(chunks'));
+    expect(html, contains('サーバーには送信しません'));
   });
 }
