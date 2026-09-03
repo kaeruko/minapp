@@ -51,29 +51,27 @@ class _GirlsZipUploadPageState extends State<GirlsZipUploadPage> {
   }
 
   Future<void> _pickZip() async {
-    final FilePickerResult? result = await FilePicker.pickFiles(
+    final PlatformFile? file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: const <String>['zip'],
-      allowMultiple: false,
-      withData: true,
     );
-    if (result == null || !mounted) return;
-    if (result.files.length != 1) {
-      setState(() => _error = 'ZIPは1ファイルだけ選んでください。');
-      return;
-    }
-    final PlatformFile file = result.files.single;
+    if (file == null || !mounted) return;
     if (file.extension?.toLowerCase() != 'zip') {
       setState(() => _error = '拡張子 .zip のファイルを選んでください。');
       return;
     }
-    final Uint8List? bytes = file.bytes;
-    if (bytes == null) {
+
+    late final Uint8List bytes;
+    try {
+      bytes = await file.readAsBytes();
+    } catch (error) {
+      if (!mounted) return;
       setState(() {
-        _error = '選択したZIPのデータを読み込めませんでした。別の読み込み方法への自動切替はしません。';
+        _error = '選択したZIPのデータを読み込めませんでした: $error';
       });
       return;
     }
+    if (!mounted) return;
     if (bytes.isEmpty) {
       setState(() => _error = '空のZIPはアップロードできません。');
       return;
