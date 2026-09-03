@@ -15,10 +15,10 @@ const Color _mint = Color(0xFFC8F3D0);
 const Color _blue = Color(0xFFC9E5FF);
 const Color _text = Color(0xFF5D4037);
 
-const String _girlsLoginHeroPatternAsset =
-    'assets/girls/generated/bg_pastel_pattern.png';
-const String _girlsLoginHeroLaceAsset =
-    'assets/girls/generated/border_lace_heart.png';
+const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
+const String _girlsLoginHeroBackgroundAsset =
+    'assets/girls/generated/login_hero_bg.svg';
+
 const Set<String> _girlsBuiltinIds = <String>{
   'ol-home',
   'novel-starter',
@@ -162,22 +162,10 @@ class _GirlsLoginHero extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: <Widget>[
-            // 1. 総柄背景（全面にカバー表示）
-            Image.asset(
-              _girlsLoginHeroPatternAsset,
+            SvgPicture.asset(
+              _girlsLoginHeroBackgroundAsset,
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
-            ),
-            // 2. 下端のレース・フリル帯
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Image.asset(
-                _girlsLoginHeroLaceAsset,
-                height: 24, // 見た目に応じて 20〜28 で微調整
-                fit: BoxFit.fill,
-              ),
             ),
             const Positioned(
               top: 52,
