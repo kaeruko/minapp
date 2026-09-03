@@ -11,7 +11,6 @@ import 'hosted_girls_api.dart';
 const Color _lavender = Color(0xFFB39DDB);
 const Color _lavenderDark = Color(0xFF745B9E);
 const Color _pink = Color(0xFFFFC4D6);
-const Color _cream = Color(0xFFFFF5E1);
 const Color _mint = Color(0xFFC8F3D0);
 const Color _blue = Color(0xFFC9E5FF);
 const Color _text = Color(0xFF5D4037);
