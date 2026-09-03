@@ -1,19 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 void main() {
-  testWidgets('Girls login hero background asset renders', (
+  testWidgets('Girls PNG login art assets render', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: Scaffold(
-          body: SvgPicture.asset(
-            'assets/girls/generated/login_hero_bg.svg',
-            width: 360,
-            height: 220,
-            fit: BoxFit.cover,
+          body: Column(
+            children: <Widget>[
+              Image(
+                image: AssetImage(
+                  'assets/girls/generated/bg_pastel_pattern.png',
+                ),
+                width: 360,
+                height: 220,
+                fit: BoxFit.cover,
+              ),
+              Image(
+                image: AssetImage(
+                  'assets/girls/generated/border_lace_heart.png',
+                ),
+                width: 360,
+                fit: BoxFit.fitWidth,
+              ),
+            ],
           ),
         ),
       ),
