@@ -487,104 +487,165 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                 child: Column(
                   children: <Widget>[
                     const _GirlsLoginHero(),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'かわいいアプリを、友達といっしょに。',
-                      style: TextStyle(
-                        color: Color(0xFF8C7893),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _PastelPanel(
+                    const SizedBox(height: 20),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
-                          SegmentedButton<bool>(
-                            segments: const <ButtonSegment<bool>>[
-                              ButtonSegment<bool>(
-                                value: false,
-                                icon: Icon(Icons.login_rounded),
-                                label: Text('ログイン'),
+                          if (_creating) ...<Widget>[
+                            const Text(
+                              '新規登録',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: _lavenderDark,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
                               ),
-                              ButtonSegment<bool>(
-                                value: true,
-                                icon: Icon(Icons.favorite_border_rounded),
-                                label: Text('はじめて'),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'メールアドレスや電話番号はいらないよ。',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Color(0xFF8C7893),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
-                            ],
-                            selected: <bool>{_creating},
-                            onSelectionChanged: _busy
-                                ? null
-                                : (Set<bool> values) {
-                                    setState(() {
-                                      _creating = values.single;
-                                      _error = null;
-                                    });
-                                  },
-                          ),
-                          const SizedBox(height: 22),
-                          Text(
-                            _creating ? '新しいアカウントをつくる' : 'おかえりなさい ♡',
-                            style: const TextStyle(
-                              color: _lavenderDark,
-                              fontSize: 23,
-                              fontWeight: FontWeight.w900,
                             ),
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            _creating
-                                ? 'メールアドレスや電話番号はいらないよ。'
-                                : 'IDとパスワードで入ってね。',
-                            style: const TextStyle(
-                              color: Color(0xFF8C7893),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 18),
+                            const SizedBox(height: 18),
+                          ],
                           TextField(
                             key: const Key('girls-login-id'),
                             controller: _loginId,
                             enabled: !_busy,
                             autocorrect: false,
                             enableSuggestions: false,
-                            decoration: const InputDecoration(
-                              labelText: 'ID',
-                              prefixIcon: Icon(Icons.face_rounded),
+                            decoration: InputDecoration(
+                              labelText: 'Login ID / ユーザー名',
+                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                              prefixIcon: const Icon(
+                                Icons.key_rounded,
+                                color: _lavender,
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFFFFEFC),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 16,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(28),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFD7C7E8),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(28),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFD7C7E8),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(28),
+                                borderSide: const BorderSide(
+                                  color: _lavender,
+                                  width: 1.5,
+                                ),
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
                           TextField(
                             key: const Key('girls-password'),
                             controller: _password,
                             enabled: !_busy,
                             obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: 'パスワード',
-                              prefixIcon: Icon(Icons.lock_outline_rounded),
+                            decoration: InputDecoration(
+                              labelText: 'Password / パスワード',
+                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                              prefixIcon: const Icon(
+                                Icons.favorite_border_rounded,
+                                color: Color(0xFFD59AB6),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFFFFEFC),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 16,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(28),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFD7C7E8),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(28),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFD7C7E8),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(28),
+                                borderSide: const BorderSide(
+                                  color: _lavender,
+                                  width: 1.5,
+                                ),
+                              ),
                             ),
                             onSubmitted: (_) {
                               if (!_creating && !_busy) _login();
                             },
                           ),
                           if (_creating) ...<Widget>[
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 14),
                             TextField(
                               key: const Key('girls-password-confirm'),
                               controller: _passwordConfirm,
                               enabled: !_busy,
                               obscureText: true,
-                              decoration: const InputDecoration(
-                                labelText: 'パスワード（もう一度）',
-                                prefixIcon: Icon(Icons.verified_user_outlined),
+                              decoration: InputDecoration(
+                                labelText: 'Password again / もう一度',
+                                floatingLabelBehavior: FloatingLabelBehavior.always,
+                                prefixIcon: const Icon(
+                                  Icons.favorite_rounded,
+                                  color: Color(0xFFD59AB6),
+                                ),
+                                filled: true,
+                                fillColor: const Color(0xFFFFFEFC),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 18,
+                                  vertical: 16,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFD7C7E8),
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFD7C7E8),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                  borderSide: const BorderSide(
+                                    color: _lavender,
+                                    width: 1.5,
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 12),
                             if (_legalError != null)
                               Row(
                                 children: <Widget>[
-                                  const Expanded(child: Text('利用規約を読み込めませんでした。')),
+                                  const Expanded(
+                                    child: Text('利用規約を読み込めませんでした。'),
+                                  ),
                                   TextButton(
                                     onPressed: _loadLegal,
                                     child: const Text('再読み込み'),
@@ -600,7 +661,9 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                                 onChanged: _busy
                                     ? null
                                     : (bool? value) {
-                                        setState(() => _accepted = value ?? false);
+                                        setState(
+                                          () => _accepted = value ?? false,
+                                        );
                                       },
                                 title: const Text(
                                   '利用規約とプライバシーポリシーに同意します',
@@ -612,6 +675,7 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                                 controlAffinity: ListTileControlAffinity.leading,
                               ),
                               Wrap(
+                                alignment: WrapAlignment.center,
                                 spacing: 8,
                                 children: <Widget>[
                                   TextButton(
@@ -625,24 +689,57 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                                 ],
                               ),
                             ],
+                          ] else ...<Widget>[
+                            const SizedBox(height: 8),
+                            const Text(
+                              'パスワードを忘れた場合は、登録時に保存した復旧コードを使います。',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Color(0xFFAA91A4),
+                                fontSize: 11,
+                              ),
+                            ),
                           ],
                           if (_error != null) ...<Widget>[
                             const SizedBox(height: 12),
                             _GirlsError(message: _error!),
                           ],
-                          const SizedBox(height: 18),
-                          SizedBox(
-                            height: 56,
+                          const SizedBox(height: 16),
+                          Container(
+                            height: 54,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: _creating
+                                    ? const <Color>[
+                                        Color(0xFF9ADFC8),
+                                        Color(0xFF62C9AD),
+                                      ]
+                                    : const <Color>[
+                                        Color(0xFFD7C2F1),
+                                        Color(0xFFA77BD5),
+                                      ],
+                              ),
+                              borderRadius: BorderRadius.circular(28),
+                              boxShadow: const <BoxShadow>[
+                                BoxShadow(
+                                  color: Color(0x33745B9E),
+                                  blurRadius: 10,
+                                  offset: Offset(0, 4),
+                                ),
+                              ],
+                            ),
                             child: FilledButton.icon(
                               key: const Key('girls-auth-submit'),
                               onPressed: _busy
                                   ? null
                                   : (_creating ? _register : _login),
                               style: FilledButton.styleFrom(
-                                backgroundColor: _lavenderDark,
+                                backgroundColor: Colors.transparent,
+                                disabledBackgroundColor: Colors.transparent,
                                 foregroundColor: Colors.white,
+                                shadowColor: Colors.transparent,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
+                                  borderRadius: BorderRadius.circular(28),
                                 ),
                               ),
                               icon: _busy
@@ -656,14 +753,83 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                                   : Icon(
                                       _creating
                                           ? Icons.favorite_rounded
-                                          : Icons.arrow_forward_rounded,
+                                          : Icons.login_rounded,
                                     ),
                               label: Text(
                                 _busy
                                     ? '確認しています…'
                                     : _creating
-                                        ? 'アカウントをつくる'
+                                        ? '新規登録する'
                                         : 'ログイン',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          Row(
+                            children: <Widget>[
+                              const Expanded(
+                                child: Divider(color: Color(0xFFE0CFD7)),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                child: Text(
+                                  _creating ? 'すでに登録済み？' : 'はじめての方',
+                                  style: const TextStyle(
+                                    color: Color(0xFF9A8793),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const Expanded(
+                                child: Divider(color: Color(0xFFE0CFD7)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 50,
+                            child: OutlinedButton.icon(
+                              onPressed: _busy
+                                  ? null
+                                  : () {
+                                      setState(() {
+                                        _creating = !_creating;
+                                        _error = null;
+                                      });
+                                    },
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: _creating
+                                    ? Colors.white.withValues(alpha: .72)
+                                    : const Color(0xFFA7E2CE),
+                                foregroundColor: _creating
+                                    ? _lavenderDark
+                                    : const Color(0xFF356F61),
+                                side: BorderSide(
+                                  color: _creating
+                                      ? const Color(0xFFD7C7E8)
+                                      : const Color(0xFF70C8AD),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(26),
+                                ),
+                              ),
+                              icon: Icon(
+                                _creating
+                                    ? Icons.arrow_back_rounded
+                                    : Icons.favorite_rounded,
+                              ),
+                              label: Text(
+                                _creating ? 'ログインに戻る' : '新規登録はこちら',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
                             ),
                           ),
