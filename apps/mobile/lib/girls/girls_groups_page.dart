@@ -485,9 +485,9 @@ class _GirlsLaceHeader extends StatelessWidget {
         children: <Widget>[
           const _GirlsLaceStrip(),
           child,
-          const Transform.flip(
+          Transform.flip(
             flipY: true,
-            child: _GirlsLaceStrip(),
+            child: const _GirlsLaceStrip(),
           ),
         ],
       ),
