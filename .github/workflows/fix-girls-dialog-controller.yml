@@ -1,0 +1,126 @@
+name: Patch Girls dialog controller lifecycle
+
+on:
+  push:
+    branches:
+      - fix/girls-group-dialog-controller
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/girls-group-dialog-controller
+      - name: Apply exact lifecycle fix
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/mobile/lib/girls/girls_app_core.dart')
+          source = path.read_text(encoding='utf-8')
+          old = '''  Future<String?> _showTextInputDialog({
+    required String title,
+    required String label,
+    required String hint,
+    required int maxLength,
+    required Key key,
+    required String submitLabel,
+    required bool capitalize,
+  }) async {
+    final TextEditingController controller = TextEditingController();
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (BuildContext dialogContext) => AlertDialog(
+          title: Text(title),
+          content: TextField(
+            key: key,
+            controller: controller,
+            maxLength: maxLength,
+            autocorrect: !capitalize,
+            enableSuggestions: !capitalize,
+            textCapitalization: capitalize
+                ? TextCapitalization.characters
+                : TextCapitalization.sentences,
+            decoration: InputDecoration(labelText: label, hintText: hint),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('やめる'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+              child: Text(submitLabel),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+'''
+          new = '''  Future<String?> _showTextInputDialog({
+    required String title,
+    required String label,
+    required String hint,
+    required int maxLength,
+    required Key key,
+    required String submitLabel,
+    required bool capitalize,
+  }) {
+    String value = '';
+    return showDialog<String>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          key: key,
+          maxLength: maxLength,
+          autocorrect: !capitalize,
+          enableSuggestions: !capitalize,
+          textCapitalization: capitalize
+              ? TextCapitalization.characters
+              : TextCapitalization.sentences,
+          decoration: InputDecoration(labelText: label, hintText: hint),
+          onChanged: (String nextValue) => value = nextValue,
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('やめる'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(value),
+            child: Text(submitLabel),
+          ),
+        ],
+      ),
+    );
+  }
+'''
+          count = source.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected exact dialog block once, found {count}. Refusing to patch.')
+          path.write_text(source.replace(old, new), encoding='utf-8')
+
+          test_path = Path('apps/mobile/test/girls/girls_group_dialog_lifecycle_test.dart')
+          test_path.write_text('''import 'dart:io';\n\nimport 'package:flutter_test/flutter_test.dart';\n\nvoid main() {\n  test('Girls group input dialog does not own a disposable text controller', () {\n    final String source = File('lib/girls/girls_app_core.dart').readAsStringSync();\n    final int start = source.indexOf('Future<String?> _showTextInputDialog');\n    final int end = source.indexOf('Future<void> _joinGroup()', start);\n    expect(start, greaterThanOrEqualTo(0));\n    expect(end, greaterThan(start));\n    final String method = source.substring(start, end);\n    expect(method, isNot(contains('TextEditingController')));\n    expect(method, isNot(contains('.dispose()')));\n    expect(method, contains('onChanged:'));\n  });\n}\n''', encoding='utf-8')
+          PY
+          rm .github/workflows/fix-girls-dialog-controller.yml
+          git diff --check
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/mobile/lib/girls/girls_app_core.dart apps/mobile/test/girls/girls_group_dialog_lifecycle_test.dart .github/workflows/fix-girls-dialog-controller.yml
+          git commit -m "Fix Girls group dialog controller lifecycle"
+          git push origin HEAD:fix/girls-group-dialog-controller
