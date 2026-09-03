@@ -34,3 +34,5 @@ flutter:
     - assets/girls/mascot_white.svg
     - assets/girls/mascot_black.svg
     - assets/girls/generated/login_hero_bg.svg
+    - assets/girls/generated/bg_pastel_pattern.png
+    - assets/girls/generated/border_lace_heart.png
