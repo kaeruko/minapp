@@ -246,11 +246,12 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       );
     } catch (error) {
       if (mounted) {
-        setState(() => _groupError = core.girlsMessageFor(error));
+        setState(() {
+          _creatingGroup = false;
+          _groupError = core.girlsMessageFor(error);
+        });
       }
       return;
-    } finally {
-      if (!mounted) return;
     }
 
     try {
@@ -258,15 +259,22 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         accessToken: widget.session.accessToken,
         groupId: createdGroup.groupId,
       );
-      await _loadGroups();
+      final List<HostedGroup> groups = await widget.api.listGroups(
+        widget.session.accessToken,
+      );
       if (!mounted) return;
+      setState(() => _groups = groups);
       await _showGroupId(invite);
       if (!mounted) return;
       await _openGroup(createdGroup);
     } catch (error) {
       if (!mounted) return;
       try {
-        await _loadGroups();
+        final List<HostedGroup> groups = await widget.api.listGroups(
+          widget.session.accessToken,
+        );
+        if (!mounted) return;
+        setState(() => _groups = groups);
       } catch (reloadError) {
         if (!mounted) return;
         setState(() {
