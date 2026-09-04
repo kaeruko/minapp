@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>みんアプ Girls | アプリを追加</title>
+    <link rel="stylesheet" href="/girls_portal.css" />
+    <script src="/portal_routing.js" defer></script>
+    <script src="/single_html_zip.js" defer></script>
+    <script src="/girls_portal.js" defer></script>
+  </head>
+  <body>
+    <header class="girls-header">
+      <a class="girls-brand" href="/girls.html" aria-label="みんアプ Girls ホーム">
+        <span class="girls-brand-heart" aria-hidden="true">♡</span>
+        <span>みんアプ Girls</span>
+      </a>
+      <span class="girls-header-tag">AIでつくって、すぐ追加</span>
+    </header>
+
+    <main class="girls-shell">
+      <section class="girls-hero" aria-labelledby="girls-title">
+        <p class="girls-kicker">スマホだけでOK ♡</p>
+        <h1 id="girls-title">AIが作ったアプリを<br />みんアプに入れよう</h1>
+        <p>
+          ZIPを作れなくても大丈夫。AIが出したHTMLをそのまま貼るか、HTML / ZIPファイルを選べば、
+          みんアプ用にしてアップロードします。
+        </p>
+      </section>
+
+      <p id="girls-fatal" class="girls-message girls-message-error hidden" role="alert"></p>
+
+      <section id="girls-classroom-panel" class="girls-card hidden" aria-labelledby="girls-classroom-title">
+        <p class="girls-step">STEP 1</p>
+        <h2 id="girls-classroom-title">教室を選ぶ</h2>
+        <p class="girls-muted">みんアプ Girlsで使っている教室コードを入力してね。</p>
+        <form id="girls-classroom-form" class="girls-form">
+          <label>
+            教室コード
+            <input id="girls-classroom-code" autocomplete="off" maxlength="64" placeholder="例: DEMO" required />
+          </label>
+          <button class="girls-primary" type="submit">この教室を使う</button>
+        </form>
+        <p id="girls-classroom-error" class="girls-message girls-message-error hidden" role="alert"></p>
+      </section>
+
+      <section id="girls-login-panel" class="girls-card hidden" aria-labelledby="girls-login-title">
+        <div class="girls-card-heading">
+          <div>
+            <p class="girls-step">STEP 2</p>
+            <h2 id="girls-login-title">ログイン</h2>
+          </div>
+          <button id="girls-change-classroom" class="girls-text-button" type="button">教室を変更</button>
+        </div>
+        <p class="girls-tenant-row">教室：<strong id="girls-login-tenant"></strong></p>
+        <form id="girls-login-form" class="girls-form">
+          <label>
+            ID
+            <input id="girls-login-id" autocomplete="username" inputmode="text" required />
+          </label>
+          <label>
+            パスワード
+            <input id="girls-login-password" type="password" autocomplete="current-password" required />
+          </label>
+          <button class="girls-primary" type="submit">ログインする</button>
+        </form>
+        <p id="girls-login-error" class="girls-message girls-message-error hidden" role="alert"></p>
+      </section>
+
+      <section id="girls-password-panel" class="girls-card hidden" aria-labelledby="girls-password-title">
+        <p class="girls-step">初回ログイン</p>
+        <h2 id="girls-password-title">新しいパスワードを決める</h2>
+        <form id="girls-password-form" class="girls-form">
+          <label>
+            新しいパスワード
+            <input id="girls-new-password" type="password" autocomplete="new-password" minlength="6" maxlength="128" required />
+          </label>
+          <label>
+            もう一度入力
+            <input id="girls-new-password-confirm" type="password" autocomplete="new-password" minlength="6" maxlength="128" required />
+          </label>
+          <button class="girls-primary" type="submit">変更して続ける</button>
+        </form>
+        <p id="girls-password-error" class="girls-message girls-message-error hidden" role="alert"></p>
+      </section>
+
+      <section id="girls-upload-panel" class="girls-card girls-upload-card hidden" aria-labelledby="girls-upload-title">
+        <div class="girls-card-heading">
+          <div>
+            <p class="girls-step">STEP 3</p>
+            <h2 id="girls-upload-title">アプリを追加</h2>
+          </div>
+          <button id="girls-logout" class="girls-text-button" type="button">ログアウト</button>
+        </div>
+        <p class="girls-tenant-row">
+          <strong id="girls-workspace-tenant"></strong> に追加します
+        </p>
+
+        <section class="girls-prompt-box" aria-labelledby="girls-prompt-title">
+          <div>
+            <p class="girls-mini-label">AIに頼むとき</p>
+            <h3 id="girls-prompt-title">この文章を使うと簡単</h3>
+          </div>
+          <p id="girls-ai-prompt" class="girls-prompt-text">みんアプ技術資料 https://cloxs.jp/minapp/ai/index.html を見て、○○のアプリを作って。HTML・CSS・JavaScriptは1つのindex.htmlにまとめて、完成したHTMLコードをそのまま出して。</p>
+          <button id="girls-copy-prompt" class="girls-secondary" type="button">お願い文をコピー</button>
+          <p id="girls-copy-result" class="girls-message girls-message-success hidden" role="status"></p>
+        </section>
+
+        <form id="girls-upload-form" class="girls-form">
+          <label>
+            追加するグループ
+            <select id="girls-upload-group" required></select>
+          </label>
+          <label>
+            アプリ名
+            <input id="girls-app-title" maxlength="80" placeholder="例: 放課後おえかき帳" required />
+          </label>
+
+          <div class="girls-source-block">
+            <label>
+              HTML / ZIPファイルを選ぶ
+              <input id="girls-source-file" type="file" accept=".html,.htm,.zip,text/html,application/zip" />
+            </label>
+            <p class="girls-or"><span>または</span></p>
+            <label>
+              AIが出したHTMLコードを貼る
+              <textarea id="girls-source-code" rows="12" spellcheck="false" placeholder="<!doctype html> ..."></textarea>
+            </label>
+          </div>
+
+          <p class="girls-note">ファイルと貼り付けは、どちらか片方だけ使ってね。HTMLは自動で index.html のZIPにしてから送ります。上限は2MBです。</p>
+          <button id="girls-upload-submit" class="girls-primary" type="submit">アップロードして公開 ♡</button>
+        </form>
+        <p id="girls-upload-error" class="girls-message girls-message-error hidden" role="alert"></p>
+        <p id="girls-upload-result" class="girls-message girls-message-success hidden" role="status"></p>
+      </section>
+    </main>
+  </body>
+</html>
