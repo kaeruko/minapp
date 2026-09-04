@@ -83,6 +83,19 @@ variable "directory_api_base_url" {
   }
 }
 
+variable "hosted_api_base_url" {
+  description = "Public HTTPS origin of the shared Hosted API used by MinApp Girls, also published in girls-config.json."
+  type        = string
+
+  validation {
+    condition = (
+      can(regex("^https://[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$", trimspace(var.hosted_api_base_url))) &&
+      !strcontains(trimprefix(trimspace(var.hosted_api_base_url), "https://"), "..")
+    )
+    error_message = "hosted_api_base_url must be a public HTTPS origin with no path, query, fragment, or trailing slash."
+  }
+}
+
 variable "tenant_api_origins" {
   description = "Explicit active tenant HTTPS origins allowed by the portal CSP for connect-src and frame-src."
   type        = set(string)
