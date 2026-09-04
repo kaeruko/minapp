@@ -178,6 +178,13 @@
     if (!response.ok) {
       const code = typeof payload.error === "string" && payload.error.length > 0 ? payload.error : null;
       const message = typeof payload.message === "string" && payload.message.length > 0 ? payload.message : null;
+      if (response.status === 401 && code === null && message !== null) {
+        const fields = Object.keys(payload);
+        if (fields.length !== 1 || fields[0] !== "message") {
+          throw new Error(`${label} 401 response fields are invalid.`);
+        }
+        throw new GirlsApiError(401, "unauthorized", message);
+      }
       if (code === null || message === null) {
         throw new Error(`${label} error response is missing error or message.`);
       }
