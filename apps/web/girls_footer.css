@@ -1,0 +1,135 @@
+.girls-auth-shell {
+  display: flex;
+  flex-direction: column;
+}
+
+.girls-auth-shell .girls-shell {
+  flex: 1 0 auto;
+  min-height: calc(100vh - 64px - 34px);
+}
+
+.girls-login-footer {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px 9px;
+  border-top: 1px solid rgba(204, 166, 193, 0.28);
+  background: rgba(255, 252, 248, 0.94);
+  color: #725f5d;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+}
+
+.girls-login-footer a,
+.girls-login-footer button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+}
+
+.girls-login-footer a:hover,
+.girls-login-footer a:focus-visible,
+.girls-login-footer button:hover,
+.girls-login-footer button:focus-visible {
+  color: #8d67a7;
+  text-decoration: underline;
+}
+
+.girls-login-footer-separator {
+  color: #ad9a96;
+  user-select: none;
+}
+
+.girls-privacy-dialog {
+  width: min(720px, calc(100% - 28px));
+  max-height: min(78vh, 760px);
+  padding: 0;
+  border: 1px solid #ead5e5;
+  border-radius: 20px;
+  background: #fffdfa;
+  color: #604943;
+  box-shadow: 0 24px 70px rgba(79, 55, 75, 0.22);
+}
+
+.girls-privacy-dialog::backdrop {
+  background: rgba(79, 55, 75, 0.28);
+  backdrop-filter: blur(2px);
+}
+
+.girls-privacy-dialog-inner {
+  display: grid;
+  gap: 14px;
+  padding: 22px 24px 24px;
+}
+
+.girls-privacy-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.girls-privacy-dialog-header h2 {
+  margin: 0;
+  color: #675568;
+  font-size: 1.15rem;
+}
+
+.girls-privacy-dialog-close {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #ead5e5;
+  border-radius: 50%;
+  background: #fff7fb;
+  color: #7b6475;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.girls-privacy-status {
+  margin: 0;
+  color: #8f756d;
+  font-size: 0.82rem;
+}
+
+.girls-privacy-status.girls-privacy-error {
+  color: #ad4960;
+}
+
+.girls-privacy-body {
+  max-height: 58vh;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1.75;
+}
+
+@media (max-width: 560px) {
+  .girls-login-footer {
+    min-height: 32px;
+    gap: 4px;
+    padding-inline: 8px;
+    font-size: 9px;
+  }
+
+  .girls-privacy-dialog-inner {
+    padding: 18px 18px 20px;
+  }
+}
