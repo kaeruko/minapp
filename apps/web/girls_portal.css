@@ -15,11 +15,16 @@
   position: absolute;
   z-index: 0;
   top: 64px;
-  left: 50%;
-  width: min(1386px, 100%);
-  aspect-ratio: 1386 / 102;
-  transform: translateX(-50%);
-  background: url("/girls_login_lace.png") center top / 100% 100% no-repeat;
+  left: 0;
+
+  width: 100%;
+  height: 50px;
+
+  background-image: url("/girls_login_lace.png");
+  background-size: 25vw auto;
+  background-position: center top;
+  background-repeat: repeat-x;
+
   pointer-events: none;
 }
 
