@@ -98,14 +98,16 @@ try {
     $distribution = Get-PortalTerraformOutput -Name "cloudfront_distribution_id"
     $portalUrl = Get-PortalTerraformOutput -Name "portal_url"
 
-    & aws s3api head-object `
-        --bucket $bucket `
-        --key "portal-config.json" `
-        --profile $Profile `
-        --region $Region `
-        --no-cli-pager *> $null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Terraform-managed portal-config.json is missing from s3://$bucket. Refusing to publish Web assets."
+    foreach ($configKey in @("portal-config.json", "girls-config.json")) {
+        & aws s3api head-object `
+            --bucket $bucket `
+            --key $configKey `
+            --profile $Profile `
+            --region $Region `
+            --no-cli-pager *> $null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Terraform-managed $configKey is missing from s3://$bucket. Refusing to publish Web assets."
+        }
     }
 
     New-Item -ItemType Directory -Path $stagingDir | Out-Null
@@ -117,7 +119,7 @@ try {
 
     Write-Host "Publishing production Web assets only:"
     $productionAssets | ForEach-Object { Write-Host "  $_" }
-    Write-Host "Protected Terraform object: portal-config.json"
+    Write-Host "Protected Terraform objects: portal-config.json, girls-config.json"
     Write-Host "Destination bucket: $bucket"
 
     & aws s3 sync `
@@ -125,6 +127,7 @@ try {
         "s3://$bucket" `
         --delete `
         --exclude "portal-config.json" `
+        --exclude "girls-config.json" `
         --profile $Profile `
         --region $Region `
         --no-progress
@@ -157,6 +160,7 @@ try {
 
     Write-Host "Portal publication complete."
     Write-Host "  URL:             $portalUrl"
+    Write-Host "  Girls URL:       $portalUrl/girls.html"
     Write-Host "  Distribution:    $distribution"
     Write-Host "  Invalidation ID: $($invalidation.Invalidation.Id)"
 }
