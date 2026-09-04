@@ -81,6 +81,7 @@
   let currentView = "home";
   let hostedApiBaseUrl = null;
   let appsLoadGeneration = 0;
+  let lastAuthenticated = null;
 
   function closeNavigation() {
     shell.classList.remove("portal-shell-nav-open");
@@ -140,6 +141,8 @@
 
   function syncAuthenticationChrome() {
     const authenticated = !shell.classList.contains("hidden");
+    if (authenticated === lastAuthenticated) return;
+    lastAuthenticated = authenticated;
     document.body.classList.toggle("girls-authenticated", authenticated);
     if (!authenticated) {
       closeNavigation();
