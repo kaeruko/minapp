@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
 import 'api.dart';
 import 'girls_app_core.dart' as core;
@@ -659,23 +660,258 @@ class _ManagedAppCard extends StatelessWidget {
 
 class _EmptyApps extends StatelessWidget {
   const _EmptyApps();
+
+  static const String _technicalGuideUrl =
+      'https://cloxs.jp/minapp/ai/index.html';
+  static const String _basePrompt =
+      'みんアプ技術資料 $_technicalGuideUrl を見て、○○のアプリを作って';
+
+  Future<void> _copyPrompt(BuildContext context, String prompt) async {
+    await Clipboard.setData(ClipboardData(text: prompt));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('AIに貼る文章をコピーしたよ♡')),
+    );
+  }
+
+  String _ideaPrompt(String idea) =>
+      'みんアプ技術資料 $_technicalGuideUrl を見て、$ideaのアプリを作って';
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: _mint,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: const Column(
-        children: <Widget>[
-          Icon(Icons.favorite_outline_rounded, color: _lavender, size: 34),
-          SizedBox(height: 8),
-          Text(
-            'まだマイアプリがないよ。\nZIPから最初のアプリを追加してみよう。',
-            textAlign: TextAlign.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        const SizedBox(height: 4),
+        const Text(
+          'まだ自作アプリがありません。',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: _ink,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
           ),
-        ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: <Widget>[
+            Expanded(
+              flex: 4,
+              child: Image.asset(
+                'assets/girls/cutouts/mascot_white.png',
+                height: 132,
+                fit: BoxFit.contain,
+                semanticLabel: 'みんアプ Girls のマスコット',
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 5,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: const Color(0xFFB99B91)),
+                ),
+                child: const Text(
+                  'AIに頼んで、\n最初のアプリを\n作ってみよう！',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: 16,
+                    height: 1.35,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFDCE7),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFF2B8CA)),
+            boxShadow: const <BoxShadow>[
+              BoxShadow(
+                color: Color(0x1F8E6977),
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              const Text(
+                'お手元のAIにこれを貼ってね！',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 9),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF9E8),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFC9A89D)),
+                ),
+                child: const SelectableText(
+                  '「$_basePrompt」',
+                  style: TextStyle(
+                    color: _ink,
+                    height: 1.35,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  key: const Key('girls-empty-app-copy-prompt'),
+                  onPressed: () => _copyPrompt(context, _basePrompt),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF9F78BB),
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  label: const Text('コピー'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'どんなアプリを作ってみる？',
+          style: TextStyle(
+            color: _ink,
+            fontSize: 19,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 10),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 1.16,
+          children: <Widget>[
+            _EmptyAppIdeaCard(
+              color: const Color(0xFFD9EBFF),
+              icon: Icons.wb_sunny_rounded,
+              title: 'お天気アプリ',
+              subtitle: '天気を見られるアプリ',
+              onTap: () => _copyPrompt(context, _ideaPrompt('お天気')),
+            ),
+            _EmptyAppIdeaCard(
+              color: _mint,
+              icon: Icons.restaurant_menu_rounded,
+              title: 'レシピアプリ',
+              subtitle: '料理をまとめるアプリ',
+              onTap: () => _copyPrompt(context, _ideaPrompt('レシピ')),
+            ),
+            _EmptyAppIdeaCard(
+              color: const Color(0xFFFFE8A8),
+              icon: Icons.checklist_rounded,
+              title: 'ToDoアプリ',
+              subtitle: 'やることを管理するアプリ',
+              onTap: () => _copyPrompt(context, _ideaPrompt('ToDo')),
+            ),
+            _EmptyAppIdeaCard(
+              color: const Color(0xFFE5D8F6),
+              icon: Icons.auto_awesome_rounded,
+              title: '占いアプリ',
+              subtitle: '今日の運勢を占うアプリ',
+              onTap: () => _copyPrompt(context, _ideaPrompt('占い')),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'アイデアカードをタップすると、その内容を入れた文章をコピーできるよ。\nAIがZIPを作ってくれたら、上の「ZIPからアプリを追加」から登録してね♡',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Color(0xFF8F756D),
+            fontSize: 11,
+            height: 1.45,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyAppIdeaCard extends StatelessWidget {
+  const _EmptyAppIdeaCard({
+    required this.color,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final Color color;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: _ink,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 7),
+              Icon(icon, color: _lavender, size: 38),
+              const SizedBox(height: 7),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _ink,
+                  fontSize: 10,
+                  height: 1.25,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
