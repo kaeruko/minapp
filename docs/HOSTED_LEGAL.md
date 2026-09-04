@@ -14,7 +14,7 @@ Current versions:
 
 ```text
 Terms:   hosted-terms-2026-08-28
-Privacy: hosted-privacy-2026-08-28
+Privacy: hosted-privacy-2026-09-04
 ```
 
 Do not silently edit the body while keeping the same version. Any substantive legal-text change must receive a new version identifier.
@@ -85,11 +85,14 @@ The Hosted Terms include a zero-tolerance rule for objectionable content and abu
 
 - login/internal/auth identifiers
 - hashed recovery credentials
+- optional verified email address and verification state
 - group/app/runtime data
 - user-provided content
 - legal-consent versions/timestamps
 - hashed abuse-control keys
 - AWS infrastructure processing
 - account deletion behavior
+
+Email linking is optional, is stored in Amazon Cognito only after the user chooses it, and requires a confirmation code. It does not change the Hosted login ID or the existing recovery-code flow.
 
 The documents deliberately do not claim that Hosted already has an in-app reporting/blocking UI. That UI remains a separate product requirement before a public UGC rollout.

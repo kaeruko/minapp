@@ -168,6 +168,9 @@ POST   /hosted/register                                    public
 POST   /hosted/recover                                     public
 
 GET    /hosted/me                                          authenticated
+GET    /hosted/account/email                               authenticated
+POST   /hosted/account/email                               authenticated; send confirmation code
+POST   /hosted/account/email/verify                        authenticated; confirm code
 POST   /hosted/recovery-code                               authenticated
 DELETE /hosted/account                                     authenticated
 

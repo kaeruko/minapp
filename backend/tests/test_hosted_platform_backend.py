@@ -80,6 +80,45 @@ class HostedPlatformBackendTests(unittest.TestCase):
             self.backend.recover_account("alice", old_code, "newsecret12")
         self.assertEqual(caught.exception.error, "invalid_recovery_credentials")
 
+    def test_email_is_linked_only_after_confirmation(self) -> None:
+        alice, _ = self._register("alice")
+        self.assertEqual(
+            self.backend.email_status(alice),
+            {"email": None, "verified": False},
+        )
+
+        requested = self.backend.request_email_link(
+            alice, "Honey@Example.com", "access-alice"
+        )
+        self.assertEqual(
+            requested,
+            {
+                "email": "honey@example.com",
+                "verified": False,
+                "code_sent": True,
+                "destination": "a***@example.com",
+            },
+        )
+        self.assertEqual(
+            self.backend.email_status(alice),
+            {"email": None, "verified": False},
+        )
+
+        with self.assertRaises(ApiProblem) as caught:
+            self.backend.verify_email_link(alice, "000000", "access-alice")
+        self.assertEqual(caught.exception.error, "invalid_verification_code")
+
+        verified = self.backend.verify_email_link(alice, "123456", "access-alice")
+        self.assertEqual(
+            verified,
+            {"email": "honey@example.com", "verified": True},
+        )
+
+        repeated = self.backend.request_email_link(
+            alice, "honey@example.com", "access-alice"
+        )
+        self.assertFalse(repeated["code_sent"])
+
     def test_owner_can_transfer_ownership_and_old_owner_can_then_delete_account(self) -> None:
         alice, _ = self._register("alice")
         bob, _ = self._register("bob")

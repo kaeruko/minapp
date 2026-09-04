@@ -14,10 +14,8 @@ const Color _pink = Color(0xFFFFC4D6);
 const Color _mint = Color(0xFFC8F3D0);
 const Color _blue = Color(0xFFC9E5FF);
 const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
-const String _girlsLogoAsset =
-    'assets/girls/generated/minapp_girls_logo.png';
-const String _girlsLaceAsset =
-    'assets/girls/generated/border_lace_heart.png';
+const String _girlsLogoAsset = 'assets/girls/generated/minapp_girls_logo.png';
+const String _girlsLaceAsset = 'assets/girls/generated/border_lace_heart.png';
 
 /// Girls group selection page using the reusable five-hill footer.
 ///
@@ -29,12 +27,14 @@ class GirlsGroupsPage extends StatefulWidget {
     required this.api,
     required this.session,
     required this.onLogout,
+    this.onHome,
     super.key,
   });
 
   final HostedGirlsApi api;
   final AuthenticatedSession session;
   final VoidCallback onLogout;
+  final VoidCallback? onHome;
 
   @override
   State<GirlsGroupsPage> createState() => _GirlsGroupsPageState();
@@ -372,7 +372,8 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
                                 const SizedBox(width: 15),
                                 const Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: <Widget>[
                                       Text(
                                         'どのグループで遊ぶ？',
@@ -418,7 +419,8 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
                           color: const Color(0xFFE8D8FF),
                           icon: Icons.folder_zip_rounded,
                           title: 'ZIPからアプリを追加',
-                          onTap: _busy || groups == null ? null : _openZipUpload,
+                          onTap:
+                              _busy || groups == null ? null : _openZipUpload,
                         ),
                         if (_error != null) ...<Widget>[
                           const SizedBox(height: 14),
@@ -459,12 +461,20 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
           ],
         ),
       ),
-      bottomNavigationBar: const SafeArea(
+      bottomNavigationBar: SafeArea(
         top: false,
         minimum: EdgeInsets.zero,
         child: GirlsFooterNav(
           selectedTab: GirlsFooterTab.groups,
-          enabledTabs: <GirlsFooterTab>{GirlsFooterTab.groups},
+          enabledTabs: widget.onHome == null
+              ? const <GirlsFooterTab>{GirlsFooterTab.groups}
+              : const <GirlsFooterTab>{
+                  GirlsFooterTab.home,
+                  GirlsFooterTab.groups,
+                },
+          onSelected: (GirlsFooterTab tab) {
+            if (tab == GirlsFooterTab.home) widget.onHome?.call();
+          },
         ),
       ),
     );
@@ -632,9 +642,7 @@ class _GroupTile extends StatelessWidget {
               CircleAvatar(
                 backgroundColor: group.isOwner ? _pink : _blue,
                 child: Icon(
-                  group.isOwner
-                      ? Icons.favorite_rounded
-                      : Icons.groups_rounded,
+                  group.isOwner ? Icons.favorite_rounded : Icons.groups_rounded,
                   color: Colors.white,
                 ),
               ),

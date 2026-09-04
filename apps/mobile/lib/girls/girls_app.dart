@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import 'api.dart';
 import 'girls_app_core.dart' as core;
-import 'girls_groups_page.dart';
+import 'girls_home_page.dart';
 import 'hosted_girls_api.dart';
 
 export 'girls_app_core.dart' hide GirlsApp;
@@ -18,8 +18,7 @@ const String _girlsLoginHeroPatternAsset =
     'assets/girls/generated/bg_pastel_pattern.png';
 const String _girlsLoginHeroLaceAsset =
     'assets/girls/generated/border_lace_heart.png';
-const String _girlsLogoAsset =
-    'assets/girls/generated/minapp_girls_logo.png';
+const String _girlsLogoAsset = 'assets/girls/generated/minapp_girls_logo.png';
 
 class GirlsApp extends StatelessWidget {
   const GirlsApp({required this.api, super.key});
@@ -89,7 +88,7 @@ class _GirlsSessionRootState extends State<_GirlsSessionRoot> {
         },
       );
     }
-    return GirlsGroupsPage(
+    return GirlsHomePage(
       api: widget.api,
       session: session,
       onLogout: () => setState(() => _session = null),
@@ -567,7 +566,8 @@ class _GirlsAuthPageState extends State<_GirlsAuthPage> {
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                controlAffinity: ListTileControlAffinity.leading,
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
                               ),
                               Wrap(
                                 alignment: WrapAlignment.center,

@@ -36,7 +36,7 @@ void main() {
     );
   });
 
-  testWidgets('Girls footer SVG and five labels render', (
+  testWidgets('Girls footer SVG and five illustrated destinations render', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -51,11 +51,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('ホーム'), findsOneWidget);
-    expect(find.text('グループ'), findsOneWidget);
-    expect(find.text('日記'), findsOneWidget);
-    expect(find.text('ゲーム'), findsOneWidget);
-    expect(find.text('その他'), findsOneWidget);
+    for (final GirlsFooterTab tab in GirlsFooterTab.values) {
+      expect(find.byKey(ValueKey<String>('girls-footer-${tab.name}')),
+          findsOneWidget);
+      expect(find.image(AssetImage(tab.assetName)), findsOneWidget);
+    }
     expect(tester.takeException(), isNull);
   });
 }

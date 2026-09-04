@@ -13,7 +13,8 @@ void main() {
   test('listGroups uses Hosted groups endpoint with bearer auth', () async {
     final MockClient client = MockClient((http.Request request) async {
       expect(request.method, 'GET');
-      expect(request.url, Uri.parse('https://girls-api.example.com/hosted/groups'));
+      expect(request.url,
+          Uri.parse('https://girls-api.example.com/hosted/groups'));
       expect(request.headers['Authorization'], 'Bearer $token');
       return _jsonResponse(<String, Object?>{
         'groups': <Object?>[
@@ -39,7 +40,8 @@ void main() {
   test('joinGroup sends the user-facing group ID as invite code', () async {
     final MockClient client = MockClient((http.Request request) async {
       expect(request.method, 'POST');
-      expect(request.url, Uri.parse('https://girls-api.example.com/hosted/groups/join'));
+      expect(request.url,
+          Uri.parse('https://girls-api.example.com/hosted/groups/join'));
       expect(request.headers['Authorization'], 'Bearer $token');
       expect(
         jsonDecode(request.body),
@@ -64,14 +66,16 @@ void main() {
     expect(group.isOwner, isFalse);
   });
 
-  test('createGroup followed by createInvite preserves backend semantics', () async {
+  test('createGroup followed by createInvite preserves backend semantics',
+      () async {
     int requestCount = 0;
     final MockClient client = MockClient((http.Request request) async {
       requestCount += 1;
       expect(request.headers['Authorization'], 'Bearer $token');
       if (requestCount == 1) {
         expect(request.method, 'POST');
-        expect(request.url, Uri.parse('https://girls-api.example.com/hosted/groups'));
+        expect(request.url,
+            Uri.parse('https://girls-api.example.com/hosted/groups'));
         expect(jsonDecode(request.body), <String, Object?>{'name': '夜ふかし創作部'});
         return _jsonResponse(<String, Object?>{
           'group_id': groupId,
@@ -85,7 +89,8 @@ void main() {
         expect(request.method, 'POST');
         expect(
           request.url,
-          Uri.parse('https://girls-api.example.com/hosted/groups/$groupId/invite'),
+          Uri.parse(
+              'https://girls-api.example.com/hosted/groups/$groupId/invite'),
         );
         expect(jsonDecode(request.body), <String, Object?>{});
         return _jsonResponse(<String, Object?>{
@@ -95,7 +100,8 @@ void main() {
           'valid_for_seconds': 604800,
         }, statusCode: 201);
       }
-      fail('Unexpected request #$requestCount: ${request.method} ${request.url}');
+      fail(
+          'Unexpected request #$requestCount: ${request.method} ${request.url}');
     });
 
     final HostedGirlsApi api = HostedGirlsApi(baseUri: baseUri, client: client);
@@ -115,13 +121,15 @@ void main() {
     expect(requestCount, 2);
   });
 
-  test('registration uses legal versions returned by Hosted legal endpoint', () async {
+  test('registration uses legal versions returned by Hosted legal endpoint',
+      () async {
     int requestCount = 0;
     final MockClient client = MockClient((http.Request request) async {
       requestCount += 1;
       if (requestCount == 1) {
         expect(request.method, 'GET');
-        expect(request.url, Uri.parse('https://girls-api.example.com/hosted/legal'));
+        expect(request.url,
+            Uri.parse('https://girls-api.example.com/hosted/legal'));
         return _jsonResponse(<String, Object?>{
           'effective_date': '2026-08-28',
           'support_email': 'mail@example.com',
@@ -139,7 +147,8 @@ void main() {
       }
       if (requestCount == 2) {
         expect(request.method, 'POST');
-        expect(request.url, Uri.parse('https://girls-api.example.com/hosted/register'));
+        expect(request.url,
+            Uri.parse('https://girls-api.example.com/hosted/register'));
         expect(
           jsonDecode(request.body),
           <String, Object?>{
@@ -164,7 +173,8 @@ void main() {
           },
         }, statusCode: 201);
       }
-      fail('Unexpected request #$requestCount: ${request.method} ${request.url}');
+      fail(
+          'Unexpected request #$requestCount: ${request.method} ${request.url}');
     });
 
     final HostedGirlsApi api = HostedGirlsApi(baseUri: baseUri, client: client);
@@ -178,6 +188,75 @@ void main() {
     expect(result.loginId, 'honey');
     expect(result.recoveryCode, 'RECOVERY-CODE-EXAMPLE-123');
     expect(requestCount, 2);
+  });
+
+  test('email linking sends and verifies a confirmation code', () async {
+    int requestCount = 0;
+    final MockClient client = MockClient((http.Request request) async {
+      requestCount += 1;
+      expect(request.headers['Authorization'], 'Bearer $token');
+      if (requestCount == 1) {
+        expect(request.method, 'GET');
+        expect(
+          request.url,
+          Uri.parse('https://girls-api.example.com/hosted/account/email'),
+        );
+        return _jsonResponse(<String, Object?>{
+          'email': null,
+          'verified': false,
+        });
+      }
+      if (requestCount == 2) {
+        expect(request.method, 'POST');
+        expect(
+          request.url,
+          Uri.parse('https://girls-api.example.com/hosted/account/email'),
+        );
+        expect(
+          jsonDecode(request.body),
+          <String, Object?>{'email': 'honey@example.com'},
+        );
+        return _jsonResponse(<String, Object?>{
+          'email': 'honey@example.com',
+          'verified': false,
+          'code_sent': true,
+          'destination': 'h***@example.com',
+        });
+      }
+      if (requestCount == 3) {
+        expect(request.method, 'POST');
+        expect(
+          request.url,
+          Uri.parse(
+            'https://girls-api.example.com/hosted/account/email/verify',
+          ),
+        );
+        expect(jsonDecode(request.body), <String, Object?>{'code': '123456'});
+        return _jsonResponse(<String, Object?>{
+          'email': 'honey@example.com',
+          'verified': true,
+        });
+      }
+      fail(
+          'Unexpected request #$requestCount: ${request.method} ${request.url}');
+    });
+
+    final HostedGirlsApi api = HostedGirlsApi(baseUri: baseUri, client: client);
+    final HostedEmailStatus initial = await api.fetchEmailStatus(token);
+    final HostedEmailLinkResult requested = await api.requestEmailLink(
+      accessToken: token,
+      email: 'Honey@Example.com',
+    );
+    final HostedEmailStatus verified = await api.verifyEmailLink(
+      accessToken: token,
+      code: '123456',
+    );
+
+    expect(initial.email, isNull);
+    expect(requested.codeSent, isTrue);
+    expect(requested.email, 'honey@example.com');
+    expect(verified.verified, isTrue);
+    expect(requestCount, 3);
   });
 
   test('invalid group ID fails before making a network request', () async {
@@ -200,6 +279,8 @@ http.Response _jsonResponse(
   return http.Response(
     jsonEncode(body),
     statusCode,
-    headers: const <String, String>{'content-type': 'application/json; charset=utf-8'},
+    headers: const <String, String>{
+      'content-type': 'application/json; charset=utf-8'
+    },
   );
 }

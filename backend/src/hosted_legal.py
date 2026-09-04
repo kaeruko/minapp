@@ -5,14 +5,16 @@ from typing import Any
 from errors import ApiProblem
 
 TERMS_VERSION = "hosted-terms-2026-08-28"
-PRIVACY_VERSION = "hosted-privacy-2026-08-28"
-LEGAL_EFFECTIVE_DATE = "2026-08-28"
+PRIVACY_VERSION = "hosted-privacy-2026-09-04"
+TERMS_EFFECTIVE_DATE = "2026-08-28"
+PRIVACY_EFFECTIVE_DATE = "2026-09-04"
+LEGAL_EFFECTIVE_DATE = PRIVACY_EFFECTIVE_DATE
 SUPPORT_EMAIL = "mail@cloxs.jp"
 
 TERMS_TITLE = "みんアプ Hosted 利用規約 / Terms of Use"
 TERMS_BODY = f"""{TERMS_TITLE}
 
-発効日: {LEGAL_EFFECTIVE_DATE}
+発効日: {TERMS_EFFECTIVE_DATE}
 
 1. サービスについて
 みんアプ Hosted は、招待された利用者どうしが非公開グループ内で小さなWebアプリや創作物を共有するためのサービスです。グループや招待コードは、意図した相手だけに共有してください。
@@ -45,18 +47,18 @@ TERMS_BODY = f"""{TERMS_TITLE}
 PRIVACY_TITLE = "みんアプ Hosted プライバシーポリシー / Privacy Policy"
 PRIVACY_BODY = f"""{PRIVACY_TITLE}
 
-発効日: {LEGAL_EFFECTIVE_DATE}
+発効日: {PRIVACY_EFFECTIVE_DATE}
 
 1. 取得・処理する情報
-みんアプ Hosted では、サービス提供に必要な範囲で、ログインID、内部ユーザーID、認証システム上の識別子、リカバリーコードのハッシュ、グループ所属情報、アプリのメタデータ、Runtime state、利用者がアップロード・公開したコンテンツ、規約同意versionと同意時刻を処理します。
+みんアプ Hosted では、サービス提供に必要な範囲で、ログインID、内部ユーザーID、認証システム上の識別子、リカバリーコードのハッシュ、利用者が任意で紐づけたメールアドレスと確認状態、グループ所属情報、アプリのメタデータ、Runtime state、利用者がアップロード・公開したコンテンツ、規約同意versionと同意時刻を処理します。
 
 不正利用対策では、IPアドレス等のネットワーク情報とログインIDをレート制限判定に使用します。レート制限用DynamoDBキーにはIPアドレスやログインIDの平文を保存せず、テナント固有の名前空間を含めてSHA-256でハッシュ化した値を保存します。
 
 2. Hosted登録で必須としない情報
-現在のHosted登録では、メールアドレス、電話番号、実名、生年月日を必須情報として要求しません。
+現在のHosted登録では、メールアドレス、電話番号、実名、生年月日を必須情報として要求しません。メールアドレスは利用者が設定から任意で紐づけた場合に限り、確認コードによる本人確認を行って保存します。現在の実装ではメールアドレスをログインIDとして使用しません。
 
 3. 利用目的
-取得・処理した情報は、本人認証、アカウント復旧、グループ共有、アプリ実行と状態保存、コンテンツ提供、不正利用・迷惑行為の防止、セキュリティ対応、障害調査、サービス運用のために利用します。
+取得・処理した情報は、本人認証、アカウント復旧、利用者が指定したメールアドレスの確認とアカウントへの紐づけ、グループ共有、アプリ実行と状態保存、コンテンツ提供、不正利用・迷惑行為の防止、セキュリティ対応、障害調査、サービス運用のために利用します。
 
 4. 外部サービス・クラウド基盤
 サービス基盤としてAmazon Web Services (AWS) の認証、データベース、ストレージ、API、ログ等のサービスを利用します。これらの事業者はサービス提供に必要な範囲でデータを処理する場合があります。

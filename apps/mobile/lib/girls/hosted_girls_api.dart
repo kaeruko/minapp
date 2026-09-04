@@ -6,11 +6,14 @@ import 'api.dart';
 import 'hosted_runtime_bridge.dart';
 
 const int maxHostedGroupNameLength = 60;
+const int maxHostedEmailLength = 254;
 
 final RegExp _hostedHexIdPattern = RegExp(r'^[0-9a-f]{32}$');
 final RegExp _inviteCodePattern = RegExp(
   r'^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}-?[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}-?[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$',
 );
+final RegExp _emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+final RegExp _emailVerificationCodePattern = RegExp(r'^[0-9]{6}$');
 
 class HostedLegalText {
   const HostedLegalText({
@@ -114,6 +117,73 @@ class HostedRegistrationResult {
   }
 }
 
+class HostedEmailStatus {
+  const HostedEmailStatus({required this.email, required this.verified});
+
+  final String? email;
+  final bool verified;
+
+  factory HostedEmailStatus.fromJson(Map<String, Object?> json) {
+    _requireExactFields(
+      json,
+      const <String>{'email', 'verified'},
+      'Hosted email status',
+    );
+    final String? email = _optionalString(json, 'email');
+    final Object? rawVerified = json['verified'];
+    if (rawVerified is! bool) {
+      throw const FormatException(
+        'Hosted email status has invalid verified value.',
+      );
+    }
+    if (rawVerified && email == null) {
+      throw const FormatException(
+        'Hosted email status cannot be verified without an email.',
+      );
+    }
+    return HostedEmailStatus(email: email, verified: rawVerified);
+  }
+}
+
+class HostedEmailLinkResult extends HostedEmailStatus {
+  const HostedEmailLinkResult({
+    required super.email,
+    required super.verified,
+    required this.codeSent,
+    required this.destination,
+  });
+
+  final bool codeSent;
+  final String? destination;
+
+  factory HostedEmailLinkResult.fromJson(Map<String, Object?> json) {
+    _requireExactFields(
+      json,
+      const <String>{'email', 'verified', 'code_sent', 'destination'},
+      'Hosted email link result',
+    );
+    final String email = _requiredString(json, 'email');
+    final Object? rawVerified = json['verified'];
+    final Object? rawCodeSent = json['code_sent'];
+    if (rawVerified is! bool || rawCodeSent is! bool) {
+      throw const FormatException(
+        'Hosted email link result has invalid boolean values.',
+      );
+    }
+    if (rawVerified && rawCodeSent) {
+      throw const FormatException(
+        'A verified email must not report a newly sent code.',
+      );
+    }
+    return HostedEmailLinkResult(
+      email: email,
+      verified: rawVerified,
+      codeSent: rawCodeSent,
+      destination: _optionalString(json, 'destination'),
+    );
+  }
+}
+
 class HostedGroup {
   const HostedGroup({
     required this.groupId,
@@ -142,7 +212,8 @@ class HostedGroup {
       throw FormatException('Hosted group returned unsupported role: $role.');
     }
     if (status != 'active') {
-      throw FormatException('Hosted group returned unsupported status: $status.');
+      throw FormatException(
+          'Hosted group returned unsupported status: $status.');
     }
     return HostedGroup(
       groupId: _requireHexId(json, 'group_id'),
@@ -174,11 +245,13 @@ class HostedInvite {
     );
     final String code = _requiredString(json, 'code');
     if (!_inviteCodePattern.hasMatch(code.toUpperCase())) {
-      throw const FormatException('Hosted invite returned an invalid group code.');
+      throw const FormatException(
+          'Hosted invite returned an invalid group code.');
     }
     final Object? rawValidForSeconds = json['valid_for_seconds'];
     if (rawValidForSeconds is! int || rawValidForSeconds <= 0) {
-      throw const FormatException('Hosted invite has invalid valid_for_seconds.');
+      throw const FormatException(
+          'Hosted invite has invalid valid_for_seconds.');
     }
     return HostedInvite(
       groupId: _requireHexId(json, 'group_id'),
@@ -334,6 +407,58 @@ class HostedGirlsApi {
       },
     );
     return HostedRegistrationResult.fromJson(payload);
+  }
+
+  Future<HostedEmailStatus> fetchEmailStatus(String accessToken) async {
+    final Map<String, Object?> payload = await _jsonRequest(
+      method: 'GET',
+      path: '/hosted/account/email',
+      accessToken: accessToken,
+    );
+    return HostedEmailStatus.fromJson(payload);
+  }
+
+  Future<HostedEmailLinkResult> requestEmailLink({
+    required String accessToken,
+    required String email,
+  }) async {
+    final String normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.length > maxHostedEmailLength ||
+        !_emailPattern.hasMatch(normalizedEmail)) {
+      throw ArgumentError.value(
+        email,
+        'email',
+        'must be a valid email address',
+      );
+    }
+    final Map<String, Object?> payload = await _jsonRequest(
+      method: 'POST',
+      path: '/hosted/account/email',
+      accessToken: accessToken,
+      body: <String, Object?>{'email': normalizedEmail},
+    );
+    return HostedEmailLinkResult.fromJson(payload);
+  }
+
+  Future<HostedEmailStatus> verifyEmailLink({
+    required String accessToken,
+    required String code,
+  }) async {
+    final String normalizedCode = code.trim();
+    if (!_emailVerificationCodePattern.hasMatch(normalizedCode)) {
+      throw ArgumentError.value(
+        code,
+        'code',
+        'must be a 6-digit verification code',
+      );
+    }
+    final Map<String, Object?> payload = await _jsonRequest(
+      method: 'POST',
+      path: '/hosted/account/email/verify',
+      accessToken: accessToken,
+      body: <String, Object?>{'code': normalizedCode},
+    );
+    return HostedEmailStatus.fromJson(payload);
   }
 
   Future<List<HostedGroup>> listGroups(String accessToken) async {

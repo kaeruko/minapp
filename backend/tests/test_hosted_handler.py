@@ -42,6 +42,27 @@ class FakeBackend:
         self.calls.append(("me", auth_subject))
         return {"user": {"user_id": "1" * 32, "login_id": "alice", "role": "user", "status": "active"}, "groups": []}
 
+    def email_status(self, auth_subject: str) -> dict[str, Any]:
+        self.calls.append(("email_status", auth_subject))
+        return {"email": None, "verified": False}
+
+    def request_email_link(
+        self, auth_subject: str, email: str, access_token: str
+    ) -> dict[str, Any]:
+        self.calls.append(("request_email_link", auth_subject, email, access_token))
+        return {
+            "email": email,
+            "verified": False,
+            "code_sent": True,
+            "destination": "a***@example.com",
+        }
+
+    def verify_email_link(
+        self, auth_subject: str, code: str, access_token: str
+    ) -> dict[str, Any]:
+        self.calls.append(("verify_email_link", auth_subject, code, access_token))
+        return {"email": "honey@example.com", "verified": True}
+
     def list_groups(self, auth_subject: str) -> list[dict[str, Any]]:
         self.calls.append(("list_groups", auth_subject))
         return []
@@ -79,10 +100,10 @@ def event(method: str, path: str, *, body: dict[str, Any] | None = None, auth: b
     result: dict[str, Any] = {
         "rawPath": path,
         "requestContext": request_context,
-        "headers": {},
+        "headers": {"authorization": "Bearer access-alice"} if auth else {},
     }
     if body is not None:
-        result["headers"] = {"content-type": "application/json"}
+        result["headers"]["content-type"] = "application/json"
         result["body"] = json.dumps(body, ensure_ascii=False)
     return result
 
@@ -178,6 +199,59 @@ class HostedHandlerTests(unittest.TestCase):
         )
         self.assertEqual(response["statusCode"], 201)
         self.assertEqual(self.backend.calls, [("create_group", "sub-alice", "月影荘")])
+
+    def test_email_link_routes_use_authenticated_subject_and_access_token(self) -> None:
+        status = hosted_handler.lambda_handler(
+            event("GET", "/hosted/account/email", auth=True), None
+        )
+        requested = hosted_handler.lambda_handler(
+            event(
+                "POST",
+                "/hosted/account/email",
+                body={"email": "Honey@Example.com"},
+                auth=True,
+            ),
+            None,
+        )
+        verified = hosted_handler.lambda_handler(
+            event(
+                "POST",
+                "/hosted/account/email/verify",
+                body={"code": "123456"},
+                auth=True,
+            ),
+            None,
+        )
+
+        self.assertEqual(status["statusCode"], 200)
+        self.assertEqual(requested["statusCode"], 200)
+        self.assertEqual(verified["statusCode"], 200)
+        self.assertEqual(
+            self.backend.calls,
+            [
+                ("email_status", "sub-alice"),
+                (
+                    "request_email_link",
+                    "sub-alice",
+                    "honey@example.com",
+                    "access-alice",
+                ),
+                ("verify_email_link", "sub-alice", "123456", "access-alice"),
+            ],
+        )
+
+    def test_email_link_rejects_invalid_email_before_backend(self) -> None:
+        response = hosted_handler.lambda_handler(
+            event(
+                "POST",
+                "/hosted/account/email",
+                body={"email": "not-an-email"},
+                auth=True,
+            ),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 400)
+        self.assertEqual(self.backend.calls, [])
 
     def test_join_group_passes_invite_code(self) -> None:
         response = hosted_handler.lambda_handler(

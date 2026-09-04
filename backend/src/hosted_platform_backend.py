@@ -25,6 +25,7 @@ MAX_RUNTIME_VALUE_BYTES = 16 * 1024
 _RECOVERY_CODE_RE = re.compile(r"^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{20}$")
 _RUNTIME_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{32,64}$")
 _STATE_KEY_RE = re.compile(r"^[a-z][a-z0-9_.-]{0,63}$")
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
 def _number_attr(value: int) -> dict[str, str]:
@@ -262,6 +263,112 @@ class HostedPlatformBackend(HostedAwsBackend):
     def rotate_recovery_code(self, auth_subject: str) -> dict[str, str]:
         user = self._user_by_auth_subject(auth_subject)
         return {"recovery_code": self._rotate_recovery_hash(user)}
+
+    def email_status(self, auth_subject: str) -> dict[str, Any]:
+        user = self._user_by_auth_subject(auth_subject)
+        response = self._cognito.admin_get_user(
+            UserPoolId=self._user_pool_id,
+            Username=user.login_id,
+        )
+        attributes = {
+            item.get("Name"): item.get("Value")
+            for item in response.get("UserAttributes", [])
+            if isinstance(item, dict)
+        }
+        email = attributes.get("email")
+        verified = attributes.get("email_verified") == "true"
+        if not isinstance(email, str) or not email:
+            email = None
+            verified = False
+        return {"email": email, "verified": verified}
+
+    def request_email_link(
+        self, auth_subject: str, email: str, access_token: str
+    ) -> dict[str, Any]:
+        normalized_email = email.strip().lower()
+        if (
+            len(normalized_email) > 254
+            or _EMAIL_RE.fullmatch(normalized_email) is None
+        ):
+            raise ApiProblem(400, "invalid_email", "メールアドレスの形式を確認してください。")
+        if not isinstance(access_token, str) or not access_token:
+            raise ApiProblem(401, "session_expired", "ログインし直してください。")
+
+        self._user_by_auth_subject(auth_subject)
+        current = self.email_status(auth_subject)
+        if current["email"] == normalized_email and current["verified"]:
+            return {
+                "email": normalized_email,
+                "verified": True,
+                "code_sent": False,
+                "destination": None,
+            }
+
+        try:
+            response = self._cognito.update_user_attributes(
+                AccessToken=access_token,
+                UserAttributes=[{"Name": "email", "Value": normalized_email}],
+            )
+        except Exception as exc:
+            code = _aws_error_code(exc)
+            if code in {"InvalidParameterException", "InvalidLambdaResponseException"}:
+                raise ApiProblem(400, "invalid_email", "メールアドレスの形式を確認してください。") from exc
+            if code == "AliasExistsException":
+                raise ApiProblem(409, "email_conflict", "このメールアドレスはすでに使われています。") from exc
+            if code == "CodeDeliveryFailureException":
+                raise ApiProblem(502, "email_delivery_failed", "確認メールを送信できませんでした。") from exc
+            if code in {"LimitExceededException", "TooManyRequestsException"}:
+                raise ApiProblem(429, "email_rate_limited", "送信回数が多すぎます。少し待ってからお試しください。") from exc
+            if code in {"NotAuthorizedException", "UserNotFoundException"}:
+                raise ApiProblem(401, "session_expired", "ログインし直してください。") from exc
+            raise
+
+        delivery_items = response.get("CodeDeliveryDetailsList", [])
+        destination = None
+        if isinstance(delivery_items, list):
+            for item in delivery_items:
+                if isinstance(item, dict) and item.get("AttributeName") == "email":
+                    raw_destination = item.get("Destination")
+                    if isinstance(raw_destination, str) and raw_destination:
+                        destination = raw_destination
+                    break
+        return {
+            "email": normalized_email,
+            "verified": False,
+            "code_sent": True,
+            "destination": destination,
+        }
+
+    def verify_email_link(
+        self, auth_subject: str, code: str, access_token: str
+    ) -> dict[str, Any]:
+        if not isinstance(code, str) or re.fullmatch(r"[0-9]{6}", code) is None:
+            raise ApiProblem(400, "invalid_verification_code", "確認コードは6桁の数字です。")
+        if not isinstance(access_token, str) or not access_token:
+            raise ApiProblem(401, "session_expired", "ログインし直してください。")
+        self._user_by_auth_subject(auth_subject)
+        try:
+            self._cognito.verify_user_attribute(
+                AccessToken=access_token,
+                AttributeName="email",
+                Code=code,
+            )
+        except Exception as exc:
+            error_code = _aws_error_code(exc)
+            if error_code == "CodeMismatchException":
+                raise ApiProblem(400, "invalid_verification_code", "確認コードが違います。") from exc
+            if error_code == "ExpiredCodeException":
+                raise ApiProblem(400, "verification_code_expired", "確認コードの期限が切れています。もう一度送信してください。") from exc
+            if error_code in {"LimitExceededException", "TooManyRequestsException"}:
+                raise ApiProblem(429, "email_rate_limited", "確認回数が多すぎます。少し待ってからお試しください。") from exc
+            if error_code in {"NotAuthorizedException", "UserNotFoundException"}:
+                raise ApiProblem(401, "session_expired", "ログインし直してください。") from exc
+            raise
+
+        result = self.email_status(auth_subject)
+        if not result["verified"]:
+            raise RuntimeError("Cognito did not mark the email attribute as verified")
+        return result
 
     def _rotate_recovery_hash(self, user: _User) -> str:
         recovery_code = _new_recovery_code()

@@ -24,7 +24,7 @@ from handler import (
 )
 from hosted_legal import legal_payload, validate_legal_versions
 
-API_VERSION = "0.4.0"
+API_VERSION = "0.5.0"
 _LOGGER = logging.getLogger(__name__)
 _BACKEND: "Backend | None" = None
 _ID_RE = r"([0-9a-f]{32})"
@@ -63,6 +63,13 @@ class Backend(Protocol):
     def rotate_recovery_code(self, auth_subject: str) -> dict[str, str]: ...
     def delete_account(self, auth_subject: str) -> None: ...
     def me(self, auth_subject: str) -> dict[str, Any]: ...
+    def email_status(self, auth_subject: str) -> dict[str, Any]: ...
+    def request_email_link(
+        self, auth_subject: str, email: str, access_token: str
+    ) -> dict[str, Any]: ...
+    def verify_email_link(
+        self, auth_subject: str, code: str, access_token: str
+    ) -> dict[str, Any]: ...
     def list_groups(self, auth_subject: str) -> list[dict[str, Any]]: ...
     def create_group(self, auth_subject: str, name: str) -> dict[str, Any]: ...
     def list_members(self, auth_subject: str, group_id: str) -> list[dict[str, str]]: ...
@@ -136,6 +143,40 @@ def _required_boolean(payload: dict[str, Any], field: str) -> bool:
     if not isinstance(value, bool):
         raise ApiProblem(400, "invalid_request", f"{field} must be a boolean.")
     return value
+
+
+def _email(payload: dict[str, Any]) -> str:
+    value = _required_string(payload, "email", min_length=3, max_length=254)
+    if value != value.strip() or re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value) is None:
+        raise ApiProblem(400, "invalid_email", "メールアドレスの形式を確認してください。")
+    return value.lower()
+
+
+def _verification_code(payload: dict[str, Any]) -> str:
+    value = _required_string(payload, "code", min_length=6, max_length=6)
+    if re.fullmatch(r"[0-9]{6}", value) is None:
+        raise ApiProblem(400, "invalid_verification_code", "確認コードは6桁の数字です。")
+    return value
+
+
+def _bearer_access_token(event: dict[str, Any]) -> str:
+    headers = event.get("headers")
+    if not isinstance(headers, dict):
+        raise ApiProblem(401, "unauthorized", "Authentication is required.")
+    authorization = next(
+        (
+            value
+            for key, value in headers.items()
+            if isinstance(key, str) and key.lower() == "authorization"
+        ),
+        None,
+    )
+    if not isinstance(authorization, str):
+        raise ApiProblem(401, "unauthorized", "Authentication is required.")
+    match = re.fullmatch(r"Bearer ([^\s]{1,4096})", authorization, re.IGNORECASE)
+    if match is None:
+        raise ApiProblem(401, "unauthorized", "Authentication is required.")
+    return match.group(1)
 
 
 def _registration_legal_versions(payload: dict[str, Any]) -> tuple[str, str]:
@@ -300,6 +341,31 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
 
     if method == "GET" and path == "/hosted/me":
         return _json_response(200, _get_backend().me(_auth_subject(event)))
+
+    if method == "GET" and path == "/hosted/account/email":
+        return _json_response(200, _get_backend().email_status(_auth_subject(event)))
+
+    if method == "POST" and path == "/hosted/account/email":
+        payload = _json_body(event)
+        _require_fields(payload, required={"email"})
+        return _json_response(
+            200,
+            _get_backend().request_email_link(
+                _auth_subject(event), _email(payload), _bearer_access_token(event)
+            ),
+        )
+
+    if method == "POST" and path == "/hosted/account/email/verify":
+        payload = _json_body(event)
+        _require_fields(payload, required={"code"})
+        return _json_response(
+            200,
+            _get_backend().verify_email_link(
+                _auth_subject(event),
+                _verification_code(payload),
+                _bearer_access_token(event),
+            ),
+        )
 
     if method == "POST" and path == "/hosted/recovery-code":
         payload = _json_body(event)

@@ -10,16 +10,16 @@ const Color _footerSelectedText = Color(0xFF745B9E);
 /// Footer destinations are kept separate from page implementation so each Girls
 /// page can own its selected state without baking state into the SVG asset.
 enum GirlsFooterTab {
-  home('ホーム', Icons.home_rounded),
-  groups('グループ', Icons.groups_rounded),
-  diary('日記', Icons.menu_book_rounded),
-  games('ゲーム', Icons.sports_esports_rounded),
-  more('その他', Icons.more_horiz_rounded);
+  home('ホーム', 'assets/girls/cutouts/home_tab.png'),
+  groups('グループ', 'assets/girls/cutouts/groups_tab.png'),
+  diary('日記', 'assets/girls/cutouts/diary_tab.png'),
+  games('ゲーム', 'assets/girls/cutouts/games_tab.png'),
+  more('その他', 'assets/girls/cutouts/more_tab.png');
 
-  const GirlsFooterTab(this.label, this.icon);
+  const GirlsFooterTab(this.label, this.assetName);
 
   final String label;
-  final IconData icon;
+  final String assetName;
 }
 
 /// Maps the five marker fills in girls_footer_base.svg to live Flutter colors.
@@ -92,7 +92,7 @@ class GirlsFooterNav extends StatelessWidget {
               semanticsLabel: 'みんアプ Girls フッターメニュー',
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(6, 10, 6, 4),
+              padding: const EdgeInsets.fromLTRB(4, 5, 4, 1),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: GirlsFooterTab.values
@@ -137,6 +137,7 @@ class _GirlsFooterItem extends StatelessWidget {
     final VoidCallback? effectiveOnTap = enabled ? onTap : null;
 
     return Semantics(
+      key: ValueKey<String>('girls-footer-${tab.name}'),
       button: true,
       selected: selected,
       enabled: enabled,
@@ -146,29 +147,19 @@ class _GirlsFooterItem extends StatelessWidget {
         radius: 30,
         containedInkWell: true,
         highlightShape: BoxShape.rectangle,
-        child: Padding(
-          padding: const EdgeInsets.only(top: 5, bottom: 3),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: <Widget>[
-              Icon(
-                tab.icon,
-                size: 25,
-                color: foreground,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                tab.label,
-                maxLines: 1,
-                overflow: TextOverflow.clip,
-                style: TextStyle(
-                  color: foreground,
-                  fontSize: 10.5,
-                  height: 1,
-                  fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                ),
-              ),
-            ],
+        child: AnimatedScale(
+          scale: selected ? 1.04 : 1,
+          duration: const Duration(milliseconds: 160),
+          child: Opacity(
+            opacity: enabled ? 1 : .68,
+            child: Image.asset(
+              tab.assetName,
+              height: 69,
+              fit: BoxFit.contain,
+              semanticLabel: tab.label,
+              color: enabled ? null : foreground.withValues(alpha: .72),
+              colorBlendMode: enabled ? null : BlendMode.modulate,
+            ),
           ),
         ),
       ),

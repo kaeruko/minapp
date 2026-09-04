@@ -13,6 +13,9 @@ locals {
 
   hosted_protected_routes = toset([
     "GET /hosted/me",
+    "GET /hosted/account/email",
+    "POST /hosted/account/email",
+    "POST /hosted/account/email/verify",
     "POST /hosted/recovery-code",
     "DELETE /hosted/account",
     "GET /hosted/groups",

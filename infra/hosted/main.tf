@@ -68,6 +68,8 @@ resource "terraform_data" "tenant_identity" {
 resource "aws_cognito_user_pool" "main" {
   name = "${local.name_prefix}-users"
 
+  auto_verified_attributes = ["email"]
+
   username_configuration {
     case_sensitive = false
   }
@@ -81,6 +83,16 @@ resource "aws_cognito_user_pool" "main" {
       name     = "admin_only"
       priority = 1
     }
+  }
+
+  user_attribute_update_settings {
+    attributes_require_verification_before_update = ["email"]
+  }
+
+  verification_message_template {
+    default_email_option = "CONFIRM_WITH_CODE"
+    email_subject        = "みんアプ Girls メールアドレス確認コード"
+    email_message        = "みんアプ Girls の確認コードは {####} です。アプリの設定画面に入力してください。"
   }
 
   password_policy {

@@ -65,10 +65,61 @@ class FakeCognito:
         user = self.users.get(Username)
         if user is None:
             raise FakeAwsError("UserNotFoundException")
+        attributes = [{"Name": "sub", "Value": user["sub"]}]
+        if "email" in user:
+            attributes.extend(
+                [
+                    {"Name": "email", "Value": user["email"]},
+                    {
+                        "Name": "email_verified",
+                        "Value": "true" if user.get("email_verified") else "false",
+                    },
+                ]
+            )
         return {
             "Username": Username,
-            "UserAttributes": [{"Name": "sub", "Value": user["sub"]}],
+            "UserAttributes": attributes,
         }
+
+    def update_user_attributes(
+        self, *, AccessToken: str, UserAttributes: list[dict[str, str]]
+    ) -> dict[str, Any]:
+        user = self._user_for_access_token(AccessToken)
+        if UserAttributes != [{"Name": "email", "Value": UserAttributes[0]["Value"]}]:
+            raise AssertionError(UserAttributes)
+        email = UserAttributes[0]["Value"]
+        user["pending_email"] = email
+        user["verification_code"] = "123456"
+        return {
+            "CodeDeliveryDetailsList": [
+                {
+                    "AttributeName": "email",
+                    "DeliveryMedium": "EMAIL",
+                    "Destination": "a***@example.com",
+                }
+            ]
+        }
+
+    def verify_user_attribute(
+        self, *, AccessToken: str, AttributeName: str, Code: str
+    ) -> dict[str, Any]:
+        if AttributeName != "email":
+            raise AssertionError(AttributeName)
+        user = self._user_for_access_token(AccessToken)
+        if user.get("verification_code") != Code:
+            raise FakeAwsError("CodeMismatchException")
+        user["email"] = user.pop("pending_email")
+        user["email_verified"] = True
+        user.pop("verification_code", None)
+        return {}
+
+    def _user_for_access_token(self, access_token: str) -> dict[str, Any]:
+        if not access_token.startswith("access-"):
+            raise FakeAwsError("NotAuthorizedException")
+        user = self.users.get(access_token.removeprefix("access-"))
+        if user is None:
+            raise FakeAwsError("NotAuthorizedException")
+        return user
 
     def admin_delete_user(self, *, UserPoolId: str, Username: str) -> None:
         del UserPoolId
