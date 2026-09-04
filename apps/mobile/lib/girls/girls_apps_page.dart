@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
 import 'api.dart';
 import 'girls_app_core.dart' as core;
@@ -820,7 +820,7 @@ class _EmptyApps extends StatelessWidget {
               onTap: () => _copyPrompt(context, _ideaPrompt('お天気')),
             ),
             _EmptyAppIdeaCard(
-              color: const Color(0xFFDDF3DF),
+              color: _mint,
               icon: Icons.restaurant_menu_rounded,
               title: 'レシピアプリ',
               subtitle: '料理をまとめるアプリ',
