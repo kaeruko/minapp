@@ -3,13 +3,13 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
 import 'girls_app_test_actions.dart';
 import 'girls_footer_nav.dart';
-import 'girls_zip_upload_page.dart';
 import 'hosted_girls_api.dart';
 import 'hosted_girls_upload_api.dart';
 
@@ -18,6 +18,7 @@ const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF745B9E);
 const Color _pink = Color(0xFFF9DDE8);
 const Color _mint = Color(0xFFDDF4E4);
+const String _girlsUploadPortalUrl = 'https://minapp.cloxs.jp/girls.html';
 
 class GirlsAppsPage extends StatefulWidget {
   const GirlsAppsPage({
@@ -83,23 +84,28 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
     }
   }
 
-  Future<void> _openZipUpload() async {
+  Future<void> _openUploadPortal() async {
     final List<HostedGroup>? ownerGroups = _ownerGroups;
     if (ownerGroups == null) return;
     if (ownerGroups.isEmpty) {
-      setState(() => _error = 'ZIPを追加するには、自分がオーナーのグループが必要です。');
+      setState(() => _error = 'アプリを追加するには、自分がオーナーのグループが必要です。');
       return;
     }
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (BuildContext context) => GirlsZipUploadPage(
-          api: widget.api,
-          session: widget.session,
-          ownerGroups: ownerGroups,
-        ),
-      ),
-    );
-    if (mounted) await _load();
+
+    setState(() => _error = null);
+    final Uri portalUri = Uri.parse(_girlsUploadPortalUrl);
+    try {
+      final bool opened = await launchUrl(
+        portalUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened) {
+        throw StateError('外部ブラウザを開けませんでした: $portalUri');
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = 'アプリ追加ページを開けませんでした: $error');
+    }
   }
 
   Future<void> _openDetail(ManagedGirlsApp app) async {
@@ -145,13 +151,13 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
             children: <Widget>[
               FilledButton.icon(
                 key: const Key('girls-my-apps-upload'),
-                onPressed: _busy ? null : _openZipUpload,
+                onPressed: _busy ? null : _openUploadPortal,
                 style: FilledButton.styleFrom(
                   backgroundColor: _lavender,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                 ),
-                icon: const Icon(Icons.folder_zip_rounded),
-                label: const Text('ZIPからアプリを追加'),
+                icon: const Icon(Icons.open_in_new_rounded),
+                label: const Text('アプリを追加♡'),
               ),
               if (_error != null) ...<Widget>[
                 const SizedBox(height: 12),
@@ -664,7 +670,7 @@ class _EmptyApps extends StatelessWidget {
   static const String _technicalGuideUrl =
       'https://cloxs.jp/minapp/ai/index.html';
   static const String _basePrompt =
-      'みんアプ技術資料 $_technicalGuideUrl を見て、○○のアプリを作って';
+      'みんアプ技術資料 $_technicalGuideUrl を見て、○○のアプリを作って。HTML・CSS・JavaScriptは1つのindex.htmlにまとめて、完成したHTMLコードをそのまま出して。';
 
   Future<void> _copyPrompt(BuildContext context, String prompt) async {
     await Clipboard.setData(ClipboardData(text: prompt));
@@ -675,7 +681,7 @@ class _EmptyApps extends StatelessWidget {
   }
 
   String _ideaPrompt(String idea) =>
-      'みんアプ技術資料 $_technicalGuideUrl を見て、$ideaのアプリを作って';
+      'みんアプ技術資料 $_technicalGuideUrl を見て、$ideaのアプリを作って。HTML・CSS・JavaScriptは1つのindex.htmlにまとめて、完成したHTMLコードをそのまま出して。';
 
   @override
   Widget build(BuildContext context) {
@@ -844,7 +850,7 @@ class _EmptyApps extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         const Text(
-          'アイデアカードをタップすると、その内容を入れた文章をコピーできるよ。\nAIがZIPを作ってくれたら、上の「ZIPからアプリを追加」から登録してね♡',
+          'アイデアカードをタップすると、その内容を入れた文章をコピーできるよ。\nAIがHTMLを作ってくれたら、上の「アプリを追加♡」からポータルを開いて貼り付けてね♡',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Color(0xFF8F756D),
