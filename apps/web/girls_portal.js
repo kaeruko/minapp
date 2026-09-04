@@ -1,18 +1,26 @@
 "use strict";
 
 (function initGirlsPortal() {
-  const routing = globalThis.MinAppPortalRouting;
   const zipApi = globalThis.MinAppSingleHtmlZip;
-  if (routing === undefined || typeof routing.PortalRouter !== "function") {
-    throw new Error("Girls portal requires portal_routing.js.");
-  }
   if (zipApi === undefined || typeof zipApi.buildSingleHtmlZip !== "function") {
     throw new Error("Girls portal requires single_html_zip.js.");
   }
 
+  const CONFIG_PATH = "/girls-config.json";
+  const ACCESS_TOKEN_KEY = "minapp_girls_portal_access_token";
+  const LOGIN_ID_KEY = "minapp_girls_portal_login_id";
   const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
   const ID_PATTERN = /^[0-9a-f]{32}$/;
   const LOGIN_ID_PATTERN = /^[a-z0-9][a-z0-9-]{2,31}$/;
+
+  class GirlsApiError extends Error {
+    constructor(status, code, message) {
+      super(message);
+      this.name = "GirlsApiError";
+      this.status = status;
+      this.code = code;
+    }
+  }
 
   function requiredElement(id) {
     const element = document.getElementById(id);
@@ -21,24 +29,17 @@
   }
 
   const fatal = requiredElement("girls-fatal");
-  const classroomPanel = requiredElement("girls-classroom-panel");
-  const classroomForm = requiredElement("girls-classroom-form");
-  const classroomCode = requiredElement("girls-classroom-code");
-  const classroomError = requiredElement("girls-classroom-error");
   const loginPanel = requiredElement("girls-login-panel");
   const loginForm = requiredElement("girls-login-form");
   const loginId = requiredElement("girls-login-id");
   const loginPassword = requiredElement("girls-login-password");
-  const loginTenant = requiredElement("girls-login-tenant");
   const loginError = requiredElement("girls-login-error");
-  const changeClassroom = requiredElement("girls-change-classroom");
   const passwordPanel = requiredElement("girls-password-panel");
   const passwordForm = requiredElement("girls-password-form");
   const newPassword = requiredElement("girls-new-password");
   const newPasswordConfirm = requiredElement("girls-new-password-confirm");
   const passwordError = requiredElement("girls-password-error");
   const uploadPanel = requiredElement("girls-upload-panel");
-  const workspaceTenant = requiredElement("girls-workspace-tenant");
   const logoutButton = requiredElement("girls-logout");
   const copyPrompt = requiredElement("girls-copy-prompt");
   const aiPrompt = requiredElement("girls-ai-prompt");
@@ -52,7 +53,6 @@
   const uploadError = requiredElement("girls-upload-error");
   const uploadResult = requiredElement("girls-upload-result");
 
-  if (!(classroomForm instanceof HTMLFormElement)) throw new Error("#girls-classroom-form must be a form.");
   if (!(loginForm instanceof HTMLFormElement)) throw new Error("#girls-login-form must be a form.");
   if (!(passwordForm instanceof HTMLFormElement)) throw new Error("#girls-password-form must be a form.");
   if (!(uploadForm instanceof HTMLFormElement)) throw new Error("#girls-upload-form must be a form.");
@@ -61,12 +61,7 @@
   if (!(sourceCode instanceof HTMLTextAreaElement)) throw new Error("#girls-source-code must be a textarea.");
   if (!(uploadSubmit instanceof HTMLButtonElement)) throw new Error("#girls-upload-submit must be a button.");
 
-  const router = new routing.PortalRouter({
-    fetchImpl: (...args) => globalThis.fetch(...args),
-    sessionStorage: globalThis.sessionStorage,
-    localStorage: globalThis.localStorage,
-  });
-
+  let apiBaseUrl = null;
   let pendingPasswordChallenge = null;
   let currentLoginId = null;
 
@@ -92,13 +87,12 @@
   }
 
   function setOnlyPanel(panel) {
-    for (const candidate of [classroomPanel, loginPanel, passwordPanel, uploadPanel]) {
+    for (const candidate of [loginPanel, passwordPanel, uploadPanel]) {
       candidate.classList.toggle("hidden", candidate !== panel);
     }
   }
 
   function errorMessage(error) {
-    if (error instanceof routing.PortalApiError) return error.message;
     if (error instanceof Error && error.message.length > 0) return error.message;
     return String(error);
   }
@@ -110,11 +104,161 @@
     return value;
   }
 
+  function requireExactFields(value, expected, label) {
+    const object = requirePlainObject(value, label);
+    const actual = Object.keys(object).sort();
+    const sortedExpected = [...expected].sort();
+    if (actual.length !== sortedExpected.length || actual.some((name, index) => name !== sortedExpected[index])) {
+      throw new Error(`${label} fields are invalid.`);
+    }
+    return object;
+  }
+
   function requireString(value, label) {
     if (typeof value !== "string" || value.length === 0) {
       throw new Error(`${label} must be a non-empty string.`);
     }
     return value;
+  }
+
+  function validateApiBaseUrl(value) {
+    if (typeof value !== "string" || value.length === 0 || value !== value.trim()) {
+      throw new Error("girls-config hosted_api_base_url is invalid.");
+    }
+    let url;
+    try {
+      url = new URL(value);
+    } catch (error) {
+      throw new Error("girls-config hosted_api_base_url is not a valid URL.", { cause: error });
+    }
+    if (
+      url.protocol !== "https:" ||
+      url.username !== "" ||
+      url.password !== "" ||
+      url.pathname !== "/" ||
+      url.search !== "" ||
+      url.hash !== ""
+    ) {
+      throw new Error("girls-config hosted_api_base_url must be an HTTPS origin without path, credentials, query, or fragment.");
+    }
+    const hostname = url.hostname.toLowerCase();
+    if (hostname === "localhost" || hostname.endsWith(".localhost") || hostname === "127.0.0.1" || hostname === "::1") {
+      throw new Error("girls-config hosted_api_base_url must be public.");
+    }
+    return url.origin;
+  }
+
+  function clearAuthentication() {
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    sessionStorage.removeItem(LOGIN_ID_KEY);
+    currentLoginId = null;
+  }
+
+  function storeAuthentication(token, authenticatedLoginId) {
+    requireString(token, "access token");
+    const normalizedLoginId = validateLoginId(authenticatedLoginId);
+    clearAuthentication();
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
+    sessionStorage.setItem(LOGIN_ID_KEY, normalizedLoginId);
+    currentLoginId = normalizedLoginId;
+  }
+
+  async function decodeJsonResponse(response, label) {
+    const contentType = response.headers.get("content-type");
+    if (contentType === null || !contentType.toLowerCase().startsWith("application/json")) {
+      throw new Error(`${label} returned a non-JSON response (HTTP ${response.status}).`);
+    }
+    let payload;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      throw new Error(`${label} returned invalid JSON.`, { cause: error });
+    }
+    requirePlainObject(payload, `${label} response`);
+    if (!response.ok) {
+      const code = typeof payload.error === "string" && payload.error.length > 0 ? payload.error : null;
+      const message = typeof payload.message === "string" && payload.message.length > 0 ? payload.message : null;
+      if (code === null || message === null) {
+        throw new Error(`${label} error response is missing error or message.`);
+      }
+      throw new GirlsApiError(response.status, code, message);
+    }
+    return payload;
+  }
+
+  async function loadConfig() {
+    const response = await fetch(CONFIG_PATH, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    const payload = await decodeJsonResponse(response, "Girls config");
+    requireExactFields(payload, ["schema_version", "hosted_api_base_url"], "Girls config");
+    if (payload.schema_version !== 1) {
+      throw new Error(`Unsupported Girls config schema_version: ${String(payload.schema_version)}`);
+    }
+    apiBaseUrl = validateApiBaseUrl(payload.hosted_api_base_url);
+  }
+
+  async function apiRequest(path, options = {}) {
+    if (apiBaseUrl === null) throw new Error("Girls API configuration is not loaded.");
+    if (typeof path !== "string" || !path.startsWith("/") || path.startsWith("//")) {
+      throw new TypeError("Girls API path must be an origin-relative path.");
+    }
+    const url = new URL(path, `${apiBaseUrl}/`);
+    if (url.origin !== apiBaseUrl || url.hash !== "") {
+      throw new TypeError("Girls API path escaped the configured API origin.");
+    }
+
+    const method = options.method ?? "GET";
+    if (!["GET", "POST"].includes(method)) throw new TypeError(`Unsupported Girls API method: ${method}`);
+    if (options.body !== undefined && options.jsonBody !== undefined) {
+      throw new TypeError("Girls API request cannot contain both body and jsonBody.");
+    }
+    if (method === "GET" && (options.body !== undefined || options.jsonBody !== undefined)) {
+      throw new TypeError("GET Girls API request must not contain a body.");
+    }
+
+    const headers = new Headers(options.headers ?? {});
+    if (headers.has("Authorization")) {
+      throw new TypeError("Authorization header is managed by Girls portal.");
+    }
+    headers.set("Accept", "application/json");
+
+    let body = options.body;
+    if (options.jsonBody !== undefined) {
+      headers.set("Content-Type", "application/json");
+      body = JSON.stringify(options.jsonBody);
+    }
+    if (options.authenticated === true) {
+      const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+      if (token === null || token.length === 0) {
+        clearAuthentication();
+        throw new GirlsApiError(401, "unauthorized", "ログインが必要です。");
+      }
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+
+    let response;
+    try {
+      response = await fetch(url.toString(), {
+        method,
+        headers,
+        body,
+        cache: "no-store",
+        credentials: "omit",
+      });
+    } catch (error) {
+      throw new Error("Girls APIとの通信に失敗しました。", { cause: error });
+    }
+
+    try {
+      return await decodeJsonResponse(response, "Girls API");
+    } catch (error) {
+      if (error instanceof GirlsApiError && error.status === 401) clearAuthentication();
+      throw error;
+    }
   }
 
   function validateLoginId(value) {
@@ -127,45 +271,41 @@
   function validateAuthenticatedResponse(payload) {
     requirePlainObject(payload, "Authentication response");
     if (payload.state === "new_password_required") {
-      requireString(payload.login_id, "login_id");
-      requireString(payload.session, "session");
+      requireExactFields(payload, ["state", "login_id", "session"], "Password challenge");
       return {
         kind: "challenge",
-        loginId: payload.login_id,
-        session: payload.session,
+        loginId: validateLoginId(requireString(payload.login_id, "login_id")),
+        session: requireString(payload.session, "session"),
       };
     }
+    requireExactFields(payload, ["state", "access_token", "token_type", "expires_in"], "Authentication response");
     if (payload.state !== "authenticated") {
       throw new Error(`Unsupported authentication state: ${String(payload.state)}`);
     }
-    const token = requireString(payload.access_token, "access_token");
-    if (payload.token_type !== "Bearer") {
-      throw new Error("Authentication token_type must be Bearer.");
-    }
+    if (payload.token_type !== "Bearer") throw new Error("Authentication token_type must be Bearer.");
     if (!Number.isInteger(payload.expires_in) || payload.expires_in <= 0) {
       throw new Error("Authentication expires_in is invalid.");
     }
-    return { kind: "authenticated", token };
-  }
-
-  function setTenant(route) {
-    requirePlainObject(route, "Tenant route");
-    loginTenant.textContent = requireString(route.display_name, "tenant display_name");
-    workspaceTenant.textContent = route.display_name;
+    return {
+      kind: "authenticated",
+      token: requireString(payload.access_token, "access_token"),
+    };
   }
 
   async function loadOwnerGroups() {
-    const payload = await router.tenantApiRequest("/hosted/groups", { authenticated: true });
-    requirePlainObject(payload, "Hosted groups response");
-    if (Object.keys(payload).length !== 1 || !Array.isArray(payload.groups)) {
-      throw new Error("Hosted groups response schema is invalid.");
-    }
+    const payload = await apiRequest("/hosted/groups", { authenticated: true });
+    requireExactFields(payload, ["groups"], "Hosted groups response");
+    if (!Array.isArray(payload.groups)) throw new Error("Hosted groups response has no groups list.");
 
     const owners = [];
     for (const rawGroup of payload.groups) {
       const group = requirePlainObject(rawGroup, "Hosted group");
       const allowedFields = new Set(["group_id", "name", "role", "status", "visibility"]);
-      for (const field of Object.keys(group)) {
+      const actual = Object.keys(group);
+      for (const field of ["group_id", "name", "role", "status"]) {
+        if (!actual.includes(field)) throw new Error(`Hosted group is missing field: ${field}`);
+      }
+      for (const field of actual) {
         if (!allowedFields.has(field)) throw new Error(`Hosted group contained unexpected field: ${field}`);
       }
       if (!ID_PATTERN.test(group.group_id)) throw new Error("Hosted group_id is invalid.");
@@ -192,23 +332,22 @@
   }
 
   async function enterWorkspace(token, authenticatedLoginId) {
-    if (typeof token !== "string" || token.length === 0) throw new TypeError("token must be non-empty.");
-    currentLoginId = validateLoginId(authenticatedLoginId);
-    router.storeAccessToken(token);
-    await loadOwnerGroups();
-    const tenant = router.currentTenant;
-    if (tenant === null) throw new Error("Tenant disappeared after login.");
-    setTenant(tenant);
+    storeAuthentication(token, authenticatedLoginId);
+    try {
+      await loadOwnerGroups();
+    } catch (error) {
+      if (error instanceof GirlsApiError && error.status === 401) {
+        clearAuthentication();
+      }
+      throw error;
+    }
     setOnlyPanel(uploadPanel);
   }
 
   async function handleAuthPayload(payload, attemptedLoginId) {
     const result = validateAuthenticatedResponse(payload);
     if (result.kind === "challenge") {
-      pendingPasswordChallenge = {
-        loginId: validateLoginId(result.loginId),
-        session: result.session,
-      };
+      pendingPasswordChallenge = { loginId: result.loginId, session: result.session };
       newPassword.value = "";
       newPasswordConfirm.value = "";
       setMessage(passwordError, null);
@@ -218,34 +357,6 @@
     pendingPasswordChallenge = null;
     await enterWorkspace(result.token, attemptedLoginId);
   }
-
-  async function showLoginForTenant(route) {
-    setTenant(route);
-    loginPassword.value = "";
-    setMessage(loginError, null);
-    setOnlyPanel(loginPanel);
-  }
-
-  classroomForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    setMessage(classroomError, null);
-    const code = classroomCode.value;
-    if (code.length === 0 || code !== code.trim()) {
-      setMessage(classroomError, "教室コードは前後に空白を入れず入力してください。");
-      return;
-    }
-    const button = classroomForm.querySelector("button[type='submit']");
-    if (!(button instanceof HTMLButtonElement)) throw new Error("Classroom submit button was not found.");
-    button.disabled = true;
-    try {
-      const route = await router.selectClassroom(code);
-      await showLoginForTenant(route);
-    } catch (error) {
-      setMessage(classroomError, errorMessage(error));
-    } finally {
-      button.disabled = false;
-    }
-  });
 
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -266,7 +377,7 @@
     if (!(button instanceof HTMLButtonElement)) throw new Error("Login submit button was not found.");
     button.disabled = true;
     try {
-      const payload = await router.tenantApiRequest("/auth/login", {
+      const payload = await apiRequest("/auth/login", {
         method: "POST",
         jsonBody: { login_id: normalizedLoginId, password },
       });
@@ -300,7 +411,7 @@
     button.disabled = true;
     try {
       const challenge = pendingPasswordChallenge;
-      const payload = await router.tenantApiRequest("/auth/change-password", {
+      const payload = await apiRequest("/auth/change-password", {
         method: "POST",
         jsonBody: {
           login_id: challenge.loginId,
@@ -316,33 +427,24 @@
     }
   });
 
-  changeClassroom.addEventListener("click", async () => {
-    await router.clearForClassroomChange();
-    pendingPasswordChallenge = null;
-    currentLoginId = null;
-    classroomCode.value = "";
-    setMessage(classroomError, null);
-    setOnlyPanel(classroomPanel);
-  });
-
   logoutButton.addEventListener("click", () => {
-    router.clearAuthentication();
+    clearAuthentication();
     pendingPasswordChallenge = null;
-    currentLoginId = null;
-    const tenant = router.currentTenant;
-    if (tenant === null) throw new Error("Cannot log out without a selected tenant.");
-    void showLoginForTenant(tenant);
+    loginPassword.value = "";
+    setMessage(loginError, null);
+    setOnlyPanel(loginPanel);
   });
 
   copyPrompt.addEventListener("click", async () => {
     setMessage(copyResult, null);
+    setMessage(uploadError, null);
     if (navigator.clipboard === undefined || typeof navigator.clipboard.writeText !== "function") {
       setMessage(uploadError, "このブラウザではクリップボードへコピーできません。文章を長押ししてコピーしてください。");
       return;
     }
     try {
       await navigator.clipboard.writeText(aiPrompt.textContent);
-      setMessage(copyResult, "コピーしたよ♡ AIにそのまま貼ってね。 ");
+      setMessage(copyResult, "コピーしたよ♡ AIにそのまま貼ってね。");
     } catch (error) {
       setMessage(uploadError, `コピーできませんでした: ${errorMessage(error)}`);
     }
@@ -359,9 +461,7 @@
   }
 
   function validateHtml(html) {
-    if (typeof html !== "string" || html.length === 0) {
-      throw new Error("HTMLコードが空です。");
-    }
+    if (typeof html !== "string" || html.length === 0) throw new Error("HTMLコードが空です。");
     if (!/<html(?:\s|>)/i.test(html)) {
       throw new Error("HTMLコードに <html> 要素が見つかりません。AIには完成したHTML全体を出してもらってください。");
     }
@@ -403,6 +503,48 @@
     return bytes;
   }
 
+  function validateCreatedApp(payload, expectedGroupId) {
+    const app = requirePlainObject(payload, "Hosted app upload response");
+    const allowed = new Set([
+      "app_id", "group_id", "title", "source_kind", "created_at", "builtin_id", "builtin_asset_path",
+      "parent_app_id", "source_sha256", "source_updated_at", "published_sha256", "published_at",
+      "deletion_state", "builtin_version", "source_revision", "published_version", "editable",
+    ]);
+    for (const field of Object.keys(app)) {
+      if (!allowed.has(field)) throw new Error(`Hosted app upload response contained unexpected field: ${field}`);
+    }
+    for (const field of ["app_id", "group_id", "title", "source_kind", "created_at"]) {
+      if (!(field in app)) throw new Error(`Hosted app upload response is missing field: ${field}`);
+    }
+    if (!ID_PATTERN.test(app.app_id)) throw new Error("Uploaded app_id is invalid.");
+    if (app.group_id !== expectedGroupId) throw new Error("Uploaded app group_id mismatch.");
+    if (app.source_kind !== "upload") throw new Error("Uploaded app source_kind mismatch.");
+    if (app.source_revision !== 1) throw new Error("Uploaded app source_revision must be 1.");
+    return app;
+  }
+
+  function validatePublishResponse(payload, expectedAppId, expectedGroupId) {
+    const published = requireExactFields(
+      payload,
+      ["app_id", "group_id", "published_version", "source_revision", "sha256", "files", "published_at"],
+      "Hosted publish response",
+    );
+    if (published.app_id !== expectedAppId) throw new Error("Published app_id mismatch.");
+    if (published.group_id !== expectedGroupId) throw new Error("Published group_id mismatch.");
+    if (!Number.isInteger(published.published_version) || published.published_version < 1) {
+      throw new Error("Publish response has invalid published_version.");
+    }
+    if (published.source_revision !== 1) throw new Error("Publish response source_revision mismatch.");
+    if (typeof published.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(published.sha256)) {
+      throw new Error("Publish response sha256 is invalid.");
+    }
+    if (!Array.isArray(published.files) || !published.files.includes("index.html")) {
+      throw new Error("Publish response does not contain index.html.");
+    }
+    requireString(published.published_at, "published_at");
+    return published;
+  }
+
   uploadForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     setMessage(uploadError, null);
@@ -432,26 +574,21 @@
     let createdAppId = null;
     try {
       const params = new URLSearchParams({ title });
-      const created = await router.tenantApiRequest(`/hosted/groups/${groupId}/apps/upload?${params.toString()}`, {
+      const created = await apiRequest(`/hosted/groups/${groupId}/apps/upload?${params.toString()}`, {
         method: "POST",
         headers: { "Content-Type": "application/zip" },
         body: zipBytes,
         authenticated: true,
       });
-      requirePlainObject(created, "Hosted app upload response");
-      if (!ID_PATTERN.test(created.app_id)) throw new Error("Uploaded app_id is invalid.");
-      if (created.group_id !== groupId) throw new Error("Uploaded app group_id mismatch.");
-      createdAppId = created.app_id;
+      const app = validateCreatedApp(created, groupId);
+      createdAppId = app.app_id;
 
-      const published = await router.tenantApiRequest(`/hosted/groups/${groupId}/apps/${createdAppId}/publish`, {
+      const published = await apiRequest(`/hosted/groups/${groupId}/apps/${createdAppId}/publish`, {
         method: "POST",
         jsonBody: { revision: 1 },
         authenticated: true,
       });
-      requirePlainObject(published, "Hosted publish response");
-      if (!Number.isInteger(published.published_version) || published.published_version < 1 || published.source_revision !== 1) {
-        throw new Error("Publish response has invalid version information.");
-      }
+      validatePublishResponse(published, createdAppId, groupId);
 
       appTitle.value = "";
       sourceFile.value = "";
@@ -462,19 +599,38 @@
         ? ""
         : `アプリは下書きとして作成されました（app_id=${createdAppId}）が、公開に失敗しました。\n`;
       setMessage(uploadError, `${prefix}${errorMessage(error)}`);
+      if (error instanceof GirlsApiError && error.status === 401) {
+        setOnlyPanel(loginPanel);
+      }
     } finally {
       uploadSubmit.disabled = uploadGroup.disabled;
     }
   });
 
   async function bootstrap() {
-    await router.loadPortalConfig();
-    const route = await router.restoreCachedTenant();
-    if (route === null) {
-      setOnlyPanel(classroomPanel);
+    await loadConfig();
+    const storedToken = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+    const storedLoginId = sessionStorage.getItem(LOGIN_ID_KEY);
+    if (storedToken === null && storedLoginId === null) {
+      setOnlyPanel(loginPanel);
       return;
     }
-    await showLoginForTenant(route);
+    if (storedToken === null || storedLoginId === null) {
+      clearAuthentication();
+      throw new Error("Girls portal session storage is incomplete.");
+    }
+    currentLoginId = validateLoginId(storedLoginId);
+    try {
+      await loadOwnerGroups();
+      setOnlyPanel(uploadPanel);
+    } catch (error) {
+      if (error instanceof GirlsApiError && error.status === 401) {
+        clearAuthentication();
+        setOnlyPanel(loginPanel);
+        return;
+      }
+      throw error;
+    }
   }
 
   bootstrap().catch((error) => {
