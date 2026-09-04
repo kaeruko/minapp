@@ -363,18 +363,18 @@ class GirlsAppManagementApi {
       'Authorization': 'Bearer $accessToken',
     };
     if (body != null) headers['Content-Type'] = 'application/json';
-    late final http.Response response;
-    switch (method) {
-      case 'GET':
-        response = await _client.get(uri, headers: headers);
-      case 'POST':
-        response = await _client.post(
-          uri,
-          headers: headers,
-          body: body == null ? null : jsonEncode(body),
-        );
-      default:
-        throw ArgumentError.value(method, 'method', 'unsupported method');
+
+    final http.Response response;
+    if (method == 'GET') {
+      response = await _client.get(uri, headers: headers);
+    } else if (method == 'POST') {
+      response = await _client.post(
+        uri,
+        headers: headers,
+        body: body == null ? null : jsonEncode(body),
+      );
+    } else {
+      throw ArgumentError.value(method, 'method', 'unsupported method');
     }
     return _decodeJsonResponse(response);
   }
