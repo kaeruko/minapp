@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../hosted_app_webview.dart';
 import 'api.dart';
+import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
 import 'girls_app_preview_api.dart';
 import 'hosted_girls_api.dart';
@@ -92,7 +93,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
       );
     } catch (error) {
       if (mounted) {
-        setState(() => _error = girlsMessageFor(error));
+        setState(() => _error = core.girlsMessageFor(error));
       }
     } finally {
       if (mounted && _busy) setState(() => _busy = false);
