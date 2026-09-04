@@ -16,15 +16,12 @@
   z-index: 0;
   top: 64px;
   left: 0;
-
   width: 100%;
   height: 50px;
-
   background-image: url("/girls_login_lace.png");
   background-size: 25vw auto;
   background-position: center top;
   background-repeat: repeat-x;
-
   pointer-events: none;
 }
 
@@ -75,17 +72,12 @@
 }
 
 .girls-auth-shell .girls-hero::before {
-  content: "みんアプ\A girls";
+  content: "";
   display: block;
-  white-space: pre;
-  color: #fffdfc;
-  font-size: clamp(3.2rem, 7vw, 5.8rem);
-  font-weight: 1000;
-  line-height: 0.82;
-  letter-spacing: -0.06em;
-  -webkit-text-stroke: 5px #aa8bb9;
-  paint-order: stroke fill;
-  filter: drop-shadow(0 5px 0 rgba(255, 255, 255, 0.75));
+  width: min(74%, 440px);
+  height: 164px;
+  margin: 0 auto;
+  background: url("/girls_logo.png") center 48% / cover no-repeat;
 }
 
 .girls-auth-shell .girls-kicker {
@@ -230,7 +222,8 @@
   }
 
   .girls-auth-shell .girls-hero::before {
-    font-size: clamp(3rem, 13vw, 4.8rem);
+    width: min(76%, 400px);
+    height: 150px;
   }
 
   .girls-auth-shell .girls-kicker {
@@ -264,8 +257,8 @@
   }
 
   .girls-auth-shell .girls-hero::before {
-    font-size: clamp(2.55rem, 15vw, 4rem);
-    -webkit-text-stroke-width: 4px;
+    width: min(82%, 330px);
+    height: 122px;
   }
 
   .girls-auth-shell .girls-kicker {
