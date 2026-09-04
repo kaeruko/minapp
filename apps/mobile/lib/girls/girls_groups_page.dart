@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_footer_nav.dart';
-import 'girls_zip_upload_page.dart';
 import 'hosted_girls_api.dart';
 
 const Color _lavender = Color(0xFFB39DDB);
@@ -16,6 +16,7 @@ const Color _blue = Color(0xFFC9E5FF);
 const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
 const String _girlsLogoAsset = 'assets/girls/generated/minapp_girls_logo.png';
 const String _girlsLaceAsset = 'assets/girls/generated/border_lace_heart.png';
+const String _girlsUploadPortalUrl = 'https://minapp.cloxs.jp/girls.html';
 
 /// Girls group selection page using the reusable five-hill footer.
 ///
@@ -228,29 +229,28 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
     }
   }
 
-  Future<void> _openZipUpload() async {
+  Future<void> _openUploadPortal() async {
     final List<HostedGroup>? groups = _groups;
     if (groups == null) return;
-    final List<HostedGroup> ownerGroups = groups
-        .where((HostedGroup group) => group.isOwner)
-        .toList(growable: false);
-    if (ownerGroups.isEmpty) {
-      setState(() => _error = 'ZIPを追加するには、自分がオーナーのグループが必要です。');
+    final bool hasOwnedGroup = groups.any((HostedGroup group) => group.isOwner);
+    if (!hasOwnedGroup) {
+      setState(() => _error = 'アプリを追加するには、自分がオーナーのグループが必要です。');
       return;
     }
-    final bool? uploaded = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (BuildContext context) => GirlsZipUploadPage(
-          api: widget.api,
-          session: widget.session,
-          ownerGroups: ownerGroups,
-        ),
-      ),
-    );
-    if (uploaded == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ZIPアプリを追加して公開しました。')),
+
+    setState(() => _error = null);
+    final Uri portalUri = Uri.parse(_girlsUploadPortalUrl);
+    try {
+      final bool opened = await launchUrl(
+        portalUri,
+        mode: LaunchMode.externalApplication,
       );
+      if (!opened) {
+        throw StateError('外部ブラウザを開けませんでした: $portalUri');
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = 'アプリ追加ページを開けませんでした: $error');
     }
   }
 
@@ -417,10 +417,10 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
                         const SizedBox(height: 12),
                         _GroupActionCard(
                           color: const Color(0xFFE8D8FF),
-                          icon: Icons.folder_zip_rounded,
-                          title: 'ZIPからアプリを追加',
+                          icon: Icons.open_in_new_rounded,
+                          title: 'アプリを追加♡',
                           onTap:
-                              _busy || groups == null ? null : _openZipUpload,
+                              _busy || groups == null ? null : _openUploadPortal,
                         ),
                         if (_error != null) ...<Widget>[
                           const SizedBox(height: 14),
