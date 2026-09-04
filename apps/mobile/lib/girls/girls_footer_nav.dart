@@ -12,8 +12,8 @@ const Color _footerSelectedText = Color(0xFF745B9E);
 enum GirlsFooterTab {
   home('ホーム', 'assets/girls/cutouts/home_tab.png'),
   groups('グループ', 'assets/girls/cutouts/groups_tab.png'),
-  diary('日記', 'assets/girls/cutouts/diary_tab.png'),
-  games('ゲーム', 'assets/girls/cutouts/games_tab.png'),
+  shop('ショップ', 'assets/girls/cutouts/shop_tab.png'),
+  apps('アプリ', 'assets/girls/cutouts/apps_tab.png'),
   more('その他', 'assets/girls/cutouts/more_tab.png');
 
   const GirlsFooterTab(this.label, this.assetName);
@@ -62,8 +62,8 @@ class GirlsFooterNav extends StatelessWidget {
     this.enabledTabs = const <GirlsFooterTab>{
       GirlsFooterTab.home,
       GirlsFooterTab.groups,
-      GirlsFooterTab.diary,
-      GirlsFooterTab.games,
+      GirlsFooterTab.shop,
+      GirlsFooterTab.apps,
       GirlsFooterTab.more,
     },
     super.key,
