@@ -84,10 +84,10 @@ def _handle_upload_request(event: dict[str, Any]) -> dict[str, Any] | None:
 def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
     method = _request_method(event)
     path = _raw_path(event)
-    auth_subject = _auth_subject(event)
-    backend = _get_backend()
 
     if method == "GET" and path == "/hosted/my/apps":
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
         return _json_response(
             200,
             {"apps": hosted_app_management.list_managed_apps(backend, auth_subject)},
@@ -95,6 +95,8 @@ def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
 
     app_match = _MY_APP_RE.fullmatch(path)
     if method == "GET" and app_match is not None:
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
         return _json_response(
             200,
             hosted_app_management.get_managed_app(
@@ -111,6 +113,8 @@ def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
         hidden = payload["hidden"]
         if not isinstance(hidden, bool):
             raise ApiProblem(400, "invalid_request", "hidden must be a boolean.")
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
         return _json_response(
             200,
             hosted_app_management.set_visibility(
