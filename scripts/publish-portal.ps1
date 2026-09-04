@@ -51,6 +51,7 @@ $productionAssets = @(
     "portal_shell.css",
     "girls_portal.css",
     "girls_portal_base.css",
+    "girls_footer.css",
     "girls_login_frame.png",
     "girls_login_pattern.png",
     "girls_login_lace.png",
@@ -70,7 +71,8 @@ $productionAssets = @(
     "display_names.js",
     "portal_shell.js",
     "girls_portal.js",
-    "girls_portal_shell.js"
+    "girls_portal_shell.js",
+    "girls_footer.js"
 )
 
 foreach ($relativePath in $productionAssets) {
