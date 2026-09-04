@@ -51,8 +51,10 @@ void main() {
       appId: _appId,
     );
 
-    expect(session.contentUri.toString(),
-        'https://hosted.example.test/hosted/content/$_contentToken/index.html');
+    expect(
+      session.contentUri.toString(),
+      'https://hosted.example.test/hosted/content/$_contentToken/index.html',
+    );
     expect(session.publishedVersion, 4);
     expect(session.sourceRevision, isNull);
     expect(session.runtimeToken, _runtimeToken);
@@ -63,7 +65,10 @@ void main() {
         '/hosted/groups/$_groupId/apps/$_appId/runtime-session',
       ],
     );
-    expect(paths, isNot(contains(contains('/launch-session'))));
+    expect(
+      paths.where((String path) => path.contains('/launch-session')),
+      isEmpty,
+    );
   });
 
   test('draft preview uses owner preview capability plus runtime session', () async {
@@ -101,8 +106,10 @@ void main() {
       appId: _appId,
     );
 
-    expect(session.contentUri.toString(),
-        'https://hosted.example.test/hosted/preview/$_previewToken/index.html');
+    expect(
+      session.contentUri.toString(),
+      'https://hosted.example.test/hosted/preview/$_previewToken/index.html',
+    );
     expect(session.sourceRevision, 7);
     expect(session.publishedVersion, isNull);
     expect(session.runtimeToken, _runtimeToken);
