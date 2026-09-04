@@ -4,6 +4,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 BACKEND_SRC = Path(__file__).resolve().parents[1] / "src"
@@ -14,9 +15,29 @@ import abuse_entry  # noqa: E402
 import hosted_entry  # noqa: E402
 
 
+class FakeDynamoDb:
+    def __init__(self) -> None:
+        self.transactions: list[list[dict[str, Any]]] = []
+
+    def transact_write_items(self, *, TransactItems: list[dict[str, Any]]) -> None:
+        self.transactions.append(TransactItems)
+
+
 class FakeLaunchBackend:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, str]] = []
+        self._dynamodb = FakeDynamoDb()
+        self._table_name = "metadata"
+
+    def _require_app_in_group(self, app_id: str, group_id: str) -> dict[str, Any]:
+        return {
+            "app_id": {"S": app_id},
+            "group_id": {"S": group_id},
+        }
+
+    def _user_by_auth_subject(self, auth_subject: str) -> SimpleNamespace:
+        self.last_user_subject = auth_subject
+        return SimpleNamespace(user_id="1" * 32)
 
     def create_launch_session(
         self, auth_subject: str, group_id: str, app_id: str
@@ -82,6 +103,9 @@ class HostedEntryTests(unittest.TestCase):
             self.backend.calls,
             [("sub-member", group_id, app_id)],
         )
+        self.assertEqual(self.backend.last_user_subject, "sub-member")
+        self.assertEqual(len(self.backend._dynamodb.transactions), 1)
+        self.assertEqual(len(self.backend._dynamodb.transactions[0]), 3)
 
     def test_deployed_abuse_entry_reaches_launch_session(self) -> None:
         group_id = "4" * 32
@@ -101,6 +125,7 @@ class HostedEntryTests(unittest.TestCase):
             self.backend.calls,
             [("sub-member", group_id, app_id)],
         )
+        self.assertEqual(len(self.backend._dynamodb.transactions), 1)
 
     def test_launch_session_rejects_unknown_body_fields(self) -> None:
         group_id = "2" * 32
@@ -117,6 +142,7 @@ class HostedEntryTests(unittest.TestCase):
 
         self.assertEqual(response["statusCode"], 400)
         self.assertEqual(self.backend.calls, [])
+        self.assertEqual(self.backend._dynamodb.transactions, [])
 
     def test_launch_session_requires_authorizer(self) -> None:
         group_id = "2" * 32
@@ -132,6 +158,7 @@ class HostedEntryTests(unittest.TestCase):
 
         self.assertEqual(response["statusCode"], 401)
         self.assertEqual(self.backend.calls, [])
+        self.assertEqual(self.backend._dynamodb.transactions, [])
 
 
 if __name__ == "__main__":

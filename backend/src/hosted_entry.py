@@ -15,6 +15,7 @@ from handler import (
     _require_fields,
     _zip_body,
 )
+import hosted_app_management
 import hosted_handler
 from hosted_upload import create_uploaded_app
 
@@ -25,6 +26,8 @@ _LAUNCH_SESSION_RE = re.compile(
     rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/launch-session$"
 )
 _GROUP_APP_UPLOAD_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/upload$")
+_MY_APP_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}$")
+_MY_APP_VISIBILITY_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/visibility$")
 
 
 class LaunchBackend(Protocol):
@@ -78,6 +81,52 @@ def _handle_upload_request(event: dict[str, Any]) -> dict[str, Any] | None:
     )
 
 
+def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
+    method = _request_method(event)
+    path = _raw_path(event)
+
+    if method == "GET" and path == "/hosted/my/apps":
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
+        return _json_response(
+            200,
+            {"apps": hosted_app_management.list_managed_apps(backend, auth_subject)},
+        )
+
+    app_match = _MY_APP_RE.fullmatch(path)
+    if method == "GET" and app_match is not None:
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
+        return _json_response(
+            200,
+            hosted_app_management.get_managed_app(
+                backend,
+                auth_subject,
+                app_match.group(1),
+            ),
+        )
+
+    visibility_match = _MY_APP_VISIBILITY_RE.fullmatch(path)
+    if method == "POST" and visibility_match is not None:
+        payload = _json_body(event)
+        _require_fields(payload, required={"hidden"})
+        hidden = payload["hidden"]
+        if not isinstance(hidden, bool):
+            raise ApiProblem(400, "invalid_request", "hidden must be a boolean.")
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
+        return _json_response(
+            200,
+            hosted_app_management.set_visibility(
+                backend,
+                auth_subject,
+                visibility_match.group(1),
+                hidden=hidden,
+            ),
+        )
+    return None
+
+
 def _handle_launch_request(event: dict[str, Any]) -> dict[str, Any] | None:
     if _request_method(event) != "POST":
         return None
@@ -87,14 +136,18 @@ def _handle_launch_request(event: dict[str, Any]) -> dict[str, Any] | None:
     payload = _json_body(event)
     _require_fields(payload, required=set())
     group_id, app_id = match.groups()
-    return _json_response(
-        201,
-        _get_backend().create_launch_session(
-            _auth_subject(event),
-            group_id,
-            app_id,
-        ),
+    auth_subject = _auth_subject(event)
+    backend = _get_backend()
+    hosted_app_management.require_visible(backend, group_id, app_id)
+    result = backend.create_launch_session(auth_subject, group_id, app_id)
+    user = backend._user_by_auth_subject(auth_subject)  # type: ignore[attr-defined]
+    hosted_app_management.record_launch(
+        backend,
+        group_id=group_id,
+        app_id=app_id,
+        user_id=user.user_id,
     )
+    return _json_response(201, result)
 
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -104,6 +157,9 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         upload_response = _handle_upload_request(event)
         if upload_response is not None:
             return upload_response
+        management_response = _handle_management_request(event)
+        if management_response is not None:
+            return management_response
         launch_response = _handle_launch_request(event)
         if launch_response is not None:
             return launch_response

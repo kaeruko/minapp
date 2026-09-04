@@ -4,6 +4,7 @@ import 'api.dart';
 import 'builtin_apps.dart';
 import 'builtin_webview.dart';
 import 'girls_app_core.dart' as core;
+import 'girls_apps_page.dart';
 import 'girls_footer_nav.dart';
 import 'girls_email_settings_page.dart';
 import 'girls_groups_page.dart';
@@ -110,6 +111,19 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
             Navigator.of(routeContext).pop();
             widget.onLogout();
           },
+        ),
+      ),
+    );
+    if (mounted) await _loadGroups();
+  }
+
+  Future<void> _openApps() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext routeContext) => GirlsAppsPage(
+          api: widget.api,
+          session: widget.session,
+          onHome: () => Navigator.of(routeContext).pop(),
         ),
       ),
     );
@@ -312,9 +326,17 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
           enabledTabs: const <GirlsFooterTab>{
             GirlsFooterTab.home,
             GirlsFooterTab.groups,
+            GirlsFooterTab.apps,
+            GirlsFooterTab.more,
           },
           onSelected: (GirlsFooterTab tab) {
-            if (tab == GirlsFooterTab.groups) _openGroups();
+            if (tab == GirlsFooterTab.groups) {
+              _openGroups();
+              return;
+            }
+            if (tab == GirlsFooterTab.apps || tab == GirlsFooterTab.more) {
+              _openApps();
+            }
           },
         ),
       ),
