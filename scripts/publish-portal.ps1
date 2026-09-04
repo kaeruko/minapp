@@ -39,6 +39,7 @@ if (-not (Test-Path $webDir -PathType Container)) {
 
 $productionAssets = @(
     "index.html",
+    "girls.html",
     "styles.css",
     "preauth.css",
     "phase2.css",
@@ -48,7 +49,9 @@ $productionAssets = @(
     "moderation_actions.css",
     "display_names.css",
     "portal_shell.css",
+    "girls_portal.css",
     "portal_routing.js",
+    "single_html_zip.js",
     "app.js",
     "phase2.js",
     "phase2_transport.js",
@@ -58,7 +61,8 @@ $productionAssets = @(
     "custom_student_login.js",
     "moderation_actions.js",
     "display_names.js",
-    "portal_shell.js"
+    "portal_shell.js",
+    "girls_portal.js"
 )
 
 foreach ($relativePath in $productionAssets) {
