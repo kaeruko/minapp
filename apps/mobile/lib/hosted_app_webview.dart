@@ -8,6 +8,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'hosted_runtime_bridge.dart';
 
+final RegExp _previewTokenPattern = RegExp(r'^[A-Za-z0-9_-]{32,128}$');
+
 bool isHostedMicrophoneOnlyPermissionRequest(
   Set<WebViewPermissionResourceType> types,
 ) {
@@ -21,11 +23,44 @@ class HostedAppWebViewPage extends StatefulWidget {
     required this.launch,
     required this.runtimeTransport,
     super.key,
-  });
+  })  : sessionContentUri = null,
+        sessionRuntimeToken = null;
+
+  const HostedAppWebViewPage.session({
+    required this.title,
+    required Uri contentUri,
+    required String runtimeToken,
+    required this.runtimeTransport,
+    super.key,
+  })  : launch = null,
+        sessionContentUri = contentUri,
+        sessionRuntimeToken = runtimeToken;
 
   final String title;
-  final HostedLaunchGrant launch;
+  final HostedLaunchGrant? launch;
+  final Uri? sessionContentUri;
+  final String? sessionRuntimeToken;
   final HostedRuntimeTransport runtimeTransport;
+
+  Uri get contentUri {
+    final HostedLaunchGrant? launchGrant = launch;
+    if (launchGrant != null) return launchGrant.contentUri;
+    final Uri? value = sessionContentUri;
+    if (value == null) {
+      throw StateError('Hosted WebView session has no content URI.');
+    }
+    return value;
+  }
+
+  String get runtimeToken {
+    final HostedLaunchGrant? launchGrant = launch;
+    if (launchGrant != null) return launchGrant.runtimeToken;
+    final String? value = sessionRuntimeToken;
+    if (value == null || value.isEmpty) {
+      throw StateError('Hosted WebView session has no Runtime token.');
+    }
+    return value;
+  }
 
   @override
   State<HostedAppWebViewPage> createState() => _HostedAppWebViewPageState();
@@ -42,17 +77,26 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
   bool _bridgeFailed = false;
   bool _permissionPromptActive = false;
 
-  late final HostedContentNavigationPolicy _navigationPolicy;
+  late final bool Function(Uri target) _allowsNavigation;
   late final HostedBridgeSession _bridgeSession;
   final HostedBridgeDocumentInjector _injector = HostedBridgeDocumentInjector();
 
   @override
   void initState() {
     super.initState();
-    _navigationPolicy = HostedContentNavigationPolicy(widget.launch.contentUri);
+    final Uri contentUri = widget.contentUri;
+    if (_HostedPreviewNavigationPolicy.isPreviewUri(contentUri)) {
+      final _HostedPreviewNavigationPolicy policy =
+          _HostedPreviewNavigationPolicy(contentUri);
+      _allowsNavigation = policy.allows;
+    } else {
+      final HostedContentNavigationPolicy policy =
+          HostedContentNavigationPolicy(contentUri);
+      _allowsNavigation = policy.allows;
+    }
     _bridgeSession = HostedBridgeSession(
       transport: widget.runtimeTransport,
-      runtimeToken: widget.launch.runtimeToken,
+      runtimeToken: widget.runtimeToken,
     );
     _prepareWebView();
   }
@@ -79,7 +123,7 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
             },
             onNavigationRequest: (NavigationRequest request) {
               final Uri? target = Uri.tryParse(request.url);
-              if (target == null || !_navigationPolicy.allows(target)) {
+              if (target == null || !_allowsNavigation(target)) {
                 return NavigationDecision.prevent;
               }
               return NavigationDecision.navigate;
@@ -95,7 +139,7 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
         return;
       }
       setState(() => _controller = controller);
-      await controller.loadRequest(widget.launch.contentUri);
+      await controller.loadRequest(widget.contentUri);
     } catch (error, stackTrace) {
       _failBridgeOrPage(
         context: 'Hosted WebView initialization failed.',
@@ -210,7 +254,7 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
       return;
     }
     final Uri? uri = Uri.tryParse(rawUrl);
-    if (uri == null || !_navigationPolicy.allows(uri)) {
+    if (uri == null || !_allowsNavigation(uri)) {
       _failBridgeOrPage(
         context: 'Hosted WebView finished an out-of-scope navigation.',
         error: StateError('Rejected finished URL: $rawUrl'),
@@ -305,6 +349,70 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
                     ],
                   ),
       ),
+    );
+  }
+}
+
+class _HostedPreviewNavigationPolicy {
+  _HostedPreviewNavigationPolicy(Uri contentUri)
+      : _contentUri = _validateContentUri(contentUri),
+        _allowedPathPrefix = _contentPathPrefix(contentUri);
+
+  final Uri _contentUri;
+  final String _allowedPathPrefix;
+
+  static bool isPreviewUri(Uri uri) {
+    final List<String> segments = uri.pathSegments;
+    return segments.length == 4 &&
+        segments[0] == 'hosted' &&
+        segments[1] == 'preview';
+  }
+
+  bool allows(Uri target) {
+    return target.scheme == 'https' &&
+        target.host == _contentUri.host &&
+        target.port == _contentUri.port &&
+        target.userInfo.isEmpty &&
+        !_containsTraversalSegment(target) &&
+        target.path.startsWith(_allowedPathPrefix);
+  }
+
+  static Uri _validateContentUri(Uri uri) {
+    if (uri.scheme != 'https' ||
+        !uri.hasAuthority ||
+        uri.userInfo.isNotEmpty ||
+        uri.query.isNotEmpty ||
+        uri.fragment.isNotEmpty ||
+        _containsTraversalSegment(uri)) {
+      throw ArgumentError.value(
+        uri,
+        'contentUri',
+        'Hosted preview URL is invalid.',
+      );
+    }
+    final List<String> segments = uri.pathSegments;
+    if (segments.length != 4 ||
+        segments[0] != 'hosted' ||
+        segments[1] != 'preview' ||
+        !_previewTokenPattern.hasMatch(segments[2]) ||
+        segments[3] != 'index.html') {
+      throw ArgumentError.value(
+        uri,
+        'contentUri',
+        'Hosted preview URL path is invalid.',
+      );
+    }
+    return uri;
+  }
+
+  static String _contentPathPrefix(Uri uri) {
+    final List<String> segments = uri.pathSegments;
+    return '/hosted/preview/${segments[2]}/';
+  }
+
+  static bool _containsTraversalSegment(Uri uri) {
+    return uri.pathSegments.any(
+      (String segment) => segment == '.' || segment == '..',
     );
   }
 }
