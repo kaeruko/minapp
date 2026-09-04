@@ -7,9 +7,11 @@
     <title>みんアプ Girls | Webポータル</title>
     <link rel="stylesheet" href="/portal_shell.css" />
     <link rel="stylesheet" href="/girls_portal.css" />
+    <link rel="stylesheet" href="/girls_footer.css" />
     <script src="/single_html_zip.js" defer></script>
     <script src="/girls_portal.js" defer></script>
     <script src="/girls_portal_shell.js" defer></script>
+    <script src="/girls_footer.js" defer></script>
   </head>
   <body>
     <div id="girls-auth-shell" class="girls-auth-shell">
@@ -68,6 +70,25 @@
           <p id="girls-password-error" class="girls-message girls-message-error hidden" role="alert"></p>
         </section>
       </main>
+
+      <footer class="girls-login-footer" aria-label="サイト情報">
+        <a href="https://cloxs.jp/" target="_blank" rel="noopener noreferrer">運営会社</a>
+        <span class="girls-login-footer-separator" aria-hidden="true">｜</span>
+        <button id="girls-footer-privacy" type="button">プライバシーポリシー</button>
+        <span class="girls-login-footer-separator" aria-hidden="true">｜</span>
+        <a href="mailto:mail@cloxs.jp">お問い合わせ</a>
+      </footer>
+
+      <dialog id="girls-privacy-dialog" class="girls-privacy-dialog" aria-labelledby="girls-privacy-title">
+        <div class="girls-privacy-dialog-inner">
+          <div class="girls-privacy-dialog-header">
+            <h2 id="girls-privacy-title">プライバシーポリシー</h2>
+            <button id="girls-privacy-close" class="girls-privacy-dialog-close" type="button" aria-label="閉じる">×</button>
+          </div>
+          <p id="girls-privacy-status" class="girls-privacy-status">読み込んでいます…</p>
+          <pre id="girls-privacy-body" class="girls-privacy-body hidden"></pre>
+        </div>
+      </dialog>
     </div>
 
     <section id="girls-upload-panel" class="portal-shell girls-portal-shell hidden" aria-label="みんアプ Girls メニュー">
