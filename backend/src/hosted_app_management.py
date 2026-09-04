@@ -1,12 +1,26 @@
 from __future__ import annotations
 
+import hashlib
+import io
+import secrets
+import time
+import zipfile
 from datetime import datetime, timezone
 from typing import Any
 
 from aws_backend import _item_string, _string_attr
 from errors import ApiProblem
-from hosted_catalog_backend import _optional_number, _optional_string
+from hosted_catalog_backend import (
+    _content_type,
+    _files_json,
+    _item_files,
+    _optional_number,
+    _optional_string,
+)
 from hosted_platform_backend import _now_iso, _number_attr
+
+PREVIEW_SESSION_SECONDS = 10 * 60
+PREVIEW_TTL_GRACE_SECONDS = 24 * 60 * 60
 
 
 def _visibility(item: dict[str, Any]) -> str:
@@ -181,6 +195,89 @@ def set_visibility(
     if refreshed is None:
         raise RuntimeError("Managed app disappeared after visibility update")
     return _managed_payload(backend, refreshed)
+
+
+def create_preview_session(
+    backend: Any,
+    auth_subject: str,
+    app_id: str,
+) -> dict[str, Any]:
+    user, app = _owned_editable_app(backend, auth_subject, app_id)
+    group_id = _item_string(app, "group_id")
+    source_revision = backend._source_revision(app)
+
+    # Validate the immutable draft object before issuing a capability for it.
+    _, files, sha256 = backend._read_current_source(app)
+    source_key = _item_string(app, "source_key")
+
+    token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode("ascii")).hexdigest()
+    expires_at_epoch = int(time.time()) + PREVIEW_SESSION_SECONDS
+    session = {
+        "pk": _string_attr(f"HOSTEDPREVIEW#{token_hash}"),
+        "sk": _string_attr("META"),
+        "entity": _string_attr("hosted_preview_session"),
+        "user_id": _string_attr(user.user_id),
+        "group_id": _string_attr(group_id),
+        "app_id": _string_attr(app_id),
+        "source_revision": _number_attr(source_revision),
+        "source_key": _string_attr(source_key),
+        "source_sha256": _string_attr(sha256),
+        "source_files_json": _string_attr(_files_json(files)),
+        "expires_at_epoch": _number_attr(expires_at_epoch),
+        "ttl_epoch": _number_attr(expires_at_epoch + PREVIEW_TTL_GRACE_SECONDS),
+    }
+    backend._transact_put_new([session])
+    return {
+        "app_id": app_id,
+        "group_id": group_id,
+        "source_revision": source_revision,
+        "content_path": f"/hosted/preview/{token}/index.html",
+        "expires_in": PREVIEW_SESSION_SECONDS,
+    }
+
+
+def get_preview_file(
+    backend: Any,
+    token: str,
+    path: str,
+) -> tuple[bytes, str]:
+    if not isinstance(token, str) or not token or len(token) > 128:
+        raise ApiProblem(404, "preview_content_not_found", "Preview content was not found.")
+    token_hash = hashlib.sha256(token.encode("ascii")).hexdigest()
+    session = backend._get_item(pk=f"HOSTEDPREVIEW#{token_hash}", sk="META")
+    if session is None or (_optional_number(session, "expires_at_epoch") or 0) <= int(time.time()):
+        raise ApiProblem(404, "preview_content_not_found", "Preview content was not found.")
+
+    user_id = _item_string(session, "user_id")
+    group_id = _item_string(session, "group_id")
+    app_id = _item_string(session, "app_id")
+    backend._require_owner_group(user_id, group_id)
+    app = backend._require_app_in_group(app_id, group_id)
+    if app.get("editable", {}).get("BOOL") is not True:
+        raise ApiProblem(409, "app_not_manageable", "このアプリはプレビューできません。")
+    if _item_string(app, "owner_user_id") != user_id:
+        raise ApiProblem(403, "forbidden", "このアプリをプレビューする権限がありません。")
+    if _optional_string(app, "deletion_state") is not None:
+        raise ApiProblem(409, "app_deleting", "このアプリは削除処理中です。")
+
+    normalized = backend._normalize_content_path(path)
+    expected_files = _item_files(session, "source_files_json")
+    if normalized not in expected_files:
+        raise ApiProblem(404, "preview_file_not_found", "Preview file was not found.")
+    zip_bytes, actual_files, _ = backend._read_zip_object(
+        bucket=backend._upload_bucket,
+        key=_item_string(session, "source_key"),
+        expected_sha256=_item_string(session, "source_sha256"),
+    )
+    if actual_files != expected_files:
+        raise RuntimeError("Preview ZIP manifest does not match DynamoDB metadata")
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
+        try:
+            data = archive.read(normalized)
+        except KeyError as exc:
+            raise ApiProblem(404, "preview_file_not_found", "Preview file was not found.") from exc
+    return data, _content_type(normalized)
 
 
 def require_visible(backend: Any, group_id: str, app_id: str) -> None:
