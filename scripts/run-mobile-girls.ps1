@@ -1,6 +1,5 @@
 [CmdletBinding()]
 param(
-    [string]$HostedApiBaseUrl = $env:MINAPP_HOSTED_API_BASE_URL,
     [string]$DeviceId
 )
 
@@ -25,29 +24,6 @@ if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) {
     throw "flutter was not found in PATH."
 }
 
-if ([string]::IsNullOrWhiteSpace($HostedApiBaseUrl)) {
-    $HostedApiBaseUrl = [Environment]::GetEnvironmentVariable(
-        "MINAPP_HOSTED_API_BASE_URL",
-        [EnvironmentVariableTarget]::User
-    )
-}
-if ([string]::IsNullOrWhiteSpace($HostedApiBaseUrl)) {
-    throw "Hosted API base URL is required. Pass -HostedApiBaseUrl or set the MINAPP_HOSTED_API_BASE_URL user environment variable."
-}
-
-$parsedHostedApiBaseUrl = $null
-if (-not [Uri]::TryCreate($HostedApiBaseUrl, [UriKind]::Absolute, [ref]$parsedHostedApiBaseUrl)) {
-    throw "Hosted API base URL is not an absolute URI: $HostedApiBaseUrl"
-}
-if ($parsedHostedApiBaseUrl.Scheme -ne "https") {
-    throw "Hosted API base URL must use HTTPS: $HostedApiBaseUrl"
-}
-if (-not [string]::IsNullOrEmpty($parsedHostedApiBaseUrl.UserInfo) -or
-    -not [string]::IsNullOrEmpty($parsedHostedApiBaseUrl.Query) -or
-    -not [string]::IsNullOrEmpty($parsedHostedApiBaseUrl.Fragment)) {
-    throw "Hosted API base URL must not contain credentials, query, or fragment: $HostedApiBaseUrl"
-}
-
 & $configureAndroidScript
 if ($LASTEXITCODE -ne 0) {
     throw "Android configuration failed."
@@ -63,8 +39,7 @@ try {
     $flutterArgs = @(
         "run",
         "-t",
-        "lib/main_girls.dart",
-        "--dart-define=MINAPP_HOSTED_API_BASE_URL=$HostedApiBaseUrl"
+        "lib/main_girls.dart"
     )
     if (-not [string]::IsNullOrWhiteSpace($DeviceId)) {
         $flutterArgs += @("-d", $DeviceId)
