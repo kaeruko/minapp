@@ -6,7 +6,6 @@
     <meta name="color-scheme" content="light" />
     <title>みんアプ Girls | アプリを追加</title>
     <link rel="stylesheet" href="/girls_portal.css" />
-    <script src="/portal_routing.js" defer></script>
     <script src="/single_html_zip.js" defer></script>
     <script src="/girls_portal.js" defer></script>
   </head>
@@ -31,29 +30,10 @@
 
       <p id="girls-fatal" class="girls-message girls-message-error hidden" role="alert"></p>
 
-      <section id="girls-classroom-panel" class="girls-card hidden" aria-labelledby="girls-classroom-title">
-        <p class="girls-step">STEP 1</p>
-        <h2 id="girls-classroom-title">教室を選ぶ</h2>
-        <p class="girls-muted">みんアプ Girlsで使っている教室コードを入力してね。</p>
-        <form id="girls-classroom-form" class="girls-form">
-          <label>
-            教室コード
-            <input id="girls-classroom-code" autocomplete="off" maxlength="64" placeholder="例: DEMO" required />
-          </label>
-          <button class="girls-primary" type="submit">この教室を使う</button>
-        </form>
-        <p id="girls-classroom-error" class="girls-message girls-message-error hidden" role="alert"></p>
-      </section>
-
       <section id="girls-login-panel" class="girls-card hidden" aria-labelledby="girls-login-title">
-        <div class="girls-card-heading">
-          <div>
-            <p class="girls-step">STEP 2</p>
-            <h2 id="girls-login-title">ログイン</h2>
-          </div>
-          <button id="girls-change-classroom" class="girls-text-button" type="button">教室を変更</button>
-        </div>
-        <p class="girls-tenant-row">教室：<strong id="girls-login-tenant"></strong></p>
+        <p class="girls-step">STEP 1</p>
+        <h2 id="girls-login-title">GirlsのIDでログイン</h2>
+        <p class="girls-muted">みんアプ Girlsアプリで使っているIDとパスワードを入力してね。</p>
         <form id="girls-login-form" class="girls-form">
           <label>
             ID
@@ -88,14 +68,11 @@
       <section id="girls-upload-panel" class="girls-card girls-upload-card hidden" aria-labelledby="girls-upload-title">
         <div class="girls-card-heading">
           <div>
-            <p class="girls-step">STEP 3</p>
+            <p class="girls-step">STEP 2</p>
             <h2 id="girls-upload-title">アプリを追加</h2>
           </div>
           <button id="girls-logout" class="girls-text-button" type="button">ログアウト</button>
         </div>
-        <p class="girls-tenant-row">
-          <strong id="girls-workspace-tenant"></strong> に追加します
-        </p>
 
         <section class="girls-prompt-box" aria-labelledby="girls-prompt-title">
           <div>
