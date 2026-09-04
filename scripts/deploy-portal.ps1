@@ -12,6 +12,10 @@ param(
     [string]$DirectoryApiBaseUrl,
 
     [Parameter(Mandatory = $true)]
+    [ValidatePattern('^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$')]
+    [string]$HostedApiBaseUrl,
+
+    [Parameter(Mandatory = $true)]
     [string[]]$TenantApiOrigins,
 
     [Parameter(Mandatory = $false)]
@@ -73,6 +77,14 @@ foreach ($origin in $TenantApiOrigins) {
     }
     $seenOrigins[$origin] = $true
 }
+if ($HostedApiBaseUrl -notmatch $tenantOriginPattern) {
+    throw "HostedApiBaseUrl must be a public HTTPS origin with no path, query, fragment, or trailing slash: $HostedApiBaseUrl"
+}
+
+$effectiveTenantApiOrigins = @($TenantApiOrigins)
+if (-not $seenOrigins.ContainsKey($HostedApiBaseUrl)) {
+    $effectiveTenantApiOrigins += $HostedApiBaseUrl
+}
 
 if ([string]::IsNullOrWhiteSpace($Route53ZoneId) -and [string]::IsNullOrWhiteSpace($CertificateArn)) {
     throw "Provide CertificateArn for external DNS, or Route53ZoneId so Terraform can create and validate the portal certificate."
@@ -114,8 +126,9 @@ Write-Host "  PortalDomain:  $PortalDomain"
 Write-Host "  LegacyDomain:  $LegacyPortalDomain"
 Write-Host "  CanonicalLive: $ActivateCanonicalDomain"
 Write-Host "  Directory API: $DirectoryApiBaseUrl"
-Write-Host "  Tenant origins:"
-$TenantApiOrigins | ForEach-Object { Write-Host "    $_" }
+Write-Host "  Hosted API:    $HostedApiBaseUrl"
+Write-Host "  Tenant origins (including Hosted API):"
+$effectiveTenantApiOrigins | ForEach-Object { Write-Host "    $_" }
 Write-Host "  StateBucket:   $StateBucket"
 
 $bucketCheckArgs = @(
@@ -186,7 +199,7 @@ if ($LASTEXITCODE -ne 0) {
 $tfvarsPath = Join-Path $portalDir "terraform.tfvars"
 $backendPath = Join-Path $portalDir "backend.hcl"
 
-$tenantOriginsHcl = ($TenantApiOrigins | ForEach-Object { "  `"$_`"," }) -join "`n"
+$tenantOriginsHcl = ($effectiveTenantApiOrigins | ForEach-Object { "  `"$_`"," }) -join "`n"
 $certificateHcl = if ([string]::IsNullOrWhiteSpace($CertificateArn)) { "null" } else { "`"$CertificateArn`"" }
 $route53ZoneHcl = if ([string]::IsNullOrWhiteSpace($Route53ZoneId)) { "null" } else { "`"$Route53ZoneId`"" }
 
@@ -198,6 +211,7 @@ portal_domain          = "$PortalDomain"
 legacy_portal_domain   = "$LegacyPortalDomain"
 activate_canonical_domain = $($ActivateCanonicalDomain.ToString().ToLowerInvariant())
 directory_api_base_url = "$DirectoryApiBaseUrl"
+hosted_api_base_url    = "$HostedApiBaseUrl"
 tenant_api_origins = [
 $tenantOriginsHcl
 ]
