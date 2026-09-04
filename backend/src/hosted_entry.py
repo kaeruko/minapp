@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from typing import Any, Protocol
+from urllib.parse import unquote
 
 from errors import ApiProblem
 from handler import (
@@ -28,6 +29,8 @@ _LAUNCH_SESSION_RE = re.compile(
 _GROUP_APP_UPLOAD_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/upload$")
 _MY_APP_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}$")
 _MY_APP_VISIBILITY_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/visibility$")
+_MY_APP_PREVIEW_SESSION_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/preview-session$")
+_PREVIEW_CONTENT_RE = re.compile(r"^/hosted/preview/([A-Za-z0-9_-]{32,128})/(.+)$")
 
 
 class LaunchBackend(Protocol):
@@ -81,6 +84,23 @@ def _handle_upload_request(event: dict[str, Any]) -> dict[str, Any] | None:
     )
 
 
+def _handle_preview_content_request(event: dict[str, Any]) -> dict[str, Any] | None:
+    if _request_method(event) != "GET":
+        return None
+    match = _PREVIEW_CONTENT_RE.fullmatch(_raw_path(event))
+    if match is None:
+        return None
+    token, encoded_path = match.groups()
+    data, content_type = hosted_app_management.get_preview_file(
+        _get_backend(),
+        token,
+        unquote(encoded_path),
+    )
+    # Preview content uses the same locked-down response headers/CSP as
+    # published Hosted content; only the source capability differs.
+    return hosted_handler._published_content_response(data, content_type)
+
+
 def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
     method = _request_method(event)
     path = _raw_path(event)
@@ -124,6 +144,21 @@ def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
                 hidden=hidden,
             ),
         )
+
+    preview_match = _MY_APP_PREVIEW_SESSION_RE.fullmatch(path)
+    if method == "POST" and preview_match is not None:
+        payload = _json_body(event)
+        _require_fields(payload, required=set())
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
+        return _json_response(
+            201,
+            hosted_app_management.create_preview_session(
+                backend,
+                auth_subject,
+                preview_match.group(1),
+            ),
+        )
     return None
 
 
@@ -157,6 +192,9 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         upload_response = _handle_upload_request(event)
         if upload_response is not None:
             return upload_response
+        preview_content_response = _handle_preview_content_request(event)
+        if preview_content_response is not None:
+            return preview_content_response
         management_response = _handle_management_request(event)
         if management_response is not None:
             return management_response
