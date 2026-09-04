@@ -1,8 +1,8 @@
 locals {
   hosted_api_origin = trimspace(var.hosted_api_base_url)
   girls_config = {
-    schema_version       = 1
-    hosted_api_base_url  = local.hosted_api_origin
+    schema_version      = 1
+    hosted_api_base_url = local.hosted_api_origin
   }
   girls_config_json = jsonencode(local.girls_config)
 }
