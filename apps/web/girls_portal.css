@@ -4,7 +4,7 @@
 .girls-auth-shell {
   min-height: 100vh;
   background:
-    linear-gradient(rgba(255, 250, 246, 0.84), rgba(255, 247, 241, 0.9)),
+    linear-gradient(rgba(255, 250, 246, 0.48), rgba(255, 247, 241, 0.58)),
     url("/girls_login_pattern.png") center top / 360px auto repeat;
 }
 
