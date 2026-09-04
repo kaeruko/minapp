@@ -3,6 +3,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:minapp_mobile/girls/girls_footer_nav.dart';
 
 void main() {
+  test('Girls footer destinations are home groups shop apps more', () {
+    expect(
+      GirlsFooterTab.values.map((GirlsFooterTab tab) => tab.name).toList(),
+      <String>['home', 'groups', 'shop', 'apps', 'more'],
+    );
+    expect(
+      GirlsFooterTab.values.map((GirlsFooterTab tab) => tab.label).toList(),
+      <String>['ホーム', 'グループ', 'ショップ', 'アプリ', 'その他'],
+    );
+  });
+
   test('Girls footer mapper colors only the selected hill', () {
     const GirlsFooterColorMapper mapper =
         GirlsFooterColorMapper(GirlsFooterTab.groups);
@@ -52,8 +63,10 @@ void main() {
     await tester.pumpAndSettle();
 
     for (final GirlsFooterTab tab in GirlsFooterTab.values) {
-      expect(find.byKey(ValueKey<String>('girls-footer-${tab.name}')),
-          findsOneWidget);
+      expect(
+        find.byKey(ValueKey<String>('girls-footer-${tab.name}')),
+        findsOneWidget,
+      );
       expect(find.image(AssetImage(tab.assetName)), findsOneWidget);
     }
     expect(tester.takeException(), isNull);
