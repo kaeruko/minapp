@@ -278,7 +278,14 @@
         session: requireString(payload.session, "session"),
       };
     }
-    requireExactFields(payload, ["state", "access_token", "token_type", "expires_in"], "Authentication response");
+    const allowedFields = new Set(["state", "access_token", "token_type", "expires_in", "refresh_token"]);
+    const actualFields = Object.keys(payload);
+    for (const field of ["state", "access_token", "token_type", "expires_in"]) {
+      if (!actualFields.includes(field)) throw new Error(`Authentication response is missing field: ${field}`);
+    }
+    for (const field of actualFields) {
+      if (!allowedFields.has(field)) throw new Error(`Authentication response contained unexpected field: ${field}`);
+    }
     if (payload.state !== "authenticated") {
       throw new Error(`Unsupported authentication state: ${String(payload.state)}`);
     }
@@ -286,6 +293,7 @@
     if (!Number.isInteger(payload.expires_in) || payload.expires_in <= 0) {
       throw new Error("Authentication expires_in is invalid.");
     }
+    if (payload.refresh_token !== undefined) requireString(payload.refresh_token, "refresh_token");
     return {
       kind: "authenticated",
       token: requireString(payload.access_token, "access_token"),
@@ -530,7 +538,7 @@
       "Hosted publish response",
     );
     if (published.app_id !== expectedAppId) throw new Error("Published app_id mismatch.");
-    if (published.group_id !== expectedGroupId) throw new Error("Published group_id mismatch.");
+    if (published.group_id !== expectedGroupId) throw new Error("Published app group_id mismatch.");
     if (!Number.isInteger(published.published_version) || published.published_version < 1) {
       throw new Error("Publish response has invalid published_version.");
     }
