@@ -2,19 +2,38 @@
 
 /* Girls login artwork layer. Keep authenticated portal styles in girls_portal_base.css. */
 .girls-auth-shell {
+  position: relative;
   min-height: 100vh;
+  isolation: isolate;
   background:
     linear-gradient(rgba(255, 250, 246, 0.48), rgba(255, 247, 241, 0.58)),
     url("/girls_login_pattern.png") center top / 360px auto repeat;
 }
 
+.girls-auth-shell::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 64px;
+  left: 50%;
+  width: min(1386px, 100%);
+  aspect-ratio: 1386 / 102;
+  transform: translateX(-50%);
+  background: url("/girls_login_lace.png") center top / 100% 100% no-repeat;
+  pointer-events: none;
+}
+
 .girls-auth-shell .girls-header {
+  position: relative;
+  z-index: 2;
   background: rgba(255, 250, 244, 0.9);
   border-bottom-color: rgba(204, 166, 193, 0.36);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.86);
 }
 
 .girls-auth-shell .girls-shell {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(360px, 430px);
   grid-template-areas:

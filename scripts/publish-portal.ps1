@@ -53,6 +53,7 @@ $productionAssets = @(
     "girls_portal_base.css",
     "girls_login_frame.png",
     "girls_login_pattern.png",
+    "girls_login_lace.png",
     "girls_mascot_pair.svg",
     "portal_routing.js",
     "single_html_zip.js",
