@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
+import 'girls_app_test_actions.dart';
 import 'girls_footer_nav.dart';
 import 'girls_zip_upload_page.dart';
 import 'hosted_girls_api.dart';
@@ -408,6 +409,12 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
               )
             else ...<Widget>[
               _AppSummary(detail: detail),
+              const SizedBox(height: 14),
+              GirlsAppTestActions(
+                api: widget.api,
+                session: widget.session,
+                detail: detail,
+              ),
               const SizedBox(height: 14),
               Row(
                 children: <Widget>[
