@@ -62,7 +62,8 @@ $productionAssets = @(
     "moderation_actions.js",
     "display_names.js",
     "portal_shell.js",
-    "girls_portal.js"
+    "girls_portal.js",
+    "girls_portal_shell.js"
 )
 
 foreach ($relativePath in $productionAssets) {

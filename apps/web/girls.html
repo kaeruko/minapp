@@ -4,114 +4,236 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
-    <title>みんアプ Girls | アプリを追加</title>
+    <title>みんアプ Girls | Webポータル</title>
+    <link rel="stylesheet" href="/portal_shell.css" />
     <link rel="stylesheet" href="/girls_portal.css" />
     <script src="/single_html_zip.js" defer></script>
     <script src="/girls_portal.js" defer></script>
+    <script src="/girls_portal_shell.js" defer></script>
   </head>
   <body>
-    <header class="girls-header">
-      <a class="girls-brand" href="/girls.html" aria-label="みんアプ Girls ホーム">
-        <span class="girls-brand-heart" aria-hidden="true">♡</span>
-        <span>みんアプ Girls</span>
-      </a>
-      <span class="girls-header-tag">AIでつくって、すぐ追加</span>
-    </header>
+    <div id="girls-auth-shell" class="girls-auth-shell">
+      <header class="girls-header">
+        <a class="girls-brand" href="/girls.html" aria-label="みんアプ Girls ホーム">
+          <span class="girls-brand-heart" aria-hidden="true">♡</span>
+          <span>みんアプ Girls</span>
+        </a>
+        <span class="girls-header-tag">AIでつくって、すぐ追加</span>
+      </header>
 
-    <main class="girls-shell">
-      <section class="girls-hero" aria-labelledby="girls-title">
-        <p class="girls-kicker">スマホだけでOK ♡</p>
-        <h1 id="girls-title">AIが作ったアプリを<br />みんアプに入れよう</h1>
-        <p>
-          ZIPを作れなくても大丈夫。AIが出したHTMLをそのまま貼るか、HTML / ZIPファイルを選べば、
-          みんアプ用にしてアップロードします。
-        </p>
-      </section>
-
-      <p id="girls-fatal" class="girls-message girls-message-error hidden" role="alert"></p>
-
-      <section id="girls-login-panel" class="girls-card hidden" aria-labelledby="girls-login-title">
-        <p class="girls-step">STEP 1</p>
-        <h2 id="girls-login-title">GirlsのIDでログイン</h2>
-        <p class="girls-muted">みんアプ Girlsアプリで使っているIDとパスワードを入力してね。</p>
-        <form id="girls-login-form" class="girls-form">
-          <label>
-            ID
-            <input id="girls-login-id" autocomplete="username" inputmode="text" required />
-          </label>
-          <label>
-            パスワード
-            <input id="girls-login-password" type="password" autocomplete="current-password" required />
-          </label>
-          <button class="girls-primary" type="submit">ログインする</button>
-        </form>
-        <p id="girls-login-error" class="girls-message girls-message-error hidden" role="alert"></p>
-      </section>
-
-      <section id="girls-password-panel" class="girls-card hidden" aria-labelledby="girls-password-title">
-        <p class="girls-step">初回ログイン</p>
-        <h2 id="girls-password-title">新しいパスワードを決める</h2>
-        <form id="girls-password-form" class="girls-form">
-          <label>
-            新しいパスワード
-            <input id="girls-new-password" type="password" autocomplete="new-password" minlength="6" maxlength="128" required />
-          </label>
-          <label>
-            もう一度入力
-            <input id="girls-new-password-confirm" type="password" autocomplete="new-password" minlength="6" maxlength="128" required />
-          </label>
-          <button class="girls-primary" type="submit">変更して続ける</button>
-        </form>
-        <p id="girls-password-error" class="girls-message girls-message-error hidden" role="alert"></p>
-      </section>
-
-      <section id="girls-upload-panel" class="girls-card girls-upload-card hidden" aria-labelledby="girls-upload-title">
-        <div class="girls-card-heading">
-          <div>
-            <p class="girls-step">STEP 2</p>
-            <h2 id="girls-upload-title">アプリを追加</h2>
-          </div>
-          <button id="girls-logout" class="girls-text-button" type="button">ログアウト</button>
-        </div>
-
-        <section class="girls-prompt-box" aria-labelledby="girls-prompt-title">
-          <div>
-            <p class="girls-mini-label">AIに頼むとき</p>
-            <h3 id="girls-prompt-title">この文章を使うと簡単</h3>
-          </div>
-          <p id="girls-ai-prompt" class="girls-prompt-text">みんアプ技術資料 https://cloxs.jp/minapp/ai/index.html を見て、○○のアプリを作って。HTML・CSS・JavaScriptは1つのindex.htmlにまとめて、完成したHTMLコードをそのまま出して。</p>
-          <button id="girls-copy-prompt" class="girls-secondary" type="button">お願い文をコピー</button>
-          <p id="girls-copy-result" class="girls-message girls-message-success hidden" role="status"></p>
+      <main class="girls-shell">
+        <section class="girls-hero" aria-labelledby="girls-title">
+          <p class="girls-kicker">スマホだけでOK ♡</p>
+          <h1 id="girls-title">AIが作ったアプリを<br />みんアプに入れよう</h1>
+          <p>
+            ZIPを作れなくても大丈夫。AIが出したHTMLをそのまま貼るか、HTML / ZIPファイルを選べば、
+            みんアプ用にしてアップロードします。
+          </p>
         </section>
 
-        <form id="girls-upload-form" class="girls-form">
-          <label>
-            追加するグループ
-            <select id="girls-upload-group" required></select>
-          </label>
-          <label>
-            アプリ名
-            <input id="girls-app-title" maxlength="80" placeholder="例: 放課後おえかき帳" required />
-          </label>
+        <p id="girls-fatal" class="girls-message girls-message-error hidden" role="alert"></p>
 
-          <div class="girls-source-block">
+        <section id="girls-login-panel" class="girls-card hidden" aria-labelledby="girls-login-title">
+          <p class="girls-step">STEP 1</p>
+          <h2 id="girls-login-title">GirlsのIDでログイン</h2>
+          <p class="girls-muted">みんアプ Girlsアプリで使っているIDとパスワードを入力してね。</p>
+          <form id="girls-login-form" class="girls-form">
             <label>
-              HTML / ZIPファイルを選ぶ
-              <input id="girls-source-file" type="file" accept=".html,.htm,.zip,text/html,application/zip" />
+              ID
+              <input id="girls-login-id" autocomplete="username" inputmode="text" required />
             </label>
-            <p class="girls-or"><span>または</span></p>
             <label>
-              AIが出したHTMLコードを貼る
-              <textarea id="girls-source-code" rows="12" spellcheck="false" placeholder="<!doctype html> ..."></textarea>
+              パスワード
+              <input id="girls-login-password" type="password" autocomplete="current-password" required />
             </label>
+            <button class="girls-primary" type="submit">ログインする</button>
+          </form>
+          <p id="girls-login-error" class="girls-message girls-message-error hidden" role="alert"></p>
+        </section>
+
+        <section id="girls-password-panel" class="girls-card hidden" aria-labelledby="girls-password-title">
+          <p class="girls-step">初回ログイン</p>
+          <h2 id="girls-password-title">新しいパスワードを決める</h2>
+          <form id="girls-password-form" class="girls-form">
+            <label>
+              新しいパスワード
+              <input id="girls-new-password" type="password" autocomplete="new-password" minlength="6" maxlength="128" required />
+            </label>
+            <label>
+              もう一度入力
+              <input id="girls-new-password-confirm" type="password" autocomplete="new-password" minlength="6" maxlength="128" required />
+            </label>
+            <button class="girls-primary" type="submit">変更して続ける</button>
+          </form>
+          <p id="girls-password-error" class="girls-message girls-message-error hidden" role="alert"></p>
+        </section>
+      </main>
+    </div>
+
+    <section id="girls-upload-panel" class="portal-shell girls-portal-shell hidden" aria-label="みんアプ Girls メニュー">
+      <aside class="portal-shell-sidebar" aria-label="みんアプ Girls メニュー">
+        <div class="portal-shell-brand">
+          <div class="portal-shell-brand-mark girls-shell-brand-mark" aria-hidden="true">♡</div>
+          <div>
+            <p class="portal-shell-brand-name">みんアプ Girls</p>
+            <p class="portal-shell-brand-context">アプリ工房</p>
           </div>
+        </div>
 
-          <p class="girls-note">ファイルと貼り付けは、どちらか片方だけ使ってね。HTMLは自動で index.html のZIPにしてから送ります。上限は2MBです。</p>
-          <button id="girls-upload-submit" class="girls-primary" type="submit">アップロードして公開 ♡</button>
-        </form>
-        <p id="girls-upload-error" class="girls-message girls-message-error hidden" role="alert"></p>
-        <p id="girls-upload-result" class="girls-message girls-message-success hidden" role="status"></p>
-      </section>
-    </main>
+        <nav id="girls-shell-nav" class="portal-shell-nav" aria-label="メインメニュー">
+          <button class="portal-shell-nav-item portal-shell-nav-item-active" type="button" data-girls-view="home" aria-current="page">
+            <span class="portal-shell-nav-icon" aria-hidden="true">⌂</span><span>ホーム</span>
+          </button>
+          <button class="portal-shell-nav-item" type="button" data-girls-view="add">
+            <span class="portal-shell-nav-icon" aria-hidden="true">＋</span><span>アプリを追加</span>
+          </button>
+          <button class="portal-shell-nav-item" type="button" data-girls-view="apps">
+            <span class="portal-shell-nav-icon" aria-hidden="true">◆</span><span>自分のアプリ</span>
+          </button>
+          <button class="portal-shell-nav-item" type="button" data-girls-view="settings">
+            <span class="portal-shell-nav-icon" aria-hidden="true">⚙</span><span>設定</span>
+          </button>
+        </nav>
+
+        <div class="portal-shell-account">
+          <div class="portal-shell-account-card">
+            <div id="girls-shell-avatar" class="portal-shell-avatar" aria-hidden="true">♡</div>
+            <div class="portal-shell-account-copy">
+              <strong id="girls-shell-account-name"></strong>
+              <span>Girls</span>
+              <span id="girls-shell-group-name">グループを確認中…</span>
+            </div>
+          </div>
+          <button id="girls-logout" class="portal-shell-logout" type="button">↪ ログアウト</button>
+        </div>
+      </aside>
+
+      <div id="girls-shell-scrim" class="portal-shell-scrim" aria-hidden="true"></div>
+
+      <div class="portal-shell-main">
+        <header class="portal-shell-topbar">
+          <div class="portal-shell-title-wrap">
+            <button id="girls-shell-menu" class="portal-shell-menu" type="button" aria-label="メニューを開く" aria-expanded="false">☰</button>
+            <div>
+              <p class="portal-shell-role-context">Girls</p>
+              <h1 id="girls-shell-title">ホーム</h1>
+            </div>
+          </div>
+        </header>
+
+        <main class="portal-shell-content girls-shell-content">
+          <section id="girls-view-home" class="girls-view-panel" data-girls-panel="home">
+            <section class="girls-dashboard-hero">
+              <div>
+                <p class="girls-dashboard-kicker">MY APPS ♡</p>
+                <h2>AIといっしょに、<br />アプリを作ろう。</h2>
+                <p>AIが作ったHTMLを貼るだけでもOK。できたアプリはグループのみんなですぐ使えます。</p>
+              </div>
+              <div class="girls-dashboard-flow" aria-hidden="true">
+                <span>1 AIで作る</span><b>→</b><span>2 追加</span><b>→</b><span>3 みんなで使う</span>
+              </div>
+            </section>
+
+            <section class="girls-dashboard-card">
+              <div class="girls-section-heading">
+                <div><p class="girls-step">かんたんスタート</p><h2>今日は何を作る？</h2></div>
+              </div>
+              <div class="girls-home-actions">
+                <button class="girls-home-action" type="button" data-girls-open-view="add">
+                  <span class="girls-home-action-icon" aria-hidden="true">＋</span>
+                  <span><strong>アプリを追加</strong><small>AIが出したHTMLを貼り付ける</small></span>
+                </button>
+                <button class="girls-home-action" type="button" data-girls-open-view="apps">
+                  <span class="girls-home-action-icon" aria-hidden="true">◆</span>
+                  <span><strong>自分のアプリ</strong><small>追加したアプリを確認する</small></span>
+                </button>
+              </div>
+              <div class="girls-group-summary">
+                <span>追加先</span>
+                <strong id="girls-home-group-summary">グループを確認中…</strong>
+              </div>
+            </section>
+          </section>
+
+          <section id="girls-view-add" class="girls-view-panel girls-view-hidden" data-girls-panel="add">
+            <section class="girls-dashboard-card girls-upload-card" aria-labelledby="girls-upload-title">
+              <div class="girls-section-heading">
+                <div>
+                  <p class="girls-step">APP UPLOAD</p>
+                  <h2 id="girls-upload-title">アプリを追加</h2>
+                </div>
+              </div>
+
+              <section class="girls-prompt-box" aria-labelledby="girls-prompt-title">
+                <div>
+                  <p class="girls-mini-label">AIに頼むとき</p>
+                  <h3 id="girls-prompt-title">この文章を使うと簡単</h3>
+                </div>
+                <p id="girls-ai-prompt" class="girls-prompt-text">みんアプ技術資料 https://cloxs.jp/minapp/ai/index.html を見て、○○のアプリを作って。HTML・CSS・JavaScriptは1つのindex.htmlにまとめて、完成したHTMLコードをそのまま出して。</p>
+                <button id="girls-copy-prompt" class="girls-secondary" type="button">お願い文をコピー</button>
+                <p id="girls-copy-result" class="girls-message girls-message-success hidden" role="status"></p>
+              </section>
+
+              <form id="girls-upload-form" class="girls-form girls-upload-form">
+                <div class="girls-upload-basics">
+                  <label>
+                    追加するグループ
+                    <select id="girls-upload-group" required></select>
+                  </label>
+                  <label>
+                    アプリ名
+                    <input id="girls-app-title" maxlength="80" placeholder="例: 放課後おえかき帳" required />
+                  </label>
+                </div>
+
+                <div class="girls-source-block">
+                  <label>
+                    HTML / ZIPファイルを選ぶ
+                    <input id="girls-source-file" type="file" accept=".html,.htm,.zip,text/html,application/zip" />
+                  </label>
+                  <p class="girls-or"><span>または</span></p>
+                  <label>
+                    AIが出したHTMLコードを貼る
+                    <textarea id="girls-source-code" rows="12" spellcheck="false" placeholder="<!doctype html> ..."></textarea>
+                  </label>
+                </div>
+
+                <p class="girls-note">ファイルと貼り付けは、どちらか片方だけ使ってね。HTMLは自動で index.html のZIPにしてから送ります。上限は2MBです。</p>
+                <button id="girls-upload-submit" class="girls-primary" type="submit">アップロードして公開 ♡</button>
+              </form>
+              <p id="girls-upload-error" class="girls-message girls-message-error hidden" role="alert"></p>
+              <p id="girls-upload-result" class="girls-message girls-message-success hidden" role="status"></p>
+            </section>
+          </section>
+
+          <section id="girls-view-apps" class="girls-view-panel girls-view-hidden" data-girls-panel="apps">
+            <section class="girls-dashboard-card">
+              <div class="girls-section-heading girls-apps-heading">
+                <div><p class="girls-step">MY APPS</p><h2>自分のアプリ</h2></div>
+                <button id="girls-apps-refresh" class="girls-secondary" type="button">更新</button>
+              </div>
+              <p class="girls-muted">自分がオーナーのグループに追加したアプリをまとめて表示します。</p>
+              <p id="girls-apps-status" class="girls-muted" role="status">アプリを読み込むとここに表示されます。</p>
+              <div id="girls-app-list" class="girls-app-grid" aria-live="polite"></div>
+              <p id="girls-apps-error" class="girls-message girls-message-error hidden" role="alert"></p>
+            </section>
+          </section>
+
+          <section id="girls-view-settings" class="girls-view-panel girls-view-hidden" data-girls-panel="settings">
+            <section class="girls-dashboard-card">
+              <div class="girls-section-heading">
+                <div><p class="girls-step">ACCOUNT</p><h2>設定</h2></div>
+              </div>
+              <div class="girls-settings-list">
+                <div class="girls-settings-row"><span>ID</span><strong id="girls-settings-login-id"></strong></div>
+                <div class="girls-settings-row"><span>追加できるグループ</span><strong id="girls-settings-groups">確認中…</strong></div>
+              </div>
+              <p class="girls-note">グループの作成・参加やプロフィールの変更は、みんアプ Girlsアプリからできます。</p>
+              <button id="girls-settings-logout" class="girls-secondary girls-settings-logout" type="button">ログアウト</button>
+            </section>
+          </section>
+        </main>
+      </div>
+    </section>
   </body>
 </html>
