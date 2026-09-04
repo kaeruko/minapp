@@ -37,8 +37,8 @@ test("buildSingleHtmlZip creates one stored index.html entry", () => {
   const centralDirectoryOffset = contentStart + uncompressedSize;
   assert.equal(uint32(bytes, centralDirectoryOffset), 0x02014b50);
   assert.equal(uint32(bytes, bytes.length - 22), 0x06054b50);
+  assert.equal(uint16(bytes, bytes.length - 14), 1);
   assert.equal(uint16(bytes, bytes.length - 12), 1);
-  assert.equal(uint16(bytes, bytes.length - 10), 1);
 });
 
 test("buildSingleHtmlZip rejects empty or non-string input", () => {
