@@ -51,21 +51,21 @@
        ry="13.76334" />
     <ellipse
        style="fill:#020202;fill-opacity:1;stroke:none;stroke-width:2.58586"
-       id="tab-group"
+       id="tab-groups"
        cx="44.57003"
        cy="15.288782"
        rx="13.762977"
        ry="13.76334" />
     <ellipse
        style="fill:#030303;fill-opacity:1;stroke:none;stroke-width:2.58586"
-       id="tab-diary"
+       id="tab-shop"
        cx="73.077316"
        cy="15.476521"
        rx="13.762977"
        ry="13.76334" />
     <ellipse
        style="fill:#040404;fill-opacity:1;stroke:none;stroke-width:2.58586"
-       id="tab-games"
+       id="tab-apps"
        cx="101.48502"
        cy="15.874876"
        rx="13.762977"
