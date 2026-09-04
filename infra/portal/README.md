@@ -8,27 +8,30 @@ It owns:
 - CloudFront with S3 Origin Access Control (OAC)
 - a strict CloudFront security response-headers policy
 - `/portal-config.json` containing only the Directory API base URL
+- `/girls-config.json` containing only the shared Hosted API base URL used by MinApp Girls
 - optional Route 53 aliases for the portal hostname
 - optional ACM certificate creation and DNS validation when the authoritative zone is already in Route 53
 
-It does **not** proxy tenant API requests. Browser login, ZIP upload, review and application operations go directly to the selected tenant API.
+It does **not** proxy API requests. The standard browser portal talks directly to the selected tenant API, and `/girls.html` talks directly to the shared Hosted API.
 
 ## Required inputs
 
 ```hcl
-operator_account_id      = "123456789012"
-environment              = "prod"
-portal_domain            = "minapp.cloxs.jp"
-legacy_portal_domain     = "portal.cloxs.jp"
+operator_account_id       = "123456789012"
+environment               = "prod"
+portal_domain             = "minapp.cloxs.jp"
+legacy_portal_domain      = "portal.cloxs.jp"
 activate_canonical_domain = true
-directory_api_base_url   = "https://example.execute-api.us-west-2.amazonaws.com"
-tenant_api_origins       = [
+directory_api_base_url    = "https://example.execute-api.us-west-2.amazonaws.com"
+hosted_api_base_url       = "https://hosted.execute-api.us-west-2.amazonaws.com"
+tenant_api_origins        = [
   "https://tenant-a.execute-api.us-west-2.amazonaws.com",
   "https://tenant-b.execute-api.us-west-2.amazonaws.com",
+  "https://hosted.execute-api.us-west-2.amazonaws.com",
 ]
 ```
 
-`tenant_api_origins` is the explicit CSP egress allow-list. Adding or rotating a tenant API endpoint requires updating this set before that endpoint can be used by the production browser portal.
+`tenant_api_origins` is the explicit CSP egress allow-list. `hosted_api_base_url` must also be present in that set; the guarded deployment script adds it automatically. Adding or rotating any API endpoint requires updating this configuration before that endpoint can be used by the production browser portal.
 
 ## TLS and DNS modes
 
@@ -71,6 +74,7 @@ The script:
 - requires an explicit `-CreateStateBucket` before creating a missing state bucket
 - enables versioning, encryption and public-access blocking on the state bucket
 - writes gitignored `terraform.tfvars` and `backend.hcl`
+- requires the exact Hosted API origin used by MinApp Girls and adds it to the CSP tenant-origin set
 - creates a saved Terraform plan
 - parses the plan and refuses every delete or replacement action
 - defaults to plan-only; `-Apply` is required to change AWS
@@ -82,6 +86,7 @@ Example using a Route 53 zone:
   -ExpectedAccountId "123456789012" `
   -Profile "operator" `
   -DirectoryApiBaseUrl "https://example.execute-api.us-west-2.amazonaws.com" `
+  -HostedApiBaseUrl "https://hosted.execute-api.us-west-2.amazonaws.com" `
   -TenantApiOrigins @(
     "https://tenant-a.execute-api.us-west-2.amazonaws.com",
     "https://tenant-b.execute-api.us-west-2.amazonaws.com"
@@ -95,7 +100,7 @@ For external DNS, replace `-Route53ZoneId` with a prevalidated `-CertificateArn`
 
 ## Portal asset publishing
 
-Terraform manages `portal-config.json` so the Directory endpoint cannot silently diverge from infrastructure configuration.
+Terraform manages both `portal-config.json` and `girls-config.json` so the Directory and Hosted API endpoints cannot silently diverge from infrastructure configuration.
 
 After a successful portal apply, publish the browser application with:
 
@@ -105,9 +110,9 @@ After a successful portal apply, publish the browser application with:
   -Profile "operator"
 ```
 
-The publisher fails closed unless Terraform outputs are available and `portal-config.json` already exists in the portal bucket. It stages and uploads only the production files referenced by `index.html`; test files such as `*.test.js` are not published. The final `aws s3 sync --delete` keeps `portal-config.json` explicitly excluded so Terraform remains its sole owner. A CloudFront `/*` invalidation is created only after a successful upload.
+The publisher fails closed unless Terraform outputs are available and both config objects already exist in the portal bucket. It stages and uploads only the production Web assets; test files such as `*.test.js` are not published. The final `aws s3 sync --delete` explicitly excludes both Terraform-managed config objects. A CloudFront `/*` invalidation is created only after a successful upload.
 
-The default CloudFront behavior deliberately uses the managed `CachingDisabled` policy for the MVP. This keeps `index.html`, JavaScript/CSS and `portal-config.json` immediately updateable; fingerprinted assets can receive long-lived caching later.
+The default CloudFront behavior deliberately uses the managed `CachingDisabled` policy for the MVP. This keeps HTML, JavaScript/CSS and both config files immediately updateable; fingerprinted assets can receive long-lived caching later.
 
 ## Phase 6E production rollout order
 
@@ -115,12 +120,14 @@ Do not publish the portal before the direct-browser API boundaries are ready.
 
 1. apply the Directory CORS update
 2. apply the CORS update to every active tenant stack
-3. plan and apply this portal stack
-4. if DNS is external, point `portal_domain` at `cloudfront_domain_name`
-5. run `publish-portal.ps1`
-6. verify `https://minapp.cloxs.jp/portal-config.json`
-7. run the two-tenant browser E2E
-8. build Android with `MINAPP_CREATOR_PORTAL_BASE_URL=https://minapp.cloxs.jp`
+3. confirm the Hosted API allows `https://minapp.cloxs.jp` for Girls requests
+4. plan and apply this portal stack with the exact Hosted API base URL
+5. if DNS is external, point `portal_domain` at `cloudfront_domain_name`
+6. run `publish-portal.ps1`
+7. verify `https://minapp.cloxs.jp/portal-config.json` and `https://minapp.cloxs.jp/girls-config.json`
+8. verify `https://minapp.cloxs.jp/girls.html` with a real Girls account
+9. run the standard two-tenant browser E2E
+10. build Android with `MINAPP_CREATOR_PORTAL_BASE_URL=https://minapp.cloxs.jp`
 
 Review every Terraform plan before apply. Existing Directory or tenant stacks must not be replaced merely to add CORS.
 
@@ -132,7 +139,7 @@ Review every Terraform plan before apply. Existing Directory or tenant stacks mu
 - The bucket policy grants `s3:GetObject` only to the specific CloudFront distribution and denies insecure S3 transport.
 - HTTP viewers are redirected to HTTPS.
 - CloudFront uses an ACM certificate from `us-east-1` and TLS 1.2 or newer policy.
-- CSP allows scripts/styles only from the portal itself and network/frame access only to the configured Directory/tenant origins.
+- CSP allows scripts/styles only from the portal itself and network/frame access only to the configured Directory/tenant/Hosted origins.
 - HSTS, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and framing protection are applied at CloudFront.
 - No wildcard CORS or credentialed browser-cookie behavior is introduced by this stack.
 
