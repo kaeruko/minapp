@@ -45,8 +45,11 @@ jobs:
           node --check apps/web/portal_routing.test.js
           node --check apps/web/portal_shell.js
           node --check apps/web/portal_shell.test.js
+          node --check apps/web/single_html_zip.js
+          node --check apps/web/single_html_zip.test.js
+          node --check apps/web/girls_portal.js
       - name: Test Web portal behavior
-        run: node --test apps/web/portal_routing.test.js apps/web/phase2_transport.test.js apps/web/portal_shell.test.js
+        run: node --test apps/web/portal_routing.test.js apps/web/phase2_transport.test.js apps/web/portal_shell.test.js apps/web/single_html_zip.test.js
 
   powershell:
     runs-on: ubuntu-latest

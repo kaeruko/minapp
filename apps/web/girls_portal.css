@@ -1,0 +1,336 @@
+:root {
+  font-family: Inter, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, system-ui, sans-serif;
+  color: #604943;
+  background: #fffaf0;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(255, 220, 231, 0.9), transparent 28rem),
+    radial-gradient(circle at 88% 24%, rgba(229, 216, 246, 0.75), transparent 24rem),
+    #fffaf0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.girls-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px max(20px, env(safe-area-inset-right)) 14px max(20px, env(safe-area-inset-left));
+  background: rgba(255, 250, 240, 0.94);
+  border-bottom: 1px solid rgba(193, 158, 171, 0.34);
+  backdrop-filter: blur(16px);
+}
+
+.girls-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #745b9e;
+  font-size: 19px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.girls-brand-heart {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: #f9dde8;
+  color: #9f78bb;
+  font-size: 24px;
+}
+
+.girls-header-tag {
+  color: #9a7a70;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.girls-shell {
+  width: min(760px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 42px 0 calc(72px + env(safe-area-inset-bottom));
+}
+
+.girls-hero {
+  padding: 16px 8px 30px;
+  text-align: center;
+}
+
+.girls-kicker,
+.girls-step,
+.girls-mini-label {
+  margin: 0 0 8px;
+  color: #9f78bb;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.girls-hero h1 {
+  margin: 0;
+  color: #604943;
+  font-size: clamp(30px, 7vw, 48px);
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+}
+
+.girls-hero p:last-child {
+  max-width: 620px;
+  margin: 18px auto 0;
+  color: #836d66;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.girls-card {
+  margin: 0 0 18px;
+  padding: 26px;
+  border: 1px solid rgba(185, 155, 145, 0.48);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 48px rgba(115, 84, 93, 0.10);
+}
+
+.girls-card h2,
+.girls-card h3 {
+  margin: 0;
+  color: #604943;
+}
+
+.girls-card h2 {
+  font-size: 25px;
+}
+
+.girls-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.girls-muted,
+.girls-note,
+.girls-tenant-row {
+  color: #8f756d;
+  line-height: 1.55;
+}
+
+.girls-tenant-row {
+  margin: 12px 0 18px;
+}
+
+.girls-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.girls-form label {
+  display: grid;
+  gap: 7px;
+  color: #604943;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.girls-form input,
+.girls-form select,
+.girls-form textarea {
+  width: 100%;
+  border: 1px solid #d8c2bc;
+  border-radius: 16px;
+  outline: none;
+  background: #fffdf9;
+  color: #4d3b36;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.girls-form input,
+.girls-form select {
+  min-height: 50px;
+  padding: 0 14px;
+}
+
+.girls-form textarea {
+  min-height: 230px;
+  padding: 14px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.girls-form input:focus,
+.girls-form select:focus,
+.girls-form textarea:focus {
+  border-color: #9f78bb;
+  box-shadow: 0 0 0 4px rgba(159, 120, 187, 0.13);
+}
+
+.girls-primary,
+.girls-secondary,
+.girls-text-button {
+  border: 0;
+  border-radius: 999px;
+  font-weight: 900;
+}
+
+.girls-primary {
+  min-height: 52px;
+  padding: 0 22px;
+  background: linear-gradient(135deg, #9f78bb, #745b9e);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(116, 91, 158, 0.22);
+}
+
+.girls-secondary {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid #c9a8d8;
+  background: #fff;
+  color: #745b9e;
+}
+
+.girls-text-button {
+  padding: 8px 10px;
+  background: transparent;
+  color: #8f756d;
+  font-size: 12px;
+}
+
+.girls-upload-card {
+  border-color: rgba(242, 184, 202, 0.78);
+}
+
+.girls-prompt-box {
+  margin: 20px 0 24px;
+  padding: 18px;
+  border: 1px solid #f2b8ca;
+  border-radius: 22px;
+  background: #ffdce7;
+}
+
+.girls-prompt-text {
+  margin: 12px 0;
+  padding: 14px;
+  border: 1px solid #ead6af;
+  border-radius: 15px;
+  background: #fff9e8;
+  color: #604943;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.girls-source-block {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  background: #fdf8ff;
+}
+
+.girls-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  color: #a18798;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.girls-or::before,
+.girls-or::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: #e7d8e8;
+}
+
+.girls-note {
+  margin: 0;
+  font-size: 12px;
+}
+
+.girls-message {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 15px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.girls-message-error {
+  border: 1px solid #ffc5ce;
+  background: #ffecef;
+  color: #a04455;
+}
+
+.girls-message-success {
+  border: 1px solid #b9dfc4;
+  background: #e9f8ed;
+  color: #41734e;
+}
+
+@media (max-width: 560px) {
+  .girls-header-tag {
+    display: none;
+  }
+
+  .girls-shell {
+    width: min(100% - 22px, 760px);
+    padding-top: 24px;
+  }
+
+  .girls-card {
+    padding: 20px 17px;
+    border-radius: 23px;
+  }
+
+  .girls-card-heading {
+    align-items: center;
+  }
+
+  .girls-form textarea {
+    min-height: 200px;
+  }
+}
