@@ -33,7 +33,7 @@ HostedGirlsApi _fakeApi() {
 }
 
 void main() {
-  testWidgets('Girls home mirrors the illustrated concept and opens groups', (
+  testWidgets('Girls home opens group creation dialog from the create card', (
     WidgetTester tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(360, 720));
@@ -73,6 +73,19 @@ void main() {
     await tester.tap(find.byKey(const Key('girls-home-groups')));
     await tester.pumpAndSettle();
 
+    expect(find.text('💗 新しいグループ'), findsOneWidget);
+    expect(find.byKey(const Key('girls-group-name')), findsOneWidget);
+    expect(find.text('グループ名'), findsOneWidget);
+    expect(find.text('やめる'), findsOneWidget);
+    expect(find.text('つくる'), findsOneWidget);
+    expect(find.text('ビルトインアプリ'), findsOneWidget);
+
+    await tester.tap(find.text('やめる'));
+    await tester.pumpAndSettle();
+    expect(find.text('💗 新しいグループ'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('girls-footer-groups')));
+    await tester.pumpAndSettle();
     expect(find.text('どのグループで遊ぶ？'), findsOneWidget);
     await tester.tap(find.byKey(const Key('girls-footer-home')));
     await tester.pumpAndSettle();

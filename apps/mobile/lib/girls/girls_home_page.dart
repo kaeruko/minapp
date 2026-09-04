@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'api.dart';
 import 'builtin_apps.dart';
@@ -57,6 +58,7 @@ class GirlsHomePage extends StatefulWidget {
 class _GirlsHomePageState extends State<GirlsHomePage> {
   List<HostedGroup>? _groups;
   bool _loadingGroups = false;
+  bool _creatingGroup = false;
   String? _groupError;
 
   BuiltInApp get _mascotApp => _findBuiltin('shiba-goshujin');
@@ -141,6 +143,154 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       ),
     );
     if (mounted) await _loadGroups();
+  }
+
+  Future<String?> _askForGroupName() {
+    String value = '';
+    return showDialog<String>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('💗 新しいグループ'),
+        content: TextField(
+          key: const Key('girls-group-name'),
+          maxLength: maxHostedGroupNameLength,
+          autocorrect: true,
+          enableSuggestions: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            labelText: 'グループ名',
+            hintText: '例：放課後イラスト部',
+          ),
+          onChanged: (String nextValue) {
+            value = nextValue;
+          },
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('やめる'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(value),
+            child: const Text('つくる'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showGroupId(HostedInvite invite) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('🎀 グループIDができたよ'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            const Text('友達はGirlsの「グループIDで参加」からこのIDを入力すると参加できます。'),
+            const SizedBox(height: 14),
+            SelectableText(
+              invite.code,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: _lavender,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '7日間有効です。新しいIDを発行すると前のIDは使えなくなります。',
+              style: TextStyle(fontSize: 12, color: Color(0xFF8C7893)),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: invite.code));
+              },
+              icon: const Icon(Icons.copy_rounded),
+              label: const Text('IDをコピー'),
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createGroupFromHome() async {
+    if (_creatingGroup) return;
+    final String? rawName = await _askForGroupName();
+    if (rawName == null || !mounted) return;
+    final String name = rawName.trim();
+    if (name.isEmpty) return;
+
+    setState(() {
+      _creatingGroup = true;
+      _groupError = null;
+    });
+
+    late final HostedGroup createdGroup;
+    try {
+      createdGroup = await widget.api.createGroup(
+        accessToken: widget.session.accessToken,
+        name: name,
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _creatingGroup = false;
+          _groupError = core.girlsMessageFor(error);
+        });
+      }
+      return;
+    }
+
+    try {
+      final HostedInvite invite = await widget.api.createInvite(
+        accessToken: widget.session.accessToken,
+        groupId: createdGroup.groupId,
+      );
+      final List<HostedGroup> groups = await widget.api.listGroups(
+        widget.session.accessToken,
+      );
+      if (!mounted) return;
+      setState(() => _groups = groups);
+      await _showGroupId(invite);
+      if (!mounted) return;
+      await _openGroup(createdGroup);
+    } catch (error) {
+      if (!mounted) return;
+      try {
+        final List<HostedGroup> groups = await widget.api.listGroups(
+          widget.session.accessToken,
+        );
+        if (!mounted) return;
+        setState(() => _groups = groups);
+      } catch (reloadError) {
+        if (!mounted) return;
+        setState(() {
+          _groupError =
+              'グループ「${createdGroup.name}」は作成できたけれど、グループIDの発行に失敗し、その後の一覧更新にも失敗しました。${core.girlsMessageFor(error)} / ${core.girlsMessageFor(reloadError)}';
+        });
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _groupError =
+            'グループ「${createdGroup.name}」は作成できたけれど、グループIDの発行に失敗しました。${core.girlsMessageFor(error)}';
+      });
+    } finally {
+      if (mounted) setState(() => _creatingGroup = false);
+    }
   }
 
   void _showNotices() {
@@ -287,7 +437,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
                                 key: const Key('girls-home-groups'),
                                 assetName: _groupCreateCardAsset,
                                 label: 'グループと友達を招待',
-                                onTap: _openGroups,
+                                onTap: _createGroupFromHome,
                               ),
                             ],
                           ),
