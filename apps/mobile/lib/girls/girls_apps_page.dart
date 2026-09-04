@@ -69,7 +69,9 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       );
       if (!mounted) return;
       setState(() {
-        _ownerGroups = groups.where((HostedGroup group) => group.isOwner).toList(growable: false);
+        _ownerGroups = groups
+            .where((HostedGroup group) => group.isOwner)
+            .toList(growable: false);
         _apps = apps;
       });
     } catch (error) {
@@ -120,7 +122,10 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
         backgroundColor: _cream,
         foregroundColor: _ink,
         automaticallyImplyLeading: false,
-        title: const Text('マイアプリ', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text(
+          'マイアプリ',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
         actions: <Widget>[
           IconButton(
             tooltip: '更新',
@@ -193,17 +198,16 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
             GirlsFooterTab.more,
           },
           onSelected: (GirlsFooterTab tab) {
-            switch (tab) {
-              case GirlsFooterTab.home:
-                widget.onHome?.call();
-              case GirlsFooterTab.groups:
-                widget.onGroups?.call();
-              case GirlsFooterTab.apps:
-                break;
-              case GirlsFooterTab.shop:
-                break;
-              case GirlsFooterTab.more:
-                _showMoreMenu(context);
+            if (tab == GirlsFooterTab.home) {
+              widget.onHome?.call();
+              return;
+            }
+            if (tab == GirlsFooterTab.groups) {
+              widget.onGroups?.call();
+              return;
+            }
+            if (tab == GirlsFooterTab.more) {
+              _showMoreMenu(context);
             }
           },
         ),
@@ -383,7 +387,10 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
         foregroundColor: _ink,
         title: Text(detail?.summary.app.title ?? 'アプリ詳細'),
         actions: <Widget>[
-          IconButton(onPressed: _busy ? null : _load, icon: const Icon(Icons.refresh_rounded)),
+          IconButton(
+            onPressed: _busy ? null : _load,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
         ],
       ),
       body: SafeArea(
@@ -415,18 +422,26 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
               ),
               const SizedBox(height: 8),
               FilledButton.icon(
-                onPressed: _busy || detail.summary.sourceRevision == null ? null : _publish,
+                onPressed:
+                    _busy || detail.summary.sourceRevision == null ? null : _publish,
                 icon: const Icon(Icons.cloud_upload_rounded),
                 label: const Text('最新版を公開'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: _busy ? null : _toggleHidden,
-                icon: Icon(detail.summary.isHidden ? Icons.visibility_rounded : Icons.visibility_off_rounded),
+                icon: Icon(
+                  detail.summary.isHidden
+                      ? Icons.visibility_rounded
+                      : Icons.visibility_off_rounded,
+                ),
                 label: Text(detail.summary.isHidden ? '再公開する' : '非表示にする'),
               ),
               const SizedBox(height: 24),
-              const Text('バージョン履歴', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+              const Text(
+                'バージョン履歴',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
               const SizedBox(height: 8),
               if (detail.sourceHistory.isEmpty)
                 const Text('まだ更新履歴がありません。')
@@ -434,13 +449,19 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
                 ...detail.sourceHistory.map(
                   (GirlsSourceHistoryItem item) => ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.description_rounded, color: _lavender),
+                    leading: const Icon(
+                      Icons.description_rounded,
+                      color: _lavender,
+                    ),
                     title: Text('revision ${item.revision}'),
                     subtitle: Text(_formatDate(item.createdAt)),
                   ),
                 ),
               const SizedBox(height: 14),
-              const Text('公開履歴', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+              const Text(
+                '公開履歴',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
               const SizedBox(height: 8),
               if (detail.publishedHistory.isEmpty)
                 const Text('まだ公開履歴がありません。')
@@ -449,7 +470,9 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
                   (GirlsPublishedHistoryItem item) => ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.public_rounded, color: _lavender),
-                    title: Text('v${item.version}  /  revision ${item.sourceRevision}'),
+                    title: Text(
+                      'v${item.version}  /  revision ${item.sourceRevision}',
+                    ),
                     subtitle: Text(_formatDate(item.publishedAt)),
                   ),
                 ),
@@ -484,21 +507,51 @@ class _AppSummary extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(app.app.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: _ink)),
+          Text(
+            app.app.title,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: _ink,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(status, style: const TextStyle(color: _lavender, fontWeight: FontWeight.w800)),
+          Text(
+            status,
+            style: const TextStyle(
+              color: _lavender,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           const SizedBox(height: 16),
           Row(
             children: <Widget>[
-              Expanded(child: _Stat(label: '遊ばれた回数', value: '${app.stats.totalPlays}回')),
-              Expanded(child: _Stat(label: '遊んだ人数', value: '${app.stats.uniqueUsers}人')),
-              Expanded(child: _Stat(label: '今月', value: '${app.stats.monthlyPlays}回')),
+              Expanded(
+                child: _Stat(
+                  label: '遊ばれた回数',
+                  value: '${app.stats.totalPlays}回',
+                ),
+              ),
+              Expanded(
+                child: _Stat(
+                  label: '遊んだ人数',
+                  value: '${app.stats.uniqueUsers}人',
+                ),
+              ),
+              Expanded(
+                child: _Stat(
+                  label: '今月',
+                  value: '${app.stats.monthlyPlays}回',
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 14),
           Text('公開バージョン: ${app.app.publishedVersion ?? '-'}'),
           Text('最新revision: ${app.sourceRevision ?? '-'}'),
-          Text('最終更新: ${app.sourceUpdatedAt == null ? '-' : _formatDate(app.sourceUpdatedAt!)}'),
+          Text(
+            '最終更新: ${app.sourceUpdatedAt == null ? '-' : _formatDate(app.sourceUpdatedAt!)}',
+          ),
         ],
       ),
     );
@@ -514,9 +567,20 @@ class _Stat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: <Widget>[
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: _lavender)),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            color: _lavender,
+          ),
+        ),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 11, color: _ink), textAlign: TextAlign.center),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: _ink),
+          textAlign: TextAlign.center,
+        ),
       ],
     );
   }
@@ -545,7 +609,8 @@ class _ManagedAppCard extends StatelessWidget {
           child: Row(
             children: <Widget>[
               CircleAvatar(
-                backgroundColor: app.isHidden ? const Color(0xFFE9E2E0) : _pink,
+                backgroundColor:
+                    app.isHidden ? const Color(0xFFE9E2E0) : _pink,
                 foregroundColor: _lavender,
                 child: const Icon(Icons.apps_rounded),
               ),
@@ -554,11 +619,25 @@ class _ManagedAppCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(app.app.title, style: const TextStyle(fontWeight: FontWeight.w900, color: _ink)),
+                    Text(
+                      app.app.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: _ink,
+                      ),
+                    ),
                     const SizedBox(height: 3),
-                    Text('$status  ・  ${app.stats.uniqueUsers}人 / ${app.stats.totalPlays}回'),
+                    Text(
+                      '$status  ・  ${app.stats.uniqueUsers}人 / ${app.stats.totalPlays}回',
+                    ),
                     if (app.groupName != null)
-                      Text(app.groupName!, style: const TextStyle(fontSize: 11, color: Color(0xFF8F7A74))),
+                      Text(
+                        app.groupName!,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF8F7A74),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -577,12 +656,18 @@ class _EmptyApps extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(color: _mint, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        color: _mint,
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: const Column(
         children: <Widget>[
           Icon(Icons.favorite_outline_rounded, color: _lavender, size: 34),
           SizedBox(height: 8),
-          Text('まだマイアプリがないよ。\nZIPから最初のアプリを追加してみよう。', textAlign: TextAlign.center),
+          Text(
+            'まだマイアプリがないよ。\nZIPから最初のアプリを追加してみよう。',
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
@@ -601,7 +686,10 @@ class _ErrorCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFFFB8C5)),
       ),
-      child: Text(message, style: const TextStyle(color: Color(0xFF9E3348))),
+      child: Text(
+        message,
+        style: const TextStyle(color: Color(0xFF9E3348)),
+      ),
     );
   }
 }
