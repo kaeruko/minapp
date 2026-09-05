@@ -24,12 +24,16 @@ foreach ($command in @("aws", "terraform")) {
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $portalDir = Join-Path $repoRoot "infra\portal"
 $webDir = Join-Path $repoRoot "apps\web"
+$girlsSourceAssetsDir = Join-Path (Split-Path -Parent $repoRoot) "apps-web\public\minapp\girls\assets"
 
 if (-not (Test-Path $portalDir -PathType Container)) {
     throw "Portal Terraform stack was not found: $portalDir"
 }
 if (-not (Test-Path $webDir -PathType Container)) {
     throw "Web application directory was not found: $webDir"
+}
+if (-not (Test-Path $girlsSourceAssetsDir -PathType Container)) {
+    throw "Girls source asset directory was not found: $girlsSourceAssetsDir"
 }
 
 & (Join-Path $PSScriptRoot "verify-aws-deploy-target.ps1") `
@@ -75,10 +79,27 @@ $productionAssets = @(
     "girls_footer.js"
 )
 
+$girlsPublishedAssets = @(
+    @{ Source = "split_icons\weather.png"; Destination = "girls-assets\split_icons\weather.png" },
+    @{ Source = "split_icons\recipe.png"; Destination = "girls-assets\split_icons\recipe.png" },
+    @{ Source = "split_icons\todo.png"; Destination = "girls-assets\split_icons\todo.png" },
+    @{ Source = "split_icons\rent_app.png"; Destination = "girls-assets\split_icons\rent_app.png" },
+    @{ Source = "split_icons\fortune_app.png"; Destination = "girls-assets\split_icons\fortune_app.png" },
+    @{ Source = "split_icons\rei_app.png"; Destination = "girls-assets\split_icons\rei_app.png" },
+    @{ Source = "ChatGPT Image 2026年9月6日 02_14_52.png"; Destination = "girls-assets\character.png" }
+)
+
 foreach ($relativePath in $productionAssets) {
     $sourcePath = Join-Path $webDir $relativePath
     if (-not (Test-Path $sourcePath -PathType Leaf)) {
         throw "Required production Web asset is missing: $sourcePath"
+    }
+}
+
+foreach ($asset in $girlsPublishedAssets) {
+    $sourcePath = Join-Path $girlsSourceAssetsDir $asset.Source
+    if (-not (Test-Path $sourcePath -PathType Leaf)) {
+        throw "Required Girls artwork asset is missing: $sourcePath"
     }
 }
 
@@ -127,8 +148,20 @@ try {
             -Destination (Join-Path $stagingDir $relativePath)
     }
 
+    foreach ($asset in $girlsPublishedAssets) {
+        $destinationPath = Join-Path $stagingDir $asset.Destination
+        $destinationDirectory = Split-Path -Parent $destinationPath
+        if (-not (Test-Path $destinationDirectory -PathType Container)) {
+            New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null
+        }
+        Copy-Item `
+            -LiteralPath (Join-Path $girlsSourceAssetsDir $asset.Source) `
+            -Destination $destinationPath
+    }
+
     Write-Host "Publishing production Web assets only:"
     $productionAssets | ForEach-Object { Write-Host "  $_" }
+    $girlsPublishedAssets | ForEach-Object { Write-Host "  $($_.Destination)" }
     Write-Host "Protected Terraform objects: portal-config.json, girls-config.json"
     Write-Host "Destination bucket: $bucket"
 
