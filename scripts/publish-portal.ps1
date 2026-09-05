@@ -24,16 +24,12 @@ foreach ($command in @("aws", "terraform")) {
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $portalDir = Join-Path $repoRoot "infra\portal"
 $webDir = Join-Path $repoRoot "apps\web"
-$girlsSourceAssetsDir = Join-Path (Split-Path -Parent $repoRoot) "apps-web\public\minapp\girls\assets"
 
 if (-not (Test-Path $portalDir -PathType Container)) {
     throw "Portal Terraform stack was not found: $portalDir"
 }
 if (-not (Test-Path $webDir -PathType Container)) {
     throw "Web application directory was not found: $webDir"
-}
-if (-not (Test-Path $girlsSourceAssetsDir -PathType Container)) {
-    throw "Girls source asset directory was not found: $girlsSourceAssetsDir"
 }
 
 & (Join-Path $PSScriptRoot "verify-aws-deploy-target.ps1") `
@@ -82,6 +78,8 @@ $productionAssets = @(
     "girls_footer.js"
 )
 
+# Girls artwork sources are intentionally kept inside this repository under apps/web.
+# They are copied to their public girls-assets paths during staging.
 $girlsPublishedAssets = @(
     @{ Source = "split_icons\weather.png"; Destination = "girls-assets\split_icons\weather.png" },
     @{ Source = "split_icons\recipe.png"; Destination = "girls-assets\split_icons\recipe.png" },
@@ -100,9 +98,9 @@ foreach ($relativePath in $productionAssets) {
 }
 
 foreach ($asset in $girlsPublishedAssets) {
-    $sourcePath = Join-Path $girlsSourceAssetsDir $asset.Source
+    $sourcePath = Join-Path $webDir $asset.Source
     if (-not (Test-Path $sourcePath -PathType Leaf)) {
-        throw "Required Girls artwork asset is missing: $sourcePath"
+        throw "Required Girls artwork asset is missing from apps/web: $sourcePath"
     }
 }
 
@@ -158,7 +156,7 @@ try {
             New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null
         }
         Copy-Item `
-            -LiteralPath (Join-Path $girlsSourceAssetsDir $asset.Source) `
+            -LiteralPath (Join-Path $webDir $asset.Source) `
             -Destination $destinationPath
     }
 
