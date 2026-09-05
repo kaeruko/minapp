@@ -56,12 +56,15 @@ $productionAssets = @(
     "girls_portal.css",
     "girls_portal_base.css",
     "girls_footer.css",
+    "girls_sidebar_art.css",
     "girls_login_frame.png",
     "girls_login_pattern.png",
     "girls_login_lace.png",
     "girls_logo.png",
     "girls_brand_icon.png",
     "girls_mascot_pair.svg",
+    "__.png",
+    "_race_b.png",
     "portal_routing.js",
     "single_html_zip.js",
     "app.js",
@@ -86,7 +89,7 @@ $girlsPublishedAssets = @(
     @{ Source = "split_icons\rent_app.png"; Destination = "girls-assets\split_icons\rent_app.png" },
     @{ Source = "split_icons\fortune_app.png"; Destination = "girls-assets\split_icons\fortune_app.png" },
     @{ Source = "split_icons\rei_app.png"; Destination = "girls-assets\split_icons\rei_app.png" },
-    @{ Source = "ChatGPT Image 2026年9月6日 02_14_52.png"; Destination = "girls-assets\character.png" }
+    @{ Source = "girls_mascot_pair.png"; Destination = "girls-assets\character.png" }
 )
 
 foreach ($relativePath in $productionAssets) {
