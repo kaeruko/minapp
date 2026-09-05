@@ -53,6 +53,7 @@ $productionAssets = @(
     "girls_portal_base.css",
     "girls_footer.css",
     "girls_sidebar_art.css",
+    "_race.png",
     "girls-assets\login\frame.png",
     "girls-assets\login\pattern.png",
     "girls-assets\login\lace.png",
