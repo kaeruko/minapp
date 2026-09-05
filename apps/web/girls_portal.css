@@ -67,13 +67,13 @@
   padding: 58px 24px 345px;
   overflow: visible;
   background-image:
-    url("https://cloxs.jp/minapp/girls/assets/split_icons/weather.png"),
-    url("https://cloxs.jp/minapp/girls/assets/split_icons/recipe.png"),
-    url("https://cloxs.jp/minapp/girls/assets/split_icons/todo.png"),
-    url("https://cloxs.jp/minapp/girls/assets/split_icons/rent_app.png"),
-    url("https://cloxs.jp/minapp/girls/assets/split_icons/fortune_app.png"),
-    url("https://cloxs.jp/minapp/girls/assets/split_icons/rei_app.png"),
-    url("https://cloxs.jp/minapp/girls/assets/ChatGPT%20Image%202026%E5%B9%B49%E6%9C%886%E6%97%A5%2002_14_52.png");
+    url("/girls-assets/split_icons/weather.png"),
+    url("/girls-assets/split_icons/recipe.png"),
+    url("/girls-assets/split_icons/todo.png"),
+    url("/girls-assets/split_icons/rent_app.png"),
+    url("/girls-assets/split_icons/fortune_app.png"),
+    url("/girls-assets/split_icons/rei_app.png"),
+    url("/girls-assets/character.png");
   background-position:
     8% 43%,
     4% 62%,
