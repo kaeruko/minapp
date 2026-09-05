@@ -66,7 +66,31 @@
   min-height: 610px;
   padding: 58px 24px 345px;
   overflow: visible;
-  background: url("/girls_mascot_pair.svg") center calc(100% - 14px) / min(78%, 560px) auto no-repeat;
+  background-image:
+    url("https://cloxs.jp/minapp/girls/assets/split_icons/weather.png"),
+    url("https://cloxs.jp/minapp/girls/assets/split_icons/recipe.png"),
+    url("https://cloxs.jp/minapp/girls/assets/split_icons/todo.png"),
+    url("https://cloxs.jp/minapp/girls/assets/split_icons/rent_app.png"),
+    url("https://cloxs.jp/minapp/girls/assets/split_icons/fortune_app.png"),
+    url("https://cloxs.jp/minapp/girls/assets/split_icons/rei_app.png"),
+    url("https://cloxs.jp/minapp/girls/assets/ChatGPT%20Image%202026%E5%B9%B49%E6%9C%886%E6%97%A5%2002_14_52.png");
+  background-position:
+    8% 43%,
+    4% 62%,
+    11% 82%,
+    91% 42%,
+    96% 64%,
+    89% 83%,
+    center calc(100% - 12px);
+  background-size:
+    72px auto,
+    72px auto,
+    72px auto,
+    72px auto,
+    72px auto,
+    72px auto,
+    min(64%, 470px) auto;
+  background-repeat: no-repeat;
   text-align: center;
 }
 
@@ -117,15 +141,7 @@
 }
 
 .girls-auth-shell .girls-hero p:last-child {
-  max-width: 520px;
-  margin: 26px auto 0;
-  padding: 10px 16px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
-  color: #806b75;
-  font-size: 0.82rem;
-  font-weight: 800;
-  line-height: 1.55;
+  display: none;
 }
 
 #girls-fatal {
@@ -229,7 +245,22 @@
   .girls-auth-shell .girls-hero {
     min-height: 430px;
     padding: 34px 18px 255px;
-    background-size: min(82%, 430px) auto;
+    background-position:
+      8% 48%,
+      4% 66%,
+      12% 84%,
+      92% 47%,
+      96% 66%,
+      88% 84%,
+      center bottom;
+    background-size:
+      60px auto,
+      60px auto,
+      60px auto,
+      60px auto,
+      60px auto,
+      60px auto,
+      min(68%, 430px) auto;
   }
 
   .girls-auth-shell .girls-hero::before {
@@ -263,8 +294,22 @@
   .girls-auth-shell .girls-hero {
     min-height: 340px;
     padding: 24px 8px 202px;
-    background-position: center bottom;
-    background-size: min(94%, 390px) auto;
+    background-position:
+      7% 54%,
+      3% 71%,
+      13% 88%,
+      93% 53%,
+      97% 71%,
+      87% 88%,
+      center bottom;
+    background-size:
+      44px auto,
+      44px auto,
+      44px auto,
+      44px auto,
+      44px auto,
+      44px auto,
+      min(68%, 300px) auto;
   }
 
   .girls-auth-shell .girls-hero::before {
@@ -281,10 +326,6 @@
 
   .girls-auth-shell .girls-kicker::after {
     font-size: 0.72rem;
-  }
-
-  .girls-auth-shell .girls-hero p:last-child {
-    display: none;
   }
 
   #girls-login-panel,
