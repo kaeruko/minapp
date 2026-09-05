@@ -107,7 +107,7 @@
 }
 
 .girls-auth-shell .girls-kicker::after {
-  content: "おかえりなさい♡\A 今日もアプリを作ろう！";
+  content: "ログインして、アプリを作ろう！";
   white-space: pre-line;
   color: #5e4a4d;
   font-size: 0.95rem;
