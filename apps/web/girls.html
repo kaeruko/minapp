@@ -237,6 +237,18 @@
               <div id="girls-app-list" class="girls-app-grid" aria-live="polite"></div>
               <p id="girls-apps-error" class="girls-message girls-message-error hidden" role="alert"></p>
             </section>
+
+            <section id="girls-preview-panel" class="girls-dashboard-card girls-preview-card hidden" aria-labelledby="girls-preview-title">
+              <div class="girls-section-heading girls-preview-heading">
+                <div><p class="girls-step">安全プレビュー</p><h2 id="girls-preview-title">アプリを確認</h2></div>
+                <button id="girls-preview-close" class="girls-secondary" type="button">閉じる</button>
+              </div>
+              <p class="girls-muted">外部通信を禁止した短時間URLを、sandbox付きiframeで表示しています。</p>
+              <div class="girls-preview-frame-wrap">
+                <iframe id="girls-preview-frame" title="アプリの安全プレビュー" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe>
+              </div>
+              <p id="girls-preview-error" class="girls-message girls-message-error hidden" role="alert"></p>
+            </section>
           </section>
 
           <section id="girls-view-settings" class="girls-view-panel girls-view-hidden" data-girls-panel="settings">
