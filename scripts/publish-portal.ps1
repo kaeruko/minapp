@@ -1,11 +1,11 @@
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [ValidatePattern('^[0-9]{12}$')]
-    [string]$ExpectedAccountId,
+    [string]$ExpectedAccountId = "314267685786",
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [ValidateNotNullOrEmpty()]
-    [string]$Profile,
+    [string]$Profile = "minapp-new",
 
     [Parameter(Mandatory = $false)]
     [ValidateNotNullOrEmpty()]
