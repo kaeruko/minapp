@@ -7,10 +7,10 @@
   padding-right: 36px;
   background:
     /* Cloud artwork belongs to the lavender sidebar area only. */
-    url("/__.png") left top / calc(100% - var(--girls-sidebar-lace-width)) auto no-repeat,
+    url("/girls-assets/sidebar/clouds.png") left top / calc(100% - var(--girls-sidebar-lace-width)) auto no-repeat,
 
     /* Lace sits on the boundary. */
-    url("/_race_b.png") right top / var(--girls-sidebar-lace-width) auto repeat-y,
+    url("/girls-assets/sidebar/lace.png") right top / var(--girls-sidebar-lace-width) auto repeat-y,
 
     /* The transparent side/holes of the lace should reveal the cream main-panel color,
        not the lavender sidebar background. */
