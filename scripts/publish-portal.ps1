@@ -53,14 +53,21 @@ $productionAssets = @(
     "girls_portal_base.css",
     "girls_footer.css",
     "girls_sidebar_art.css",
-    "girls_login_frame.png",
-    "girls_login_pattern.png",
-    "girls_login_lace.png",
-    "girls_logo.png",
-    "girls_brand_icon.png",
-    "girls_mascot_pair.svg",
-    "__.png",
-    "_race_b.png",
+    "girls-assets\login\frame.png",
+    "girls-assets\login\pattern.png",
+    "girls-assets\login\lace.png",
+    "girls-assets\logo.png",
+    "girls-assets\brand_icon.png",
+    "girls-assets\character.png",
+    "girls-assets\mascot_pair.svg",
+    "girls-assets\sidebar\clouds.png",
+    "girls-assets\sidebar\lace.png",
+    "girls-assets\split_icons\weather.png",
+    "girls-assets\split_icons\recipe.png",
+    "girls-assets\split_icons\todo.png",
+    "girls-assets\split_icons\rent_app.png",
+    "girls-assets\split_icons\fortune_app.png",
+    "girls-assets\split_icons\rei_app.png",
     "portal_routing.js",
     "single_html_zip.js",
     "app.js",
@@ -78,29 +85,10 @@ $productionAssets = @(
     "girls_footer.js"
 )
 
-# Girls artwork sources are intentionally kept inside this repository under apps/web.
-# They are copied to their public girls-assets paths during staging.
-$girlsPublishedAssets = @(
-    @{ Source = "split_icons\weather.png"; Destination = "girls-assets\split_icons\weather.png" },
-    @{ Source = "split_icons\recipe.png"; Destination = "girls-assets\split_icons\recipe.png" },
-    @{ Source = "split_icons\todo.png"; Destination = "girls-assets\split_icons\todo.png" },
-    @{ Source = "split_icons\rent_app.png"; Destination = "girls-assets\split_icons\rent_app.png" },
-    @{ Source = "split_icons\fortune_app.png"; Destination = "girls-assets\split_icons\fortune_app.png" },
-    @{ Source = "split_icons\rei_app.png"; Destination = "girls-assets\split_icons\rei_app.png" },
-    @{ Source = "girls_mascot_pair.png"; Destination = "girls-assets\character.png" }
-)
-
 foreach ($relativePath in $productionAssets) {
     $sourcePath = Join-Path $webDir $relativePath
     if (-not (Test-Path $sourcePath -PathType Leaf)) {
         throw "Required production Web asset is missing: $sourcePath"
-    }
-}
-
-foreach ($asset in $girlsPublishedAssets) {
-    $sourcePath = Join-Path $webDir $asset.Source
-    if (-not (Test-Path $sourcePath -PathType Leaf)) {
-        throw "Required Girls artwork asset is missing from apps/web: $sourcePath"
     }
 }
 
@@ -144,25 +132,19 @@ try {
 
     New-Item -ItemType Directory -Path $stagingDir | Out-Null
     foreach ($relativePath in $productionAssets) {
-        Copy-Item `
-            -LiteralPath (Join-Path $webDir $relativePath) `
-            -Destination (Join-Path $stagingDir $relativePath)
-    }
-
-    foreach ($asset in $girlsPublishedAssets) {
-        $destinationPath = Join-Path $stagingDir $asset.Destination
+        $destinationPath = Join-Path $stagingDir $relativePath
         $destinationDirectory = Split-Path -Parent $destinationPath
         if (-not (Test-Path $destinationDirectory -PathType Container)) {
             New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null
         }
+
         Copy-Item `
-            -LiteralPath (Join-Path $webDir $asset.Source) `
+            -LiteralPath (Join-Path $webDir $relativePath) `
             -Destination $destinationPath
     }
 
     Write-Host "Publishing production Web assets only:"
     $productionAssets | ForEach-Object { Write-Host "  $_" }
-    $girlsPublishedAssets | ForEach-Object { Write-Host "  $($_.Destination)" }
     Write-Host "Protected Terraform objects: portal-config.json, girls-config.json"
     Write-Host "Destination bucket: $bucket"
 
