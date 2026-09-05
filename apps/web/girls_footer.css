@@ -1,3 +1,5 @@
+@import url("/girls_sidebar_art.css");
+
 .girls-auth-shell {
   display: flex;
   flex-direction: column;
