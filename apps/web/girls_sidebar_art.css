@@ -2,21 +2,31 @@
    Keep the existing sidebar structure and layer only the decorative cloud header
    and the vertical lace edge over the current Girls color treatment. */
 .girls-portal-shell .portal-shell-sidebar {
-  padding-right: 34px;
+  --girls-sidebar-lace-width: 24px;
+
+  padding-right: 36px;
   background:
-    url("/__.png") left top / calc(100% - 22px) auto no-repeat,
-    url("/_race_b.png") right top / 22px auto repeat-y,
+    /* Cloud artwork belongs to the lavender sidebar area only. */
+    url("/__.png") left top / calc(100% - var(--girls-sidebar-lace-width)) auto no-repeat,
+
+    /* Lace sits on the boundary. */
+    url("/_race_b.png") right top / var(--girls-sidebar-lace-width) auto repeat-y,
+
+    /* The transparent side/holes of the lace should reveal the cream main-panel color,
+       not the lavender sidebar background. */
+    linear-gradient(
+      to right,
+      transparent 0 calc(100% - var(--girls-sidebar-lace-width)),
+      var(--portal-bg, #fff9f4) calc(100% - var(--girls-sidebar-lace-width)) 100%
+    ),
+
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 26%),
     linear-gradient(180deg, #9872b5 0%, #7f66aa 56%, #725895 100%);
 }
 
 @media (max-width: 900px) {
   .girls-portal-shell .portal-shell-sidebar {
-    padding-right: 34px;
-    background:
-      url("/__.png") left top / calc(100% - 22px) auto no-repeat,
-      url("/_race_b.png") right top / 22px auto repeat-y,
-      linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 26%),
-      linear-gradient(180deg, #9872b5 0%, #7f66aa 56%, #725895 100%);
+    --girls-sidebar-lace-width: 24px;
+    padding-right: 36px;
   }
 }
