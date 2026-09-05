@@ -231,6 +231,51 @@
   font-size: 0.72rem;
 }
 
+/* Authenticated app preview */
+.girls-app-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.girls-app-card-heading h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.girls-app-preview-button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 13px;
+  font-size: 0.75rem;
+}
+
+.girls-preview-card {
+  scroll-margin-top: 96px;
+}
+
+.girls-preview-heading {
+  align-items: center;
+}
+
+.girls-preview-frame-wrap {
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid #e3cfe0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+}
+
+#girls-preview-frame {
+  display: block;
+  width: 100%;
+  min-height: 520px;
+  border: 0;
+  background: #fff;
+}
+
 @media (max-width: 900px) {
   .girls-auth-shell .girls-shell {
     grid-template-columns: 1fr;
@@ -337,5 +382,18 @@
   #girls-login-panel h2,
   #girls-password-panel h2 {
     font-size: 1.4rem;
+  }
+
+  .girls-app-card-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .girls-app-preview-button {
+    align-self: flex-start;
+  }
+
+  #girls-preview-frame {
+    min-height: 430px;
   }
 }
