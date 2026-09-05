@@ -21,7 +21,7 @@
     ),
 
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 26%),
-    linear-gradient(180deg, #9872b5 0%, #7f66aa 56%, #725895 100%);
+    linear-gradient(180deg, #cabbdd 0%, #7f66aa 56%, #725895 100%);
 }
 
 @media (max-width: 900px) {
