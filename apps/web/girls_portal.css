@@ -7,7 +7,7 @@
   isolation: isolate;
   background:
     linear-gradient(rgba(255, 250, 246, 0.48), rgba(255, 247, 241, 0.58)),
-    url("/girls_login_pattern.png") center top / 360px auto repeat;
+    url("/girls-assets/login/pattern.png") center top / 360px auto repeat;
 }
 
 .girls-auth-shell::after {
@@ -18,7 +18,7 @@
   left: 0;
   width: 100%;
   height: 50px;
-  background-image: url("/girls_login_lace.png");
+  background-image: url("/girls-assets/login/lace.png");
   background-size: 25vw auto;
   background-position: center top;
   background-repeat: repeat-x;
@@ -37,7 +37,7 @@
 .girls-shell-brand-mark {
   color: transparent !important;
   background-color: transparent !important;
-  background-image: url("/girls_brand_icon.png") !important;
+  background-image: url("/girls-assets/brand_icon.png") !important;
   background-position: center !important;
   background-size: contain !important;
   background-repeat: no-repeat !important;
@@ -112,7 +112,7 @@
   width: min(74%, 440px);
   height: 164px;
   margin: 0 auto;
-  background: url("/girls_logo.png") center / contain no-repeat;
+  background: url("/girls-assets/logo.png") center / contain no-repeat;
 }
 
 .girls-auth-shell .girls-kicker {
@@ -159,7 +159,7 @@
   padding: 132px 54px 70px;
   border: 0;
   border-radius: 0;
-  background: transparent url("/girls_login_frame.png") center / 100% 100% no-repeat;
+  background: transparent url("/girls-assets/login/frame.png") center / 100% 100% no-repeat;
   box-shadow: none;
 }
 
