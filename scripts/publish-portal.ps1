@@ -100,40 +100,107 @@ function Get-PortalTerraformOutput {
         [string]$Name
     )
 
-    $value = & terraform -chdir=$portalDir output -raw $Name
+    $value = (& terraform "-chdir=$portalDir" output -raw $Name) -join "`n"
     if ($LASTEXITCODE -ne 0) {
-        throw "Failed to read Terraform output '$Name'."
+        throw "Failed to read Terraform output '$Name'. Run deploy-portal.ps1 successfully first."
     }
-
-    $trimmed = $value.Trim()
-    if ([string]::IsNullOrWhiteSpace($trimmed)) {
+    if ([string]::IsNullOrWhiteSpace($value)) {
         throw "Terraform output '$Name' was empty."
     }
-
-    return $trimmed
+    return $value
 }
 
-$bucketName = Get-PortalTerraformOutput -Name "portal_bucket_name"
-$distributionId = Get-PortalTerraformOutput -Name "cloudfront_distribution_id"
+$previousProfile = $env:AWS_PROFILE
+$stagingDir = Join-Path ([System.IO.Path]::GetTempPath()) ("minapp-portal-" + [guid]::NewGuid().ToString("N"))
 
-Write-Host "Publishing portal assets to s3://$bucketName ..."
-foreach ($relativePath in $productionAssets) {
-    $sourcePath = Join-Path $webDir $relativePath
-    $s3Key = $relativePath.Replace("\\", "/")
-    & aws s3 cp $sourcePath "s3://$bucketName/$s3Key" --profile $Profile --region $Region --only-show-errors
+try {
+    $env:AWS_PROFILE = $Profile
+
+    $bucket = Get-PortalTerraformOutput -Name "portal_bucket_name"
+    $distribution = Get-PortalTerraformOutput -Name "cloudfront_distribution_id"
+    $portalUrl = Get-PortalTerraformOutput -Name "portal_url"
+
+    foreach ($configKey in @("portal-config.json", "girls-config.json")) {
+        & aws s3api head-object `
+            --bucket $bucket `
+            --key $configKey `
+            --profile $Profile `
+            --region $Region `
+            --no-cli-pager *> $null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Terraform-managed $configKey is missing from s3://$bucket. Refusing to publish Web assets."
+        }
+    }
+
+    New-Item -ItemType Directory -Path $stagingDir | Out-Null
+    foreach ($relativePath in $productionAssets) {
+        $destinationPath = Join-Path $stagingDir $relativePath
+        $destinationDirectory = Split-Path -Parent $destinationPath
+        if (-not (Test-Path $destinationDirectory -PathType Container)) {
+            New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null
+        }
+
+        Copy-Item `
+            -LiteralPath (Join-Path $webDir $relativePath) `
+            -Destination $destinationPath
+    }
+
+    Write-Host "Publishing production Web assets only:"
+    $productionAssets | ForEach-Object { Write-Host "  $_" }
+    Write-Host "Protected Terraform objects: portal-config.json, girls-config.json"
+    Write-Host "Destination bucket: $bucket"
+
+    & aws s3 sync `
+        $stagingDir `
+        "s3://$bucket" `
+        --delete `
+        --exclude "portal-config.json" `
+        --exclude "girls-config.json" `
+        --profile $Profile `
+        --region $Region `
+        --no-progress
     if ($LASTEXITCODE -ne 0) {
-        throw "Failed to upload portal asset: $relativePath"
+        throw "Portal asset upload failed."
+    }
+
+    $invalidationJson = (& aws cloudfront create-invalidation `
+        --distribution-id $distribution `
+        --paths "/*" `
+        --profile $Profile `
+        --output json `
+        --no-cli-pager) -join "`n"
+    if ($LASTEXITCODE -ne 0) {
+        throw "CloudFront invalidation creation failed."
+    }
+    if ([string]::IsNullOrWhiteSpace($invalidationJson)) {
+        throw "CloudFront invalidation returned an empty response."
+    }
+
+    try {
+        $invalidation = $invalidationJson | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        throw "CloudFront invalidation returned invalid JSON: $($_.Exception.Message)"
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$invalidation.Invalidation.Id)) {
+        throw "CloudFront invalidation response did not contain an invalidation ID."
+    }
+
+    Write-Host "Portal publication complete."
+    Write-Host "  URL:             $portalUrl"
+    Write-Host "  Girls URL:       $portalUrl/girls.html"
+    Write-Host "  Distribution:    $distribution"
+    Write-Host "  Invalidation ID: $($invalidation.Invalidation.Id)"
+}
+finally {
+    if (Test-Path $stagingDir) {
+        Remove-Item -LiteralPath $stagingDir -Recurse -Force
+    }
+
+    if ($null -eq $previousProfile) {
+        Remove-Item Env:AWS_PROFILE -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:AWS_PROFILE = $previousProfile
     }
 }
-
-Write-Host "Creating CloudFront invalidation for distribution $distributionId ..."
-& aws cloudfront create-invalidation `
-    --distribution-id $distributionId `
-    --paths "/*" `
-    --profile $Profile `
-    --region $Region | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to create CloudFront invalidation."
-}
-
-Write-Host "Portal publish completed."
