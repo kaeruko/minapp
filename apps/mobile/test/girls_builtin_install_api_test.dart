@@ -16,18 +16,25 @@ http.Response _json(int status, Map<String, Object?> body) => http.Response(
       headers: const <String, String>{'content-type': 'application/json'},
     );
 
-Map<String, Object?> _installedApp({String groupId = _groupId}) =>
-    <String, Object?>{
-      'app_id': _appId,
-      'group_id': groupId,
-      'title': 'ノベルゲームメーカー',
-      'source_kind': 'builtin',
-      'created_at': '2026-09-07T01:00:00Z',
-      'builtin_id': novelEditorBuiltinId,
-      'builtin_asset_path': 'assets/builtin/novel_editor/index.html',
-      'builtin_version': 1,
-      'editable': false,
-    };
+Map<String, Object?> _installedApp({
+  String groupId = _groupId,
+  String builtinId = novelEditorBuiltinId,
+}) {
+  final bool isEditor = builtinId == novelEditorBuiltinId;
+  return <String, Object?>{
+    'app_id': _appId,
+    'group_id': groupId,
+    'title': isEditor ? 'ノベルゲームメーカー' : 'ひみつの放課後',
+    'source_kind': 'builtin',
+    'created_at': '2026-09-07T01:00:00Z',
+    'builtin_id': builtinId,
+    'builtin_asset_path': isEditor
+        ? 'assets/builtin/novel_editor/index.html'
+        : 'assets/builtin/novel_starter/index.html',
+    'builtin_version': isEditor ? 1 : 4,
+    'editable': false,
+  };
+}
 
 void main() {
   test('Novel Editor install uses JWT and exact builtin id', () async {
@@ -62,6 +69,37 @@ void main() {
     expect(app.builtinId, novelEditorBuiltinId);
   });
 
+  test('Novel Player install uses the exact novel-starter builtin id', () async {
+    late http.Request captured;
+    final MockClient client = MockClient((http.Request request) async {
+      captured = request;
+      return _json(
+        201,
+        _installedApp(builtinId: novelPlayerBuiltinId),
+      );
+    });
+    final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
+      baseUri: Uri.parse('https://hosted.example.test'),
+      client: client,
+    );
+
+    final HostedGroupApp app = await api.installNovelPlayer(
+      accessToken: 'owner-token',
+      groupId: _groupId,
+    );
+
+    expect(captured.method, 'POST');
+    expect(captured.url.path, '/hosted/groups/$_groupId/apps/install');
+    expect(captured.headers['authorization'], 'Bearer owner-token');
+    expect(
+      jsonDecode(captured.body),
+      const <String, Object?>{'builtin_id': novelPlayerBuiltinId},
+    );
+    expect(app.groupId, _groupId);
+    expect(app.sourceKind, 'builtin');
+    expect(app.builtinId, novelPlayerBuiltinId);
+  });
+
   test('install response cannot silently change group scope', () async {
     final MockClient client = MockClient(
       (http.Request request) async => _json(
@@ -76,6 +114,24 @@ void main() {
 
     await expectLater(
       api.installNovelEditor(
+        accessToken: 'owner-token',
+        groupId: _groupId,
+      ),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('Player install response cannot silently change builtin id', () async {
+    final MockClient client = MockClient(
+      (http.Request request) async => _json(201, _installedApp()),
+    );
+    final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
+      baseUri: Uri.parse('https://hosted.example.test'),
+      client: client,
+    );
+
+    await expectLater(
+      api.installNovelPlayer(
         accessToken: 'owner-token',
         groupId: _groupId,
       ),
