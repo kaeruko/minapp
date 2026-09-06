@@ -123,6 +123,108 @@
   line-height: 1.75;
 }
 
+/* Girls app cards */
+.girls-app-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 390px), 420px));
+  gap: 16px;
+  justify-content: start;
+}
+
+.girls-app-card {
+  grid-template-columns: 124px minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  min-height: 152px;
+  padding: 14px;
+  border-radius: 22px;
+  background: linear-gradient(145deg, #fffafd 0%, #fffdfb 100%);
+  box-shadow: 0 10px 24px rgba(120, 88, 126, 0.08);
+}
+
+.girls-app-card-media {
+  align-self: start;
+  width: 124px;
+}
+
+.girls-app-card-thumbnail {
+  display: block;
+  width: 124px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border: 1px solid #ead8e7;
+  border-radius: 17px;
+  background: #f8eff8;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+}
+
+.girls-app-card-thumbnail[data-thumbnail-state="no-image"] {
+  object-fit: cover;
+}
+
+.girls-app-card-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.girls-app-card-heading {
+  display: block;
+}
+
+.girls-app-card-heading h3 {
+  margin: 0;
+  color: #61464f;
+  font-size: 1.02rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.girls-app-card-body > p {
+  color: #947b82;
+}
+
+.girls-app-card-meta {
+  gap: 6px;
+}
+
+.girls-app-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: auto;
+}
+
+.girls-app-card-actions .girls-secondary {
+  min-height: 32px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.girls-app-visibility-button {
+  background: #fff9fd;
+}
+
+.girls-app-delete-button {
+  border-color: #edc0ca !important;
+  background: #fff8fa !important;
+  color: #a94d63 !important;
+}
+
+.girls-app-delete-button:hover,
+.girls-app-delete-button:focus-visible {
+  border-color: #d991a1 !important;
+  background: #fff0f4 !important;
+  color: #8f3d51 !important;
+}
+
+.girls-app-hidden-chip {
+  background: #f7e5ef !important;
+  color: #9b5875 !important;
+}
+
 @media (max-width: 560px) {
   .girls-login-footer {
     min-height: 32px;
@@ -133,5 +235,22 @@
 
   .girls-privacy-dialog-inner {
     padding: 18px 18px 20px;
+  }
+
+  .girls-app-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .girls-app-card {
+    grid-template-columns: 1fr;
+  }
+
+  .girls-app-card-media,
+  .girls-app-card-thumbnail {
+    width: 100%;
+  }
+
+  .girls-app-card-thumbnail {
+    aspect-ratio: 16 / 9;
   }
 }
