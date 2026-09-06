@@ -31,6 +31,7 @@ def player_source_zip() -> bytes:
             "</script><script src='player.js'></script>",
         )
         archive.writestr("player.js", "window.playerLoaded = true;")
+        archive.writestr("face.jpg", b"PLAYER-FACE")
     return buffer.getvalue()
 
 
@@ -199,8 +200,8 @@ class HostedAuthoringPreviewTests(unittest.TestCase):
             self.subject,
             self.project["content_id"],
             expected_revision=1,
-            path="player.js",
-            data=b"not actually javascript",
+            path="face.jpg",
+            data=b"AUTHORING-FACE",
         )
         before_keys = set(self.metadata.items)
 
