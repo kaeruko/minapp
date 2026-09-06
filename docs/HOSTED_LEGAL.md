@@ -14,8 +14,10 @@ Current versions:
 
 ```text
 Terms:   hosted-terms-2026-09-06
-Privacy: hosted-privacy-2026-09-04
+Privacy: hosted-privacy-2026-09-06
 ```
+
+The same Hosted Terms and Privacy Policy are used across MinApp visual/product variants. Variant-specific features such as private groups are described conditionally in the shared documents rather than maintaining separate legal text.
 
 Do not silently edit the body while keeping the same version. Any substantive legal-text change must receive a new version identifier.
 
@@ -43,7 +45,7 @@ Clients must fetch this endpoint before presenting Hosted registration.
   "login_id": "example-user",
   "password": "...",
   "terms_version": "hosted-terms-2026-09-06",
-  "privacy_version": "hosted-privacy-2026-09-04",
+  "privacy_version": "hosted-privacy-2026-09-06",
   "terms_accepted": true,
   "privacy_accepted": true
 }
@@ -86,7 +88,8 @@ The Hosted Terms include a zero-tolerance rule for objectionable content and abu
 - login/internal/auth identifiers
 - hashed recovery credentials
 - optional verified email address and verification state
-- group/app/runtime data
+- app/runtime data
+- group membership data when the group feature is used
 - user-provided content
 - legal-consent versions/timestamps
 - hashed abuse-control keys
