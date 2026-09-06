@@ -22,12 +22,12 @@
     }
 
     .game {
-      width: min(100%, 520px);
+      width: min(100%, 720px);
       min-height: 100vh;
       min-height: 100dvh;
       margin: auto;
       display: grid;
-      grid-template-rows: auto 1fr auto;
+      grid-template-rows: auto minmax(320px, 1fr) auto;
       gap: 12px;
       padding: max(16px, env(safe-area-inset-top)) 14px max(16px, env(safe-area-inset-bottom));
     }
@@ -40,7 +40,7 @@
       color: white;
     }
 
-    h1 { margin: 0; font-size: 24px; }
+    h1 { margin: 0; font-size: clamp(20px, 5vw, 28px); }
 
     #save-status {
       padding: 6px 9px;
@@ -50,29 +50,56 @@
       text-align: center;
     }
 
-    .portrait-wrap {
-      display: grid;
-      place-items: center;
+    .stage-wrap {
+      position: relative;
       min-height: 0;
     }
 
-    .portrait {
-      width: min(74vw, 290px);
-      aspect-ratio: 4 / 5;
-      position: relative;
+    .stage {
+      position: absolute;
+      inset: 0;
       overflow: hidden;
-      border: 5px solid white;
-      border-radius: 26px;
-      background: #f7f2f5;
+      border: 4px solid #ffffffd9;
+      border-radius: 28px;
+      background-color: #b9a6d2;
+      background-image: linear-gradient(#8b82bd, #e4aec8);
+      background-size: cover;
+      background-position: center;
       box-shadow: 0 16px 36px #35284b55;
     }
 
-    .portrait img {
-      width: 100%;
-      height: 100%;
-      display: block;
-      object-fit: cover;
+    .character {
+      position: absolute;
+      bottom: 0;
+      width: min(44%, 280px);
+      max-height: 92%;
+      object-fit: contain;
+      object-position: center bottom;
+      filter: drop-shadow(0 12px 14px #35284b66);
     }
+
+    .character[hidden] { display: none; }
+    .character[data-character-slot="left"] { left: 1%; }
+    .character[data-character-slot="center"] { left: 50%; transform: translateX(-50%); }
+    .character[data-character-slot="right"] { right: 1%; }
+
+    .start-overlay,
+    .fatal {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: grid;
+      place-content: center;
+      gap: 12px;
+      padding: 24px;
+      border-radius: 28px;
+      background: #35284bd9;
+      color: white;
+      text-align: center;
+    }
+
+    .start-overlay[hidden], .fatal[hidden] { display: none; }
+    .start-overlay p, .fatal p { margin: 0; line-height: 1.6; }
 
     .dialogue {
       overflow: hidden;
@@ -91,6 +118,8 @@
       font-weight: 800;
     }
 
+    #speaker[hidden] { display: none; }
+
     #text {
       min-height: 78px;
       margin: 0;
@@ -101,16 +130,20 @@
       white-space: pre-line;
     }
 
+    #text.clickable { cursor: pointer; }
+    #text.clickable::after { content: "  ▼"; font-size: 12px; }
+
     #choices {
       display: grid;
       gap: 8px;
       padding: 0 12px 13px;
     }
 
-    .choice, .restart {
+    .choice, .restart, .primary, .secondary, .danger {
       min-height: 46px;
       border: 0;
       border-radius: 14px;
+      padding: 10px 14px;
       background: #785a96;
       box-shadow: 0 4px 0 #503d67;
       color: white;
@@ -118,212 +151,172 @@
       cursor: pointer;
     }
 
-    .choice:active, .restart:active {
+    .choice:active, .restart:active, .primary:active, .secondary:active, .danger:active {
       transform: translateY(3px);
       box-shadow: 0 1px 0 #503d67;
     }
 
-    .restart { background: #a36e85; }
-    #end { padding-bottom: 8px; text-align: center; font-size: 12px; font-weight: 800; }
+    .secondary { background: #6c799c; }
+    .restart, .danger { background: #a36e85; }
+    #end { padding: 0 12px 10px; text-align: center; font-size: 13px; font-weight: 900; }
+    #fatal-message { max-width: 560px; overflow-wrap: anywhere; }
+
+    @media (max-width: 520px) {
+      .game { grid-template-rows: auto minmax(280px, 1fr) auto; }
+      .character { width: 52%; }
+      #text { font-size: 16px; }
+    }
   </style>
 </head>
 <body>
   <main class="game">
     <header>
-      <h1 id="title">ひみつの放課後</h1>
-      <div id="save-status" aria-live="polite">セーブ確認中</div>
+      <h1 id="title">ノベルを読み込み中</h1>
+      <div id="save-status" aria-live="polite">初期化中</div>
     </header>
 
-    <section class="portrait-wrap" aria-label="白髪の男子キャラクター">
-      <div class="portrait">
-        <img src="face.jpg" alt="レンの顔">
+    <section class="stage-wrap" aria-label="ノベルゲーム画面">
+      <div id="stage" class="stage">
+        <img class="character" data-character-slot="left" hidden alt="">
+        <img class="character" data-character-slot="center" hidden alt="">
+        <img class="character" data-character-slot="right" hidden alt="">
+      </div>
+
+      <div id="start-overlay" class="start-overlay">
+        <p>物語をはじめます</p>
+        <button id="start-button" class="primary" type="button">はじめから</button>
+        <button id="continue-button" class="secondary" type="button" hidden>つづきから</button>
+      </div>
+
+      <div id="fatal" class="fatal" hidden role="alert">
+        <p>この作品を再生できません。</p>
+        <p id="fatal-message"></p>
+        <button id="reset-save-button" class="danger" type="button" hidden>セーブを消して最初から</button>
       </div>
     </section>
 
     <section class="dialogue" aria-live="polite">
-      <div id="speaker">レン</div>
+      <div id="speaker" hidden></div>
       <p id="text"></p>
       <div id="end" hidden>END</div>
       <div id="choices"></div>
     </section>
   </main>
 
-  <script>
-    'use strict';
-
-    // ============================================================
-    // AIで改造するなら、まずここだけ変えればお話を作れます。
-    // title: タイトル
-    // speaker: 話している人
-    // text: セリフ
-    // choices: 選択肢。to に移動先の scene 名を書く
-    // end: true ならエンディング
-    // 顔画像は同じフォルダの face.jpg を差し替えてください。
-    // ============================================================
-    const GAME_TITLE = 'ひみつの放課後';
-    const SAVE_KEY = 'novel_progress';
-
-    const SCENES = {
-      start: {
-        speaker: 'レン',
-        text: 'なあ。\n今日、ちょっとだけ寄り道していかない？',
-        choices: [
-          { label: '「どうしたの？」', to: 'rooftop' },
-          { label: '「今日は帰るね」', to: 'leave' },
-        ],
-      },
-      rooftop: {
-        speaker: 'レン',
-        text: '屋上の空、すごくきれいだったから。\nきみに見せたかったんだ。',
-        choices: [
-          { label: 'となりに座る', to: 'together' },
-          { label: '空の写真を撮る', to: 'photo' },
-        ],
-      },
-      together: {
-        speaker: 'レン',
-        text: '……よかった。\nこの場所、ふたりだけの秘密にしよう。',
-        choices: [],
-        end: true,
-      },
-      photo: {
-        speaker: 'レン',
-        text: 'じゃあ同じ空を持って帰れるね。\n明日も、ここで会おう。',
-        choices: [],
-        end: true,
-      },
-      leave: {
-        speaker: 'レン',
-        text: 'そっか。じゃあ、また明日。\n次はちゃんと誘うから。',
-        choices: [],
-        end: true,
-      },
-    };
-
-    let currentScene = 'start';
-    let bridgeReadyHandled = false;
-
-    const title = document.getElementById('title');
-    const speaker = document.getElementById('speaker');
-    const text = document.getElementById('text');
-    const choices = document.getElementById('choices');
-    const end = document.getElementById('end');
-    const saveStatus = document.getElementById('save-status');
-
-    title.textContent = GAME_TITLE;
-
-    function hasMinAppState() {
-      return Boolean(
-        window.minapp &&
-        window.minapp.version === 1 &&
-        window.minapp.state &&
-        typeof window.minapp.state.get === 'function' &&
-        typeof window.minapp.state.set === 'function' &&
-        typeof window.minapp.state.delete === 'function'
-      );
-    }
-
-    function status(message) {
-      saveStatus.textContent = message;
-    }
-
-    function render(sceneId) {
-      const scene = SCENES[sceneId];
-      if (!scene) throw new Error(`Unknown scene: ${sceneId}`);
-
-      currentScene = sceneId;
-      speaker.textContent = scene.speaker;
-      text.textContent = scene.text;
-      end.hidden = scene.end !== true;
-      choices.replaceChildren();
-
-      for (const item of scene.choices) {
-        const button = document.createElement('button');
-        button.className = 'choice';
-        button.textContent = item.label;
-        button.addEventListener('click', async () => {
-          render(item.to);
-          await saveProgress();
-        });
-        choices.appendChild(button);
+  <!--
+    v1では story.json の fetch を前提にしない。
+    Publish時のcompilerは、このapplication/json要素へMaster Dataを安全に埋め込む。
+  -->
+  <script id="minapp-novel-story" type="application/json">
+  {
+    "content_format": "minapp/novel@1",
+    "schema_version": 1,
+    "content_revision": 1,
+    "title": "ひみつの放課後",
+    "start_scene": "start",
+    "assets": {
+      "ren-face": {
+        "kind": "image",
+        "src": "face.jpg",
+        "mime": "image/jpeg",
+        "alt": "レン"
       }
-
-      if (scene.end === true) {
-        const button = document.createElement('button');
-        button.className = 'restart';
-        button.textContent = 'はじめから読む';
-        button.addEventListener('click', restartStory);
-        choices.appendChild(button);
-      }
-    }
-
-    async function saveProgress() {
-      if (!hasMinAppState()) {
-        status('この環境はセーブなし');
-        return;
-      }
-      try {
-        await window.minapp.state.set(SAVE_KEY, { scene: currentScene });
-        status('セーブしました');
-      } catch (error) {
-        status(`保存失敗: ${error && error.code ? error.code : 'unknown_error'}`);
-      }
-    }
-
-    async function restoreProgress() {
-      if (!hasMinAppState()) {
-        status('この環境はセーブなし');
-        return;
-      }
-      try {
-        const saved = await window.minapp.state.get(SAVE_KEY);
-        if (saved && typeof saved.scene === 'string' && SCENES[saved.scene]) {
-          render(saved.scene);
-          status('つづきから');
-        } else {
-          status('はじめから');
+    },
+    "characters": {
+      "ren": {
+        "name": "レン",
+        "expressions": {
+          "normal": "ren-face"
         }
-      } catch (error) {
-        if (error && error.code === 'state_not_found') {
-          status('はじめから');
-          return;
-        }
-        status(`読込失敗: ${error && error.code ? error.code : 'unknown_error'}`);
+      }
+    },
+    "scenes": {
+      "start": {
+        "id": "start",
+        "events": [
+          {
+            "id": "evt-start-ren",
+            "type": "character",
+            "action": "show",
+            "slot": "center",
+            "character": "ren",
+            "expression": "normal"
+          },
+          {
+            "id": "evt-start-line",
+            "type": "dialogue",
+            "speaker": "ren",
+            "text": "なあ。\n今日、ちょっとだけ寄り道していかない？"
+          },
+          {
+            "id": "evt-start-choice",
+            "type": "choice",
+            "options": [
+              { "id": "ask", "label": "「どうしたの？」", "goto": "rooftop" },
+              { "id": "leave", "label": "「今日は帰るね」", "goto": "leave" }
+            ]
+          }
+        ]
+      },
+      "rooftop": {
+        "id": "rooftop",
+        "events": [
+          {
+            "id": "evt-rooftop-line",
+            "type": "dialogue",
+            "speaker": "ren",
+            "text": "屋上の空、すごくきれいだったから。\nきみに見せたかったんだ。"
+          },
+          {
+            "id": "evt-rooftop-choice",
+            "type": "choice",
+            "options": [
+              { "id": "sit", "label": "となりに座る", "goto": "together" },
+              { "id": "photo", "label": "空の写真を撮る", "goto": "photo" }
+            ]
+          }
+        ]
+      },
+      "together": {
+        "id": "together",
+        "events": [
+          {
+            "id": "evt-together-line",
+            "type": "dialogue",
+            "speaker": "ren",
+            "text": "……よかった。\nこの場所、ふたりだけの秘密にしよう。"
+          },
+          { "id": "evt-together-end", "type": "end", "label": "END - ふたりの秘密" }
+        ]
+      },
+      "photo": {
+        "id": "photo",
+        "events": [
+          {
+            "id": "evt-photo-line",
+            "type": "dialogue",
+            "speaker": "ren",
+            "text": "じゃあ同じ空を持って帰れるね。\n明日も、ここで会おう。"
+          },
+          { "id": "evt-photo-end", "type": "end", "label": "END - 同じ空" }
+        ]
+      },
+      "leave": {
+        "id": "leave",
+        "events": [
+          {
+            "id": "evt-leave-line",
+            "type": "dialogue",
+            "speaker": "ren",
+            "text": "そっか。じゃあ、また明日。\n次はちゃんと誘うから。"
+          },
+          { "id": "evt-leave-end", "type": "end", "label": "END - また明日" }
+        ]
       }
     }
-
-    async function restartStory() {
-      render('start');
-      if (!hasMinAppState()) {
-        status('この環境はセーブなし');
-        return;
-      }
-      try {
-        await window.minapp.state.delete(SAVE_KEY);
-        status('はじめから');
-      } catch (error) {
-        if (error && error.code === 'state_not_found') {
-          status('はじめから');
-          return;
-        }
-        status(`削除失敗: ${error && error.code ? error.code : 'unknown_error'}`);
-      }
-    }
-
-    async function onMinAppReady() {
-      if (bridgeReadyHandled) return;
-      bridgeReadyHandled = true;
-      await restoreProgress();
-    }
-
-    window.addEventListener('minappready', onMinAppReady);
-    render('start');
-
-    if (hasMinAppState()) {
-      onMinAppReady();
-    } else {
-      status('この環境はセーブなし');
-    }
+  }
   </script>
+  <script src="story-validator.js"></script>
+  <script src="player.js"></script>
 </body>
 </html>
