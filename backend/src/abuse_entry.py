@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 import handler
+import hosted_authoring_capability_entry
 import hosted_authoring_entry
 import hosted_entry
 import hosted_handler
@@ -118,6 +119,10 @@ def hosted_lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]
         preview_state_response = hosted_preview_state_entry.handle_request(event)
         if preview_state_response is not None:
             return preview_state_response
+
+        authoring_capability_response = hosted_authoring_capability_entry.handle_request(event)
+        if authoring_capability_response is not None:
+            return authoring_capability_response
 
         authoring_response = hosted_authoring_entry.handle_request(event)
         if authoring_response is not None:
