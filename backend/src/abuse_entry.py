@@ -6,6 +6,7 @@ from typing import Any
 import handler
 import hosted_authoring_capability_entry
 import hosted_authoring_entry
+import hosted_authoring_publish_entry
 import hosted_entry
 import hosted_handler
 import hosted_preview_state_entry
@@ -123,6 +124,10 @@ def hosted_lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]
         authoring_capability_response = hosted_authoring_capability_entry.handle_request(event)
         if authoring_capability_response is not None:
             return authoring_capability_response
+
+        authoring_publish_response = hosted_authoring_publish_entry.handle_request(event)
+        if authoring_publish_response is not None:
+            return authoring_publish_response
 
         authoring_response = hosted_authoring_entry.handle_request(event)
         if authoring_response is not None:
