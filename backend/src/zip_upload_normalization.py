@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import stat
 import zipfile
 from pathlib import PurePosixPath
 
@@ -8,27 +9,62 @@ from errors import ApiProblem
 from phase2_backend import _safe_zip_paths
 
 
-def normalize_uploaded_zip(zip_bytes: bytes) -> tuple[bytes, list[str]]:
-    """Return a canonical app ZIP with index.html at the archive root.
+def _is_desktop_packaging_metadata(parts: list[str]) -> bool:
+    return parts[0] == "__MACOSX" or parts[-1] == ".DS_Store"
 
-    Already-canonical ZIPs are returned byte-for-byte unchanged. If the only
-    problem is a missing root index.html, accept exactly one common top-level
-    directory when that directory contains index.html directly, and rewrite
-    the archive without that one directory level.
 
-    Ambiguous layouts are deliberately rejected rather than guessed.
+def _strip_desktop_packaging_metadata(zip_bytes: bytes) -> bytes | None:
+    """Remove only well-known Finder metadata, after validating archive paths.
+
+    Returns None when no such metadata exists so callers can preserve ordinary
+    uploads byte-for-byte.
     """
-    try:
-        return zip_bytes, _safe_zip_paths(zip_bytes)
-    except ApiProblem as exc:
-        if exc.error != "index_missing":
-            raise
-
     try:
         archive = zipfile.ZipFile(io.BytesIO(zip_bytes))
     except zipfile.BadZipFile as exc:
-        # _safe_zip_paths normally owns this error, but keep the helper
-        # fail-fast if the archive changes between validation attempts.
+        raise ApiProblem(400, "invalid_zip", "正しいZIPファイルではありません。") from exc
+
+    with archive:
+        kept: list[zipfile.ZipInfo] = []
+        removed_any = False
+        for info in archive.infolist():
+            raw_name = info.filename
+            if not isinstance(raw_name, str) or not raw_name:
+                raise ApiProblem(400, "invalid_zip_path", "ZIP内に不正なファイル名があります。")
+            if "\\" in raw_name or "\x00" in raw_name or raw_name.startswith("/"):
+                raise ApiProblem(400, "invalid_zip_path", f"ZIP内のパスが不正です: {raw_name}")
+
+            parts = raw_name.rstrip("/").split("/")
+            if any(part in {"", ".", ".."} for part in parts):
+                raise ApiProblem(400, "invalid_zip_path", f"ZIP内のパスが不正です: {raw_name}")
+
+            mode = (info.external_attr >> 16) & 0o170000
+            if mode == stat.S_IFLNK:
+                raise ApiProblem(400, "zip_symlink_forbidden", "ZIP内のシンボリックリンクは使えません。")
+            if info.flag_bits & 0x1:
+                raise ApiProblem(400, "encrypted_zip_forbidden", "暗号化ZIPは使えません。")
+            if info.is_dir():
+                continue
+
+            if _is_desktop_packaging_metadata(parts):
+                removed_any = True
+                continue
+            kept.append(info)
+
+        if not removed_any:
+            return None
+
+        output = io.BytesIO()
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as cleaned:
+            for info in kept:
+                cleaned.writestr(PurePosixPath(info.filename).as_posix(), archive.read(info))
+        return output.getvalue()
+
+
+def _unwrap_single_top_level_folder(zip_bytes: bytes) -> tuple[bytes, list[str]]:
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    except zipfile.BadZipFile as exc:
         raise ApiProblem(400, "invalid_zip", "正しいZIPファイルではありません。") from exc
 
     with archive:
@@ -80,5 +116,35 @@ def normalize_uploaded_zip(zip_bytes: bytes) -> tuple[bytes, list[str]]:
                 normalized.writestr(relative, archive.read(info))
 
     normalized_bytes = output.getvalue()
-    files = _safe_zip_paths(normalized_bytes)
-    return normalized_bytes, files
+    return normalized_bytes, _safe_zip_paths(normalized_bytes)
+
+
+def normalize_uploaded_zip(zip_bytes: bytes) -> tuple[bytes, list[str]]:
+    """Return a canonical app ZIP with index.html at the archive root.
+
+    Already-canonical ZIPs are returned byte-for-byte unchanged. Desktop ZIPs
+    may contain Finder packaging metadata; only `__MACOSX` and `.DS_Store` are
+    removed. If root index.html is then missing, exactly one top-level folder
+    may be unwrapped when it directly contains index.html.
+
+    Ambiguous layouts and all existing security validation errors are rejected.
+    """
+    try:
+        return zip_bytes, _safe_zip_paths(zip_bytes)
+    except ApiProblem as original_error:
+        if original_error.error not in {"index_missing", "unsupported_file_type"}:
+            raise
+
+    cleaned = _strip_desktop_packaging_metadata(zip_bytes)
+    candidate = zip_bytes if cleaned is None else cleaned
+
+    try:
+        files = _safe_zip_paths(candidate)
+        return candidate, files
+    except ApiProblem as candidate_error:
+        if candidate_error.error != "index_missing":
+            raise
+        if cleaned is None and original_error.error == "unsupported_file_type":
+            raise original_error
+
+    return _unwrap_single_top_level_folder(candidate)
