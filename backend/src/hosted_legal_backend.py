@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import secrets
 import time
 import uuid
@@ -86,6 +87,12 @@ class HostedLegalBackend(HostedCatalogBackend):
             "editable": {"BOOL": False},
             "created_at": _string_attr(created_at),
         }
+        for contract_field in ("accepts", "edits"):
+            formats = template.get(contract_field)
+            if formats is not None:
+                common[f"{contract_field}_json"] = _string_attr(
+                    json.dumps(formats, separators=(",", ":"))
+                )
         app_meta = {
             "pk": _string_attr(f"APP#{app_id}"),
             "sk": _string_attr("META"),
