@@ -1,6 +1,7 @@
 locals {
   hosted_authoring_session_create_routes = toset([
     "POST /hosted/authoring/projects/{content_id}/session",
+    "POST /hosted/authoring/projects/{content_id}/launch",
   ])
 
   hosted_authoring_capability_routes = toset([
@@ -10,6 +11,7 @@ locals {
     "GET /hosted/authoring/session/{token}/assets/{proxy+}",
     "POST /hosted/authoring/session/{token}/assets/{proxy+}",
     "DELETE /hosted/authoring/session/{token}/assets/{proxy+}",
+    "GET /hosted/authoring-editor/{token}/{proxy+}",
   ])
 }
 
