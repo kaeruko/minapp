@@ -12,6 +12,7 @@ if str(BACKEND_SRC) not in sys.path:
 
 from errors import ApiProblem  # noqa: E402
 from hosted_authoring_backend import HostedAuthoringBackend  # noqa: E402
+from hosted_legal import PRIVACY_VERSION, TERMS_VERSION  # noqa: E402
 from test_hosted_backend import FakeAwsError, FakeCognito, FakeDynamoDb  # noqa: E402
 from test_hosted_catalog_backend import FakeS3  # noqa: E402
 
@@ -95,7 +96,7 @@ class HostedAuthoringBackendTests(unittest.TestCase):
             upload_bucket="uploads",
             published_bucket="published",
         )
-        self.backend.register("alice", "secret12", "2026-08-28", "2026-08-28")
+        self.backend.register("alice", "secret12", TERMS_VERSION, PRIVACY_VERSION)
         self.subject = self.cognito.users["alice"]["sub"]
         self.group = self.backend.create_group(self.subject, "ノベル制作部")
 
