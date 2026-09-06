@@ -4,11 +4,11 @@ from typing import Any
 
 from errors import ApiProblem
 
-TERMS_VERSION = "hosted-terms-2026-08-28"
+TERMS_VERSION = "hosted-terms-2026-09-06"
 PRIVACY_VERSION = "hosted-privacy-2026-09-04"
-TERMS_EFFECTIVE_DATE = "2026-08-28"
+TERMS_EFFECTIVE_DATE = "2026-09-06"
 PRIVACY_EFFECTIVE_DATE = "2026-09-04"
-LEGAL_EFFECTIVE_DATE = PRIVACY_EFFECTIVE_DATE
+LEGAL_EFFECTIVE_DATE = max(TERMS_EFFECTIVE_DATE, PRIVACY_EFFECTIVE_DATE)
 SUPPORT_EMAIL = "mail@cloxs.jp"
 
 TERMS_TITLE = "みんアプ Hosted 利用規約 / Terms of Use"
@@ -23,7 +23,9 @@ TERMS_BODY = f"""{TERMS_TITLE}
 みんアプでは、わいせつ、暴力、差別、脅迫、いじめ、嫌がらせ、個人情報の侵害、違法行為を助長する内容、その他他者に危害を与えるコンテンツや abusive behavior を一切許容しません（zero tolerance）。
 
 3. ユーザーコンテンツ
-利用者は、自分が作成・保存・共有する文章、画像、アプリ、設定データその他のコンテンツについて必要な権利を有し、第三者の権利を侵害しないことを確認してください。
+利用者は、自分が作成・保存・共有する文章、画像、音声、動画、アプリ、設定データその他のコンテンツについて、必要な権利を有するものに限り利用してください。
+
+第三者の著作権、著作隣接権、商標権、肖像権その他の権利を侵害するコンテンツを、本サービスを通じてアップロード、公開または共有してはなりません。市販の音楽、映像その他第三者が権利を有する素材を利用する場合は、利用者自身で必要な許諾の有無を確認してください。
 
 4. 安全上の報告と運営対応
 安全上の問題や規約違反は {SUPPORT_EMAIL} へ連絡できます。運営は報告された内容を確認し、必要に応じてコンテンツの削除・公開停止、グループからの除外、アカウントの利用停止その他の措置を行います。
