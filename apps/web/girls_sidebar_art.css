@@ -11,15 +11,15 @@
   padding-top: calc(var(--girls-sidebar-header-height) + 10px);
   padding-right: 44px;
 
-  /* The sidebar box itself is transparent at the far right. The parent portal
-     background (#fff9f4) shows there, while #cbb5d7 fills the left side.
-     The transition is intentionally placed underneath the lace. */
+  /* Keep both sides explicit: lavender on the sidebar side and the Girls cream
+     on the content side. The color transition stays underneath the lace, so no
+     straight vertical boundary is exposed through transparent lace pixels. */
   background:
     url("/girls-assets/sidebar/header.png") left top / calc(100% - var(--girls-sidebar-lace-overhang)) auto no-repeat,
     linear-gradient(
       to right,
       #cbb5d7 0 calc(100% - var(--girls-sidebar-lace-overhang)),
-      transparent calc(100% - var(--girls-sidebar-lace-overhang)) 100%
+      var(--portal-bg, #fff9f4) calc(100% - var(--girls-sidebar-lace-overhang)) 100%
     );
 }
 
@@ -42,7 +42,7 @@
 }
 
 /* One continuous lace strip defines the visible sidebar edge. Because the
-   purple/cream transition sits underneath the middle of this image, there is
+   lavender/cream transition sits underneath the middle of this image, there is
    no exposed straight vertical boundary. */
 .girls-portal-shell .portal-shell-sidebar::after {
   content: "";
