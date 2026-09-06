@@ -94,18 +94,6 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     iconBorderColor: Color(0xFFA78BFA),
     iconColor: Color(0xFF6D28D9),
   ),
-  BuiltInApp(
-    id: 'novel-editor',
-    title: 'ノベルゲームメーカー',
-    assetPath: 'assets/builtin/novel_editor/index.html',
-    searchableText:
-        'ノベルゲームメーカー ノベル エディタ 編集 作成 作品 ストーリー 選択肢 みんアプ公式 制作ツール',
-    icon: Icons.edit_note_rounded,
-    cardColor: Color(0xFFF8F1FF),
-    iconBackgroundColor: Color(0xFFEDE0FF),
-    iconBorderColor: Color(0xFFA78BFA),
-    iconColor: Color(0xFF6D28D9),
-  ),
 ];
 
 List<BuiltInApp> filterBuiltInApps(String query) {
