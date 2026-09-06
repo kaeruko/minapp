@@ -91,7 +91,10 @@ class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
         self,
         auth_subject: str,
         group_id: str,
+        content_format: str | None = None,
     ) -> list[dict[str, Any]]:
+        if content_format is not None:
+            content_format = validate_content_format(content_format)
         user = self._user_by_auth_subject(auth_subject)
         self._require_owner_group(user.user_id, group_id)
         response = self._dynamodb.query(
@@ -113,8 +116,11 @@ class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
             if _item_string(index, "owner_user_id") != user.user_id:
                 raise RuntimeError("Authoring group content index has a mismatched owner")
             content_id = _item_string(index, "content_id")
-            if _item_string(index, "content_format") == "":
+            indexed_format = _item_string(index, "content_format")
+            if indexed_format == "":
                 raise RuntimeError("Authoring group content index has an empty content format")
+            if content_format is not None and indexed_format != content_format:
+                continue
 
             meta = self._get_item(pk=f"CONTENT#{content_id}", sk="META")
             if meta is None:
@@ -123,7 +129,7 @@ class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
                 raise RuntimeError("Indexed Authoring content no longer matches its group")
             if _item_string(meta, "owner_user_id") != user.user_id:
                 raise RuntimeError("Indexed Authoring content no longer matches its owner")
-            if _item_string(meta, "content_format") != _item_string(index, "content_format"):
+            if _item_string(meta, "content_format") != indexed_format:
                 raise RuntimeError("Indexed Authoring content format no longer matches metadata")
             projects.append(self._public_project(meta))
 
