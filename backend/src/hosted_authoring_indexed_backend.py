@@ -5,10 +5,12 @@ import uuid
 from typing import Any
 
 from aws_backend import _item_string, _string_attr
+from errors import ApiProblem
 from hosted_authoring_backend import (
     HostedAuthoringBackend,
     _assets_json,
     _document_bytes,
+    _validate_content_id,
     validate_content_format,
 )
 from hosted_platform_backend import _now_iso, _number_attr
@@ -19,7 +21,7 @@ class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
 
     The index is written in the same DynamoDB transaction as content metadata
     and revision 1. Listing never scans the metadata table and never silently
-    skips a stale/corrupt index entry.
+    skips a stale/corrupt index entry owned by the current user.
     """
 
     def create_authoring_project(
@@ -32,7 +34,7 @@ class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
         content_format = validate_content_format(content_format)
         document_bytes = _document_bytes(document)
         user = self._user_by_auth_subject(auth_subject)
-        self._require_owner_group(user.user_id, group_id)
+        self._require_active_membership(user.user_id, group_id)
 
         content_id = uuid.uuid4().hex
         revision = 1
@@ -96,7 +98,7 @@ class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
         if content_format is not None:
             content_format = validate_content_format(content_format)
         user = self._user_by_auth_subject(auth_subject)
-        self._require_owner_group(user.user_id, group_id)
+        self._require_active_membership(user.user_id, group_id)
         response = self._dynamodb.query(
             TableName=self._table_name,
             KeyConditionExpression="pk = :pk AND begins_with(sk, :content_prefix)",
@@ -114,7 +116,7 @@ class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
             if _item_string(index, "group_id") != group_id:
                 raise RuntimeError("Authoring group content index has a mismatched group")
             if _item_string(index, "owner_user_id") != user.user_id:
-                raise RuntimeError("Authoring group content index has a mismatched owner")
+                continue
             content_id = _item_string(index, "content_id")
             indexed_format = _item_string(index, "content_format")
             if indexed_format == "":
@@ -135,3 +137,22 @@ class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
 
         projects.sort(key=lambda project: project["updated_at"], reverse=True)
         return projects
+
+    def _owned_content(
+        self,
+        auth_subject: str,
+        content_id: str,
+    ) -> tuple[Any, dict[str, Any]]:
+        _validate_content_id(content_id)
+        user = self._user_by_auth_subject(auth_subject)
+        item = self._get_item(pk=f"CONTENT#{content_id}", sk="META")
+        if item is None:
+            raise ApiProblem(404, "content_not_found", "Authoring content was not found.")
+        group_id = _item_string(item, "group_id")
+        self._require_active_membership(user.user_id, group_id)
+        if _item_string(item, "owner_user_id") != user.user_id:
+            raise ApiProblem(403, "forbidden", "You do not own this Authoring content.")
+        status = _item_string(item, "status")
+        if status != "draft":
+            raise ApiProblem(409, "content_not_editable", "Authoring content is not editable.")
+        return user, item
