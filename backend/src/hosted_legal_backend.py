@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 import hashlib
 import json
 import secrets
 import time
 import uuid
-from typing import Any
+from typing import Any, Iterator
 
 from aws_backend import _User, _aws_error_code, _item_string, _string_attr
 from errors import ApiProblem
@@ -29,6 +31,11 @@ from hosted_platform_backend import (
     _recovery_hash,
 )
 
+_APP_OWNER_GROUP_OVERRIDE: ContextVar[tuple[str, str] | None] = ContextVar(
+    "hosted_app_owner_group_override",
+    default=None,
+)
+
 
 class HostedLegalBackend(HostedCatalogBackend):
     """Hosted catalog backend with auditable registration consent records."""
@@ -48,6 +55,120 @@ class HostedLegalBackend(HostedCatalogBackend):
             }
             for builtin_id in sorted(templates)
         ]
+
+    def _require_owner_group(self, user_id: str, group_id: str) -> dict[str, Any]:
+        if _APP_OWNER_GROUP_OVERRIDE.get() == (user_id, group_id):
+            return self._require_active_membership(user_id, group_id)
+        return super()._require_owner_group(user_id, group_id)
+
+    @contextmanager
+    def _allow_owned_app_group(self, user_id: str, group_id: str) -> Iterator[None]:
+        token = _APP_OWNER_GROUP_OVERRIDE.set((user_id, group_id))
+        try:
+            yield
+        finally:
+            _APP_OWNER_GROUP_OVERRIDE.reset(token)
+
+    def _require_owned_app(
+        self,
+        auth_subject: str,
+        group_id: str,
+        app_id: str,
+        *,
+        editable: bool,
+    ) -> tuple[_User, dict[str, Any]]:
+        user = self._user_by_auth_subject(auth_subject)
+        self._require_active_membership(user.user_id, group_id)
+        app = self._require_app_in_group(app_id, group_id)
+        self._require_not_deleting(app)
+        if _item_string(app, "owner_user_id") != user.user_id:
+            raise ApiProblem(403, "forbidden", "このアプリを管理する権限がありません。")
+        if editable:
+            self._require_editable_app(app)
+        return user, app
+
+    def fork_app(
+        self,
+        auth_subject: str,
+        group_id: str,
+        app_id: str,
+        title: str,
+    ) -> dict[str, Any]:
+        user = self._user_by_auth_subject(auth_subject)
+        self._require_active_membership(user.user_id, group_id)
+        parent = self._require_app_in_group(app_id, group_id)
+        self._require_not_deleting(parent)
+        with self._allow_owned_app_group(user.user_id, group_id):
+            return super().fork_app(auth_subject, group_id, app_id, title)
+
+    def get_editable_source(
+        self,
+        auth_subject: str,
+        group_id: str,
+        app_id: str,
+    ) -> tuple[bytes, dict[str, Any]]:
+        user, _ = self._require_owned_app(
+            auth_subject,
+            group_id,
+            app_id,
+            editable=True,
+        )
+        with self._allow_owned_app_group(user.user_id, group_id):
+            return super().get_editable_source(auth_subject, group_id, app_id)
+
+    def update_editable_source(
+        self,
+        auth_subject: str,
+        group_id: str,
+        app_id: str,
+        expected_revision: int,
+        zip_bytes: bytes,
+    ) -> dict[str, Any]:
+        user, _ = self._require_owned_app(
+            auth_subject,
+            group_id,
+            app_id,
+            editable=True,
+        )
+        with self._allow_owned_app_group(user.user_id, group_id):
+            return super().update_editable_source(
+                auth_subject,
+                group_id,
+                app_id,
+                expected_revision,
+                zip_bytes,
+            )
+
+    def publish_app(
+        self,
+        auth_subject: str,
+        group_id: str,
+        app_id: str,
+        expected_revision: int,
+    ) -> dict[str, Any]:
+        user, _ = self._require_owned_app(
+            auth_subject,
+            group_id,
+            app_id,
+            editable=True,
+        )
+        with self._allow_owned_app_group(user.user_id, group_id):
+            return super().publish_app(
+                auth_subject,
+                group_id,
+                app_id,
+                expected_revision,
+            )
+
+    def delete_hosted_app(self, auth_subject: str, group_id: str, app_id: str) -> None:
+        user, _ = self._require_owned_app(
+            auth_subject,
+            group_id,
+            app_id,
+            editable=False,
+        )
+        with self._allow_owned_app_group(user.user_id, group_id):
+            super().delete_hosted_app(auth_subject, group_id, app_id)
 
     def install_builtin(
         self,
