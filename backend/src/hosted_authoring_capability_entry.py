@@ -13,11 +13,15 @@ from hosted_authoring_entry import (
     _expected_revision_header,
     _require_no_body,
 )
+import hosted_authoring_launch
 import hosted_authoring_session
+import hosted_handler
 
 _CONTENT_ID_RE = r"([0-9a-f]{32})"
 _TOKEN_RE = r"([A-Za-z0-9_-]{32,64})"
 _CREATE_SESSION_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/session$")
+_CREATE_LAUNCH_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/launch$")
+_EDITOR_CONTENT_RE = re.compile(r"^/hosted/authoring-editor/([A-Za-z0-9_-]{32,64})/(.+)$")
 _SESSION_PROJECT_RE = re.compile(rf"^/hosted/authoring/session/{_TOKEN_RE}$")
 _SESSION_DOCUMENT_RE = re.compile(rf"^/hosted/authoring/session/{_TOKEN_RE}/document$")
 _SESSION_PUBLISH_RE = re.compile(rf"^/hosted/authoring/session/{_TOKEN_RE}/publish$")
@@ -34,28 +38,63 @@ def _get_backend() -> Any:
     return _BACKEND
 
 
+def _editor_app_id(payload: dict[str, Any]) -> str:
+    _require_fields(payload, required={"editor_app_id"})
+    editor_app_id = payload["editor_app_id"]
+    if not isinstance(editor_app_id, str) or re.fullmatch(r"[0-9a-f]{32}", editor_app_id) is None:
+        raise ApiProblem(
+            400,
+            "invalid_request",
+            "editor_app_id must be a 32-character lowercase hexadecimal ID.",
+        )
+    return editor_app_id
+
+
 def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
     if not isinstance(event, dict):
         raise TypeError("event must be a dictionary")
     method = _request_method(event)
     path = _raw_path(event)
 
+    editor_content_match = _EDITOR_CONTENT_RE.fullmatch(path)
+    if editor_content_match is not None:
+        if method != "GET":
+            return None
+        token, encoded_path = editor_content_match.groups()
+        data, content_type = hosted_authoring_launch.get_editor_file(
+            _get_backend(),
+            token,
+            unquote(encoded_path),
+        )
+        return hosted_handler._published_content_response(data, content_type)
+
+    create_launch_match = _CREATE_LAUNCH_RE.fullmatch(path)
+    if create_launch_match is not None:
+        if method != "POST":
+            return None
+        payload = _authoring_json_body(event)
+        return _json_response(
+            201,
+            hosted_authoring_launch.create_launch(
+                _get_backend(),
+                _auth_subject(event),
+                create_launch_match.group(1),
+                _editor_app_id(payload),
+            ),
+        )
+
     create_match = _CREATE_SESSION_RE.fullmatch(path)
     if create_match is not None:
         if method != "POST":
             return None
         payload = _authoring_json_body(event)
-        _require_fields(payload, required={"editor_app_id"})
-        editor_app_id = payload["editor_app_id"]
-        if not isinstance(editor_app_id, str) or re.fullmatch(r"[0-9a-f]{32}", editor_app_id) is None:
-            raise ApiProblem(400, "invalid_request", "editor_app_id must be a 32-character lowercase hexadecimal ID.")
         return _json_response(
             201,
             hosted_authoring_session.create_session(
                 _get_backend(),
                 _auth_subject(event),
                 create_match.group(1),
-                editor_app_id,
+                _editor_app_id(payload),
             ),
         )
 
