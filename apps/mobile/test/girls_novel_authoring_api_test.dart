@@ -55,11 +55,15 @@ Map<String, Object?> _novelDocument({int revision = 1, String title = '放課後
     };
 
 void main() {
-  test('list filters explicit non-Novel formats without changing group scope', () async {
+  test('list requests an explicit Novel content_format filter', () async {
     final MockClient client = MockClient((http.Request request) async {
       expect(
         request.url.path,
         '/hosted/authoring/groups/$_groupId/projects',
+      );
+      expect(
+        request.url.queryParameters,
+        const <String, String>{'content_format': minappNovelContentFormat},
       );
       expect(request.headers['authorization'], 'Bearer owner-token');
       return _json(200, <String, Object?>{
@@ -67,10 +71,6 @@ void main() {
           _summary(
             contentId: _contentId,
             format: minappNovelContentFormat,
-          ),
-          _summary(
-            contentId: _otherContentId,
-            format: 'example/quiz@1',
           ),
         ],
       });
@@ -88,6 +88,35 @@ void main() {
     expect(projects, hasLength(1));
     expect(projects.single.contentId, _contentId);
     expect(projects.single.contentFormat, minappNovelContentFormat);
+  });
+
+  test('list rejects a server response outside the requested format scope', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(
+        request.url.queryParameters['content_format'],
+        minappNovelContentFormat,
+      );
+      return _json(200, <String, Object?>{
+        'projects': <Object?>[
+          _summary(
+            contentId: _otherContentId,
+            format: 'example/quiz@1',
+          ),
+        ],
+      });
+    });
+    final GirlsNovelAuthoringApi api = GirlsNovelAuthoringApi(
+      baseUri: Uri.parse('https://hosted.example.test'),
+      client: client,
+    );
+
+    await expectLater(
+      api.listProjects(
+        accessToken: 'owner-token',
+        groupId: _groupId,
+      ),
+      throwsA(isA<FormatException>()),
+    );
   });
 
   test('create sends canonical minimal minapp/novel@1 Master Data', () async {
