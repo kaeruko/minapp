@@ -98,8 +98,16 @@ jobs:
 
   terraform:
     runs-on: ubuntu-latest
+    env:
+      TF_VAR_minapp_apps_source_root: ${{ github.workspace }}/external/minapp_apps
     steps:
       - uses: actions/checkout@v7
+      - name: Checkout creative app sources
+        uses: actions/checkout@v7
+        with:
+          repository: kaeruko/minapp_apps
+          ref: chatgpt/novel-v1-player-foundation
+          path: external/minapp_apps
       - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "1.15.5"
