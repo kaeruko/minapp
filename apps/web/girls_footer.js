@@ -23,6 +23,30 @@
     return value;
   }
 
+  function bindSidebarGroupLabels() {
+    const labels = [...document.querySelectorAll("#girls-upload-panel [id='girls-shell-group-name']")];
+    if (labels.length !== 2) {
+      throw new Error(`Expected exactly 2 Girls sidebar group labels, found ${labels.length}.`);
+    }
+
+    const [source, visible] = labels;
+    for (const label of labels) {
+      label.removeAttribute("id");
+      label.dataset.girlsShellGroupName = "";
+    }
+
+    function sync() {
+      visible.textContent = source.textContent;
+    }
+
+    new MutationObserver(sync).observe(source, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
+    sync();
+  }
+
   function validateApiBaseUrl(value) {
     if (typeof value !== "string" || value.length === 0 || value !== value.trim()) {
       throw new Error("girls-config hosted_api_base_url is invalid.");
@@ -99,6 +123,8 @@
       body: requireString(privacy.body, "Girls legal privacy body"),
     };
   }
+
+  bindSidebarGroupLabels();
 
   const privacyButton = requiredElement("girls-footer-privacy");
   const dialog = requiredElement("girls-privacy-dialog");
