@@ -17,6 +17,7 @@ from hosted_authoring_backend import (
     _item_assets,
     _public_assets,
     _required_item_number,
+    _validate_content_id,
     _validate_expected_revision,
 )
 from hosted_catalog_backend import _optional_number
@@ -37,6 +38,25 @@ class AuthoringPublishCleanupError(RuntimeError):
 
 class HostedAuthoringPublishBackend(HostedAuthoringBackend):
     """Materializes immutable Authoring revisions, then advances a publish pointer."""
+
+    def _owned_content(
+        self,
+        auth_subject: str,
+        content_id: str,
+    ) -> tuple[Any, dict[str, Any]]:
+        _validate_content_id(content_id)
+        user = self._user_by_auth_subject(auth_subject)
+        item = self._get_item(pk=f"CONTENT#{content_id}", sk="META")
+        if item is None:
+            raise ApiProblem(404, "content_not_found", "Authoring content was not found.")
+        group_id = _item_string(item, "group_id")
+        self._require_active_membership(user.user_id, group_id)
+        if _item_string(item, "owner_user_id") != user.user_id:
+            raise ApiProblem(403, "forbidden", "You do not own this Authoring content.")
+        status = _item_string(item, "status")
+        if status != "draft":
+            raise ApiProblem(409, "content_not_editable", "Authoring content is not editable.")
+        return user, item
 
     def publish_authoring_project(
         self,
@@ -150,8 +170,6 @@ class HostedAuthoringPublishBackend(HostedAuthoringBackend):
                     "revision": _asset_manifest_int(source_asset, "revision"),
                 }
 
-            # Verify the completed immutable published objects before making
-            # them reachable through the metadata pointer.
             verified_document = self._read_published_object(
                 key=document_key,
                 expected_sha256=document_sha256,
