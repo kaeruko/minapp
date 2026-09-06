@@ -29,6 +29,16 @@ Map<String, Object?> _project({required int revision, bool document = false}) =>
       if (document) 'document': <String, Object?>{'version': 1},
     };
 
+Map<String, Object?> _published({required int revision}) => <String, Object?>{
+      'content_id': _contentId,
+      'group_id': _groupId,
+      'content_format': 'minapp/novel@1',
+      'published_version': 1,
+      'source_revision': revision,
+      'assets': <Object?>[],
+      'published_at': '2026-09-06T10:20:00Z',
+    };
+
 class FakeAuthoringTransport implements HostedAuthoringTransport {
   final List<String> calls = <String>[];
 
@@ -46,6 +56,15 @@ class FakeAuthoringTransport implements HostedAuthoringTransport {
   }) async {
     calls.add('save:$authoringToken:$expectedRevision:${document['version']}');
     return _project(revision: expectedRevision + 1);
+  }
+
+  @override
+  Future<Map<String, Object?>> publishProject(
+    String authoringToken, {
+    required int expectedRevision,
+  }) async {
+    calls.add('publish:$authoringToken:$expectedRevision');
+    return _published(revision: expectedRevision);
   }
 }
 
@@ -69,6 +88,7 @@ void main() {
             'get_asset',
             'save_asset',
             'delete_asset',
+            'publish_request',
           ],
         });
       }
@@ -86,6 +106,11 @@ void main() {
           },
         );
         return _json(200, _project(revision: 8));
+      }
+      if (request.url.path == '/hosted/authoring/session/$_token/publish') {
+        expect(request.headers['authorization'], isNull);
+        expect(jsonDecode(request.body), <String, Object?>{'expected_revision': 8});
+        return _json(201, _published(revision: 8));
       }
       fail('Unexpected request: ${request.method} ${request.url}');
     });
@@ -105,17 +130,24 @@ void main() {
       expectedRevision: 7,
       document: <String, Object?>{'version': 1, 'start': 'end'},
     );
+    final Map<String, Object?> published = await api.publishProject(
+      grant.token,
+      expectedRevision: 8,
+    );
 
     expect(grant.contentId, _contentId);
     expect(grant.editorAppId, _editorAppId);
+    expect(grant.allowedOperations, contains('publish_request'));
     expect(loaded['draft_revision'], 7);
     expect(saved['draft_revision'], 8);
+    expect(published['source_revision'], 8);
     expect(
       requests.map((http.Request request) => request.url.path).toList(),
       <String>[
         '/hosted/authoring/projects/$_contentId/session',
         '/hosted/authoring/session/$_token',
         '/hosted/authoring/session/$_token/document',
+        '/hosted/authoring/session/$_token/publish',
       ],
     );
   });
@@ -147,7 +179,7 @@ void main() {
     );
   });
 
-  test('bridge load and save always use the bound authoring token', () async {
+  test('bridge load save and publish always use the bound authoring token', () async {
     final FakeAuthoringTransport transport = FakeAuthoringTransport();
     final HostedAuthoringBridgeSession bridge = HostedAuthoringBridgeSession(
       transport: transport,
@@ -170,13 +202,49 @@ void main() {
         'data': <String, Object?>{'version': 1},
       }),
     );
+    final Map<String, Object?> publish = await bridge.handleMessage(
+      jsonEncode(<String, Object?>{
+        'version': 1,
+        'id': '3',
+        'method': 'authoring.publish',
+        'expectedRevision': 8,
+      }),
+    );
 
     expect(load['ok'], isTrue);
     expect(save['ok'], isTrue);
+    expect(publish['ok'], isTrue);
     expect(
       transport.calls,
-      <String>['load:$_token', 'save:$_token:7:1'],
+      <String>[
+        'load:$_token',
+        'save:$_token:7:1',
+        'publish:$_token:8',
+      ],
     );
+  });
+
+  test('publish rejects identity scope and data fields instead of ignoring them', () async {
+    final FakeAuthoringTransport transport = FakeAuthoringTransport();
+    final HostedAuthoringBridgeSession bridge = HostedAuthoringBridgeSession(
+      transport: transport,
+      authoringToken: _token,
+    );
+
+    final Map<String, Object?> response = await bridge.handleMessage(
+      jsonEncode(<String, Object?>{
+        'version': 1,
+        'id': 'publish-scope',
+        'method': 'authoring.publish',
+        'expectedRevision': 8,
+        'contentId': _contentId,
+      }),
+    );
+
+    expect(response['ok'], isFalse);
+    final Map<String, Object?> error = response['error']! as Map<String, Object?>;
+    expect(error['code'], 'invalid_authoring_bridge_request');
+    expect(transport.calls, isEmpty);
   });
 
   test('bridge rejects identity and scope fields instead of ignoring them', () async {
@@ -205,6 +273,7 @@ void main() {
     final String script = HostedAuthoringBridgeProtocol.bootstrapJavaScript;
     expect(script, contains('authoring.load'));
     expect(script, contains('authoring.save'));
+    expect(script, contains('authoring.publish'));
     expect(script, contains('Object.assign({}, current, { authoring })'));
     expect(script, isNot(contains(_token)));
     expect(script.toLowerCase(), isNot(contains('cognito')));
