@@ -561,7 +561,7 @@ class HostedBridgeProtocol {
       }
       const waiter = pending.get(response.id);
       if (!waiter) return;
-      pending.delete(id);
+      pending.delete(response.id);
       if (response.ok === true) {
         waiter.resolve(response.result);
         return;
