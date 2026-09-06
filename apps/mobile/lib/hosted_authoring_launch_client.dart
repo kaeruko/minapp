@@ -94,7 +94,7 @@ class HostedAuthoringLaunchApiClient {
     }
 
     final String contentPath = _requiredString(payload, 'content_path');
-    if (_authoringEditorPathPattern.fullMatch(contentPath) == null) {
+    if (!_authoringEditorPathPattern.hasMatch(contentPath)) {
       throw const FormatException(
         'Authoring launch response returned an invalid Editor content path.',
       );
