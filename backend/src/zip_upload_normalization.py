@@ -129,11 +129,13 @@ def normalize_uploaded_zip(zip_bytes: bytes) -> tuple[bytes, list[str]]:
 
     Ambiguous layouts and all existing security validation errors are rejected.
     """
+    initial_error: ApiProblem | None = None
     try:
         return zip_bytes, _safe_zip_paths(zip_bytes)
-    except ApiProblem as original_error:
-        if original_error.error not in {"index_missing", "unsupported_file_type"}:
+    except ApiProblem as exc:
+        if exc.error not in {"index_missing", "unsupported_file_type"}:
             raise
+        initial_error = exc
 
     cleaned = _strip_desktop_packaging_metadata(zip_bytes)
     candidate = zip_bytes if cleaned is None else cleaned
@@ -141,10 +143,10 @@ def normalize_uploaded_zip(zip_bytes: bytes) -> tuple[bytes, list[str]]:
     try:
         files = _safe_zip_paths(candidate)
         return candidate, files
-    except ApiProblem as candidate_error:
-        if candidate_error.error != "index_missing":
+    except ApiProblem as exc:
+        if exc.error != "index_missing":
             raise
-        if cleaned is None and original_error.error == "unsupported_file_type":
-            raise original_error
+        if cleaned is None and initial_error.error == "unsupported_file_type":
+            raise initial_error
 
     return _unwrap_single_top_level_folder(candidate)
