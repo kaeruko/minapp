@@ -16,7 +16,6 @@ from hosted_catalog_backend import (
     _files_json,
     _item_files,
     _optional_number,
-    _optional_string,
 )
 from hosted_platform_backend import RUNTIME_SESSION_TTL_SECONDS, _number_attr
 
@@ -41,10 +40,6 @@ def create_launch(
         editor_app_id,
         now_epoch=now_epoch,
     )
-    group_id = authoring_result["content_id"]
-    # The content id above is intentionally not used as a group id. Read scope
-    # only from the validated server-side Editor/content metadata.
-    del group_id
     group_id = _item_string(editor, "group_id")
     content_format = str(authoring_result["content_format"])
 
