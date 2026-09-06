@@ -6,6 +6,8 @@ from typing import Any, Protocol
 from handler import _json_body, _json_response, _raw_path, _request_method, _require_fields
 from hosted_handler import _empty_response
 
+_ID_RE = r"([0-9a-f]{32})"
+_GROUP_APP_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}$")
 _RUNTIME_USER_STATE_RE = re.compile(
     r"^/hosted/runtime/([A-Za-z0-9_-]{32,64})/user-state/([^/]{1,128})$"
 )
@@ -21,6 +23,8 @@ class UserStateBackend(Protocol):
 
     def delete_runtime_user_state(self, token: str, key: str) -> None: ...
 
+    def delete_hosted_app(self, auth_subject: str, group_id: str, app_id: str) -> None: ...
+
 
 def _get_backend() -> UserStateBackend:
     global _BACKEND
@@ -35,12 +39,22 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
     if not isinstance(event, dict):
         raise TypeError("event must be a dictionary")
 
-    match = _RUNTIME_USER_STATE_RE.fullmatch(_raw_path(event))
+    path = _raw_path(event)
+    method = _request_method(event)
+
+    app_match = _GROUP_APP_RE.fullmatch(path)
+    if method == "DELETE" and app_match is not None:
+        from handler import _auth_subject
+
+        group_id, app_id = app_match.groups()
+        _get_backend().delete_hosted_app(_auth_subject(event), group_id, app_id)
+        return _empty_response()
+
+    match = _RUNTIME_USER_STATE_RE.fullmatch(path)
     if match is None:
         return None
 
     token, key = match.groups()
-    method = _request_method(event)
     backend = _get_backend()
     if method == "GET":
         return _json_response(200, backend.get_runtime_user_state(token, key))
