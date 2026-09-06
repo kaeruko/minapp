@@ -13,7 +13,7 @@ backend/src/hosted_legal.py
 Current versions:
 
 ```text
-Terms:   hosted-terms-2026-08-28
+Terms:   hosted-terms-2026-09-06
 Privacy: hosted-privacy-2026-09-04
 ```
 
@@ -42,8 +42,8 @@ Clients must fetch this endpoint before presenting Hosted registration.
 {
   "login_id": "example-user",
   "password": "...",
-  "terms_version": "hosted-terms-2026-08-28",
-  "privacy_version": "hosted-privacy-2026-08-28",
+  "terms_version": "hosted-terms-2026-09-06",
+  "privacy_version": "hosted-privacy-2026-09-04",
   "terms_accepted": true,
   "privacy_accepted": true
 }
@@ -81,7 +81,7 @@ Accounts created before this feature do not have a fabricated consent record. Do
 
 ## UGC and privacy scope
 
-The Hosted Terms include a zero-tolerance rule for objectionable content and abusive behavior and identify the safety contact. The Hosted Privacy Policy reflects the current implementation, including:
+The Hosted Terms include a zero-tolerance rule for objectionable content and abusive behavior, prohibit uploading/publishing/sharing content that infringes third-party rights, and identify the safety contact. The Hosted Privacy Policy reflects the current implementation, including:
 
 - login/internal/auth identifiers
 - hashed recovery credentials
