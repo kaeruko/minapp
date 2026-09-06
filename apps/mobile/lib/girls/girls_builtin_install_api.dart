@@ -6,6 +6,7 @@ import 'api.dart';
 import 'hosted_girls_api.dart';
 
 const String novelEditorBuiltinId = 'novel-editor';
+const String novelPlayerBuiltinId = 'novel-starter';
 
 final RegExp _hostedIdPattern = RegExp(r'^[0-9a-f]{32}$');
 
@@ -22,6 +23,32 @@ class GirlsBuiltinInstallApi {
   Future<HostedGroupApp> installNovelEditor({
     required String accessToken,
     required String groupId,
+  }) {
+    return _installBuiltin(
+      accessToken: accessToken,
+      groupId: groupId,
+      builtinId: novelEditorBuiltinId,
+      label: 'Novel Editor',
+    );
+  }
+
+  Future<HostedGroupApp> installNovelPlayer({
+    required String accessToken,
+    required String groupId,
+  }) {
+    return _installBuiltin(
+      accessToken: accessToken,
+      groupId: groupId,
+      builtinId: novelPlayerBuiltinId,
+      label: 'Novel Player',
+    );
+  }
+
+  Future<HostedGroupApp> _installBuiltin({
+    required String accessToken,
+    required String groupId,
+    required String builtinId,
+    required String label,
   }) async {
     if (accessToken.isEmpty) {
       throw ArgumentError.value(accessToken, 'accessToken', 'must not be empty');
@@ -42,9 +69,7 @@ class GirlsBuiltinInstallApi {
         'Authorization': 'Bearer $accessToken',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode(
-        const <String, Object?>{'builtin_id': novelEditorBuiltinId},
-      ),
+      body: jsonEncode(<String, Object?>{'builtin_id': builtinId}),
     );
 
     final Map<String, Object?> payload = _decodeJsonObject(response);
@@ -55,9 +80,9 @@ class GirlsBuiltinInstallApi {
     final HostedGroupApp app = HostedGroupApp.fromJson(payload);
     if (app.groupId != groupId ||
         app.sourceKind != 'builtin' ||
-        app.builtinId != novelEditorBuiltinId) {
-      throw const FormatException(
-        'Novel Editor install response changed the requested app scope.',
+        app.builtinId != builtinId) {
+      throw FormatException(
+        '$label install response changed the requested app scope.',
       );
     }
     return app;
