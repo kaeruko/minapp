@@ -17,15 +17,20 @@ import hosted_authoring_entry  # noqa: E402
 
 class FakeListBackend:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, str, str]] = []
+        self.calls: list[tuple[Any, ...]] = []
 
-    def list_authoring_projects(self, auth_subject: str, group_id: str) -> list[dict[str, Any]]:
-        self.calls.append(("list", auth_subject, group_id))
+    def list_authoring_projects(
+        self,
+        auth_subject: str,
+        group_id: str,
+        content_format: str | None = None,
+    ) -> list[dict[str, Any]]:
+        self.calls.append(("list", auth_subject, group_id, content_format))
         return [
             {
                 "content_id": "3" * 32,
                 "group_id": group_id,
-                "content_format": "minapp/novel@1",
+                "content_format": content_format or "minapp/novel@1",
                 "status": "draft",
                 "draft_revision": 4,
                 "assets": [],
@@ -35,7 +40,13 @@ class FakeListBackend:
         ]
 
 
-def event(method: str, path: str, *, body: str | None = None) -> dict[str, Any]:
+def event(
+    method: str,
+    path: str,
+    *,
+    body: str | None = None,
+    query: dict[str, str] | None = None,
+) -> dict[str, Any]:
     result: dict[str, Any] = {
         "rawPath": path,
         "requestContext": {
@@ -46,6 +57,8 @@ def event(method: str, path: str, *, body: str | None = None) -> dict[str, Any]:
     }
     if body is not None:
         result["body"] = body
+    if query is not None:
+        result["queryStringParameters"] = query
     return result
 
 
@@ -64,10 +77,41 @@ class HostedAuthoringListEntryTests(unittest.TestCase):
             None,
         )
         self.assertEqual(response["statusCode"], 200)
-        self.assertEqual(self.backend.calls, [("list", "sub-owner", self.group_id)])
+        self.assertEqual(
+            self.backend.calls,
+            [("list", "sub-owner", self.group_id, None)],
+        )
         payload = json.loads(response["body"])
         self.assertEqual(set(payload), {"projects"})
         self.assertEqual(payload["projects"][0]["content_format"], "minapp/novel@1")
+
+    def test_list_passes_explicit_content_format_filter(self) -> None:
+        response = abuse_entry.hosted_lambda_handler(
+            event(
+                "GET",
+                f"/hosted/authoring/groups/{self.group_id}/projects",
+                query={"content_format": "minapp/novel@1"},
+            ),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(
+            self.backend.calls,
+            [("list", "sub-owner", self.group_id, "minapp/novel@1")],
+        )
+
+    def test_list_rejects_unknown_query_parameter_before_backend(self) -> None:
+        response = abuse_entry.hosted_lambda_handler(
+            event(
+                "GET",
+                f"/hosted/authoring/groups/{self.group_id}/projects",
+                query={"format": "minapp/novel@1"},
+            ),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 400)
+        self.assertEqual(json.loads(response["body"])["error"], "invalid_request")
+        self.assertEqual(self.backend.calls, [])
 
     def test_list_rejects_body_before_backend(self) -> None:
         response = abuse_entry.hosted_lambda_handler(
