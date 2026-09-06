@@ -43,7 +43,7 @@ class HostedAppWebViewPage extends StatefulWidget {
         authoringLaunch = null,
         authoringTransport = null;
 
-  const HostedAppWebViewPage.authoring({
+  HostedAppWebViewPage.authoring({
     required this.title,
     required HostedAuthoringLaunchGrant launch,
     required this.runtimeTransport,
