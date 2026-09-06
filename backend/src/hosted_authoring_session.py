@@ -24,6 +24,7 @@ _ALLOWED_OPERATIONS = (
     "get_asset",
     "save_asset",
     "delete_asset",
+    "publish_request",
 )
 
 
@@ -132,6 +133,20 @@ def delete_asset(
         context[1],
         expected_revision=expected_revision,
         path=path,
+    )
+
+
+def publish_project(
+    backend: Any,
+    token: str,
+    *,
+    expected_revision: int,
+) -> dict[str, Any]:
+    context = _consume_session(backend, token, "publish_request")
+    return backend.publish_authoring_project(
+        context[0],
+        context[1],
+        expected_revision=expected_revision,
     )
 
 

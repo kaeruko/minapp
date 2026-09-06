@@ -20,6 +20,7 @@ _TOKEN_RE = r"([A-Za-z0-9_-]{32,64})"
 _CREATE_SESSION_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/session$")
 _SESSION_PROJECT_RE = re.compile(rf"^/hosted/authoring/session/{_TOKEN_RE}$")
 _SESSION_DOCUMENT_RE = re.compile(rf"^/hosted/authoring/session/{_TOKEN_RE}/document$")
+_SESSION_PUBLISH_RE = re.compile(rf"^/hosted/authoring/session/{_TOKEN_RE}/publish$")
 _SESSION_ASSET_RE = re.compile(rf"^/hosted/authoring/session/{_TOKEN_RE}/assets/(.+)$")
 _BACKEND: Any | None = None
 
@@ -27,9 +28,9 @@ _BACKEND: Any | None = None
 def _get_backend() -> Any:
     global _BACKEND
     if _BACKEND is None:
-        from hosted_authoring_backend import HostedAuthoringBackend
+        from hosted_authoring_publish_backend import HostedAuthoringPublishBackend
 
-        _BACKEND = HostedAuthoringBackend.from_environment()
+        _BACKEND = HostedAuthoringPublishBackend.from_environment()
     return _BACKEND
 
 
@@ -87,6 +88,21 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
                 document_match.group(1),
                 expected_revision=_expected_revision_field(payload),
                 document=document,
+            ),
+        )
+
+    publish_match = _SESSION_PUBLISH_RE.fullmatch(path)
+    if publish_match is not None:
+        if method != "POST":
+            return None
+        payload = _authoring_json_body(event)
+        _require_fields(payload, required={"expected_revision"})
+        return _json_response(
+            201,
+            hosted_authoring_session.publish_project(
+                _get_backend(),
+                publish_match.group(1),
+                expected_revision=_expected_revision_field(payload),
             ),
         )
 

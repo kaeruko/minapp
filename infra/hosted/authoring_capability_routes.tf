@@ -6,6 +6,7 @@ locals {
   hosted_authoring_capability_routes = toset([
     "GET /hosted/authoring/session/{token}",
     "POST /hosted/authoring/session/{token}/document",
+    "POST /hosted/authoring/session/{token}/publish",
     "GET /hosted/authoring/session/{token}/assets/{proxy+}",
     "POST /hosted/authoring/session/{token}/assets/{proxy+}",
     "DELETE /hosted/authoring/session/{token}/assets/{proxy+}",

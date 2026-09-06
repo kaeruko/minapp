@@ -142,6 +142,20 @@ class FakeBackend:
         self.calls.append(("delete-asset", auth_subject, content_id, expected_revision, path))
         return {"content_id": content_id, "draft_revision": expected_revision + 1}
 
+    def publish_authoring_project(
+        self,
+        auth_subject: str,
+        content_id: str,
+        *,
+        expected_revision: int,
+    ) -> dict[str, Any]:
+        self.calls.append(("publish", auth_subject, content_id, expected_revision))
+        return {
+            "content_id": content_id,
+            "published_version": 1,
+            "source_revision": expected_revision,
+        }
+
 
 class HostedAuthoringSessionTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -168,7 +182,14 @@ class HostedAuthoringSessionTests(unittest.TestCase):
         self.assertNotIn((f"AUTHORINGSESSION#{token}", "META"), self.backend.items)
         self.assertEqual(
             session["allowed_operations"],
-            ["load", "save_document", "get_asset", "save_asset", "delete_asset"],
+            [
+                "load",
+                "save_document",
+                "get_asset",
+                "save_asset",
+                "delete_asset",
+                "publish_request",
+            ],
         )
 
     def test_capability_operations_use_only_bound_content_and_subject(self) -> None:
@@ -180,9 +201,15 @@ class HostedAuthoringSessionTests(unittest.TestCase):
             expected_revision=1,
             document={"version": 1, "start": "end"},
         )
+        published = hosted_authoring_session.publish_project(
+            self.backend,
+            token,
+            expected_revision=2,
+        )
 
         self.assertEqual(loaded["content_id"], self.backend.content_id)
         self.assertEqual(saved["draft_revision"], 2)
+        self.assertEqual(published["source_revision"], 2)
         self.assertEqual(
             self.backend.calls,
             [
@@ -194,6 +221,7 @@ class HostedAuthoringSessionTests(unittest.TestCase):
                     1,
                     {"version": 1, "start": "end"},
                 ),
+                ("publish", self.backend.auth_subject, self.backend.content_id, 2),
             ],
         )
 
@@ -232,6 +260,22 @@ class HostedAuthoringSessionTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 429)
         self.assertEqual(caught.exception.error, "authoring_request_limit_reached")
         self.assertEqual(self.backend.calls, [("load", self.backend.auth_subject, self.backend.content_id)])
+
+    def test_publish_requires_explicit_publish_operation_in_session(self) -> None:
+        token = self._session()["token"]
+        token_hash = hashlib.sha256(token.encode("ascii")).hexdigest()
+        item = self.backend.items[(f"AUTHORINGSESSION#{token_hash}", "META")]
+        item["allowed_operations_json"] = _string_attr('["load","save_document"]')
+
+        with self.assertRaises(ApiProblem) as caught:
+            hosted_authoring_session.publish_project(
+                self.backend,
+                token,
+                expected_revision=1,
+            )
+        self.assertEqual(caught.exception.status_code, 403)
+        self.assertEqual(caught.exception.error, "authoring_operation_not_allowed")
+        self.assertEqual(self.backend.calls, [])
 
 
 if __name__ == "__main__":
