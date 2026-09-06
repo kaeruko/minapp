@@ -7,6 +7,7 @@ import handler
 import hosted_entry
 import hosted_handler
 from abuse_guard import get_abuse_guard, source_ip_from_event
+from auth_refresh import refresh_access_token
 from errors import ApiProblem
 from handler import (
     _json_body,
@@ -16,6 +17,7 @@ from handler import (
     _raw_path,
     _request_method,
     _require_fields,
+    _required_string,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -69,11 +71,27 @@ def _guard_recover(event: dict[str, Any]) -> None:
     )
 
 
+def _handle_refresh(event: dict[str, Any]) -> dict[str, Any]:
+    payload = _json_body(event)
+    _require_fields(payload, required={"refresh_token"})
+    refresh_token = _required_string(
+        payload,
+        "refresh_token",
+        min_length=1,
+        max_length=8192,
+    )
+    return _json_response(200, refresh_access_token(refresh_token))
+
+
 def api_lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     if not isinstance(event, dict):
         raise TypeError("event must be a dictionary")
     try:
-        if _request_method(event) == "POST" and _raw_path(event) == "/auth/login":
+        method = _request_method(event)
+        path = _raw_path(event)
+        if method == "POST" and path == "/auth/refresh":
+            return _handle_refresh(event)
+        if method == "POST" and path == "/auth/login":
             _guard_login(event)
         return handler.lambda_handler(event, context)
     except ApiProblem as exc:
