@@ -128,6 +128,9 @@ class GirlsNovelAuthoringApi {
       method: 'GET',
       path: '/hosted/authoring/groups/$groupId/projects',
       accessToken: accessToken,
+      queryParameters: const <String, String>{
+        'content_format': minappNovelContentFormat,
+      },
     );
     _requireExactFields(
       payload,
@@ -146,15 +149,6 @@ class GirlsNovelAuthoringApi {
         throw const FormatException(
           'Authoring projects response contains a non-object project.',
         );
-      }
-      final Object? rawFormat = rawProject['content_format'];
-      if (rawFormat is! String || rawFormat.isEmpty) {
-        throw const FormatException(
-          'Authoring project summary has an invalid content_format.',
-        );
-      }
-      if (rawFormat != minappNovelContentFormat) {
-        continue;
       }
       final GirlsNovelProjectSummary project =
           GirlsNovelProjectSummary.fromJson(rawProject);
@@ -222,9 +216,13 @@ class GirlsNovelAuthoringApi {
     required String method,
     required String path,
     required String accessToken,
+    Map<String, String>? queryParameters,
     Map<String, Object?>? body,
   }) async {
-    final Uri uri = _baseUri.resolve(path);
+    Uri uri = _baseUri.resolve(path);
+    if (queryParameters != null) {
+      uri = uri.replace(queryParameters: queryParameters);
+    }
     final Map<String, String> headers = <String, String>{
       'Accept': 'application/json',
       'Authorization': 'Bearer $accessToken',
@@ -236,6 +234,9 @@ class GirlsNovelAuthoringApi {
       if (body != null) throw ArgumentError('GET request must not contain a body.');
       response = await _client.get(uri, headers: headers);
     } else if (method == 'POST') {
+      if (queryParameters != null) {
+        throw ArgumentError('POST request must not contain query parameters.');
+      }
       response = await _client.post(
         uri,
         headers: headers,
