@@ -33,6 +33,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   String? _error;
 
   bool get _isNovelEditor =>
+      widget.detail.summary.app.sourceKind == 'builtin' &&
       widget.detail.summary.app.builtinId == 'novel-editor';
 
   @override
@@ -120,6 +121,32 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isNovelEditor) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          FilledButton.icon(
+            key: const Key('girls-novel-open-projects'),
+            onPressed: _busy ? null : _openNovelProjects,
+            icon: const Icon(Icons.edit_note_rounded),
+            label: const Text('ノベル作品を編集'),
+          ),
+          if (_error != null) ...<Widget>[
+            const SizedBox(height: 7),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: _testError,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
     final ManagedGirlsAppDetail detail = widget.detail;
     final int? sourceRevision = detail.summary.sourceRevision;
     final int? latestPublishedRevision = detail.publishedHistory.isEmpty
@@ -131,15 +158,6 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        if (_isNovelEditor) ...<Widget>[
-          FilledButton.icon(
-            key: const Key('girls-novel-open-projects'),
-            onPressed: _busy ? null : _openNovelProjects,
-            icon: const Icon(Icons.edit_note_rounded),
-            label: const Text('ノベル作品を編集'),
-          ),
-          const SizedBox(height: 10),
-        ],
         FilledButton.tonalIcon(
           key: const Key('girls-app-try-published'),
           onPressed: _busy || detail.summary.app.publishedVersion == null
