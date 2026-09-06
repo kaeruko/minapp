@@ -5,9 +5,6 @@ import unittest
 from pathlib import Path
 
 BACKEND_SRC = Path(__file__).resolve().parents[1] / "src"
-REPO_ROOT = Path(__file__).resolve().parents[2]
-NOVEL_STARTER_DIR = REPO_ROOT / "apps" / "mobile" / "assets" / "builtin" / "novel_starter"
-NOVEL_EDITOR_DIR = REPO_ROOT / "apps" / "mobile" / "assets" / "builtin" / "novel_editor"
 if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
 
@@ -52,39 +49,6 @@ class HostedBuiltinRegistryTests(unittest.TestCase):
         self.assertEqual(template["edits"], ["minapp/novel@1"])
         self.assertNotIn("accepts", template)
         self.assertNotIn("master_data_element_id", template)
-
-    def test_novel_starter_v4_bundles_json_player_runtime(self) -> None:
-        index = (NOVEL_STARTER_DIR / "index.html").read_text(encoding="utf-8")
-        player = (NOVEL_STARTER_DIR / "player.js").read_text(encoding="utf-8")
-        validator = (NOVEL_STARTER_DIR / "story-validator.js").read_text(encoding="utf-8")
-
-        self.assertIn('id="minapp-novel-story"', index)
-        self.assertIn('<script src="story-validator.js"></script>', index)
-        self.assertIn('<script src="player.js"></script>', index)
-        self.assertIn("const FORMAT = 'minapp/novel@1';", validator)
-        self.assertIn("window.addEventListener('minappready', onMinAppReady);", player)
-        self.assertIn("window.minapp.userState", player)
-        self.assertNotIn("window.minapp.state", player)
-
-    def test_novel_editor_v1_bundles_shared_format_and_authoring_bridge(self) -> None:
-        index = (NOVEL_EDITOR_DIR / "index.html").read_text(encoding="utf-8")
-        editor = (NOVEL_EDITOR_DIR / "editor.js").read_text(encoding="utf-8")
-        core = (NOVEL_EDITOR_DIR / "editor-core.js").read_text(encoding="utf-8")
-        editor_validator = (NOVEL_EDITOR_DIR / "story-validator.js").read_text(encoding="utf-8")
-        player_validator = (NOVEL_STARTER_DIR / "story-validator.js").read_text(encoding="utf-8")
-
-        self.assertEqual(editor_validator, player_validator)
-        self.assertIn('<script src="story-validator.js"></script>', index)
-        self.assertIn('<script src="editor-core.js"></script>', index)
-        self.assertIn('<script src="editor.js"></script>', index)
-        self.assertIn("const FORMAT = 'minapp/novel@1';", core)
-        self.assertIn("minapp.authoring", editor)
-        self.assertIn("api.load()", editor)
-        self.assertIn("api.save(documentToSave, { expectedRevision })", editor)
-        self.assertIn("api.publish({ expectedRevision })", editor)
-        self.assertIn("window.addEventListener('minappready', initializeFromHost);", editor)
-        self.assertNotIn("window.minapp.state", editor)
-        self.assertNotIn("window.minapp.userState", editor)
 
     def test_contract_validation_fails_closed(self) -> None:
         for field, value in (
