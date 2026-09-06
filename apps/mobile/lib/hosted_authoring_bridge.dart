@@ -36,6 +36,11 @@ abstract interface class HostedAuthoringTransport {
     required int expectedRevision,
     required Map<String, Object?> document,
   });
+
+  Future<Map<String, Object?>> publishProject(
+    String authoringToken, {
+    required int expectedRevision,
+  });
 }
 
 class HostedAuthoringApiClient implements HostedAuthoringTransport {
@@ -111,13 +116,7 @@ class HostedAuthoringApiClient implements HostedAuthoringTransport {
     required Map<String, Object?> document,
   }) async {
     _validateAuthoringToken(authoringToken);
-    if (expectedRevision < 1) {
-      throw ArgumentError.value(
-        expectedRevision,
-        'expectedRevision',
-        'must be a positive integer',
-      );
-    }
+    _validateExpectedRevision(expectedRevision);
     final Map<String, Object?> payload = await _jsonRequest(
       method: 'POST',
       path: '/hosted/authoring/session/$authoringToken/document',
@@ -127,6 +126,22 @@ class HostedAuthoringApiClient implements HostedAuthoringTransport {
       },
     );
     _validateProjectPayload(payload, includeDocument: false);
+    return payload;
+  }
+
+  @override
+  Future<Map<String, Object?>> publishProject(
+    String authoringToken, {
+    required int expectedRevision,
+  }) async {
+    _validateAuthoringToken(authoringToken);
+    _validateExpectedRevision(expectedRevision);
+    final Map<String, Object?> payload = await _jsonRequest(
+      method: 'POST',
+      path: '/hosted/authoring/session/$authoringToken/publish',
+      body: <String, Object?>{'expected_revision': expectedRevision},
+    );
+    _validatePublishPayload(payload);
     return payload;
   }
 
@@ -200,6 +215,31 @@ class HostedAuthoringApiClient implements HostedAuthoringTransport {
     }
     if (includeDocument && payload['document'] is! Map<String, Object?>) {
       throw const FormatException('Authoring project document must be an object.');
+    }
+  }
+
+  static void _validatePublishPayload(Map<String, Object?> payload) {
+    _requireExactFields(
+      payload,
+      const <String>{
+        'content_id',
+        'group_id',
+        'content_format',
+        'published_version',
+        'source_revision',
+        'assets',
+        'published_at',
+      },
+      'Authoring publish response',
+    );
+    _validateId(_requiredString(payload, 'content_id'), 'content_id');
+    _validateId(_requiredString(payload, 'group_id'), 'group_id');
+    _requiredString(payload, 'content_format');
+    _requiredPositiveInt(payload, 'published_version');
+    _requiredPositiveInt(payload, 'source_revision');
+    _requiredString(payload, 'published_at');
+    if (payload['assets'] is! List<Object?>) {
+      throw const FormatException('Authoring publish assets must be a list.');
     }
   }
 
@@ -311,7 +351,9 @@ class HostedAuthoringBridgeProtocol {
       );
     }
     final Object? rawMethod = decoded['method'];
-    if (rawMethod != 'authoring.load' && rawMethod != 'authoring.save') {
+    if (rawMethod != 'authoring.load' &&
+        rawMethod != 'authoring.save' &&
+        rawMethod != 'authoring.publish') {
       throw HostedAuthoringBridgeProtocolException(
         code: 'unsupported_authoring_bridge_method',
         message: 'Authoring bridge method is not supported.',
@@ -328,11 +370,10 @@ class HostedAuthoringBridgeProtocol {
       return HostedAuthoringBridgeRequest(id: id, method: rawMethod as String);
     }
 
-    _requireBridgeFields(
-      decoded,
-      const <String>{'version', 'id', 'method', 'expectedRevision', 'data'},
-      id,
-    );
+    final Set<String> expectedFields = rawMethod == 'authoring.save'
+        ? const <String>{'version', 'id', 'method', 'expectedRevision', 'data'}
+        : const <String>{'version', 'id', 'method', 'expectedRevision'};
+    _requireBridgeFields(decoded, expectedFields, id);
     final Object? rawRevision = decoded['expectedRevision'];
     if (rawRevision is! int || rawRevision is bool || rawRevision < 1) {
       throw HostedAuthoringBridgeProtocolException(
@@ -341,6 +382,14 @@ class HostedAuthoringBridgeProtocol {
         requestId: id,
       );
     }
+    if (rawMethod == 'authoring.publish') {
+      return HostedAuthoringBridgeRequest(
+        id: id,
+        method: rawMethod as String,
+        expectedRevision: rawRevision,
+      );
+    }
+
     final Object? rawData = decoded['data'];
     if (rawData is! Map<String, Object?>) {
       throw HostedAuthoringBridgeProtocolException(
@@ -451,6 +500,18 @@ class HostedAuthoringBridgeProtocol {
     },
   });
 
+  const validateExpectedRevision = (options) => {
+    const expectedRevision = options && options.expectedRevision;
+    if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
+      throw new MinAppAuthoringError(
+        0,
+        'invalid_expected_revision',
+        'expectedRevision must be a positive integer.',
+      );
+    }
+    return expectedRevision;
+  };
+
   const authoring = Object.freeze({
     load: () => send({ method: 'authoring.load' }),
     save: (data, options) => {
@@ -461,19 +522,26 @@ class HostedAuthoringBridgeProtocol {
           'Authoring save data must be an object.',
         ));
       }
-      const expectedRevision = options && options.expectedRevision;
-      if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
-        return Promise.reject(new MinAppAuthoringError(
-          0,
-          'invalid_expected_revision',
-          'expectedRevision must be a positive integer.',
-        ));
+      let expectedRevision;
+      try {
+        expectedRevision = validateExpectedRevision(options);
+      } catch (error) {
+        return Promise.reject(error);
       }
       return send({
         method: 'authoring.save',
         expectedRevision,
         data,
       });
+    },
+    publish: (options) => {
+      let expectedRevision;
+      try {
+        expectedRevision = validateExpectedRevision(options);
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      return send({ method: 'authoring.publish', expectedRevision });
     },
   });
 
@@ -549,6 +617,15 @@ class HostedAuthoringBridgeSession {
           expectedRevision: expectedRevision,
           document: document,
         );
+      } else if (request.method == 'authoring.publish') {
+        final int? expectedRevision = request.expectedRevision;
+        if (expectedRevision == null) {
+          throw StateError('Validated Authoring publish request lost expectedRevision.');
+        }
+        result = await _transport.publishProject(
+          _authoringToken,
+          expectedRevision: expectedRevision,
+        );
       } else {
         throw StateError('Validated Authoring bridge request has an unsupported method.');
       }
@@ -602,6 +679,16 @@ void _validateAuthoringToken(String token) {
 String _validatedAuthoringToken(String token) {
   _validateAuthoringToken(token);
   return token;
+}
+
+void _validateExpectedRevision(int value) {
+  if (value < 1) {
+    throw ArgumentError.value(
+      value,
+      'expectedRevision',
+      'must be a positive integer',
+    );
+  }
 }
 
 String _requiredString(Map<String, Object?> json, String key) {
