@@ -35,6 +35,10 @@ _ALLOWED_SUFFIXES = {
     ".gif",
     ".webp",
     ".ico",
+    ".mp3",
+    ".m4a",
+    ".ogg",
+    ".wav",
 }
 
 
@@ -149,6 +153,10 @@ def _content_type(path: str) -> str:
         ".mjs": "text/javascript; charset=utf-8",
         ".json": "application/json; charset=utf-8",
         ".txt": "text/plain; charset=utf-8",
+        ".mp3": "audio/mpeg",
+        ".m4a": "audio/mp4",
+        ".ogg": "audio/ogg",
+        ".wav": "audio/wav",
     }
     if suffix in explicit:
         return explicit[suffix]
