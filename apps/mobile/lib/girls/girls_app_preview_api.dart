@@ -113,6 +113,8 @@ class GirlsAppPreviewApi {
         'source_revision',
         'content_path',
         'expires_in',
+        'runtime_token',
+        'runtime_expires_in',
       },
       'Draft preview session response',
     );
@@ -133,17 +135,22 @@ class GirlsAppPreviewApi {
       );
     }
     final int contentExpiresIn = _requiredPositiveInt(content, 'expires_in');
-
-    final _RuntimeSession runtime = await _createRuntimeSession(
-      accessToken: accessToken,
-      groupId: groupId,
-      appId: appId,
+    final String runtimeToken = _requiredString(content, 'runtime_token');
+    if (!_runtimeTokenPattern.hasMatch(runtimeToken)) {
+      throw const FormatException(
+        'Draft preview session returned an invalid Runtime token.',
+      );
+    }
+    final int runtimeExpiresIn = _requiredPositiveInt(
+      content,
+      'runtime_expires_in',
     );
+
     return GirlsAppTestSession(
       contentUri: _baseUri.resolve(contentPath),
       contentExpiresIn: contentExpiresIn,
-      runtimeToken: runtime.token,
-      runtimeExpiresIn: runtime.expiresIn,
+      runtimeToken: runtimeToken,
+      runtimeExpiresIn: runtimeExpiresIn,
       sourceRevision: sourceRevision,
       publishedVersion: null,
     );

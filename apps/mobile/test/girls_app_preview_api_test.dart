@@ -71,7 +71,7 @@ void main() {
     );
   });
 
-  test('draft preview uses owner preview capability plus runtime session', () async {
+  test('draft preview receives its isolated runtime capability from preview-session', () async {
     final List<String> paths = <String>[];
     final MockClient client = MockClient((http.Request request) async {
       paths.add(request.url.path);
@@ -85,12 +85,8 @@ void main() {
           'source_revision': 7,
           'content_path': '/hosted/preview/$_previewToken/index.html',
           'expires_in': 600,
-        });
-      }
-      if (request.url.path.endsWith('/runtime-session')) {
-        return _json(201, <String, Object?>{
-          'token': _runtimeToken,
-          'expires_in': 600,
+          'runtime_token': _runtimeToken,
+          'runtime_expires_in': 600,
         });
       }
       fail('Unexpected request: ${request.url}');
@@ -113,12 +109,10 @@ void main() {
     expect(session.sourceRevision, 7);
     expect(session.publishedVersion, isNull);
     expect(session.runtimeToken, _runtimeToken);
+    expect(session.runtimeExpiresIn, 600);
     expect(
       paths,
-      <String>[
-        '/hosted/my/apps/$_appId/preview-session',
-        '/hosted/groups/$_groupId/apps/$_appId/runtime-session',
-      ],
+      <String>['/hosted/my/apps/$_appId/preview-session'],
     );
   });
 }

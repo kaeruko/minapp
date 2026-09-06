@@ -34,6 +34,32 @@ class HostedPreviewStateBackend(HostedUserStateBackend):
     persistent Runtime table keys used by published ``state`` or ``userState``.
     """
 
+    def get_runtime_user_state(self, token: str, key: str) -> dict[str, Any]:
+        if self.is_preview_runtime_session(token):
+            return self.get_preview_runtime_state(token, key, user_state=True)
+        return super().get_runtime_user_state(token, key)
+
+    def set_runtime_user_state(
+        self,
+        token: str,
+        key: str,
+        value: Any,
+    ) -> dict[str, Any]:
+        if self.is_preview_runtime_session(token):
+            return self.set_preview_runtime_state(
+                token,
+                key,
+                value,
+                user_state=True,
+            )
+        return super().set_runtime_user_state(token, key, value)
+
+    def delete_runtime_user_state(self, token: str, key: str) -> None:
+        if self.is_preview_runtime_session(token):
+            self.delete_preview_runtime_state(token, key, user_state=True)
+            return
+        super().delete_runtime_user_state(token, key)
+
     def is_preview_runtime_session(self, token: str) -> bool:
         session = self._runtime_session_item(token)
         if session is None:

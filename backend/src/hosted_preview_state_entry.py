@@ -7,7 +7,7 @@ from handler import _json_body, _json_response, _raw_path, _request_method, _req
 from hosted_handler import _empty_response
 
 _RUNTIME_STATE_RE = re.compile(
-    r"^/hosted/runtime/([A-Za-z0-9_-]{32,64})/(state|user-state)/([^/]{1,128})$"
+    r"^/hosted/runtime/([A-Za-z0-9_-]{32,64})/state/([^/]{1,128})$"
 )
 _BACKEND: "PreviewStateBackend | None" = None
 
@@ -58,12 +58,11 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
     if match is None:
         return None
 
-    token, namespace, key = match.groups()
+    token, key = match.groups()
     backend = _get_backend()
     if not backend.is_preview_runtime_session(token):
         return None
 
-    user_state = namespace == "user-state"
     method = _request_method(event)
     if method == "GET":
         return _json_response(
@@ -71,7 +70,7 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
             backend.get_preview_runtime_state(
                 token,
                 key,
-                user_state=user_state,
+                user_state=False,
             ),
         )
     if method == "POST":
@@ -83,14 +82,14 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
                 token,
                 key,
                 payload["value"],
-                user_state=user_state,
+                user_state=False,
             ),
         )
     if method == "DELETE":
         backend.delete_preview_runtime_state(
             token,
             key,
-            user_state=user_state,
+            user_state=False,
         )
         return _empty_response()
     return None

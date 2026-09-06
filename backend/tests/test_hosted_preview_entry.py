@@ -57,9 +57,11 @@ class HostedPreviewEntryTests(unittest.TestCase):
             "source_revision": 4,
             "content_path": "/hosted/preview/" + "A" * 43 + "/index.html",
             "expires_in": 600,
+            "runtime_token": "B" * 43,
+            "runtime_expires_in": 600,
         }
         with patch.object(
-            hosted_entry.hosted_app_management,
+            hosted_entry.hosted_preview_session,
             "create_preview_session",
             return_value=expected,
         ) as create:
@@ -80,7 +82,7 @@ class HostedPreviewEntryTests(unittest.TestCase):
     def test_owner_preview_session_rejects_unknown_body_fields(self) -> None:
         app_id = "3" * 32
         with patch.object(
-            hosted_entry.hosted_app_management,
+            hosted_entry.hosted_preview_session,
             "create_preview_session",
         ) as create:
             response = hosted_entry.lambda_handler(

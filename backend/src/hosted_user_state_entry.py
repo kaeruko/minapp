@@ -25,9 +25,9 @@ class UserStateBackend(Protocol):
 def _get_backend() -> UserStateBackend:
     global _BACKEND
     if _BACKEND is None:
-        from hosted_user_state_backend import HostedUserStateBackend
+        from hosted_preview_state_backend import HostedPreviewStateBackend
 
-        _BACKEND = HostedUserStateBackend.from_environment()
+        _BACKEND = HostedPreviewStateBackend.from_environment()
     return _BACKEND
 
 

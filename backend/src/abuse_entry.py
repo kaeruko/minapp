@@ -6,7 +6,6 @@ from typing import Any
 import handler
 import hosted_entry
 import hosted_handler
-import hosted_preview_state_entry
 import hosted_user_state_entry
 from abuse_guard import get_abuse_guard, source_ip_from_event
 from auth_refresh import refresh_access_token
@@ -110,10 +109,6 @@ def hosted_lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]
     if not isinstance(event, dict):
         raise TypeError("event must be a dictionary")
     try:
-        preview_state_response = hosted_preview_state_entry.handle_request(event)
-        if preview_state_response is not None:
-            return preview_state_response
-
         user_state_response = hosted_user_state_entry.handle_request(event)
         if user_state_response is not None:
             return user_state_response
