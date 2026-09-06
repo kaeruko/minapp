@@ -9,6 +9,7 @@ import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
 import 'girls_app_test_actions.dart';
+import 'girls_builtin_install_api.dart';
 import 'girls_footer_nav.dart';
 import 'hosted_girls_api.dart';
 import 'hosted_girls_upload_api.dart';
@@ -40,6 +41,7 @@ class GirlsAppsPage extends StatefulWidget {
 
 class _GirlsAppsPageState extends State<GirlsAppsPage> {
   late final GirlsAppManagementApi _managementApi;
+  late final GirlsBuiltinInstallApi _builtinInstallApi;
   List<ManagedGirlsApp>? _apps;
   List<HostedGroup>? _ownerGroups;
   bool _busy = false;
@@ -49,12 +51,14 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
   void initState() {
     super.initState();
     _managementApi = GirlsAppManagementApi(baseUri: widget.api.baseUri);
+    _builtinInstallApi = GirlsBuiltinInstallApi(baseUri: widget.api.baseUri);
     _load();
   }
 
   @override
   void dispose() {
     _managementApi.close();
+    _builtinInstallApi.close();
     super.dispose();
   }
 
@@ -108,17 +112,106 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
     }
   }
 
-  Future<void> _openDetail(ManagedGirlsApp app) async {
+  Future<void> _openDetailById(String appId) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) => GirlsAppDetailPage(
           api: widget.api,
           session: widget.session,
-          appId: app.app.appId,
+          appId: appId,
         ),
       ),
     );
     if (mounted) await _load();
+  }
+
+  Future<void> _openDetail(ManagedGirlsApp app) {
+    return _openDetailById(app.app.appId);
+  }
+
+  Future<ManagedGirlsApp?> _chooseInstalledNovelEditor(
+    List<ManagedGirlsApp> editors,
+  ) async {
+    if (editors.length == 1) return editors.single;
+    return showDialog<ManagedGirlsApp>(
+      context: context,
+      builder: (BuildContext dialogContext) => SimpleDialog(
+        title: const Text('どのグループのノベルゲームメーカーを使う？'),
+        children: editors
+            .map(
+              (ManagedGirlsApp editor) => SimpleDialogOption(
+                onPressed: () => Navigator.of(dialogContext).pop(editor),
+                child: Text(editor.groupName ?? editor.app.groupId),
+              ),
+            )
+            .toList(growable: false),
+      ),
+    );
+  }
+
+  Future<HostedGroup?> _chooseOwnerGroup(List<HostedGroup> groups) async {
+    if (groups.length == 1) return groups.single;
+    return showDialog<HostedGroup>(
+      context: context,
+      builder: (BuildContext dialogContext) => SimpleDialog(
+        title: const Text('どのグループに追加する？'),
+        children: groups
+            .map(
+              (HostedGroup group) => SimpleDialogOption(
+                onPressed: () => Navigator.of(dialogContext).pop(group),
+                child: Text(group.name),
+              ),
+            )
+            .toList(growable: false),
+      ),
+    );
+  }
+
+  Future<void> _openNovelMaker() async {
+    final List<ManagedGirlsApp>? apps = _apps;
+    final List<HostedGroup>? ownerGroups = _ownerGroups;
+    if (apps == null || ownerGroups == null) return;
+
+    final List<ManagedGirlsApp> installedEditors = apps
+        .where(
+          (ManagedGirlsApp app) =>
+              app.app.sourceKind == 'builtin' &&
+              app.app.builtinId == novelEditorBuiltinId,
+        )
+        .toList(growable: false);
+    if (installedEditors.isNotEmpty) {
+      final ManagedGirlsApp? editor =
+          await _chooseInstalledNovelEditor(installedEditors);
+      if (editor != null && mounted) await _openDetail(editor);
+      return;
+    }
+
+    if (ownerGroups.isEmpty) {
+      setState(() => _error = 'ノベルゲームメーカーを追加するには、自分がオーナーのグループが必要です。');
+      return;
+    }
+    final HostedGroup? group = await _chooseOwnerGroup(ownerGroups);
+    if (group == null || !mounted) return;
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    String? installedAppId;
+    try {
+      final HostedGroupApp installed = await _builtinInstallApi.installNovelEditor(
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
+      );
+      installedAppId = installed.appId;
+    } catch (error) {
+      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (installedAppId != null && mounted) {
+      await _openDetailById(installedAppId);
+    }
   }
 
   @override
@@ -158,6 +251,16 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
                 ),
                 icon: const Icon(Icons.open_in_new_rounded),
                 label: const Text('アプリを追加♡'),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                key: const Key('girls-my-apps-novel-maker'),
+                onPressed: _busy ? null : _openNovelMaker,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                icon: const Icon(Icons.edit_note_rounded),
+                label: const Text('ノベルゲームを作る'),
               ),
               if (_error != null) ...<Widget>[
                 const SizedBox(height: 12),
