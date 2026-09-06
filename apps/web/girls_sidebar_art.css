@@ -59,6 +59,67 @@
   grid-template-columns: 28px minmax(0, 1fr);
 }
 
+/* Decorative account frame at the bottom of the Girls sidebar.
+   Keep the bitmap at its authored 150 x 188 size so the lace and ribbon are
+   not enlarged further; the useful white area begins below the pink header. */
+.girls-portal-shell .portal-shell-account {
+  width: 150px;
+  min-height: 188px;
+  margin-inline: auto;
+  padding: 58px 10px 12px;
+  gap: 6px;
+  border-top: 0;
+  background: transparent url("/girls-assets/ChatGPT%20Image%202026%E5%B9%B49%E6%9C%886%E6%97%A5%2003_44_07.png") center / 100% 100% no-repeat;
+}
+
+.girls-portal-shell .portal-shell-account-card {
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 7px;
+  padding: 4px 2px;
+}
+
+.girls-portal-shell .portal-shell-avatar {
+  width: 34px;
+  height: 34px;
+  background: #f5edf8;
+  color: #a989ba;
+  font-size: 0.86rem;
+}
+
+.girls-portal-shell .portal-shell-account-copy {
+  gap: 1px;
+}
+
+.girls-portal-shell .portal-shell-account-copy strong {
+  color: #5f4a57;
+  font-size: 0.72rem;
+}
+
+.girls-portal-shell .portal-shell-account-copy span {
+  color: #806b78;
+  font-size: 0.6rem;
+  line-height: 1.25;
+}
+
+.girls-portal-shell .portal-shell-logout {
+  min-height: 32px;
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #cbb9d8 0%, #ad91c2 100%);
+  color: #fff;
+  font-size: 0.68rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    0 3px 7px rgba(116, 83, 130, 0.18);
+}
+
+.girls-portal-shell .portal-shell-logout:hover,
+.girls-portal-shell .portal-shell-logout:focus-visible {
+  background: linear-gradient(180deg, #bea7cf 0%, #9f80b7 100%);
+  color: #fff;
+}
+
 @media (max-width: 900px) {
   .girls-portal-shell {
     --girls-sidebar-width: min(280px, calc(100vw - 46px));
