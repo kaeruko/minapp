@@ -25,7 +25,9 @@ from hosted_authoring_backend import (
 )
 
 _CONTENT_ID_RE = r"([0-9a-f]{32})"
+_GROUP_ID_RE = r"([0-9a-f]{32})"
 _PROJECTS_RE = re.compile(r"^/hosted/authoring/projects$")
+_GROUP_PROJECTS_RE = re.compile(rf"^/hosted/authoring/groups/{_GROUP_ID_RE}/projects$")
 _PROJECT_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}$")
 _DOCUMENT_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/document$")
 _ASSET_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/assets/(.+)$")
@@ -41,6 +43,12 @@ class AuthoringBackend(Protocol):
         content_format: str,
         document: dict[str, Any],
     ) -> dict[str, Any]: ...
+
+    def list_authoring_projects(
+        self,
+        auth_subject: str,
+        group_id: str,
+    ) -> list[dict[str, Any]]: ...
 
     def load_authoring_project(
         self,
@@ -87,9 +95,9 @@ class AuthoringBackend(Protocol):
 def _get_backend() -> AuthoringBackend:
     global _BACKEND
     if _BACKEND is None:
-        from hosted_authoring_backend import HostedAuthoringBackend
+        from hosted_authoring_indexed_backend import HostedAuthoringIndexedBackend
 
-        _BACKEND = HostedAuthoringBackend.from_environment()
+        _BACKEND = HostedAuthoringIndexedBackend.from_environment()
     return _BACKEND
 
 
@@ -216,6 +224,21 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
                 content_format,
                 document,
             ),
+        )
+
+    group_projects_match = _GROUP_PROJECTS_RE.fullmatch(path)
+    if group_projects_match is not None:
+        if method != "GET":
+            return None
+        _require_no_body(event)
+        return _json_response(
+            200,
+            {
+                "projects": _get_backend().list_authoring_projects(
+                    _auth_subject(event),
+                    group_projects_match.group(1),
+                )
+            },
         )
 
     project_match = _PROJECT_RE.fullmatch(path)
