@@ -28,12 +28,21 @@ _ALLOWED_OPERATIONS = (
 )
 
 
-def create_session(
+def prepare_session(
     backend: Any,
     auth_subject: str,
     content_id: str,
     editor_app_id: str,
-) -> dict[str, Any]:
+    *,
+    now_epoch: int | None = None,
+) -> tuple[dict[str, Any], dict[str, Any], Any, dict[str, Any]]:
+    """Validate scope and build an Authoring capability without persisting it.
+
+    Callers that need additional capabilities can include the returned item in
+    the same DynamoDB transaction. The returned token exists only in the public
+    result; DynamoDB stores its SHA-256 hash.
+    """
+
     if not isinstance(editor_app_id, str) or _APP_ID_RE.fullmatch(editor_app_id) is None:
         raise ApiProblem(404, "app_not_found", "Authoring Editor app was not found.")
 
@@ -46,8 +55,8 @@ def create_session(
 
     token = secrets.token_urlsafe(32)
     token_hash = _token_hash(token)
-    now_epoch = int(time.time())
-    expires_at = now_epoch + AUTHORING_SESSION_SECONDS
+    effective_now = int(time.time()) if now_epoch is None else now_epoch
+    expires_at = effective_now + AUTHORING_SESSION_SECONDS
     item = {
         "pk": _string_attr(f"AUTHORINGSESSION#{token_hash}"),
         "sk": _string_attr("META"),
@@ -65,8 +74,7 @@ def create_session(
         "expires_at_epoch": _number_attr(expires_at),
         "ttl_epoch": _number_attr(expires_at + AUTHORING_SESSION_TTL_GRACE_SECONDS),
     }
-    backend._transact_put_new([item])
-    return {
+    result = {
         "token": token,
         "expires_in": AUTHORING_SESSION_SECONDS,
         "content_id": content_id,
@@ -74,6 +82,23 @@ def create_session(
         "editor_app_id": editor_app_id,
         "allowed_operations": list(_ALLOWED_OPERATIONS),
     }
+    return result, item, user, editor
+
+
+def create_session(
+    backend: Any,
+    auth_subject: str,
+    content_id: str,
+    editor_app_id: str,
+) -> dict[str, Any]:
+    result, item, _, _ = prepare_session(
+        backend,
+        auth_subject,
+        content_id,
+        editor_app_id,
+    )
+    backend._transact_put_new([item])
+    return result
 
 
 def load_project(backend: Any, token: str) -> dict[str, Any]:
