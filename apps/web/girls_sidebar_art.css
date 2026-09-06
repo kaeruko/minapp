@@ -8,14 +8,24 @@
   padding-top: calc(var(--girls-sidebar-header-height) + 10px);
   padding-right: 44px;
 
-  /* The sidebar stays lavender all the way underneath the lace. This is
-     intentional: every transparent pixel in lace.png must reveal #cbb5d7,
-     never the cream/white content background. */
+  /* The sidebar stays lavender all the way underneath the lace. Every
+     transparent pixel in lace.png therefore reveals #cbb5d7. */
   background-color: #cbb5d7;
   background-image: url("/girls-assets/sidebar/header.png");
   background-position: left top;
   background-size: 100% auto;
   background-repeat: no-repeat;
+
+  /* portal_shell.css makes the sidebar a vertical scroll container. On Windows
+     Chromium its scrollbar gutter can render as a 1px light seam beside the
+     lace, so keep scrolling available but hide the scrollbar chrome. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.girls-portal-shell .portal-shell-sidebar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 /* The cloud artwork does not contain the logo. Draw the existing Girls logo
@@ -36,15 +46,14 @@
   pointer-events: none;
 }
 
-/* One continuous lace strip from top to bottom. The pseudo-element itself has
-   no background color, so its transparent pixels reveal the lavender sidebar
-   underneath. */
+/* One continuous lace strip from top to bottom. Nudge it one pixel across the
+   box edge as well, so sub-pixel rounding cannot expose a straight seam. */
 .girls-portal-shell .portal-shell-sidebar::after {
   content: "";
   position: absolute;
   z-index: 3;
   top: 0;
-  right: 0;
+  right: -1px;
   bottom: 0;
   width: var(--girls-sidebar-lace-width);
   background-image: url("/girls-assets/sidebar/lace.png");
