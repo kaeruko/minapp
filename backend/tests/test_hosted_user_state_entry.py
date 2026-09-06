@@ -40,6 +40,7 @@ def event(method: str, path: str, body: dict[str, Any] | None = None) -> dict[st
         "headers": {},
     }
     if body is not None:
+        result["headers"] = {"content-type": "application/json"}
         result["body"] = json.dumps(body)
     return result
 
