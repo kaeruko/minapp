@@ -1,17 +1,18 @@
 /* Authenticated Girls sidebar artwork.
-   The top artwork already contains the clouds, logo and the first section of lace.
-   Continue the lace only below that artwork so the join stays seamless. */
+   The header asset contains the clouds and the first section of the right-edge lace.
+   The logo is layered separately so the artwork can be resized without baking text into it. */
 .girls-portal-shell .portal-shell-sidebar {
-  --girls-sidebar-lace-width: 24px;
-  --girls-sidebar-header-height: 183px;
+  /* header.png is 417 x 297. The lace occupies about 55 px of its source width. */
+  --girls-sidebar-header-height: 177px;
+  --girls-sidebar-lace-width: 33px;
 
   padding-top: calc(var(--girls-sidebar-header-height) + 10px);
-  padding-right: 36px;
+  padding-right: 42px;
   background:
-    /* Integrated cloud + logo + lace header. 317 x 234 at the 248px desktop sidebar width. */
-    url("/_race.png") left top / 100% auto no-repeat,
+    url("/girls-assets/sidebar/header.png") left top / 100% auto no-repeat,
 
-    /* Any transparent pixels outside the lace reveal the cream content background. */
+    /* Transparent pixels around the lace must reveal the cream content side,
+       not the purple sidebar underneath. */
     linear-gradient(
       to right,
       transparent 0 calc(100% - var(--girls-sidebar-lace-width)),
@@ -22,13 +23,26 @@
     linear-gradient(180deg, #cabbdd 0%, #7f66aa 56%, #725895 100%);
 }
 
-/* The header image already owns the visible Girls logo. */
+/* The header artwork no longer contains the logo. Draw the existing Girls logo
+   over the cloud artwork instead of showing the generic sidebar brand row. */
 .girls-portal-shell .portal-shell-brand {
   display: none;
 }
 
-/* Continue the lace from the exact bottom of the integrated header instead of
-   drawing a second lace layer underneath it. */
+.girls-portal-shell .portal-shell-sidebar::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 42px;
+  left: 24px;
+  width: min(62%, 154px);
+  height: 92px;
+  background: url("/girls-assets/logo.png") left center / contain no-repeat;
+  pointer-events: none;
+}
+
+/* Continue only the lace below the integrated header. The continuation uses the
+   same rendered width as the lace already visible in header.png. */
 .girls-portal-shell .portal-shell-sidebar::after {
   content: "";
   position: absolute;
@@ -37,21 +51,32 @@
   right: 0;
   bottom: 0;
   width: var(--girls-sidebar-lace-width);
-  background: url("/girls-assets/sidebar/lace.png") right top / var(--girls-sidebar-lace-width) auto repeat-y;
+  background:
+    var(--portal-bg, #fff9f4)
+    url("/girls-assets/sidebar/lace.png") right top / var(--girls-sidebar-lace-width) auto repeat-y;
   pointer-events: none;
 }
 
 .girls-portal-shell .portal-shell-nav,
 .girls-portal-shell .portal-shell-account {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 @media (max-width: 900px) {
   .girls-portal-shell .portal-shell-sidebar {
-    /* Sidebar width is min(310px, 100vw - 46px). 234 / 317 = 0.73817. */
-    --girls-sidebar-header-height: min(229px, calc(73.817vw - 34px));
+    /* Mobile sidebar width is min(310px, 100vw - 46px).
+       Keep the 417:297 header ratio and the ~55:417 lace ratio. */
+    --girls-sidebar-header-height: min(221px, calc(71.223vw - 32.762px));
+    --girls-sidebar-lace-width: min(41px, calc(13.189vw - 6.067px));
     padding-top: calc(var(--girls-sidebar-header-height) + 10px);
-    padding-right: 36px;
+    padding-right: calc(var(--girls-sidebar-lace-width) + 9px);
+  }
+
+  .girls-portal-shell .portal-shell-sidebar::before {
+    top: clamp(42px, 13vw, 56px);
+    left: 9%;
+    width: min(62%, 188px);
+    height: 110px;
   }
 }
