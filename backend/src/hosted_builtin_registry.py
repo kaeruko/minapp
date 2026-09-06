@@ -7,6 +7,7 @@ from typing import Any, Mapping
 _CONTENT_FORMAT_RE = re.compile(
     r"^[a-z0-9][a-z0-9._-]{0,63}/[a-z0-9][a-z0-9._-]{0,63}@[1-9][0-9]{0,5}$"
 )
+_MASTER_DATA_ELEMENT_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,63}$")
 _CONTRACT_FIELDS = ("accepts", "edits")
 
 
@@ -20,6 +21,7 @@ CREATIVE_BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = {
         "asset_path": "assets/builtin/novel_starter/index.html",
         "source_key": "hosted/templates/novel-starter/v4/source.zip",
         "accepts": ["minapp/novel@1"],
+        "master_data_element_id": "minapp-novel-story",
     },
     "novel-editor": {
         "builtin_id": "novel-editor",
@@ -53,6 +55,21 @@ def _validated_template_copy(template: Mapping[str, Any]) -> dict[str, Any]:
                     f"builtin template {template.get('builtin_id')!r} declares invalid {field} format {content_format!r}"
                 )
         copied[field] = list(raw)
+
+    master_data_element_id = template.get("master_data_element_id")
+    if master_data_element_id is not None:
+        if template.get("accepts") is None:
+            raise RuntimeError(
+                f"builtin template {template.get('builtin_id')!r} cannot declare master_data_element_id without accepts"
+            )
+        if (
+            not isinstance(master_data_element_id, str)
+            or _MASTER_DATA_ELEMENT_ID_RE.fullmatch(master_data_element_id) is None
+        ):
+            raise RuntimeError(
+                f"builtin template {template.get('builtin_id')!r} has invalid master_data_element_id"
+            )
+        copied["master_data_element_id"] = master_data_element_id
     return copied
 
 
