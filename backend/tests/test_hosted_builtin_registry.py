@@ -5,6 +5,8 @@ import unittest
 from pathlib import Path
 
 BACKEND_SRC = Path(__file__).resolve().parents[1] / "src"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+NOVEL_STARTER_DIR = REPO_ROOT / "apps" / "mobile" / "assets" / "builtin" / "novel_starter"
 if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
 
@@ -28,6 +30,19 @@ class HostedBuiltinRegistryTests(unittest.TestCase):
             template["source_key"],
             "hosted/templates/novel-starter/v4/source.zip",
         )
+
+    def test_novel_starter_v4_bundles_json_player_runtime(self) -> None:
+        index = (NOVEL_STARTER_DIR / "index.html").read_text(encoding="utf-8")
+        player = (NOVEL_STARTER_DIR / "player.js").read_text(encoding="utf-8")
+        validator = (NOVEL_STARTER_DIR / "story-validator.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="minapp-novel-story"', index)
+        self.assertIn('<script src="story-validator.js"></script>', index)
+        self.assertIn('<script src="player.js"></script>', index)
+        self.assertIn("const FORMAT = 'minapp/novel@1';", validator)
+        self.assertIn("window.addEventListener('minappready', onMinAppReady);", player)
+        self.assertIn("window.minapp.userState", player)
+        self.assertNotIn("window.minapp.state", player)
 
     def test_merge_keeps_input_unchanged_and_returns_copies(self) -> None:
         core = {
