@@ -39,11 +39,12 @@ class HostedLegalBackend(HostedCatalogBackend):
 
     def list_builtin_templates(self) -> list[dict[str, Any]]:
         templates = self._hosted_builtin_templates()
+        private_fields = {"source_key", "accepts", "edits"}
         return [
             {
                 field: value
                 for field, value in templates[builtin_id].items()
-                if field != "source_key"
+                if field not in private_fields
             }
             for builtin_id in sorted(templates)
         ]
