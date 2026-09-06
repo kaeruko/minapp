@@ -7,7 +7,7 @@ from typing import Any
 from aws_backend import _string_attr
 from hosted_catalog_backend import _files_json
 from hosted_platform_backend import _now_iso, _number_attr
-from phase2_backend import _safe_zip_paths
+from zip_upload_normalization import normalize_uploaded_zip
 
 
 def create_uploaded_app(
@@ -23,9 +23,13 @@ def create_uploaded_app(
     supplied by the caller becomes source revision 1 of an independent app.
     Existing Hosted source validation, S3 immutability, app-capacity checks,
     and owner authorization are reused without fallback behavior.
+
+    A common desktop packaging shape (one top-level folder containing
+    index.html) is normalized to the canonical root-index ZIP before storage.
+    Ambiguous archive layouts still fail validation.
     """
-    files = _safe_zip_paths(zip_bytes)
-    sha256 = hashlib.sha256(zip_bytes).hexdigest()
+    normalized_zip, files = normalize_uploaded_zip(zip_bytes)
+    sha256 = hashlib.sha256(normalized_zip).hexdigest()
 
     owner = backend._user_by_auth_subject(auth_subject)
     backend._require_owner_group(owner.user_id, group_id)
@@ -64,7 +68,7 @@ def create_uploaded_app(
     source_version_id = backend._put_immutable_zip(
         bucket=backend._upload_bucket,
         key=source_key,
-        zip_bytes=zip_bytes,
+        zip_bytes=normalized_zip,
         sha256=sha256,
     )
     source_manifest = backend._source_manifest(
