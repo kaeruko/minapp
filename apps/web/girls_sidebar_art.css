@@ -2,25 +2,27 @@
    header.png contains only the cloud decoration. lace.png owns the whole
    left/right boundary from top to bottom. */
 .girls-portal-shell .portal-shell-sidebar {
-  /* Desktop sidebar is 248px wide. Place the purple/cream transition under the
-     middle of the lace so the rectangular edge is hidden by the lace itself. */
+  /* Desktop sidebar is 248px wide. The PNG includes the lavender up to its
+     scalloped edge, so nothing should paint underneath the lace strip. */
   --girls-sidebar-lace-width: 35px;
-  --girls-sidebar-lace-overhang: 18px;
   --girls-sidebar-header-height: 164px;
 
   padding-top: calc(var(--girls-sidebar-header-height) + 10px);
   padding-right: 44px;
 
-  /* Keep both sides explicit: lavender on the sidebar side and the Girls cream
-     on the content side. The color transition stays underneath the lace, so no
-     straight vertical boundary is exposed through transparent lace pixels. */
+  /* Restrict the header and solid fill to the left of the lace. Its alpha then
+     reveals the actual page (or mobile scrim), rather than a cream rectangle.
+     Repeat the lace on the scrolling sidebar itself so short screens also
+     retain the edge when the navigation is scrolled. */
   background:
-    url("/girls-assets/sidebar/header.png") left top / calc(100% - var(--girls-sidebar-lace-overhang)) auto no-repeat,
+    url("/girls-assets/sidebar/lace.png") right top / var(--girls-sidebar-lace-width) auto repeat-y,
+    url("/girls-assets/sidebar/header.png") left top / calc(100% - var(--girls-sidebar-lace-width)) auto no-repeat,
     linear-gradient(
       to right,
-      #cbb5d7 0 calc(100% - var(--girls-sidebar-lace-overhang)),
-      var(--portal-bg, #fff9f4) calc(100% - var(--girls-sidebar-lace-overhang)) 100%
+      #cbb5d7 0 calc(100% - var(--girls-sidebar-lace-width)),
+      transparent calc(100% - var(--girls-sidebar-lace-width)) 100%
     );
+  box-shadow: none;
 }
 
 /* The cloud artwork does not contain the logo. Draw the existing Girls logo
@@ -41,21 +43,6 @@
   pointer-events: none;
 }
 
-/* One continuous lace strip defines the visible sidebar edge. Because the
-   lavender/cream transition sits underneath the middle of this image, there is
-   no exposed straight vertical boundary. */
-.girls-portal-shell .portal-shell-sidebar::after {
-  content: "";
-  position: absolute;
-  z-index: 3;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: var(--girls-sidebar-lace-width);
-  background: url("/girls-assets/sidebar/lace.png") center top / 100% auto repeat-y;
-  pointer-events: none;
-}
-
 .girls-portal-shell .portal-shell-nav,
 .girls-portal-shell .portal-shell-account {
   position: relative;
@@ -65,10 +52,8 @@
 @media (max-width: 900px) {
   .girls-portal-shell .portal-shell-sidebar {
     /* Mobile sidebar width is min(310px, 100vw - 46px). Scale the lace and
-       cloud header with that width while keeping the transition centered under
-       the lace. */
+       reserved header space with that width. */
     --girls-sidebar-lace-width: min(44px, calc(14.113vw - 6.492px));
-    --girls-sidebar-lace-overhang: min(22px, calc(7.056vw - 3.246px));
     --girls-sidebar-header-height: min(205px, calc(66.198vw - 30.451px));
 
     padding-top: calc(var(--girls-sidebar-header-height) + 10px);
