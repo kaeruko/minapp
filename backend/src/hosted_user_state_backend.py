@@ -11,6 +11,7 @@ from hosted_platform_backend import _now_iso, _number_attr, _validate_state_key
 
 MAX_USER_STATE_KEYS_PER_USER_APP = 64
 MAX_USER_STATE_BYTES_PER_USER_APP = 256 * 1024
+_DYNAMODB_TRANSACTION_LIMIT = 100
 
 
 class HostedUserStateBackend(HostedLegalBackend):
@@ -111,6 +112,16 @@ class HostedUserStateBackend(HostedLegalBackend):
             ]
         )
 
+    def delete_hosted_app(self, auth_subject: str, group_id: str, app_id: str) -> None:
+        # Authorize before touching private rows. Cleanup happens before the
+        # existing app deletion so a cleanup failure leaves app metadata in
+        # place and the delete can be retried explicitly.
+        owner = self._user_by_auth_subject(auth_subject)
+        self._require_owner_group(owner.user_id, group_id)
+        self._require_app_in_group(app_id, group_id)
+        self._delete_all_runtime_user_state(group_id, app_id)
+        super().delete_hosted_app(auth_subject, group_id, app_id)
+
     def _runtime_user_get_item(
         self, group_id: str, app_id: str, user_id: str, key: str
     ) -> dict[str, Any] | None:
@@ -142,3 +153,46 @@ class HostedUserStateBackend(HostedLegalBackend):
             ConsistentRead=True,
         )
         return self._query_items(response)
+
+    def _all_runtime_user_items(
+        self, group_id: str, app_id: str
+    ) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        exclusive_start_key: dict[str, Any] | None = None
+        while True:
+            arguments: dict[str, Any] = {
+                "TableName": self._runtime_table_name,
+                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :state_prefix)",
+                "ExpressionAttributeValues": {
+                    ":pk": _string_attr(f"GROUP#{group_id}#APP#{app_id}"),
+                    ":state_prefix": _string_attr("USER#"),
+                },
+                "ConsistentRead": True,
+            }
+            if exclusive_start_key is not None:
+                arguments["ExclusiveStartKey"] = exclusive_start_key
+            response = self._runtime_dynamodb.query(**arguments)
+            items.extend(self._query_items(response))
+            last_key = response.get("LastEvaluatedKey")
+            if last_key is None:
+                return items
+            if not isinstance(last_key, dict) or not last_key:
+                raise RuntimeError("DynamoDB Query returned an invalid LastEvaluatedKey")
+            exclusive_start_key = last_key
+
+    def _delete_all_runtime_user_state(self, group_id: str, app_id: str) -> None:
+        items = self._all_runtime_user_items(group_id, app_id)
+        for offset in range(0, len(items), _DYNAMODB_TRANSACTION_LIMIT):
+            chunk = items[offset : offset + _DYNAMODB_TRANSACTION_LIMIT]
+            self._runtime_dynamodb.transact_write_items(
+                TransactItems=[
+                    {
+                        "Delete": {
+                            "TableName": self._runtime_table_name,
+                            "Key": {"pk": item["pk"], "sk": item["sk"]},
+                            "ConditionExpression": "attribute_exists(pk)",
+                        }
+                    }
+                    for item in chunk
+                ]
+            )
