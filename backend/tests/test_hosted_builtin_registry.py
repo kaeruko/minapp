@@ -33,6 +33,7 @@ class HostedBuiltinRegistryTests(unittest.TestCase):
             "hosted/templates/novel-starter/v4/source.zip",
         )
         self.assertEqual(template["accepts"], ["minapp/novel@1"])
+        self.assertEqual(template["master_data_element_id"], "minapp-novel-story")
         self.assertNotIn("edits", template)
 
     def test_novel_editor_contract(self) -> None:
@@ -50,6 +51,7 @@ class HostedBuiltinRegistryTests(unittest.TestCase):
         )
         self.assertEqual(template["edits"], ["minapp/novel@1"])
         self.assertNotIn("accepts", template)
+        self.assertNotIn("master_data_element_id", template)
 
     def test_novel_starter_v4_bundles_json_player_runtime(self) -> None:
         index = (NOVEL_STARTER_DIR / "index.html").read_text(encoding="utf-8")
@@ -102,6 +104,26 @@ class HostedBuiltinRegistryTests(unittest.TestCase):
                             field: value,
                         }
                     )
+
+        with self.assertRaises(RuntimeError):
+            _validated_template_copy(
+                {
+                    "builtin_id": "bad-target-without-player",
+                    "version": 1,
+                    "title": "bad",
+                    "master_data_element_id": "minapp-master-data",
+                }
+            )
+        with self.assertRaises(RuntimeError):
+            _validated_template_copy(
+                {
+                    "builtin_id": "bad-target",
+                    "version": 1,
+                    "title": "bad",
+                    "accepts": ["minapp/novel@1"],
+                    "master_data_element_id": "bad target",
+                }
+            )
 
     def test_merge_keeps_input_unchanged_and_returns_copies(self) -> None:
         core = {
