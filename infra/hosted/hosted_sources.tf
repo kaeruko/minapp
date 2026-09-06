@@ -12,6 +12,10 @@ locals {
       version    = 4
       source_dir = abspath("${path.module}/../../apps/mobile/assets/builtin/novel_starter")
     }
+    novel-editor = {
+      version    = 1
+      source_dir = abspath("${path.module}/../../apps/mobile/assets/builtin/novel_editor")
+    }
   }
 }
 
