@@ -57,6 +57,7 @@ class HostedAuthoringCapabilityEntryTests(unittest.TestCase):
         hosted_authoring_capability_entry._BACKEND = self.backend
         self.content_id = "3" * 32
         self.editor_app_id = "4" * 32
+        self.player_app_id = "5" * 32
         self.token = "A" * 43
 
     def tearDown(self) -> None:
@@ -94,6 +95,60 @@ class HostedAuthoringCapabilityEntryTests(unittest.TestCase):
             self.content_id,
             self.editor_app_id,
         )
+
+    def test_structured_preview_requires_jwt_and_explicit_player_revision(self) -> None:
+        expected = {
+            "content_id": self.content_id,
+            "content_format": "minapp/novel@1",
+            "draft_revision": 7,
+            "player_app_id": self.player_app_id,
+            "content_path": f"/hosted/authoring-preview/{self.token}/index.html",
+            "expires_in": 600,
+            "runtime_token": "R" * 43,
+            "runtime_expires_in": 600,
+        }
+        with patch.object(
+            hosted_authoring_capability_entry.hosted_authoring_preview,
+            "create_preview",
+            return_value=expected,
+        ) as create:
+            response = abuse_entry.hosted_lambda_handler(
+                event(
+                    "POST",
+                    f"/hosted/authoring/projects/{self.content_id}/preview",
+                    content_type="application/json",
+                    body=json.dumps(
+                        {"player_app_id": self.player_app_id, "expected_revision": 7}
+                    ),
+                    auth=True,
+                ),
+                None,
+            )
+        self.assertEqual(response["statusCode"], 201)
+        self.assertEqual(json.loads(response["body"]), expected)
+        create.assert_called_once_with(
+            self.backend,
+            "sub-owner",
+            self.content_id,
+            self.player_app_id,
+            expected_revision=7,
+        )
+
+    def test_structured_preview_content_is_capability_only(self) -> None:
+        with patch.object(
+            hosted_authoring_capability_entry.hosted_authoring_preview,
+            "get_preview_file",
+            return_value=(b"<!doctype html>", "text/html; charset=utf-8"),
+        ) as get_file:
+            response = abuse_entry.hosted_lambda_handler(
+                event(
+                    "GET",
+                    f"/hosted/authoring-preview/{self.token}/index.html",
+                ),
+                None,
+            )
+        self.assertEqual(response["statusCode"], 200)
+        get_file.assert_called_once_with(self.backend, self.token, "index.html")
 
     def test_capability_load_does_not_require_cognito_or_accept_content_id(self) -> None:
         expected = {"content_id": self.content_id, "draft_revision": 7, "document": {"version": 1}}
@@ -174,6 +229,30 @@ class HostedAuthoringCapabilityEntryTests(unittest.TestCase):
                     content_type="application/json",
                     body=json.dumps(
                         {"editor_app_id": self.editor_app_id, "content_format": "minapp/novel@1"}
+                    ),
+                    auth=True,
+                ),
+                None,
+            )
+        self.assertEqual(response["statusCode"], 400)
+        create.assert_not_called()
+
+    def test_preview_rejects_unknown_scope_fields_before_backend(self) -> None:
+        with patch.object(
+            hosted_authoring_capability_entry.hosted_authoring_preview,
+            "create_preview",
+        ) as create:
+            response = abuse_entry.hosted_lambda_handler(
+                event(
+                    "POST",
+                    f"/hosted/authoring/projects/{self.content_id}/preview",
+                    content_type="application/json",
+                    body=json.dumps(
+                        {
+                            "player_app_id": self.player_app_id,
+                            "expected_revision": 7,
+                            "group_id": "6" * 32,
+                        }
                     ),
                     auth=True,
                 ),
