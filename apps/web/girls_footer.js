@@ -143,6 +143,7 @@
 (function initGirlsAppManagementActions() {
   const ACCESS_TOKEN_KEY = "minapp_girls_portal_access_token";
   const CONFIG_PATH = "/girls-config.json";
+  const NO_IMAGE_URL = "/girls-assets/no_image.svg";
   const ID_PATTERN = /^[0-9a-f]{32}$/;
   const DATE_LABEL_PATTERN = /^\d{4}\/\d{1,2}\/\d{1,2}$/;
 
@@ -172,47 +173,6 @@
   let decorateScheduled = false;
   let decorateGeneration = 0;
 
-  const style = document.createElement("style");
-  style.textContent = `
-    .girls-app-card-actions {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      gap: 6px;
-      margin-left: auto;
-    }
-    .girls-app-card-actions .girls-secondary {
-      min-height: 34px;
-      padding: 7px 11px;
-      font-size: 0.72rem;
-      white-space: nowrap;
-    }
-    .girls-app-delete-button {
-      border-color: #e8bac4 !important;
-      background: #fff8fa !important;
-      color: #a94d63 !important;
-    }
-    .girls-app-delete-button:hover,
-    .girls-app-delete-button:focus-visible {
-      border-color: #d991a1 !important;
-      background: #fff0f4 !important;
-      color: #8f3d51 !important;
-    }
-    .girls-app-hidden-chip {
-      background: #f7e5ef !important;
-      color: #9b5875 !important;
-    }
-    @media (max-width: 680px) {
-      .girls-app-card-heading {
-        align-items: flex-start;
-      }
-      .girls-app-card-actions {
-        justify-content: flex-start;
-      }
-    }
-  `;
-  document.head.append(style);
-
   function requirePlainObject(value, label) {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       throw new Error(`${label} must be an object.`);
@@ -225,6 +185,26 @@
       throw new Error(`${label} must be a non-empty string.`);
     }
     return value;
+  }
+
+  function optionalThumbnailUrl(value, label) {
+    if (value === undefined || value === null) return null;
+    if (typeof value !== "string" || value.length === 0 || value !== value.trim()) {
+      throw new Error(`${label} must be null or a non-empty URL string.`);
+    }
+
+    let url;
+    try {
+      url = new URL(value, globalThis.location.origin);
+    } catch (error) {
+      throw new Error(`${label} is not a valid URL.`, { cause: error });
+    }
+
+    const isSameOrigin = url.origin === globalThis.location.origin;
+    if (!isSameOrigin && url.protocol !== "https:") {
+      throw new Error(`${label} must be same-origin or HTTPS.`);
+    }
+    return url.toString();
   }
 
   function setError(message) {
@@ -359,6 +339,7 @@
             groupName: group.name,
             title,
             dateLabel: parsedDate.toLocaleDateString("ja-JP"),
+            thumbnailUrl: optionalThumbnailUrl(app.thumbnail_url, "Hosted app thumbnail_url"),
           };
         });
       })),
@@ -377,6 +358,7 @@
       managedById.set(managed.app_id, {
         appId: managed.app_id,
         visibility: managed.visibility,
+        thumbnailUrl: optionalThumbnailUrl(managed.thumbnail_url, "Managed Girls app thumbnail_url"),
       });
     }
 
@@ -410,6 +392,48 @@
     chip.className = "girls-app-chip girls-app-hidden-chip";
     chip.textContent = "非表示";
     if (existing === null) meta.append(chip);
+  }
+
+  function createThumbnail(app) {
+    const media = document.createElement("div");
+    media.className = "girls-app-card-media";
+
+    const image = document.createElement("img");
+    image.className = "girls-app-card-thumbnail";
+    image.loading = "lazy";
+    image.decoding = "async";
+    image.referrerPolicy = "no-referrer";
+
+    const hasThumbnail = app.thumbnailUrl !== null;
+    image.src = hasThumbnail ? app.thumbnailUrl : NO_IMAGE_URL;
+    image.alt = hasThumbnail ? `${app.title}のサムネイル` : "";
+    image.dataset.thumbnailState = hasThumbnail ? "custom" : "no-image";
+
+    let fallbackApplied = !hasThumbnail;
+    image.addEventListener("error", () => {
+      if (fallbackApplied) {
+        console.error(`No Image asset failed to load for app ${app.appId}.`);
+        return;
+      }
+      fallbackApplied = true;
+      console.error(`Thumbnail failed to load for app ${app.appId}; showing No Image.`);
+      image.src = NO_IMAGE_URL;
+      image.alt = "";
+      image.dataset.thumbnailState = "no-image";
+    });
+
+    media.append(image);
+    return media;
+  }
+
+  function installCardLayout(card, app) {
+    if (card.querySelector(":scope > .girls-app-card-body") !== null) {
+      throw new Error("Girls app card layout was already installed.");
+    }
+    const body = document.createElement("div");
+    body.className = "girls-app-card-body";
+    while (card.firstChild !== null) body.append(card.firstChild);
+    card.append(createThumbnail(app), body);
   }
 
   async function toggleVisibility(app, managed, button, card) {
@@ -469,7 +493,7 @@
 
     const actions = document.createElement("div");
     actions.className = "girls-app-card-actions";
-    previewButton.replaceWith(actions);
+    previewButton.remove();
     actions.append(previewButton);
 
     if (managed !== undefined) {
@@ -490,6 +514,10 @@
     deleteButton.textContent = "削除";
     deleteButton.addEventListener("click", () => void deleteApp(app, deleteButton));
     actions.append(deleteButton);
+    card.append(actions);
+
+    const thumbnailUrl = app.thumbnailUrl ?? managed?.thumbnailUrl ?? null;
+    installCardLayout(card, { ...app, thumbnailUrl });
   }
 
   async function decorateCards() {
@@ -504,6 +532,12 @@
       const used = new Set();
 
       for (const card of cards) {
+        const existingId = card.dataset.girlsAppId ?? "";
+        if (ID_PATTERN.test(existingId)) {
+          used.add(existingId);
+          continue;
+        }
+
         const identity = cardIdentity(card);
         const matches = apps.filter((app) =>
           !used.has(app.appId) &&
