@@ -1,26 +1,30 @@
 /* Authenticated Girls sidebar artwork.
-   The header asset contains the clouds and the first section of the right-edge lace.
-   The logo is layered separately so the artwork can be resized without baking text into it. */
+   header.png contains only the cloud decoration. lace.png owns the whole
+   left/right boundary from top to bottom. */
 .girls-portal-shell .portal-shell-sidebar {
-  /* header.png is 417 x 297. Keep the continuation lace slightly wider so its
-     visible scale matches the lace embedded in the header artwork. */
-  --girls-sidebar-header-height: 177px;
+  /* Desktop sidebar is 248px wide. Place the purple/cream transition under the
+     middle of the lace so the rectangular edge is hidden by the lace itself. */
   --girls-sidebar-lace-width: 35px;
+  --girls-sidebar-lace-overhang: 18px;
+  --girls-sidebar-header-height: 164px;
 
   padding-top: calc(var(--girls-sidebar-header-height) + 10px);
   padding-right: 44px;
 
-  /* The whole sidebar stays lavender. Transparent pixels in header.png and
-     lace.png therefore reveal this color instead of the white page behind it. */
-  background-color: #cbb5d7;
-  background-image: url("/girls-assets/sidebar/header.png");
-  background-position: left top;
-  background-size: 100% auto;
-  background-repeat: no-repeat;
+  /* The sidebar box itself is transparent at the far right. The parent portal
+     background (#fff9f4) shows there, while #cbb5d7 fills the left side.
+     The transition is intentionally placed underneath the lace. */
+  background:
+    url("/girls-assets/sidebar/header.png") left top / calc(100% - var(--girls-sidebar-lace-overhang)) auto no-repeat,
+    linear-gradient(
+      to right,
+      #cbb5d7 0 calc(100% - var(--girls-sidebar-lace-overhang)),
+      transparent calc(100% - var(--girls-sidebar-lace-overhang)) 100%
+    );
 }
 
-/* The header artwork no longer contains the logo. Draw the existing Girls logo
-   over the cloud artwork instead of showing the generic sidebar brand row. */
+/* The cloud artwork does not contain the logo. Draw the existing Girls logo
+   separately and hide the generic sidebar brand row. */
 .girls-portal-shell .portal-shell-brand {
   display: none;
 }
@@ -28,26 +32,27 @@
 .girls-portal-shell .portal-shell-sidebar::before {
   content: "";
   position: absolute;
-  z-index: 1;
-  top: 42px;
+  z-index: 2;
+  top: 36px;
   left: 24px;
   width: min(62%, 154px);
-  height: 92px;
+  height: 88px;
   background: url("/girls-assets/logo.png") left center / contain no-repeat;
   pointer-events: none;
 }
 
-/* Continue only the lace below the integrated header. Its transparent pixels
-   reveal the sidebar's #cbb5d7 background. */
+/* One continuous lace strip defines the visible sidebar edge. Because the
+   purple/cream transition sits underneath the middle of this image, there is
+   no exposed straight vertical boundary. */
 .girls-portal-shell .portal-shell-sidebar::after {
   content: "";
   position: absolute;
-  z-index: 0;
-  top: calc(var(--girls-sidebar-header-height) - 1px);
+  z-index: 3;
+  top: 0;
   right: 0;
   bottom: 0;
   width: var(--girls-sidebar-lace-width);
-  background: url("/girls-assets/sidebar/lace.png") right top / var(--girls-sidebar-lace-width) auto repeat-y;
+  background: url("/girls-assets/sidebar/lace.png") center top / 100% auto repeat-y;
   pointer-events: none;
 }
 
@@ -59,18 +64,21 @@
 
 @media (max-width: 900px) {
   .girls-portal-shell .portal-shell-sidebar {
-    /* Mobile sidebar width is min(310px, 100vw - 46px).
-       Keep the 417:297 header ratio and scale the continuation lace with it. */
-    --girls-sidebar-header-height: min(221px, calc(71.223vw - 32.762px));
-    --girls-sidebar-lace-width: min(42px, calc(13.429vw - 6.177px));
+    /* Mobile sidebar width is min(310px, 100vw - 46px). Scale the lace and
+       cloud header with that width while keeping the transition centered under
+       the lace. */
+    --girls-sidebar-lace-width: min(44px, calc(14.113vw - 6.492px));
+    --girls-sidebar-lace-overhang: min(22px, calc(7.056vw - 3.246px));
+    --girls-sidebar-header-height: min(205px, calc(66.198vw - 30.451px));
+
     padding-top: calc(var(--girls-sidebar-header-height) + 10px);
     padding-right: calc(var(--girls-sidebar-lace-width) + 9px);
   }
 
   .girls-portal-shell .portal-shell-sidebar::before {
-    top: clamp(42px, 13vw, 56px);
+    top: clamp(36px, 11vw, 48px);
     left: 9%;
     width: min(62%, 188px);
-    height: 110px;
+    height: 104px;
   }
 }
