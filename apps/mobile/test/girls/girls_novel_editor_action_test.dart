@@ -55,7 +55,7 @@ const AuthenticatedSession _session = AuthenticatedSession(
 );
 
 void main() {
-  testWidgets('installed novel-editor exposes the Novel project action', (
+  testWidgets('installed novel-editor exposes only the Novel project action', (
     WidgetTester tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(420, 820));
@@ -76,10 +76,12 @@ void main() {
 
     expect(find.byKey(const Key('girls-novel-open-projects')), findsOneWidget);
     expect(find.text('ノベル作品を編集'), findsOneWidget);
+    expect(find.byKey(const Key('girls-app-try-published')), findsNothing);
+    expect(find.byKey(const Key('girls-app-preview-latest')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Novel Player does not receive Authoring UI', (
+  testWidgets('Novel Player keeps runtime test actions and no Authoring UI', (
     WidgetTester tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(420, 820));
@@ -100,6 +102,8 @@ void main() {
 
     expect(find.byKey(const Key('girls-novel-open-projects')), findsNothing);
     expect(find.text('ノベル作品を編集'), findsNothing);
+    expect(find.byKey(const Key('girls-app-try-published')), findsOneWidget);
+    expect(find.byKey(const Key('girls-app-preview-latest')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
