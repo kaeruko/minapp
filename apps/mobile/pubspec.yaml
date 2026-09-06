@@ -30,6 +30,8 @@ flutter:
     - assets/builtin/ol_home/index.html
     - assets/builtin/ol_home/effects.js
     - assets/builtin/novel_starter/index.html
+    - assets/builtin/novel_starter/player.js
+    - assets/builtin/novel_starter/story-validator.js
     - assets/builtin/novel_starter/face.jpg
     - assets/girls/mascot_pair.svg
     - assets/girls/mascot_white.svg
