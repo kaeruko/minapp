@@ -40,8 +40,11 @@ if (-not (Test-Path $webDir -PathType Container)) {
 $productionAssets = @(
     "index.html",
     "girls.html",
+    "privacy.html",
+    "terms.html",
     "favicon.ico",
     "styles.css",
+    "legal_document.css",
     "preauth.css",
     "phase2.css",
     "phase4.css",
@@ -74,6 +77,7 @@ $productionAssets = @(
     "girls-assets\split_icons\rei_app.png",
     "portal_routing.js",
     "single_html_zip.js",
+    "legal_document.js",
     "app.js",
     "phase2.js",
     "phase2_transport.js",
@@ -191,6 +195,8 @@ try {
     Write-Host "Portal publication complete."
     Write-Host "  URL:             $portalUrl"
     Write-Host "  Girls URL:       $portalUrl/girls.html"
+    Write-Host "  Privacy URL:     $portalUrl/privacy.html"
+    Write-Host "  Terms URL:       $portalUrl/terms.html"
     Write-Host "  Distribution:    $distribution"
     Write-Host "  Invalidation ID: $($invalidation.Invalidation.Id)"
 }

@@ -36,6 +36,15 @@ The response contains:
 
 Clients must fetch this endpoint before presenting Hosted registration.
 
+The public browser pages use the same endpoint rather than duplicating the legal text:
+
+```text
+https://minapp.cloxs.jp/terms.html
+https://minapp.cloxs.jp/privacy.html
+```
+
+`apps/web/legal_document.js` reads the Terraform-managed `girls-config.json` only to discover the shared Hosted API origin, then renders the selected document from `/hosted/legal`. The public HTML pages therefore stay in sync with the in-app legal text and version automatically.
+
 ## Registration contract
 
 `POST /hosted/register` requires all six fields:
