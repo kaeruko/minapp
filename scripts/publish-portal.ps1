@@ -56,7 +56,7 @@ $productionAssets = @(
     "girls-assets\login\frame.png",
     "girls-assets\login\pattern.png",
     "girls-assets\login\lace.png",
-    "girls-assets\ChatGPT Image 2026年9月6日 03_44_07.png",
+    "girls-assets\form.png",
     "girls-assets\logo.png",
     "girls-assets\brand_icon.png",
     "girls-assets\character.png",
