@@ -59,24 +59,27 @@
   grid-template-columns: 28px minmax(0, 1fr);
 }
 
-/* Decorative account frame at the bottom of the Girls sidebar.
-   The reference frame occupies most of the lavender area before the lace.
-   Display the 150 x 188 bitmap at roughly 170 x 213 CSS px to preserve that
-   proportion on the 224px desktop sidebar. */
+/* Decorative account frame below the Girls navigation.
+   form.png is authored at 285 x 380 (3:4), matching the reference card. */
 .girls-portal-shell .portal-shell-account {
   width: 170px;
-  min-height: 213px;
+  height: 227px;
+  min-height: 0;
+  margin-top: 42px;
   margin-inline: auto;
-  padding: 65px 11px 13px;
+  margin-bottom: 0;
+  padding: 58px 12px 14px;
   gap: 7px;
   border-top: 0;
-  background: transparent url("/girls-assets/ChatGPT%20Image%202026%E5%B9%B49%E6%9C%886%E6%97%A5%2003_44_07.png") center / 100% 100% no-repeat;
+  background: transparent url("/girls-assets/form.png") center / 100% 100% no-repeat;
 }
 
 .girls-portal-shell .portal-shell-account-card {
-  grid-template-columns: 37px minmax(0, 1fr);
-  gap: 8px;
-  padding: 4px 2px;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  gap: 4px;
+  padding: 3px 2px;
+  text-align: center;
 }
 
 .girls-portal-shell .portal-shell-avatar {
@@ -88,7 +91,9 @@
 }
 
 .girls-portal-shell .portal-shell-account-copy {
+  justify-items: center;
   gap: 1px;
+  text-align: center;
 }
 
 .girls-portal-shell .portal-shell-account-copy strong {
