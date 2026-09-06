@@ -1,5 +1,262 @@
 "use strict";
 
+/* Long-lived Girls authentication compatibility layer.
+   The existing portal and shell deliberately keep their sessionStorage call
+   sites. Only the two Girls auth keys are redirected to localStorage here, so
+   unrelated sessionStorage data keeps its normal browser-session lifetime.
+
+   Cognito access tokens remain short-lived. A successful login also returns a
+   refresh token; this layer keeps that token and exchanges it for a new access
+   token shortly before expiry. Logout still goes through the existing
+   clearAuthentication() path, whose removeItem call clears the persistent
+   credentials as well. */
+(function installGirlsPersistentAuthentication() {
+  const ACCESS_TOKEN_KEY = "minapp_girls_portal_access_token";
+  const LOGIN_ID_KEY = "minapp_girls_portal_login_id";
+  const REFRESH_TOKEN_KEY = "minapp_girls_portal_refresh_token";
+  const ACCESS_EXPIRES_AT_KEY = "minapp_girls_portal_access_expires_at";
+  const REFRESH_SKEW_MS = 60 * 1000;
+  const originalGetItem = Storage.prototype.getItem;
+  const originalSetItem = Storage.prototype.setItem;
+  const originalRemoveItem = Storage.prototype.removeItem;
+  const originalFetch = globalThis.fetch.bind(globalThis);
+
+  let pendingAuthentication = null;
+  let refreshInFlight = null;
+
+  function getItem(storage, key) {
+    return originalGetItem.call(storage, key);
+  }
+
+  function setItem(storage, key, value) {
+    originalSetItem.call(storage, key, value);
+  }
+
+  function removeItem(storage, key) {
+    originalRemoveItem.call(storage, key);
+  }
+
+  function requireNonEmptyString(value, label) {
+    if (typeof value !== "string" || value.length === 0) {
+      throw new Error(`${label} must be a non-empty string.`);
+    }
+    return value;
+  }
+
+  function requirePositiveInteger(value, label) {
+    if (!Number.isInteger(value) || value <= 0) {
+      throw new Error(`${label} must be a positive integer.`);
+    }
+    return value;
+  }
+
+  function clearPersistentAuthentication() {
+    removeItem(localStorage, ACCESS_TOKEN_KEY);
+    removeItem(localStorage, LOGIN_ID_KEY);
+    removeItem(localStorage, REFRESH_TOKEN_KEY);
+    removeItem(localStorage, ACCESS_EXPIRES_AT_KEY);
+  }
+
+  function migrateCurrentBrowserSession() {
+    const persistentAccess = getItem(localStorage, ACCESS_TOKEN_KEY);
+    const persistentLogin = getItem(localStorage, LOGIN_ID_KEY);
+    const legacyAccess = getItem(sessionStorage, ACCESS_TOKEN_KEY);
+    const legacyLogin = getItem(sessionStorage, LOGIN_ID_KEY);
+
+    if (persistentAccess === null && persistentLogin === null) {
+      if (legacyAccess !== null && legacyLogin !== null) {
+        setItem(localStorage, ACCESS_TOKEN_KEY, legacyAccess);
+        setItem(localStorage, LOGIN_ID_KEY, legacyLogin);
+      } else if (legacyAccess !== null || legacyLogin !== null) {
+        throw new Error("Existing Girls browser session is incomplete.");
+      }
+    }
+
+    removeItem(sessionStorage, ACCESS_TOKEN_KEY);
+    removeItem(sessionStorage, LOGIN_ID_KEY);
+  }
+
+  function captureAuthenticationPayload(payload) {
+    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+      throw new Error("Authentication response must be an object.");
+    }
+    if (payload.state !== "authenticated") return;
+
+    const accessToken = requireNonEmptyString(payload.access_token, "access_token");
+    const refreshToken = requireNonEmptyString(payload.refresh_token, "refresh_token");
+    const expiresIn = requirePositiveInteger(payload.expires_in, "expires_in");
+    if (payload.token_type !== "Bearer") {
+      throw new Error("Authentication token_type must be Bearer.");
+    }
+
+    pendingAuthentication = { accessToken, refreshToken, expiresIn };
+  }
+
+  function commitPendingAuthentication(accessToken) {
+    if (pendingAuthentication === null) return;
+    if (pendingAuthentication.accessToken !== accessToken) {
+      pendingAuthentication = null;
+      throw new Error("Girls authentication access token changed unexpectedly.");
+    }
+    const expiresAt = Date.now() + pendingAuthentication.expiresIn * 1000;
+    if (!Number.isSafeInteger(expiresAt)) {
+      pendingAuthentication = null;
+      throw new Error("Girls authentication expiry is outside the supported range.");
+    }
+    setItem(localStorage, REFRESH_TOKEN_KEY, pendingAuthentication.refreshToken);
+    setItem(localStorage, ACCESS_EXPIRES_AT_KEY, String(expiresAt));
+    pendingAuthentication = null;
+  }
+
+  function parseStoredExpiry(rawValue) {
+    if (rawValue === null) return null;
+    if (!/^[0-9]+$/.test(rawValue)) {
+      throw new Error("Stored Girls access token expiry is invalid.");
+    }
+    const value = Number(rawValue);
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      throw new Error("Stored Girls access token expiry is invalid.");
+    }
+    return value;
+  }
+
+  function validateRefreshPayload(payload) {
+    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+      throw new Error("Refresh response must be an object.");
+    }
+    const expected = ["access_token", "expires_in", "state", "token_type"];
+    const actual = Object.keys(payload).sort();
+    if (actual.length !== expected.length || actual.some((name, index) => name !== expected[index])) {
+      throw new Error("Refresh response fields are invalid.");
+    }
+    if (payload.state !== "authenticated") {
+      throw new Error("Refresh response state is invalid.");
+    }
+    if (payload.token_type !== "Bearer") {
+      throw new Error("Refresh response token_type must be Bearer.");
+    }
+    return {
+      accessToken: requireNonEmptyString(payload.access_token, "refresh access_token"),
+      expiresIn: requirePositiveInteger(payload.expires_in, "refresh expires_in"),
+    };
+  }
+
+  async function refreshAccessToken(apiOrigin) {
+    if (refreshInFlight !== null) return await refreshInFlight;
+    const refreshToken = getItem(localStorage, REFRESH_TOKEN_KEY);
+    if (refreshToken === null || refreshToken.length === 0) return null;
+
+    refreshInFlight = (async () => {
+      const response = await originalFetch(`${apiOrigin}/auth/refresh`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+        cache: "no-store",
+        credentials: "omit",
+      });
+
+      if (response.status === 401) {
+        clearPersistentAuthentication();
+        return null;
+      }
+      if (!response.ok) {
+        throw new Error(`Girls access token refresh failed: HTTP ${response.status}`);
+      }
+      const contentType = response.headers.get("content-type");
+      if (contentType === null || !contentType.toLowerCase().startsWith("application/json")) {
+        throw new Error("Girls access token refresh returned a non-JSON response.");
+      }
+
+      const refreshed = validateRefreshPayload(await response.json());
+      const expiresAt = Date.now() + refreshed.expiresIn * 1000;
+      if (!Number.isSafeInteger(expiresAt)) {
+        throw new Error("Girls refreshed access token expiry is outside the supported range.");
+      }
+      setItem(localStorage, ACCESS_TOKEN_KEY, refreshed.accessToken);
+      setItem(localStorage, ACCESS_EXPIRES_AT_KEY, String(expiresAt));
+      return refreshed.accessToken;
+    })();
+
+    try {
+      return await refreshInFlight;
+    } finally {
+      refreshInFlight = null;
+    }
+  }
+
+  async function maybeRefreshRequest(request) {
+    const accessToken = getItem(localStorage, ACCESS_TOKEN_KEY);
+    if (accessToken === null || accessToken.length === 0) return request;
+    if (request.headers.get("Authorization") !== `Bearer ${accessToken}`) return request;
+
+    const refreshToken = getItem(localStorage, REFRESH_TOKEN_KEY);
+    const expiresAt = parseStoredExpiry(getItem(localStorage, ACCESS_EXPIRES_AT_KEY));
+    if (refreshToken === null || refreshToken.length === 0 || expiresAt === null) return request;
+    if (expiresAt - Date.now() > REFRESH_SKEW_MS) return request;
+
+    const refreshedToken = await refreshAccessToken(new URL(request.url).origin);
+    if (refreshedToken === null) return request;
+
+    const headers = new Headers(request.headers);
+    headers.set("Authorization", `Bearer ${refreshedToken}`);
+    return new Request(request, { headers });
+  }
+
+  async function persistentFetch(input, init) {
+    const initialRequest = new Request(input, init);
+    const request = await maybeRefreshRequest(initialRequest);
+    const response = await originalFetch(request);
+
+    if (
+      response.ok &&
+      request.method === "POST" &&
+      ["/auth/login", "/auth/change-password"].includes(new URL(request.url).pathname)
+    ) {
+      const contentType = response.headers.get("content-type");
+      if (contentType !== null && contentType.toLowerCase().startsWith("application/json")) {
+        captureAuthenticationPayload(await response.clone().json());
+      }
+    }
+    return response;
+  }
+
+  migrateCurrentBrowserSession();
+
+  Storage.prototype.getItem = function girlsPersistentGetItem(key) {
+    if (this === sessionStorage && (key === ACCESS_TOKEN_KEY || key === LOGIN_ID_KEY)) {
+      return getItem(localStorage, key);
+    }
+    return getItem(this, key);
+  };
+
+  Storage.prototype.setItem = function girlsPersistentSetItem(key, value) {
+    if (this === sessionStorage && (key === ACCESS_TOKEN_KEY || key === LOGIN_ID_KEY)) {
+      const text = String(value);
+      setItem(localStorage, key, text);
+      if (key === ACCESS_TOKEN_KEY) commitPendingAuthentication(text);
+      return;
+    }
+    setItem(this, key, String(value));
+  };
+
+  Storage.prototype.removeItem = function girlsPersistentRemoveItem(key) {
+    if (this === sessionStorage && key === ACCESS_TOKEN_KEY) {
+      clearPersistentAuthentication();
+      return;
+    }
+    if (this === sessionStorage && key === LOGIN_ID_KEY) {
+      removeItem(localStorage, LOGIN_ID_KEY);
+      return;
+    }
+    removeItem(this, key);
+  };
+
+  globalThis.fetch = persistentFetch;
+})();
+
 (function initGirlsPortal() {
   const zipApi = globalThis.MinAppSingleHtmlZip;
   if (zipApi === undefined || typeof zipApi.buildSingleHtmlZip !== "function") {
@@ -147,7 +404,6 @@
     }
     return url.origin;
   }
-
   function clearAuthentication() {
     sessionStorage.removeItem(ACCESS_TOKEN_KEY);
     sessionStorage.removeItem(LOGIN_ID_KEY);
@@ -597,7 +853,6 @@
       });
       const app = validateCreatedApp(created, groupId);
       createdAppId = app.app_id;
-
       const published = await apiRequest(`/hosted/groups/${groupId}/apps/${createdAppId}/publish`, {
         method: "POST",
         jsonBody: { revision: 1 },
