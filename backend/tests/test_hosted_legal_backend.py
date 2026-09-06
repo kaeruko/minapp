@@ -58,16 +58,25 @@ class HostedLegalBackendTests(unittest.TestCase):
 
         self.assertEqual(
             {item["builtin_id"] for item in builtins},
-            {"shiba-game", "shiba-goshujin", "novel-starter"},
+            {"shiba-game", "shiba-goshujin", "novel-starter", "novel-editor"},
         )
         novel = next(
             item for item in builtins if item["builtin_id"] == "novel-starter"
         )
+        editor = next(
+            item for item in builtins if item["builtin_id"] == "novel-editor"
+        )
         self.assertEqual(novel["title"], "ひみつの放課後")
         self.assertEqual(novel["version"], 4)
-        self.assertNotIn("source_key", novel)
+        self.assertEqual(editor["title"], "ノベルゲームメーカー")
+        self.assertEqual(editor["version"], 1)
+        for item in (novel, editor):
+            self.assertNotIn("source_key", item)
+            self.assertNotIn("accepts", item)
+            self.assertNotIn("edits", item)
         self.assertEqual(BUILTIN_TEMPLATES, core_before)
         self.assertNotIn("novel-starter", BUILTIN_TEMPLATES)
+        self.assertNotIn("novel-editor", BUILTIN_TEMPLATES)
 
     def test_owner_can_install_and_fork_novel_starter_source(self) -> None:
         subject = self._register("novel-owner")
