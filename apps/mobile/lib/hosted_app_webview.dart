@@ -6,9 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import 'hosted_authoring_bridge.dart';
+import 'hosted_authoring_launch_client.dart';
 import 'hosted_runtime_bridge.dart';
 
 final RegExp _previewTokenPattern = RegExp(r'^[A-Za-z0-9_-]{32,128}$');
+final RegExp _authoringEditorTokenPattern = RegExp(r'^[A-Za-z0-9_-]{32,64}$');
 
 bool isHostedMicrophoneOnlyPermissionRequest(
   Set<WebViewPermissionResourceType> types,
@@ -24,7 +27,9 @@ class HostedAppWebViewPage extends StatefulWidget {
     required this.runtimeTransport,
     super.key,
   })  : sessionContentUri = null,
-        sessionRuntimeToken = null;
+        sessionRuntimeToken = null,
+        authoringLaunch = null,
+        authoringTransport = null;
 
   const HostedAppWebViewPage.session({
     required this.title,
@@ -34,13 +39,29 @@ class HostedAppWebViewPage extends StatefulWidget {
     super.key,
   })  : launch = null,
         sessionContentUri = contentUri,
-        sessionRuntimeToken = runtimeToken;
+        sessionRuntimeToken = runtimeToken,
+        authoringLaunch = null,
+        authoringTransport = null;
+
+  const HostedAppWebViewPage.authoring({
+    required this.title,
+    required HostedAuthoringLaunchGrant launch,
+    required this.runtimeTransport,
+    required HostedAuthoringTransport authoringTransport,
+    super.key,
+  })  : launch = null,
+        sessionContentUri = launch.contentUri,
+        sessionRuntimeToken = launch.runtimeToken,
+        authoringLaunch = launch,
+        authoringTransport = authoringTransport;
 
   final String title;
   final HostedLaunchGrant? launch;
   final Uri? sessionContentUri;
   final String? sessionRuntimeToken;
   final HostedRuntimeTransport runtimeTransport;
+  final HostedAuthoringLaunchGrant? authoringLaunch;
+  final HostedAuthoringTransport? authoringTransport;
 
   Uri get contentUri {
     final HostedLaunchGrant? launchGrant = launch;
@@ -79,13 +100,20 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
 
   late final bool Function(Uri target) _allowsNavigation;
   late final HostedBridgeSession _bridgeSession;
+  late final HostedAuthoringBridgeSession? _authoringBridgeSession;
   final HostedBridgeDocumentInjector _injector = HostedBridgeDocumentInjector();
+  final HostedAuthoringBridgeDocumentInjector _authoringInjector =
+      HostedAuthoringBridgeDocumentInjector();
 
   @override
   void initState() {
     super.initState();
     final Uri contentUri = widget.contentUri;
-    if (_HostedPreviewNavigationPolicy.isPreviewUri(contentUri)) {
+    if (widget.authoringLaunch != null) {
+      final _HostedAuthoringEditorNavigationPolicy policy =
+          _HostedAuthoringEditorNavigationPolicy(contentUri);
+      _allowsNavigation = policy.allows;
+    } else if (_HostedPreviewNavigationPolicy.isPreviewUri(contentUri)) {
       final _HostedPreviewNavigationPolicy policy =
           _HostedPreviewNavigationPolicy(contentUri);
       _allowsNavigation = policy.allows;
@@ -98,6 +126,19 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
       transport: widget.runtimeTransport,
       runtimeToken: widget.runtimeToken,
     );
+    final HostedAuthoringLaunchGrant? authoringLaunch = widget.authoringLaunch;
+    if (authoringLaunch == null) {
+      _authoringBridgeSession = null;
+    } else {
+      final HostedAuthoringTransport? authoringTransport = widget.authoringTransport;
+      if (authoringTransport == null) {
+        throw StateError('Authoring WebView has no Authoring transport.');
+      }
+      _authoringBridgeSession = HostedAuthoringBridgeSession(
+        transport: authoringTransport,
+        authoringToken: authoringLaunch.authoringToken,
+      );
+    }
     _prepareWebView();
   }
 
@@ -133,6 +174,12 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
             },
           ),
         );
+      if (_authoringBridgeSession != null) {
+        await controller.addJavaScriptChannel(
+          'MinAppAuthoringBridge',
+          onMessageReceived: _onAuthoringBridgeMessage,
+        );
+      }
       await controller.clearLocalStorage();
       await controller.clearCache();
       if (!mounted) {
@@ -268,6 +315,11 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
     }
     try {
       await controller.runJavaScript(_injector.scriptForFinishedDocument());
+      if (_authoringBridgeSession != null) {
+        await controller.runJavaScript(
+          _authoringInjector.scriptForFinishedDocument(),
+        );
+      }
     } catch (error, stackTrace) {
       _failBridgeOrPage(
         context: 'Hosted bridge injection failed.',
@@ -301,6 +353,47 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
     } catch (error, stackTrace) {
       _failBridgeOrPage(
         context: 'Hosted bridge request processing failed.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _onAuthoringBridgeMessage(JavaScriptMessage message) async {
+    if (_bridgeFailed) {
+      return;
+    }
+    final HostedAuthoringBridgeSession? authoringBridgeSession =
+        _authoringBridgeSession;
+    if (authoringBridgeSession == null) {
+      _failBridgeOrPage(
+        context: 'Authoring bridge received a message outside Authoring mode.',
+        error: StateError('Authoring bridge is not enabled for this WebView.'),
+        stackTrace: StackTrace.current,
+      );
+      return;
+    }
+    final WebViewController? controller = _controller;
+    if (controller == null) {
+      _failBridgeOrPage(
+        context: 'Authoring bridge received a message before WebView initialization completed.',
+        error: StateError('WebView controller is not ready.'),
+        stackTrace: StackTrace.current,
+      );
+      return;
+    }
+
+    try {
+      final Map<String, Object?> response =
+          await authoringBridgeSession.handleMessage(message.message);
+      final String encoded = jsonEncode(response);
+      await controller.runJavaScript(
+        'window.__minappAuthoringBridgeReceive && '
+        'window.__minappAuthoringBridgeReceive($encoded);',
+      );
+    } catch (error, stackTrace) {
+      _failBridgeOrPage(
+        context: 'Authoring bridge request processing failed.',
         error: error,
         stackTrace: stackTrace,
       );
@@ -408,6 +501,63 @@ class _HostedPreviewNavigationPolicy {
   static String _contentPathPrefix(Uri uri) {
     final List<String> segments = uri.pathSegments;
     return '/hosted/preview/${segments[2]}/';
+  }
+
+  static bool _containsTraversalSegment(Uri uri) {
+    return uri.pathSegments.any(
+      (String segment) => segment == '.' || segment == '..',
+    );
+  }
+}
+
+class _HostedAuthoringEditorNavigationPolicy {
+  _HostedAuthoringEditorNavigationPolicy(Uri contentUri)
+      : _contentUri = _validateContentUri(contentUri),
+        _allowedPathPrefix = _contentPathPrefix(contentUri);
+
+  final Uri _contentUri;
+  final String _allowedPathPrefix;
+
+  bool allows(Uri target) {
+    return target.scheme == 'https' &&
+        target.host == _contentUri.host &&
+        target.port == _contentUri.port &&
+        target.userInfo.isEmpty &&
+        !_containsTraversalSegment(target) &&
+        target.path.startsWith(_allowedPathPrefix);
+  }
+
+  static Uri _validateContentUri(Uri uri) {
+    if (uri.scheme != 'https' ||
+        !uri.hasAuthority ||
+        uri.userInfo.isNotEmpty ||
+        uri.query.isNotEmpty ||
+        uri.fragment.isNotEmpty ||
+        _containsTraversalSegment(uri)) {
+      throw ArgumentError.value(
+        uri,
+        'contentUri',
+        'Hosted Authoring Editor URL is invalid.',
+      );
+    }
+    final List<String> segments = uri.pathSegments;
+    if (segments.length != 4 ||
+        segments[0] != 'hosted' ||
+        segments[1] != 'authoring-editor' ||
+        !_authoringEditorTokenPattern.hasMatch(segments[2]) ||
+        segments[3] != 'index.html') {
+      throw ArgumentError.value(
+        uri,
+        'contentUri',
+        'Hosted Authoring Editor URL path is invalid.',
+      );
+    }
+    return uri;
+  }
+
+  static String _contentPathPrefix(Uri uri) {
+    final List<String> segments = uri.pathSegments;
+    return '/hosted/authoring-editor/${segments[2]}/';
   }
 
   static bool _containsTraversalSegment(Uri uri) {
