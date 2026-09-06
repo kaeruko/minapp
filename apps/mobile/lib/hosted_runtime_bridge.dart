@@ -39,7 +39,15 @@ abstract interface class HostedRuntimeTransport {
   Future<void> deleteState(String runtimeToken, String key);
 }
 
-class HostedApiClient implements HostedRuntimeTransport {
+abstract interface class HostedUserStateTransport {
+  Future<Object?> getUserState(String runtimeToken, String key);
+
+  Future<Object?> setUserState(String runtimeToken, String key, Object? value);
+
+  Future<void> deleteUserState(String runtimeToken, String key);
+}
+
+class HostedApiClient implements HostedRuntimeTransport, HostedUserStateTransport {
   HostedApiClient({required Uri baseUri, http.Client? client})
       : _baseUri = _validateBaseUri(baseUri),
         _client = client ?? http.Client();
@@ -129,6 +137,42 @@ class HostedApiClient implements HostedRuntimeTransport {
     await _emptyRequest(
       method: 'DELETE',
       path: '/hosted/runtime/$runtimeToken/state/${Uri.encodeComponent(key)}',
+      expectedStatus: 204,
+    );
+  }
+
+  @override
+  Future<Object?> getUserState(String runtimeToken, String key) async {
+    _validateRuntimeToken(runtimeToken);
+    validateHostedStateKey(key);
+    final Map<String, Object?> payload = await _jsonRequest(
+      method: 'GET',
+      path: '/hosted/runtime/$runtimeToken/user-state/${Uri.encodeComponent(key)}',
+    );
+    _validateRuntimeStateResponse(payload, key, 'Runtime user-state get response');
+    return payload['value'];
+  }
+
+  @override
+  Future<Object?> setUserState(String runtimeToken, String key, Object? value) async {
+    _validateRuntimeToken(runtimeToken);
+    validateHostedStateKey(key);
+    final Map<String, Object?> payload = await _jsonRequest(
+      method: 'POST',
+      path: '/hosted/runtime/$runtimeToken/user-state/${Uri.encodeComponent(key)}',
+      body: <String, Object?>{'value': value},
+    );
+    _validateRuntimeStateResponse(payload, key, 'Runtime user-state set response');
+    return payload['value'];
+  }
+
+  @override
+  Future<void> deleteUserState(String runtimeToken, String key) async {
+    _validateRuntimeToken(runtimeToken);
+    validateHostedStateKey(key);
+    await _emptyRequest(
+      method: 'DELETE',
+      path: '/hosted/runtime/$runtimeToken/user-state/${Uri.encodeComponent(key)}',
       expectedStatus: 204,
     );
   }
@@ -389,7 +433,14 @@ class HostedBridgeProtocol {
 
     final Object? rawMethod = decoded['method'];
     if (rawMethod is! String ||
-        !const <String>{'state.get', 'state.set', 'state.delete'}.contains(rawMethod)) {
+        !const <String>{
+          'state.get',
+          'state.set',
+          'state.delete',
+          'userState.get',
+          'userState.set',
+          'userState.delete',
+        }.contains(rawMethod)) {
       throw HostedBridgeProtocolException(
         code: 'unsupported_bridge_method',
         message: 'Bridge method is not supported.',
@@ -415,7 +466,7 @@ class HostedBridgeProtocol {
     }
 
     final bool hasValue = decoded.containsKey('value');
-    final Set<String> expectedFields = rawMethod == 'state.set'
+    final Set<String> expectedFields = rawMethod.endsWith('.set')
         ? const <String>{'version', 'id', 'method', 'key', 'value'}
         : const <String>{'version', 'id', 'method', 'key'};
     if (decoded.keys.toSet().difference(expectedFields).isNotEmpty ||
@@ -530,9 +581,14 @@ class HostedBridgeProtocol {
     set: (key, value) => send('state.set', key, true, value),
     delete: (key) => send('state.delete', key, false, undefined),
   });
+  const userState = Object.freeze({
+    get: (key) => send('userState.get', key, false, undefined),
+    set: (key, value) => send('userState.set', key, true, value),
+    delete: (key) => send('userState.delete', key, false, undefined),
+  });
   Object.defineProperty(window, 'minapp', {
     configurable: true,
-    value: Object.freeze({ version: VERSION, state }),
+    value: Object.freeze({ version: VERSION, state, userState }),
   });
   window.dispatchEvent(new Event('minappready'));
 })();
@@ -549,6 +605,16 @@ class HostedBridgeSession {
   final HostedRuntimeTransport _transport;
   final String _runtimeToken;
   final Set<String> _inFlightRequestIds = <String>{};
+
+  HostedUserStateTransport get _userStateTransport {
+    final HostedRuntimeTransport transport = _transport;
+    if (transport is! HostedUserStateTransport) {
+      throw StateError(
+        'Hosted Runtime transport does not implement private user state; shared state fallback is forbidden.',
+      );
+    }
+    return transport;
+  }
 
   Future<Map<String, Object?>> handleMessage(String message) async {
     final HostedBridgeRequest request;
@@ -583,6 +649,20 @@ class HostedBridgeSession {
         result = await _transport.setState(_runtimeToken, request.key, request.value);
       } else if (request.method == 'state.delete') {
         await _transport.deleteState(_runtimeToken, request.key);
+        result = null;
+      } else if (request.method == 'userState.get') {
+        result = await _userStateTransport.getUserState(_runtimeToken, request.key);
+      } else if (request.method == 'userState.set') {
+        if (!request.hasValue) {
+          throw StateError('userState.set request lost its required value after validation.');
+        }
+        result = await _userStateTransport.setUserState(
+          _runtimeToken,
+          request.key,
+          request.value,
+        );
+      } else if (request.method == 'userState.delete') {
+        await _userStateTransport.deleteUserState(_runtimeToken, request.key);
         result = null;
       } else {
         throw StateError('Validated bridge request has an unsupported method.');
