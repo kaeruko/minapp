@@ -13,6 +13,7 @@ from handler import (
     _content_response,
     _header,
     _json_response,
+    _query_parameters,
     _raw_path,
     _request_method,
     _require_fields,
@@ -48,6 +49,7 @@ class AuthoringBackend(Protocol):
         self,
         auth_subject: str,
         group_id: str,
+        content_format: str | None = None,
     ) -> list[dict[str, Any]]: ...
 
     def load_authoring_project(
@@ -196,6 +198,18 @@ def _require_no_body(event: dict[str, Any]) -> None:
         raise ApiProblem(400, "invalid_request", "This Authoring request must not contain a body.")
 
 
+def _project_list_content_format(event: dict[str, Any]) -> str | None:
+    params = _query_parameters(event)
+    unknown = set(params) - {"content_format"}
+    if unknown:
+        raise ApiProblem(
+            400,
+            "invalid_request",
+            f"Unknown query parameter(s): {', '.join(sorted(unknown))}.",
+        )
+    return params.get("content_format")
+
+
 def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
     if not isinstance(event, dict):
         raise TypeError("event must be a dictionary")
@@ -231,12 +245,14 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
         if method != "GET":
             return None
         _require_no_body(event)
+        content_format = _project_list_content_format(event)
         return _json_response(
             200,
             {
                 "projects": _get_backend().list_authoring_projects(
                     _auth_subject(event),
                     group_projects_match.group(1),
+                    content_format,
                 )
             },
         )
