@@ -116,9 +116,12 @@ class HostedUserStateBackend(HostedLegalBackend):
         # Authorize before touching private rows. Cleanup happens before the
         # existing app deletion so a cleanup failure leaves app metadata in
         # place and the delete can be retried explicitly.
-        owner = self._user_by_auth_subject(auth_subject)
-        self._require_owner_group(owner.user_id, group_id)
-        self._require_app_in_group(app_id, group_id)
+        self._require_owned_app(
+            auth_subject,
+            group_id,
+            app_id,
+            editable=False,
+        )
         self._delete_all_runtime_user_state(group_id, app_id)
         super().delete_hosted_app(auth_subject, group_id, app_id)
 
