@@ -9,16 +9,14 @@
 
   padding-top: calc(var(--girls-sidebar-header-height) + 10px);
   padding-right: 44px;
-  background:
-    url("/girls-assets/sidebar/header.png") left top / 100% auto no-repeat,
 
-    /* Keep the actual sidebar lavender, but leave the lace strip transparent so
-       transparent pixels in the PNG reveal the page behind it instead of a forced white/cream fill. */
-    linear-gradient(
-      to right,
-      #cbb5d7 0 calc(100% - var(--girls-sidebar-lace-width)),
-      transparent calc(100% - var(--girls-sidebar-lace-width)) 100%
-    );
+  /* The whole sidebar stays lavender. Transparent pixels in header.png and
+     lace.png therefore reveal this color instead of the white page behind it. */
+  background-color: #cbb5d7;
+  background-image: url("/girls-assets/sidebar/header.png");
+  background-position: left top;
+  background-size: 100% auto;
+  background-repeat: no-repeat;
 }
 
 /* The header artwork no longer contains the logo. Draw the existing Girls logo
@@ -39,8 +37,8 @@
   pointer-events: none;
 }
 
-/* Continue only the lace below the integrated header. Do not paint a color under
-   it: the PNG alpha should remain visually transparent. */
+/* Continue only the lace below the integrated header. Its transparent pixels
+   reveal the sidebar's #cbb5d7 background. */
 .girls-portal-shell .portal-shell-sidebar::after {
   content: "";
   position: absolute;
