@@ -561,7 +561,7 @@ class HostedBridgeProtocol {
       }
       const waiter = pending.get(response.id);
       if (!waiter) return;
-      pending.delete(response.id);
+      pending.delete(id);
       if (response.ok === true) {
         waiter.resolve(response.result);
         return;
@@ -613,7 +613,7 @@ class HostedBridgeSession {
         'Hosted Runtime transport does not implement private user state; shared state fallback is forbidden.',
       );
     }
-    return transport;
+    return transport as HostedUserStateTransport;
   }
 
   Future<Map<String, Object?>> handleMessage(String message) async {
