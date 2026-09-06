@@ -14,6 +14,7 @@ from hosted_authoring_entry import (
     _require_no_body,
 )
 import hosted_authoring_launch
+import hosted_authoring_preview
 import hosted_authoring_session
 import hosted_handler
 
@@ -21,7 +22,9 @@ _CONTENT_ID_RE = r"([0-9a-f]{32})"
 _TOKEN_RE = r"([A-Za-z0-9_-]{32,64})"
 _CREATE_SESSION_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/session$")
 _CREATE_LAUNCH_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/launch$")
+_CREATE_PREVIEW_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/preview$")
 _EDITOR_CONTENT_RE = re.compile(r"^/hosted/authoring-editor/([A-Za-z0-9_-]{32,64})/(.+)$")
+_PREVIEW_CONTENT_RE = re.compile(r"^/hosted/authoring-preview/([A-Za-z0-9_-]{32,64})/(.+)$")
 _SESSION_PROJECT_RE = re.compile(rf"^/hosted/authoring/session/{_TOKEN_RE}$")
 _SESSION_DOCUMENT_RE = re.compile(rf"^/hosted/authoring/session/{_TOKEN_RE}/document$")
 _SESSION_PUBLISH_RE = re.compile(rf"^/hosted/authoring/session/{_TOKEN_RE}/publish$")
@@ -50,6 +53,17 @@ def _editor_app_id(payload: dict[str, Any]) -> str:
     return editor_app_id
 
 
+def _player_app_id(payload: dict[str, Any]) -> str:
+    player_app_id = payload.get("player_app_id")
+    if not isinstance(player_app_id, str) or re.fullmatch(r"[0-9a-f]{32}", player_app_id) is None:
+        raise ApiProblem(
+            400,
+            "invalid_request",
+            "player_app_id must be a 32-character lowercase hexadecimal ID.",
+        )
+    return player_app_id
+
+
 def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
     if not isinstance(event, dict):
         raise TypeError("event must be a dictionary")
@@ -67,6 +81,35 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
             unquote(encoded_path),
         )
         return hosted_handler._published_content_response(data, content_type)
+
+    preview_content_match = _PREVIEW_CONTENT_RE.fullmatch(path)
+    if preview_content_match is not None:
+        if method != "GET":
+            return None
+        token, encoded_path = preview_content_match.groups()
+        data, content_type = hosted_authoring_preview.get_preview_file(
+            _get_backend(),
+            token,
+            unquote(encoded_path),
+        )
+        return hosted_handler._published_content_response(data, content_type)
+
+    create_preview_match = _CREATE_PREVIEW_RE.fullmatch(path)
+    if create_preview_match is not None:
+        if method != "POST":
+            return None
+        payload = _authoring_json_body(event)
+        _require_fields(payload, required={"player_app_id", "expected_revision"})
+        return _json_response(
+            201,
+            hosted_authoring_preview.create_preview(
+                _get_backend(),
+                _auth_subject(event),
+                create_preview_match.group(1),
+                _player_app_id(payload),
+                expected_revision=_expected_revision_field(payload),
+            ),
+        )
 
     create_launch_match = _CREATE_LAUNCH_RE.fullmatch(path)
     if create_launch_match is not None:
