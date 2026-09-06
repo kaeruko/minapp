@@ -4,8 +4,10 @@ import 'package:http/http.dart' as http;
 import '../hosted_app_webview.dart';
 import '../hosted_authoring_bridge.dart';
 import '../hosted_authoring_launch_client.dart';
+import '../hosted_authoring_preview_client.dart';
 import 'api.dart';
 import 'girls_app_core.dart' as core;
+import 'girls_builtin_install_api.dart';
 import 'girls_novel_authoring_api.dart';
 import 'hosted_girls_api.dart';
 
@@ -32,7 +34,9 @@ class GirlsNovelProjectsPage extends StatefulWidget {
 class _GirlsNovelProjectsPageState extends State<GirlsNovelProjectsPage> {
   late final http.Client _client;
   late final GirlsNovelAuthoringApi _projectsApi;
+  late final GirlsBuiltinInstallApi _builtinInstallApi;
   late final HostedAuthoringLaunchApiClient _launchApi;
+  late final HostedAuthoringPreviewApiClient _previewApi;
   late final HostedAuthoringApiClient _authoringTransport;
 
   List<GirlsNovelProject>? _projects;
@@ -48,7 +52,15 @@ class _GirlsNovelProjectsPageState extends State<GirlsNovelProjectsPage> {
       baseUri: widget.api.baseUri,
       client: _client,
     );
+    _builtinInstallApi = GirlsBuiltinInstallApi(
+      baseUri: widget.api.baseUri,
+      client: _client,
+    );
     _launchApi = HostedAuthoringLaunchApiClient(
+      baseUri: widget.api.baseUri,
+      client: _client,
+    );
+    _previewApi = HostedAuthoringPreviewApiClient(
       baseUri: widget.api.baseUri,
       client: _client,
     );
@@ -67,7 +79,7 @@ class _GirlsNovelProjectsPageState extends State<GirlsNovelProjectsPage> {
 
   void _validateEditorApp() {
     final HostedGroupApp app = widget.editorApp;
-    if (app.builtinId != 'novel-editor' || app.sourceKind != 'builtin') {
+    if (app.builtinId != novelEditorBuiltinId || app.sourceKind != 'builtin') {
       throw StateError('Novel Authoring page requires the installed novel-editor builtin.');
     }
   }
@@ -202,6 +214,93 @@ class _GirlsNovelProjectsPageState extends State<GirlsNovelProjectsPage> {
     }
   }
 
+  Future<HostedGroupApp?> _resolveNovelPlayer() async {
+    final List<HostedGroupApp> groupApps = await widget.api.listGroupApps(
+      accessToken: widget.session.accessToken,
+      groupId: widget.editorApp.groupId,
+    );
+    final List<HostedGroupApp> players = groupApps
+        .where(
+          (HostedGroupApp app) =>
+              app.sourceKind == 'builtin' &&
+              app.builtinId == novelPlayerBuiltinId,
+        )
+        .toList(growable: false);
+    if (players.length > 1) {
+      throw const FormatException(
+        'The Novel Player builtin is installed more than once in this group.',
+      );
+    }
+    if (players.length == 1) return players.single;
+    if (!mounted) return null;
+
+    final bool? install = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('プレビュー用プレイヤーを追加する？'),
+        content: const Text(
+          '下書きを実際のノベル画面で確認するには、公式プレイヤー「ひみつの放課後」がこのグループに必要です。追加してプレビューしますか？',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('やめる'),
+          ),
+          FilledButton(
+            key: const Key('girls-novel-install-player-confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('追加してプレビュー'),
+          ),
+        ],
+      ),
+    );
+    if (install != true || !mounted) return null;
+
+    return _builtinInstallApi.installNovelPlayer(
+      accessToken: widget.session.accessToken,
+      groupId: widget.editorApp.groupId,
+    );
+  }
+
+  Future<void> _previewProject(GirlsNovelProject project) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final HostedGroupApp? player = await _resolveNovelPlayer();
+      if (player == null) return;
+      final HostedAuthoringPreviewGrant preview = await _previewApi.createPreview(
+        accessToken: widget.session.accessToken,
+        contentId: project.summary.contentId,
+        playerAppId: player.appId,
+        expectedRevision: project.summary.draftRevision,
+      );
+      if (preview.contentFormat != minappNovelContentFormat) {
+        throw const FormatException(
+          'Novel preview returned an incompatible content format.',
+        );
+      }
+      if (!mounted) return;
+      setState(() => _busy = false);
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (BuildContext context) => HostedAppWebViewPage.session(
+            title: '${project.title}（下書きプレビュー）',
+            contentUri: preview.contentUri,
+            runtimeToken: preview.runtimeToken,
+            runtimeTransport: widget.api.runtimeClient,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+    } finally {
+      if (mounted && _busy) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<GirlsNovelProject>? projects = _projects;
@@ -239,7 +338,7 @@ class _GirlsNovelProjectsPageState extends State<GirlsNovelProjectsPage> {
               ),
               const SizedBox(height: 6),
               const Text(
-                '作品を選ぶと、保存した続きから同じノベルエディタで編集できます。',
+                '作品をタップすると編集、再生ボタンでは保存済みの下書きを本番と同じプレイヤーで確認できます。',
                 style: TextStyle(color: _novelLavender, fontSize: 12),
               ),
               if (_error != null) ...<Widget>[
@@ -279,7 +378,21 @@ class _GirlsNovelProjectsPageState extends State<GirlsNovelProjectsPage> {
                         subtitle: Text(
                           '下書き revision ${project.summary.draftRevision}',
                         ),
-                        trailing: const Icon(Icons.edit_rounded),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            IconButton(
+                              key: Key(
+                                'girls-novel-preview-${project.summary.contentId}',
+                              ),
+                              tooltip: '下書きをプレビュー',
+                              onPressed:
+                                  _busy ? null : () => _previewProject(project),
+                              icon: const Icon(Icons.play_circle_outline_rounded),
+                            ),
+                            const Icon(Icons.edit_rounded),
+                          ],
+                        ),
                         enabled: !_busy,
                         onTap: _busy
                             ? null
