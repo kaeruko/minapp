@@ -2,27 +2,20 @@
    header.png contains only the cloud decoration. lace.png owns the whole
    left/right boundary from top to bottom. */
 .girls-portal-shell .portal-shell-sidebar {
-  /* Desktop sidebar is 248px wide. The PNG includes the lavender up to its
-     scalloped edge, so nothing should paint underneath the lace strip. */
   --girls-sidebar-lace-width: 35px;
   --girls-sidebar-header-height: 164px;
 
   padding-top: calc(var(--girls-sidebar-header-height) + 10px);
   padding-right: 44px;
 
-  /* Restrict the header and solid fill to the left of the lace. Its alpha then
-     reveals the actual page (or mobile scrim), rather than a cream rectangle.
-     Repeat the lace on the scrolling sidebar itself so short screens also
-     retain the edge when the navigation is scrolled. */
-  background:
-    url("/girls-assets/sidebar/lace.png") right top / var(--girls-sidebar-lace-width) auto repeat-y,
-    url("/girls-assets/sidebar/header.png") left top / calc(100% - var(--girls-sidebar-lace-width)) auto no-repeat,
-    linear-gradient(
-      to right,
-      #cbb5d7 0 calc(100% - var(--girls-sidebar-lace-width)),
-      transparent calc(100% - var(--girls-sidebar-lace-width)) 100%
-    );
-  box-shadow: none;
+  /* The sidebar stays lavender all the way underneath the lace. This is
+     intentional: every transparent pixel in lace.png must reveal #cbb5d7,
+     never the cream/white content background. */
+  background-color: #cbb5d7;
+  background-image: url("/girls-assets/sidebar/header.png");
+  background-position: left top;
+  background-size: 100% auto;
+  background-repeat: no-repeat;
 }
 
 /* The cloud artwork does not contain the logo. Draw the existing Girls logo
@@ -43,6 +36,24 @@
   pointer-events: none;
 }
 
+/* One continuous lace strip from top to bottom. The pseudo-element itself has
+   no background color, so its transparent pixels reveal the lavender sidebar
+   underneath. */
+.girls-portal-shell .portal-shell-sidebar::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--girls-sidebar-lace-width);
+  background-image: url("/girls-assets/sidebar/lace.png");
+  background-position: right top;
+  background-size: var(--girls-sidebar-lace-width) auto;
+  background-repeat: repeat-y;
+  pointer-events: none;
+}
+
 .girls-portal-shell .portal-shell-nav,
 .girls-portal-shell .portal-shell-account {
   position: relative;
@@ -51,8 +62,6 @@
 
 @media (max-width: 900px) {
   .girls-portal-shell .portal-shell-sidebar {
-    /* Mobile sidebar width is min(310px, 100vw - 46px). Scale the lace and
-       reserved header space with that width. */
     --girls-sidebar-lace-width: min(44px, calc(14.113vw - 6.492px));
     --girls-sidebar-header-height: min(205px, calc(66.198vw - 30.451px));
 
