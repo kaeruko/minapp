@@ -61,6 +61,7 @@ $productionAssets = @(
     "girls-assets\brand_icon.png",
     "girls-assets\character.png",
     "girls-assets\mascot_pair.svg",
+    "girls-assets\no_image.svg",
     "girls-assets\sidebar\header.png",
     "girls-assets\sidebar\clouds.png",
     "girls-assets\sidebar\lace.png",
