@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import logging
 import re
 from typing import Any, Protocol
@@ -8,6 +10,8 @@ from urllib.parse import unquote
 from errors import ApiProblem
 from handler import (
     _auth_subject,
+    _content_response,
+    _header,
     _json_body,
     _json_response,
     _query_parameters,
@@ -18,6 +22,7 @@ from handler import (
 )
 import hosted_app_management
 import hosted_handler
+import hosted_thumbnail
 from hosted_upload import create_uploaded_app
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,6 +34,7 @@ _LAUNCH_SESSION_RE = re.compile(
 _GROUP_APP_UPLOAD_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/upload$")
 _MY_APP_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}$")
 _MY_APP_VISIBILITY_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/visibility$")
+_MY_APP_THUMBNAIL_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/thumbnail$")
 _MY_APP_PREVIEW_SESSION_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/preview-session$")
 _PREVIEW_CONTENT_RE = re.compile(r"^/hosted/preview/([A-Za-z0-9_-]{32,128})/(.+)$")
 
@@ -64,6 +70,41 @@ def _upload_title(event: dict[str, Any]) -> str:
             "title must be a trimmed non-empty string up to 80 characters.",
         )
     return title
+
+
+def _image_body(event: dict[str, Any]) -> tuple[bytes, str]:
+    content_type_header = _header(event, "content-type")
+    if content_type_header is None:
+        raise ApiProblem(
+            415,
+            "unsupported_media_type",
+            "サムネイルのContent-Typeがありません。",
+        )
+    content_type = content_type_header.split(";", 1)[0].strip().lower()
+    if content_type not in {"image/jpeg", "image/png", "image/webp"}:
+        raise ApiProblem(
+            415,
+            "unsupported_media_type",
+            "サムネイルはJPEG・PNG・WebPのいずれかにしてください。",
+        )
+    if event.get("isBase64Encoded") is not True:
+        raise ApiProblem(
+            400,
+            "invalid_thumbnail_transport",
+            "画像リクエストはAPI Gatewayでbase64エンコードされている必要があります。",
+        )
+    body = event.get("body")
+    if not isinstance(body, str) or not body:
+        raise ApiProblem(400, "invalid_request", "サムネイル画像が空です。")
+    try:
+        data = base64.b64decode(body, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ApiProblem(
+            400,
+            "invalid_thumbnail_transport",
+            "画像リクエストのbase64データが不正です。",
+        ) from exc
+    return data, content_type
 
 
 def _handle_upload_request(event: dict[str, Any]) -> dict[str, Any] | None:
@@ -144,6 +185,31 @@ def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
                 hidden=hidden,
             ),
         )
+
+    thumbnail_match = _MY_APP_THUMBNAIL_RE.fullmatch(path)
+    if thumbnail_match is not None:
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
+        app_id = thumbnail_match.group(1)
+        if method == "GET":
+            data, content_type = hosted_thumbnail.get_thumbnail(
+                backend,
+                auth_subject,
+                app_id,
+            )
+            return _content_response(data, content_type)
+        if method == "POST":
+            data, content_type = _image_body(event)
+            return _json_response(
+                200,
+                hosted_thumbnail.set_thumbnail(
+                    backend,
+                    auth_subject,
+                    app_id,
+                    data=data,
+                    content_type=content_type,
+                ),
+            )
 
     preview_match = _MY_APP_PREVIEW_SESSION_RE.fullmatch(path)
     if method == "POST" and preview_match is not None:

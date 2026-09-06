@@ -574,3 +574,457 @@
   });
   scheduleDecorate();
 })();
+
+(function initGirlsThumbnailEditor() {
+  const ACCESS_TOKEN_KEY = "minapp_girls_portal_access_token";
+  const CONFIG_PATH = "/girls-config.json";
+  const NO_IMAGE_URL = "/girls-assets/no_image.svg";
+  const ID_PATTERN = /^[0-9a-f]{32}$/;
+  const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+  const MAX_STORED_BYTES = 192 * 1024;
+  const MAX_INPUT_BYTES = 12 * 1024 * 1024;
+
+  const appList = document.getElementById("girls-app-list");
+  const logoutButton = document.getElementById("girls-logout");
+  if (!(appList instanceof HTMLElement)) throw new Error("#girls-app-list has an unexpected type.");
+  if (!(logoutButton instanceof HTMLButtonElement)) throw new Error("#girls-logout has an unexpected type.");
+
+  const style = document.createElement("style");
+  style.textContent = `
+    .girls-app-thumbnail-editor {
+      display: grid;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .girls-app-thumbnail-picker,
+    .girls-app-thumbnail-save {
+      display: grid;
+      width: 100%;
+      min-height: 30px;
+      place-items: center;
+      padding: 5px 8px;
+      border: 1px solid #d8b9df;
+      border-radius: 999px;
+      background: #fff9fd;
+      color: #765a8e;
+      font: inherit;
+      font-size: 0.66rem;
+      font-weight: 800;
+      line-height: 1.2;
+      text-align: center;
+      cursor: pointer;
+    }
+    .girls-app-thumbnail-picker:hover,
+    .girls-app-thumbnail-picker:focus-within,
+    .girls-app-thumbnail-save:hover:not(:disabled),
+    .girls-app-thumbnail-save:focus-visible:not(:disabled) {
+      border-color: #bc93c9;
+      background: #f9effb;
+      outline: none;
+    }
+    .girls-app-thumbnail-picker input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .girls-app-thumbnail-save:disabled {
+      cursor: default;
+      opacity: 0.46;
+    }
+    .girls-app-thumbnail-status {
+      min-height: 1.3em;
+      margin: 0;
+      color: #8e7482;
+      font-size: 0.58rem;
+      font-weight: 700;
+      line-height: 1.3;
+      text-align: center;
+    }
+    .girls-app-thumbnail-status[data-state="error"] {
+      color: #aa4d63;
+    }
+    .girls-app-thumbnail-status[data-state="success"] {
+      color: #4d7c58;
+    }
+    @media (max-width: 560px) {
+      .girls-app-thumbnail-editor {
+        grid-template-columns: minmax(0, 1fr) minmax(90px, 0.35fr);
+        align-items: center;
+      }
+      .girls-app-thumbnail-status {
+        grid-column: 1 / -1;
+        text-align: left;
+      }
+    }
+  `;
+  document.head.append(style);
+
+  let apiBaseUrl = null;
+  let decorateScheduled = false;
+  const objectUrls = new Map();
+  const cardState = new WeakMap();
+
+  function errorMessage(error) {
+    return error instanceof Error && error.message.length > 0 ? error.message : String(error);
+  }
+
+  function validateApiBaseUrl(value) {
+    if (typeof value !== "string" || value.length === 0 || value !== value.trim()) {
+      throw new Error("girls-config hosted_api_base_url is invalid.");
+    }
+    const url = new URL(value);
+    if (
+      url.protocol !== "https:" ||
+      url.username !== "" ||
+      url.password !== "" ||
+      url.pathname !== "/" ||
+      url.search !== "" ||
+      url.hash !== ""
+    ) {
+      throw new Error("girls-config hosted_api_base_url must be an HTTPS origin.");
+    }
+    return url.origin;
+  }
+
+  async function getApiBaseUrl() {
+    if (apiBaseUrl !== null) return apiBaseUrl;
+    const response = await fetch(CONFIG_PATH, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    if (!response.ok) throw new Error(`Girls config request failed: HTTP ${response.status}`);
+    const payload = await response.json();
+    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+      throw new Error("Girls config response must be an object.");
+    }
+    if (payload.schema_version !== 1) {
+      throw new Error(`Unsupported Girls config schema_version: ${String(payload.schema_version)}`);
+    }
+    apiBaseUrl = validateApiBaseUrl(payload.hosted_api_base_url);
+    return apiBaseUrl;
+  }
+
+  async function authenticatedFetch(path, options = {}) {
+    if (typeof path !== "string" || !path.startsWith("/") || path.startsWith("//")) {
+      throw new TypeError("Girls thumbnail path must be origin-relative.");
+    }
+    const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+    if (token === null || token.length === 0) {
+      throw new Error("ログイン情報がありません。もう一度ログインしてください。");
+    }
+    const baseUrl = await getApiBaseUrl();
+    const url = new URL(path, `${baseUrl}/`);
+    if (url.origin !== baseUrl) throw new Error("Girls thumbnail path escaped the configured origin.");
+
+    const headers = new Headers(options.headers ?? {});
+    headers.set("Authorization", `Bearer ${token}`);
+    const response = await fetch(url.toString(), {
+      method: options.method ?? "GET",
+      headers,
+      body: options.body,
+      cache: "no-store",
+      credentials: "omit",
+    });
+    if (response.status === 401) {
+      logoutButton.click();
+      throw new Error("ログインの有効期限が切れました。もう一度ログインしてください。");
+    }
+    return response;
+  }
+
+  async function responseError(response) {
+    const contentType = response.headers.get("content-type") ?? "";
+    if (contentType.toLowerCase().startsWith("application/json")) {
+      const payload = await response.json();
+      if (typeof payload === "object" && payload !== null && !Array.isArray(payload)) {
+        if (typeof payload.message === "string" && payload.message.length > 0) return payload.message;
+      }
+    }
+    return `HTTP ${response.status}`;
+  }
+
+  function setStatus(element, message, state = "idle") {
+    element.textContent = message;
+    element.dataset.state = state;
+  }
+
+  function releaseObjectUrl(appId) {
+    const previous = objectUrls.get(appId);
+    if (previous !== undefined) {
+      URL.revokeObjectURL(previous);
+      objectUrls.delete(appId);
+    }
+  }
+
+  function setNoImage(appId, image) {
+    releaseObjectUrl(appId);
+    image.src = NO_IMAGE_URL;
+    image.alt = "";
+    image.dataset.thumbnailState = "no-image";
+  }
+
+  function setBlobImage(appId, image, blob, alt, state) {
+    releaseObjectUrl(appId);
+    const url = URL.createObjectURL(blob);
+    objectUrls.set(appId, url);
+    image.src = url;
+    image.alt = alt;
+    image.dataset.thumbnailState = state;
+  }
+
+  async function loadSavedThumbnail(appId, image) {
+    const response = await authenticatedFetch(`/hosted/my/apps/${appId}/thumbnail`, {
+      headers: { Accept: "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8" },
+    });
+    if (response.status === 404) {
+      setNoImage(appId, image);
+      return false;
+    }
+    if (!response.ok) throw new Error(await responseError(response));
+
+    const contentType = (response.headers.get("content-type") ?? "").split(";", 1)[0].trim().toLowerCase();
+    if (!ACCEPTED_TYPES.has(contentType)) {
+      throw new Error(`サムネイルAPIが未対応の形式を返しました: ${contentType || "不明"}`);
+    }
+    const blob = await response.blob();
+    if (blob.size === 0 || blob.size > MAX_STORED_BYTES) {
+      throw new Error("保存済みサムネイルのサイズが不正です。");
+    }
+    setBlobImage(appId, image, blob, "アプリのサムネイル", "custom");
+    return true;
+  }
+
+  async function decodeImage(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      image.decoding = "async";
+      const loaded = new Promise((resolve, reject) => {
+        image.addEventListener("load", resolve, { once: true });
+        image.addEventListener("error", () => reject(new Error("画像を読み込めませんでした。")), { once: true });
+      });
+      image.src = url;
+      await loaded;
+      if (image.naturalWidth < 1 || image.naturalHeight < 1) {
+        throw new Error("画像のサイズを確認できませんでした。");
+      }
+      return image;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  function canvasToBlob(canvas, contentType, quality) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!(blob instanceof Blob)) {
+          reject(new Error("サムネイル画像を圧縮できませんでした。"));
+          return;
+        }
+        resolve(blob);
+      }, contentType, quality);
+    });
+  }
+
+  async function prepareThumbnail(file) {
+    if (!(file instanceof File)) throw new TypeError("Thumbnail selection must be a File.");
+    if (!ACCEPTED_TYPES.has(file.type)) {
+      throw new Error("JPEG・PNG・WebPの画像を選んでください。");
+    }
+    if (file.size < 1 || file.size > MAX_INPUT_BYTES) {
+      throw new Error("元画像は12MB以下にしてください。");
+    }
+
+    const source = await decodeImage(file);
+    const attempts = [
+      { width: 640, height: 480, qualities: [0.86, 0.76, 0.66, 0.56] },
+      { width: 480, height: 360, qualities: [0.76, 0.64, 0.52] },
+      { width: 360, height: 270, qualities: [0.64, 0.5] },
+    ];
+
+    for (const attempt of attempts) {
+      const canvas = document.createElement("canvas");
+      canvas.width = attempt.width;
+      canvas.height = attempt.height;
+      const context = canvas.getContext("2d", { alpha: false });
+      if (context === null) throw new Error("画像処理用のCanvasを作成できませんでした。");
+      context.fillStyle = "#fffafd";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      const scale = Math.max(canvas.width / source.naturalWidth, canvas.height / source.naturalHeight);
+      const drawWidth = source.naturalWidth * scale;
+      const drawHeight = source.naturalHeight * scale;
+      const dx = (canvas.width - drawWidth) / 2;
+      const dy = (canvas.height - drawHeight) / 2;
+      context.drawImage(source, dx, dy, drawWidth, drawHeight);
+
+      for (const quality of attempt.qualities) {
+        let blob = await canvasToBlob(canvas, "image/webp", quality);
+        if (!ACCEPTED_TYPES.has(blob.type)) {
+          blob = await canvasToBlob(canvas, "image/jpeg", quality);
+        }
+        if (ACCEPTED_TYPES.has(blob.type) && blob.size > 0 && blob.size <= MAX_STORED_BYTES) {
+          return blob;
+        }
+      }
+    }
+    throw new Error("画像を192KB以下に圧縮できませんでした。別の画像を選んでください。");
+  }
+
+  function installEditor(card) {
+    if (card.dataset.girlsThumbnailEditor === "ready") return;
+    const appId = card.dataset.girlsAppId ?? "";
+    if (!ID_PATTERN.test(appId)) return;
+    const media = card.querySelector(".girls-app-card-media");
+    const image = card.querySelector(".girls-app-card-thumbnail");
+    const title = card.querySelector("h3")?.textContent?.trim() ?? "アプリ";
+    if (!(media instanceof HTMLElement) || !(image instanceof HTMLImageElement)) return;
+
+    card.dataset.girlsThumbnailEditor = "ready";
+    const editor = document.createElement("div");
+    editor.className = "girls-app-thumbnail-editor";
+
+    const picker = document.createElement("label");
+    picker.className = "girls-app-thumbnail-picker";
+    picker.textContent = "画像を選ぶ";
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/jpeg,image/png,image/webp";
+    picker.append(input);
+
+    const save = document.createElement("button");
+    save.className = "girls-app-thumbnail-save";
+    save.type = "button";
+    save.textContent = "保存";
+    save.disabled = true;
+
+    const status = document.createElement("p");
+    status.className = "girls-app-thumbnail-status";
+    status.setAttribute("role", "status");
+
+    editor.append(picker, save, status);
+    media.append(editor);
+
+    const state = { prepared: null, generation: 0 };
+    cardState.set(card, state);
+
+    void loadSavedThumbnail(appId, image).catch((error) => {
+      setNoImage(appId, image);
+      setStatus(status, `画像を読み込めません: ${errorMessage(error)}`, "error");
+    });
+
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      state.generation += 1;
+      const generation = state.generation;
+      state.prepared = null;
+      save.disabled = true;
+      if (file === undefined) {
+        setStatus(status, "");
+        return;
+      }
+
+      input.disabled = true;
+      setStatus(status, "画像を準備中…");
+      void prepareThumbnail(file)
+        .then((blob) => {
+          if (state.generation !== generation) return;
+          state.prepared = blob;
+          setBlobImage(appId, image, blob, `${title}の保存前サムネイル`, "pending");
+          save.disabled = false;
+          setStatus(status, `保存前 ${Math.ceil(blob.size / 1024)}KB`);
+        })
+        .catch((error) => {
+          if (state.generation !== generation) return;
+          state.prepared = null;
+          save.disabled = true;
+          setStatus(status, errorMessage(error), "error");
+        })
+        .finally(() => {
+          if (state.generation === generation) input.disabled = false;
+        });
+    });
+
+    save.addEventListener("click", () => {
+      const blob = state.prepared;
+      if (!(blob instanceof Blob)) {
+        setStatus(status, "先に画像を選んでください。", "error");
+        return;
+      }
+      if (!ACCEPTED_TYPES.has(blob.type) || blob.size < 1 || blob.size > MAX_STORED_BYTES) {
+        throw new Error("Prepared thumbnail has an invalid type or size.");
+      }
+
+      save.disabled = true;
+      input.disabled = true;
+      setStatus(status, "保存中…");
+      void authenticatedFetch(`/hosted/my/apps/${appId}/thumbnail`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": blob.type,
+        },
+        body: blob,
+      })
+        .then(async (response) => {
+          if (!response.ok) throw new Error(await responseError(response));
+          const contentType = response.headers.get("content-type") ?? "";
+          if (!contentType.toLowerCase().startsWith("application/json")) {
+            throw new Error("サムネイル保存APIがJSONを返しませんでした。");
+          }
+          const payload = await response.json();
+          if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+            throw new Error("サムネイル保存APIの応答が不正です。");
+          }
+          if (
+            payload.app_id !== appId ||
+            payload.content_type !== blob.type ||
+            payload.bytes !== blob.size ||
+            typeof payload.updated_at !== "string" ||
+            payload.updated_at.length === 0
+          ) {
+            throw new Error("サムネイル保存APIの応答内容が一致しません。");
+          }
+          state.prepared = null;
+          input.value = "";
+          await loadSavedThumbnail(appId, image);
+          setStatus(status, "保存しました ♡", "success");
+        })
+        .catch((error) => {
+          save.disabled = false;
+          setStatus(status, `保存できませんでした: ${errorMessage(error)}`, "error");
+        })
+        .finally(() => {
+          input.disabled = false;
+        });
+    });
+  }
+
+  function decorateCards() {
+    for (const card of appList.querySelectorAll(".girls-app-card[data-girls-app-id]")) {
+      if (card instanceof HTMLElement) installEditor(card);
+    }
+  }
+
+  function scheduleDecorate() {
+    if (decorateScheduled) return;
+    decorateScheduled = true;
+    queueMicrotask(() => {
+      decorateScheduled = false;
+      decorateCards();
+    });
+  }
+
+  new MutationObserver(scheduleDecorate).observe(appList, { childList: true, subtree: true });
+  globalThis.addEventListener("beforeunload", () => {
+    for (const url of objectUrls.values()) URL.revokeObjectURL(url);
+    objectUrls.clear();
+  });
+  scheduleDecorate();
+})();
