@@ -45,13 +45,13 @@ class GirlsNovelProjectSummary {
     final String contentFormat = _requiredString(json, 'content_format');
     if (contentFormat != minappNovelContentFormat) {
       throw FormatException(
-        'Novel Authoring list returned unsupported format $contentFormat.',
+        'Novel Authoring response returned unsupported format $contentFormat.',
       );
     }
     final String status = _requiredString(json, 'status');
     if (status != 'draft') {
       throw FormatException(
-        'Novel Authoring list returned unsupported status $status.',
+        'Novel Authoring response returned unsupported status $status.',
       );
     }
     final Object? assets = json['assets'];
@@ -138,11 +138,23 @@ class GirlsNovelAuthoringApi {
     if (rawProjects is! List<Object?>) {
       throw const FormatException('Authoring projects response has no projects list.');
     }
-    return rawProjects.map((Object? rawProject) {
+
+    final List<GirlsNovelProjectSummary> projects =
+        <GirlsNovelProjectSummary>[];
+    for (final Object? rawProject in rawProjects) {
       if (rawProject is! Map<String, Object?>) {
         throw const FormatException(
           'Authoring projects response contains a non-object project.',
         );
+      }
+      final Object? rawFormat = rawProject['content_format'];
+      if (rawFormat is! String || rawFormat.isEmpty) {
+        throw const FormatException(
+          'Authoring project summary has an invalid content_format.',
+        );
+      }
+      if (rawFormat != minappNovelContentFormat) {
+        continue;
       }
       final GirlsNovelProjectSummary project =
           GirlsNovelProjectSummary.fromJson(rawProject);
@@ -151,8 +163,9 @@ class GirlsNovelAuthoringApi {
           'Authoring projects response changed the requested group scope.',
         );
       }
-      return project;
-    }).toList(growable: false);
+      projects.add(project);
+    }
+    return List<GirlsNovelProjectSummary>.unmodifiable(projects);
   }
 
   Future<GirlsNovelProject> loadProject({
