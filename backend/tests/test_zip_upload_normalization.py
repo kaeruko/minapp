@@ -44,6 +44,21 @@ class ZipUploadNormalizationTests(unittest.TestCase):
             self.assertEqual(set(archive.namelist()), set(files))
             self.assertEqual(archive.read("index.html"), b"<h1>minappchi</h1>")
 
+    def test_finder_metadata_is_removed_before_unwrapping(self) -> None:
+        original = _zip(
+            {
+                "minappchi/index.html": b"<h1>minappchi</h1>",
+                "minappchi/.DS_Store": b"finder",
+                "__MACOSX/minappchi/._index.html": b"resource-fork",
+            }
+        )
+        normalized, files = normalize_uploaded_zip(original)
+
+        self.assertEqual(files, ["index.html"])
+        with zipfile.ZipFile(io.BytesIO(normalized)) as archive:
+            self.assertEqual(archive.namelist(), ["index.html"])
+            self.assertEqual(archive.read("index.html"), b"<h1>minappchi</h1>")
+
     def test_two_top_level_folders_remain_invalid(self) -> None:
         with self.assertRaises(ApiProblem) as context:
             normalize_uploaded_zip(
@@ -72,6 +87,18 @@ class ZipUploadNormalizationTests(unittest.TestCase):
                 )
             )
         self.assertEqual(context.exception.error, "invalid_zip_path")
+
+    def test_unknown_unsupported_file_is_not_silently_removed(self) -> None:
+        with self.assertRaises(ApiProblem) as context:
+            normalize_uploaded_zip(
+                _zip(
+                    {
+                        "app/index.html": b"ok",
+                        "app/program.exe": b"no",
+                    }
+                )
+            )
+        self.assertEqual(context.exception.error, "unsupported_file_type")
 
 
 if __name__ == "__main__":
