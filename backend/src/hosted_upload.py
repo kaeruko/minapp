@@ -19,10 +19,9 @@ def create_uploaded_app(
 ) -> dict[str, Any]:
     """Create a new editable Hosted app directly from a validated ZIP.
 
-    This deliberately does not fork or install a hidden built-in app. The ZIP
-    supplied by the caller becomes source revision 1 of an independent app.
-    Existing Hosted source validation, S3 immutability, app-capacity checks,
-    and owner authorization are reused without fallback behavior.
+    The caller only needs active membership in the target group. The newly
+    created app is owned by that caller, and later source/preview/publish
+    operations must authorize against owner_user_id rather than group role.
 
     A common desktop packaging shape (one top-level folder containing
     index.html) is normalized to the canonical root-index ZIP before storage.
@@ -32,7 +31,7 @@ def create_uploaded_app(
     sha256 = hashlib.sha256(normalized_zip).hexdigest()
 
     owner = backend._user_by_auth_subject(auth_subject)
-    backend._require_owner_group(owner.user_id, group_id)
+    backend._require_active_membership(owner.user_id, group_id)
     backend._require_app_capacity(group_id)
 
     app_id = uuid.uuid4().hex
