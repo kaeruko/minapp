@@ -92,21 +92,35 @@ void main() {
     expect(html, contains('しょうがいぶつを よけて スーパーへ！'));
   });
 
-  test('novel starter documents AI edit points and optional Hosted save', () async {
+  test('novel starter uses JSON player and private Hosted user state', () async {
     final BuiltInApp novel = builtInApps.singleWhere(
       (BuiltInApp app) => app.id == 'novel-starter',
     );
     final String html = await rootBundle.loadString(novel.assetPath);
+    final String player = await rootBundle.loadString(
+      'assets/builtin/novel_starter/player.js',
+    );
+    final String validator = await rootBundle.loadString(
+      'assets/builtin/novel_starter/story-validator.js',
+    );
 
-    expect(html, contains('AIで改造するなら'));
-    expect(html, contains('aria-label="白髪の男子キャラクター"'));
-    expect(html, contains('<img src="face.jpg" alt="レンの顔">'));
-    expect(html, contains("speaker: 'レン'"));
-    expect(html, contains("const SAVE_KEY = 'novel_progress';"));
-    expect(html, contains('window.minapp.state.get(SAVE_KEY)'));
-    expect(html, contains('window.minapp.state.set(SAVE_KEY'));
-    expect(html, contains('window.minapp.state.delete(SAVE_KEY)'));
-    expect(html, contains('この環境はセーブなし'));
+    expect(html, contains('id="minapp-novel-story"'));
+    expect(html, contains('"content_format": "minapp/novel@1"'));
+    expect(html, contains('<script src="story-validator.js"></script>'));
+    expect(html, contains('<script src="player.js"></script>'));
+    expect(html, isNot(contains('const SCENES')));
+
+    expect(player, contains("const SAVE_KEY = 'novel_progress_v1';"));
+    expect(player, contains('window.MinAppNativeBridge'));
+    expect(player, contains("window.addEventListener('minappready'"));
+    expect(player, contains('window.minapp.userState.get(SAVE_KEY)'));
+    expect(player, contains('window.minapp.userState.set(SAVE_KEY'));
+    expect(player, contains('window.minapp.userState.delete(SAVE_KEY)'));
+    expect(player, isNot(contains('window.minapp.state.')));
+
+    expect(validator, contains("const FORMAT = 'minapp/novel@1';"));
+    expect(validator, contains('unknown_event_type'));
+    expect(validator, contains('missing_asset'));
 
     final ByteData portrait = await rootBundle.load(
       'assets/builtin/novel_starter/face.jpg',
