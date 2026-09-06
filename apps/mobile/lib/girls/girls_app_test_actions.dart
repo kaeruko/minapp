@@ -5,6 +5,7 @@ import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
 import 'girls_app_preview_api.dart';
+import 'girls_novel_projects_page.dart';
 import 'hosted_girls_api.dart';
 
 const Color _testLavender = Color(0xFF745B9E);
@@ -31,6 +32,9 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   bool _busy = false;
   String? _error;
 
+  bool get _isNovelEditor =>
+      widget.detail.summary.app.builtinId == 'novel-editor';
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +45,20 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   void dispose() {
     _previewApi.close();
     super.dispose();
+  }
+
+  Future<void> _openNovelProjects() async {
+    if (!_isNovelEditor || _busy) return;
+    final HostedGroupApp editorApp = widget.detail.summary.app;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => GirlsNovelProjectsPage(
+          api: widget.api,
+          session: widget.session,
+          editorApp: editorApp,
+        ),
+      ),
+    );
   }
 
   Future<void> _tryPublished() async {
@@ -113,6 +131,15 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        if (_isNovelEditor) ...<Widget>[
+          FilledButton.icon(
+            key: const Key('girls-novel-open-projects'),
+            onPressed: _busy ? null : _openNovelProjects,
+            icon: const Icon(Icons.edit_note_rounded),
+            label: const Text('ノベル作品を編集'),
+          ),
+          const SizedBox(height: 10),
+        ],
         FilledButton.tonalIcon(
           key: const Key('girls-app-try-published'),
           onPressed: _busy || detail.summary.app.publishedVersion == null
