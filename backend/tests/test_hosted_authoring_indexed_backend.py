@@ -87,6 +87,24 @@ class HostedAuthoringIndexedBackendTests(unittest.TestCase):
             self.assertEqual(project["status"], "draft")
             self.assertNotIn("document", project)
 
+    def test_list_can_filter_by_explicit_content_format(self) -> None:
+        novel = self._create("作品A")
+        quiz = self.backend.create_authoring_project(
+            self.subject,
+            self.group["group_id"],
+            "example/quiz@1",
+            {"content_format": "example/quiz@1", "schema_version": 1},
+        )
+
+        projects = self.backend.list_authoring_projects(
+            self.subject,
+            str(self.group["group_id"]),
+            "minapp/novel@1",
+        )
+
+        self.assertEqual([project["content_id"] for project in projects], [novel["content_id"]])
+        self.assertNotEqual(novel["content_id"], quiz["content_id"])
+
     def test_corrupt_group_index_fails_instead_of_skipping_project(self) -> None:
         created = self._create("作品A")
         content_id = str(created["content_id"])
