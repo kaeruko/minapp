@@ -12,24 +12,35 @@ const String _groupId = '22222222222222222222222222222222';
 const String _appId = '44444444444444444444444444444444';
 
 class _NoopRuntimeTransport implements HostedRuntimeTransport {
-  @override
-  Future<void> deleteState(String runtimeToken, String key) async {
+  Never _unused() {
     throw StateError('Runtime transport must not be used while rendering.');
   }
 
   @override
-  Future<Object?> getState(String runtimeToken, String key) async {
-    throw StateError('Runtime transport must not be used while rendering.');
-  }
+  Future<void> deleteState(String runtimeToken, String key) async => _unused();
+
+  @override
+  Future<Object?> getState(String runtimeToken, String key) async => _unused();
 
   @override
   Future<Object?> setState(
     String runtimeToken,
     String key,
     Object? value,
-  ) async {
-    throw StateError('Runtime transport must not be used while rendering.');
-  }
+  ) async => _unused();
+
+  @override
+  Future<void> deleteUserState(String runtimeToken, String key) async => _unused();
+
+  @override
+  Future<Object?> getUserState(String runtimeToken, String key) async => _unused();
+
+  @override
+  Future<Object?> setUserState(
+    String runtimeToken,
+    String key,
+    Object? value,
+  ) async => _unused();
 }
 
 HostedAuthoringContractApi _contractApi({

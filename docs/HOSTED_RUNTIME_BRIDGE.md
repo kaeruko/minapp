@@ -58,6 +58,10 @@ await minapp.userState.delete("progress")
 
 `minapp.state` is shared for the Runtime app scope. `minapp.userState` is private to the authenticated Runtime user; child code never supplies a `user_id`.
 
+The Flutter Runtime transport contract requires both scopes. There is no optional private-state transport, compatibility adapter, or fallback from `userState` to shared `state`. A transport that cannot provide both contracts is not a valid Hosted Runtime transport.
+
+Shared state and private state use separate explicit quotas. Shared state is bounded per app; private state is bounded per authenticated user and app. A private quota failure stays a private-state error and never writes the value into shared state. The backend does not compress, truncate, move, or reinterpret the value to make the request succeed.
+
 All methods return a `Promise`. `get()` and `set()` resolve to the state value. `delete()` resolves to `null`.
 
 A backend failure rejects with `MinAppError`. The error preserves the backend contract:
@@ -72,7 +76,7 @@ try {
 }
 ```
 
-Expected backend errors include `state_not_found`, `runtime_session_not_found`, `runtime_request_limit_reached`, `runtime_value_too_large`, `runtime_storage_limit_reached`, and current-membership rejection. Other than the exact Runtime-expiry recovery described below, the bridge/client does not rewrite error codes, retry through another path, or substitute shared state for user state.
+Expected backend errors include `state_not_found`, `runtime_session_not_found`, `runtime_request_limit_reached`, `runtime_value_too_large`, `runtime_storage_limit_reached`, `runtime_user_key_limit_reached`, `runtime_user_storage_limit_reached`, and current-membership rejection. Other than the exact Runtime-expiry recovery described below, the bridge/client does not rewrite error codes, retry through another path, or substitute shared state for user state.
 
 Bridge request envelopes are versioned and strict. Unknown methods, unknown/missing fields, invalid state keys, and duplicate in-flight request IDs are rejected instead of being interpreted permissively.
 

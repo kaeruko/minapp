@@ -3,12 +3,12 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:minapp_mobile/api.dart';
 import 'package:minapp_mobile/hosted_runtime_bridge.dart';
 
 const String _runtimeToken = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
 
-class FakePrivateRuntimeTransport
-    implements HostedRuntimeTransport, HostedUserStateTransport {
+class FakePrivateRuntimeTransport implements HostedRuntimeTransport {
   final List<String> calls = <String>[];
   Object? sharedValue;
   Object? userValue;
@@ -155,6 +155,45 @@ void main() {
         <String, Object?>{'scene': 'start'},
       ),
       <String, Object?>{'scene': 'start'},
+    );
+  });
+
+  test('user-state backend error status and code are preserved', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(
+        request.url.path,
+        '/hosted/runtime/$_runtimeToken/user-state/progress',
+      );
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'error': 'runtime_user_storage_limit_reached',
+          'message': 'private state quota exceeded',
+        }),
+        413,
+        headers: <String, String>{'content-type': 'application/json'},
+      );
+    });
+    final HostedApiClient api = HostedApiClient(
+      baseUri: Uri.parse('https://hosted.example.test/'),
+      client: client,
+    );
+
+    await expectLater(
+      api.setUserState(_runtimeToken, 'progress', 1),
+      throwsA(
+        isA<ApiException>()
+            .having((ApiException error) => error.statusCode, 'statusCode', 413)
+            .having(
+              (ApiException error) => error.code,
+              'code',
+              'runtime_user_storage_limit_reached',
+            )
+            .having(
+              (ApiException error) => error.message,
+              'message',
+              'private state quota exceeded',
+            ),
+      ),
     );
   });
 

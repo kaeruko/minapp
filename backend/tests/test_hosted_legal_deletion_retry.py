@@ -10,7 +10,7 @@ if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
 
 from hosted_legal import PRIVACY_VERSION, TERMS_VERSION  # noqa: E402
-from hosted_legal_backend import HostedLegalBackend  # noqa: E402
+from hosted_user_state_backend import HostedUserStateBackend  # noqa: E402
 from test_hosted_backend import FakeCognito, FakeDynamoDb  # noqa: E402
 from test_hosted_catalog_backend import FakeS3, source_zip  # noqa: E402
 
@@ -23,7 +23,7 @@ class HostedLegalDeletionRetryTests(unittest.TestCase):
         self.s3.objects[
             ("uploads", "hosted/templates/novel-starter/v4/source.zip")
         ] = source_zip("<!doctype html><h1>novel-v4</h1>")
-        self.backend = HostedLegalBackend(
+        self.backend = HostedUserStateBackend(
             cognito=self.cognito,
             dynamodb=self.dynamo,
             runtime_dynamodb=self.dynamo,
@@ -45,6 +45,28 @@ class HostedLegalDeletionRetryTests(unittest.TestCase):
         )
         return self.cognito.users[login_id]["sub"]
 
+    def _put_runtime_rows(self, group_id: str, app_id: str) -> list[tuple[str, str]]:
+        pk = f"GROUP#{group_id}#APP#{app_id}"
+        rows = [
+            (pk, "STATE#shared"),
+            (pk, "USER#user-a#STATE#progress"),
+            (pk, "USER#user-b#STATE#progress"),
+        ]
+        for row_pk, row_sk in rows:
+            self.dynamo.items[(row_pk, row_sk)] = {
+                "pk": {"S": row_pk},
+                "sk": {"S": row_sk},
+                "entity": {
+                    "S": "runtime_state"
+                    if row_sk.startswith("STATE#")
+                    else "runtime_user_state"
+                },
+                "key": {"S": row_sk.rsplit("#", 1)[-1]},
+                "value_json": {"S": "1"},
+                "updated_at": {"S": "2026-09-07T00:00:00Z"},
+            }
+        return rows
+
     def test_owned_app_deletion_can_resume_after_s3_cleanup_failure(self) -> None:
         subject = self._register("retry-owner")
         group = self.backend.create_group(subject, "再試行部")
@@ -60,6 +82,8 @@ class HostedLegalDeletionRetryTests(unittest.TestCase):
             "再試行する作品",
         )
         app_id = forked["app_id"]
+        runtime_rows = self._put_runtime_rows(group["group_id"], app_id)
+        shared_row, *private_rows = runtime_rows
 
         original_delete = self.s3.delete_object
         failed = False
@@ -77,6 +101,9 @@ class HostedLegalDeletionRetryTests(unittest.TestCase):
 
         app_item = self.dynamo.items[(f"APP#{app_id}", "META")]
         self.assertEqual(app_item["deletion_state"]["S"], "deleting")
+        for row in private_rows:
+            self.assertNotIn(row, self.dynamo.items)
+        self.assertIn(shared_row, self.dynamo.items)
 
         self.s3.delete_object = original_delete  # type: ignore[method-assign]
         self.backend.delete_hosted_app(subject, group["group_id"], app_id)
@@ -86,6 +113,8 @@ class HostedLegalDeletionRetryTests(unittest.TestCase):
             (f"GROUP#{group['group_id']}", f"APP#{app_id}"),
             self.dynamo.items,
         )
+        for row in runtime_rows:
+            self.assertNotIn(row, self.dynamo.items)
 
 
 if __name__ == "__main__":

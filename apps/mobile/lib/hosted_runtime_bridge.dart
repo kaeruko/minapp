@@ -37,9 +37,7 @@ abstract interface class HostedRuntimeTransport {
   Future<Object?> setState(String runtimeToken, String key, Object? value);
 
   Future<void> deleteState(String runtimeToken, String key);
-}
 
-abstract interface class HostedUserStateTransport {
   Future<Object?> getUserState(String runtimeToken, String key);
 
   Future<Object?> setUserState(String runtimeToken, String key, Object? value);
@@ -66,7 +64,7 @@ class HostedRuntimeRefreshException implements Exception {
   }
 }
 
-class HostedApiClient implements HostedRuntimeTransport, HostedUserStateTransport {
+class HostedApiClient implements HostedRuntimeTransport {
   HostedApiClient({required Uri baseUri, http.Client? client})
       : _baseUri = _validateBaseUri(baseUri),
         _client = client ?? http.Client();
@@ -775,16 +773,6 @@ class HostedBridgeSession {
   final String _runtimeToken;
   final Set<String> _inFlightRequestIds = <String>{};
 
-  HostedUserStateTransport get _userStateTransport {
-    final HostedRuntimeTransport transport = _transport;
-    if (transport is! HostedUserStateTransport) {
-      throw StateError(
-        'Hosted Runtime transport does not implement private user state; shared state fallback is forbidden.',
-      );
-    }
-    return transport as HostedUserStateTransport;
-  }
-
   Future<Map<String, Object?>> handleMessage(String message) async {
     final HostedBridgeRequest request;
     try {
@@ -820,18 +808,18 @@ class HostedBridgeSession {
         await _transport.deleteState(_runtimeToken, request.key);
         result = null;
       } else if (request.method == 'userState.get') {
-        result = await _userStateTransport.getUserState(_runtimeToken, request.key);
+        result = await _transport.getUserState(_runtimeToken, request.key);
       } else if (request.method == 'userState.set') {
         if (!request.hasValue) {
           throw StateError('userState.set request lost its required value after validation.');
         }
-        result = await _userStateTransport.setUserState(
+        result = await _transport.setUserState(
           _runtimeToken,
           request.key,
           request.value,
         );
       } else if (request.method == 'userState.delete') {
-        await _userStateTransport.deleteUserState(_runtimeToken, request.key);
+        await _transport.deleteUserState(_runtimeToken, request.key);
         result = null;
       } else {
         throw StateError('Validated bridge request has an unsupported method.');
