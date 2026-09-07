@@ -12,6 +12,14 @@ from aws_backend import _item_string, _string_attr
 from errors import ApiProblem
 from hosted_authoring_app_source import resolve_authoring_app_source
 import hosted_authoring_session
+from hosted_authoring_web_bridge import (
+    HOST_ADAPTER_NATIVE,
+    HOST_ADAPTER_WEB,
+    inject_web_bridge,
+    new_web_bridge_nonce,
+    portal_origin_from_environment,
+    validate_host_adapter,
+)
 from hosted_catalog_backend import (
     _content_type,
     _files_json,
@@ -30,8 +38,18 @@ def create_launch(
     auth_subject: str,
     content_id: str,
     editor_app_id: str,
+    *,
+    host_adapter: str = HOST_ADAPTER_NATIVE,
 ) -> dict[str, Any]:
     """Mint Editor content, ephemeral Runtime, and Authoring capabilities atomically."""
+
+    host_adapter = validate_host_adapter(host_adapter)
+    web_parent_origin: str | None = None
+    web_bridge_nonce: str | None = None
+    if host_adapter == HOST_ADAPTER_WEB:
+        # Validate the trusted parent before creating any capability/session.
+        web_parent_origin = portal_origin_from_environment()
+        web_bridge_nonce = new_web_bridge_nonce()
 
     now_epoch = int(time.time())
     authoring_result, authoring_item, user, editor = hosted_authoring_session.prepare_session(
@@ -68,6 +86,7 @@ def create_launch(
         "pk": _string_attr(f"AUTHORINGEDITOR#{content_token_hash}"),
         "sk": _string_attr("META"),
         "entity": _string_attr("authoring_editor_content_session"),
+        "host_adapter": _string_attr(host_adapter),
         "authoring_session_hash": _string_attr(authoring_token_hash),
         "user_id": _string_attr(user.user_id),
         "group_id": _string_attr(group_id),
@@ -84,6 +103,12 @@ def create_launch(
             content_expires_at + AUTHORING_EDITOR_TTL_GRACE_SECONDS
         ),
     }
+    if host_adapter == HOST_ADAPTER_WEB:
+        if web_parent_origin is None or web_bridge_nonce is None:
+            raise RuntimeError("Validated Web Authoring launch lost bridge metadata")
+        content_item["web_parent_origin"] = _string_attr(web_parent_origin)
+        content_item["web_bridge_nonce"] = _string_attr(web_bridge_nonce)
+
     runtime_item = {
         "pk": _string_attr(f"RUNTIMESESSION#{runtime_token_hash}"),
         "sk": _string_attr("META"),
@@ -100,7 +125,7 @@ def create_launch(
     }
 
     backend._transact_put_new([authoring_item, content_item, runtime_item])
-    return {
+    result: dict[str, Any] = {
         "content_path": f"/hosted/authoring-editor/{content_token}/index.html",
         "content_expires_in": AUTHORING_EDITOR_CONTENT_SECONDS,
         "runtime_token": runtime_token,
@@ -112,6 +137,11 @@ def create_launch(
         "editor_app_id": editor_app_id,
         "allowed_operations": authoring_result["allowed_operations"],
     }
+    if host_adapter == HOST_ADAPTER_WEB:
+        if web_bridge_nonce is None:
+            raise RuntimeError("Validated Web Authoring launch lost its bridge nonce")
+        result["web_bridge_nonce"] = web_bridge_nonce
+    return result
 
 
 def get_editor_file(
@@ -136,6 +166,9 @@ def get_editor_file(
         )
     if _item_string(item, "entity") != "authoring_editor_content_session":
         raise RuntimeError("Authoring Editor content key contains an unexpected entity")
+    host_adapter = _item_string(item, "host_adapter")
+    if host_adapter not in {HOST_ADAPTER_NATIVE, HOST_ADAPTER_WEB}:
+        raise RuntimeError("Authoring Editor content has an unsupported host_adapter")
 
     authoring_hash = _item_string(item, "authoring_session_hash")
     authoring_item = backend._get_item(
@@ -213,4 +246,11 @@ def get_editor_file(
                 "authoring_editor_file_not_found",
                 "Authoring Editor file was not found.",
             ) from exc
+
+    if host_adapter == HOST_ADAPTER_WEB and normalized == "index.html":
+        data = inject_web_bridge(
+            data,
+            parent_origin=_item_string(item, "web_parent_origin"),
+            bridge_nonce=_item_string(item, "web_bridge_nonce"),
+        )
     return data, _content_type(normalized)
