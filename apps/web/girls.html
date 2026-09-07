@@ -7,10 +7,14 @@
     <title>みんアプ Girls | Webポータル</title>
     <link rel="stylesheet" href="/portal_shell.css" />
     <link rel="stylesheet" href="/girls_portal.css" />
+    <link rel="stylesheet" href="/hosted_authoring_portal.css" />
     <link rel="stylesheet" href="/girls_footer.css" />
     <script src="/single_html_zip.js" defer></script>
+    <script src="/authoring_host_adapter.js" defer></script>
+    <script src="/hosted_authoring_portal.js" defer></script>
     <script src="/girls_portal.js" defer></script>
     <script src="/girls_portal_shell.js" defer></script>
+    <script src="/girls_authoring_portal.js" defer></script>
     <script src="/girls_footer.js" defer></script>
   </head>
   <body>
@@ -110,6 +114,9 @@
           <button class="portal-shell-nav-item" type="button" data-girls-view="apps">
             <span class="portal-shell-nav-icon" aria-hidden="true">◆</span><span>自分のアプリ</span>
           </button>
+          <button id="girls-authoring-nav" class="portal-shell-nav-item" type="button" data-girls-authoring-open>
+            <span class="portal-shell-nav-icon" aria-hidden="true">✎</span><span>作品を作る</span>
+          </button>
           <button class="portal-shell-nav-item" type="button" data-girls-view="settings">
             <span class="portal-shell-nav-icon" aria-hidden="true">⚙</span><span>設定</span>
           </button>
@@ -165,6 +172,10 @@
                 <button class="girls-home-action" type="button" data-girls-open-view="apps">
                   <span class="girls-home-action-icon" aria-hidden="true">◆</span>
                   <span><strong>自分のアプリ</strong><small>追加したアプリを確認する</small></span>
+                </button>
+                <button class="girls-home-action" type="button" data-girls-authoring-open>
+                  <span class="girls-home-action-icon" aria-hidden="true">✎</span>
+                  <span><strong>作品を作る</strong><small>Editorでノベルやクイズを作る</small></span>
                 </button>
               </div>
               <div class="girls-group-summary">
@@ -250,6 +261,30 @@
             </section>
           </section>
 
+          <section id="girls-view-authoring" class="girls-view-panel girls-view-hidden">
+            <section class="girls-dashboard-card" aria-labelledby="girls-authoring-title">
+              <div class="girls-section-heading girls-apps-heading">
+                <div><p class="girls-step">AUTHORING</p><h2 id="girls-authoring-title">作品を作る</h2></div>
+                <button id="girls-authoring-refresh" class="girls-secondary" type="button">更新</button>
+              </div>
+              <p class="girls-muted">グループに公開されているEditorを使って、ノベルやクイズなどの作品を作れます。</p>
+              <div class="hosted-authoring-toolbar">
+                <label>
+                  グループ
+                  <select id="girls-authoring-group"></select>
+                </label>
+                <label>
+                  Editor / 形式
+                  <select id="girls-authoring-editor"></select>
+                </label>
+                <button id="girls-authoring-create" class="girls-primary" type="button">新しい作品</button>
+              </div>
+              <p id="girls-authoring-status" class="girls-muted" role="status">Editorを確認すると作品が表示されます。</p>
+              <div id="girls-authoring-projects" class="hosted-authoring-projects" aria-live="polite"></div>
+              <p id="girls-authoring-error" class="girls-message girls-message-error hidden" role="alert"></p>
+            </section>
+          </section>
+
           <section id="girls-view-settings" class="girls-view-panel girls-view-hidden" data-girls-panel="settings">
             <section class="girls-dashboard-card">
               <div class="girls-section-heading">
@@ -265,6 +300,33 @@
           </section>
         </main>
       </div>
+
+      <dialog id="girls-authoring-editor-dialog" class="hosted-authoring-dialog" aria-labelledby="girls-authoring-editor-title">
+        <div class="hosted-authoring-dialog-shell">
+          <div class="hosted-authoring-dialog-header">
+            <h2 id="girls-authoring-editor-title">作品を編集</h2>
+            <button id="girls-authoring-editor-close" class="girls-secondary" type="button">閉じる</button>
+          </div>
+          <iframe id="girls-authoring-editor-frame" class="hosted-authoring-frame" title="作品Editor" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe>
+        </div>
+      </dialog>
+
+      <dialog id="girls-authoring-player-dialog" class="hosted-authoring-player-dialog" aria-labelledby="girls-authoring-player-title">
+        <h2 id="girls-authoring-player-title">どのプレイヤーで確認する？</h2>
+        <p class="girls-muted">対応するPlayerが複数あります。使うPlayerを選んでください。</p>
+        <div id="girls-authoring-player-options" class="hosted-authoring-player-options"></div>
+        <button id="girls-authoring-player-cancel" class="girls-secondary" type="button">キャンセル</button>
+      </dialog>
+
+      <dialog id="girls-authoring-preview-dialog" class="hosted-authoring-dialog" aria-labelledby="girls-authoring-preview-title">
+        <div class="hosted-authoring-dialog-shell">
+          <div class="hosted-authoring-dialog-header">
+            <h2 id="girls-authoring-preview-title">下書きプレビュー</h2>
+            <button id="girls-authoring-preview-close" class="girls-secondary" type="button">Editorへ戻る</button>
+          </div>
+          <iframe id="girls-authoring-preview-frame" class="hosted-authoring-frame" title="作品の下書きプレビュー" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe>
+        </div>
+      </dialog>
     </section>
   </body>
 </html>

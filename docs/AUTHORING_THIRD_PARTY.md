@@ -1,6 +1,6 @@
 # Third-party Authoring Editor / Player contract
 
-Tracks #161. This document describes the Hosted v1 contract implemented by the platform. Format-specific schema belongs to the Editor/Player author, not to the Host. Follow-up Web Portal Host Adapter work is tracked by #167.
+Tracks #161 and #167. This document describes the Hosted v1 contract implemented by the platform. Format-specific schema belongs to the Editor/Player author, not to the Host.
 
 ## Identities
 
@@ -252,13 +252,23 @@ Flutter `HostedAppWebViewPage.authoring` is the implemented native Host Adapter.
 
 The Flutter path supports `minapp.authoring.load`, `save`, `getAsset`, `saveAsset`, `deleteAsset`, `preview`, and `publish`. Asset reads/writes are bound to the current Authoring session: Editor JavaScript supplies only a validated relative asset path, `Uint8Array` bytes for writes, and `expectedRevision` for mutations. The trusted Host retains the Authoring token and backend URL. `preview` is Host-driven: Editor JavaScript supplies only `expectedRevision`; compatible Player discovery, explicit selection, authenticated Preview creation, and Preview presentation stay in `HostedAuthoringProjectsPage` / the trusted Host.
 
-The Web Portal Host Adapter foundation is implemented under #167. A Web launch must be requested explicitly with `host_adapter: "web"`; native launches are not silently converted. Before any capability is created, the backend validates the configured trusted Portal origin. Only the Web launch receives a per-launch bridge nonce, and only its Editor `index.html` receives the Web `postMessage` bootstrap. Other source files and native Editor content remain unchanged.
+The Web Portal Host Adapter uses an explicit `host_adapter: "web"` launch; native launches are not silently converted. Before any capability is created, the backend validates the configured trusted Portal origin. Only the Web launch receives a per-launch bridge nonce, and only its Editor `index.html` receives the Web `postMessage` bootstrap. Other source files and native Editor content remain unchanged.
 
 The Web child receives the same `minapp.state`, `minapp.userState`, and `minapp.authoring.load/save/getAsset/saveAsset/deleteAsset/preview/publish` surface. `getAsset` returns `{ bytes: Uint8Array, contentType }`; `saveAsset` accepts only a non-empty `Uint8Array`. Base64 exists only as the bridge transport representation and is not a second child API. The injected HTML contains the trusted Portal origin and the per-launch nonce, but does not contain the Cognito JWT, AWS credentials, Runtime token, Authoring token, or backend selector. Those capability tokens remain in the parent Portal adapter.
 
 The parent accepts a bridge request only when it comes from the exact Editor iframe window, the sandboxed child origin is still opaque (`"null"`), the launch nonce matches, the protocol version/request id are valid, and the method-specific fields are exact. In particular, `authoring.preview` carries only `expectedRevision`; the child cannot supply another `content_id`, `player_app_id`, API, or backend. Parent-to-child replies use `postMessage(..., "*")` because the sandboxed child has an opaque origin; the child accepts them only from its trusted configured Portal origin with the same nonce/version/request id.
 
-`apps/web/authoring_host_adapter.js` provides the reusable trusted-parent transport and discovery/Preview helpers. Production Web Portal project-list/editor-selection UI wiring is still tracked by #167. Until a Portal route explicitly installs this adapter, that route must not fall back to native assumptions, direct child credentials, or another storage/API path.
+`apps/web/authoring_host_adapter.js` provides the reusable trusted-parent transport and discovery/Preview helpers. `apps/web/hosted_authoring_portal.js` provides the format-neutral production Portal controller. The Girls Hosted Web Portal installs those common modules and exposes a production Authoring route that:
+
+- copies only validated active group IDs/names from the authenticated Portal shell;
+- discovers published Authoring apps and exposes each exact Editor `edits` contract as an explicit Editor/format choice;
+- lists projects by exact group + `content_format` and creates new work with exact `document: {}`;
+- launches the selected Editor through the explicit Web launch and installs `WebAuthoringHostAdapter` before loading the sandboxed child;
+- resolves Preview Players only by exact `accepts`; zero candidates fail, one candidate is used, and multiple candidates require explicit user selection;
+- displays Preview in a separate `sandbox="allow-scripts"` iframe and returns only `content_format`, `draft_revision`, and `player_app_id` to the Editor after Preview closes;
+- destroys the active Adapter when the Editor closes, the user leaves Authoring, or the Hosted session logs out.
+
+The production route does not pass the Cognito JWT, Authoring/Runtime capability tokens, `content_id`, Player selectors, or backend selectors into child JavaScript. It does not fall back to native assumptions, another Player, another API, or another storage path when discovery/launch/Preview fails.
 
 ## 10. Delete an Authoring Project
 
@@ -303,5 +313,7 @@ Alice uploads Editor + Player
 `backend/tests/test_hosted_authoring_deletion.py` verifies unpublished cleanup, retry after a partial S3 failure, physical removal of exact versioned Authoring objects, and deletion of the linked normal Hosted app for a published work. `backend/tests/test_hosted_authoring_delete_entry.py` verifies that the deployed Hosted entrypoint accepts only the authenticated bodyless/queryless DELETE route.
 
 `backend/tests/test_hosted_authoring_web_bridge.py` verifies explicit Web launch, pre-capability Portal-origin validation, Web-only bootstrap injection, native-content non-regression, and absence of Runtime/Authoring capability tokens from the injected Editor HTML. `apps/web/authoring_host_adapter.test.js` verifies iframe/source/origin/nonce scoping, exact method schemas, child inability to smuggle content/player selectors, Runtime/User State capability routing, and preservation of backend Authoring errors.
+
+`apps/web/hosted_authoring_portal.test.js` verifies production project-list scope, exact `{}` creation, backend error preservation, script installation order, sandbox policy, and that the Authoring route stays separate from the legacy Girls view router rather than weakening its fail-fast behavior.
 
 The roundtrip test also verifies that Alice's later unpublished Editor draft is not exposed to Bob and that Bob cannot manage Alice's Editor source.
