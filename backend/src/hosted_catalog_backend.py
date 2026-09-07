@@ -10,6 +10,11 @@ import zipfile
 from pathlib import PurePosixPath
 from typing import Any
 
+from app_zip import (
+    MAX_ZIP_BYTES,
+    content_type as _content_type,
+    safe_zip_paths as _safe_zip_paths,
+)
 from aws_backend import _aws_error_code, _item_string, _required_env, _string_attr
 from errors import ApiProblem
 from hosted_platform_backend import (
@@ -20,7 +25,6 @@ from hosted_platform_backend import (
     _runtime_token_hash,
     _validate_state_key,
 )
-from phase2_backend import MAX_ZIP_BYTES, _content_type, _safe_zip_paths
 
 MAX_APPS_PER_GROUP = 20
 MAX_RUNTIME_KEYS_PER_APP = 64

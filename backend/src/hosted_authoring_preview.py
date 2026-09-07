@@ -9,6 +9,7 @@ import time
 import zipfile
 from typing import Any
 
+from app_zip import content_type as _content_type
 from aws_backend import _item_string, _string_attr
 from errors import ApiProblem
 from hosted_app_management import PREVIEW_SESSION_SECONDS, PREVIEW_TTL_GRACE_SECONDS
@@ -22,7 +23,7 @@ from hosted_authoring_backend import (
     _required_item_number,
     validate_content_format,
 )
-from hosted_catalog_backend import _content_type, _files_json, _item_files, _optional_number
+from hosted_catalog_backend import _files_json, _item_files, _optional_number
 from hosted_platform_backend import RUNTIME_SESSION_TTL_SECONDS, _now_iso, _number_attr
 
 
