@@ -10,6 +10,7 @@ from typing import Any
 
 from aws_backend import _item_string, _string_attr
 from errors import ApiProblem
+from hosted_authoring_app_source import resolve_authoring_app_source
 import hosted_authoring_session
 from hosted_catalog_backend import (
     _content_type,
@@ -42,8 +43,11 @@ def create_launch(
     )
     group_id = _item_string(editor, "group_id")
     content_format = str(authoring_result["content_format"])
-
-    source_key, source_files, source_sha256 = _editor_source(backend, editor)
+    source = resolve_authoring_app_source(
+        backend,
+        editor,
+        require_master_data_target=False,
+    )
 
     content_token = secrets.token_urlsafe(32)
     content_token_hash = hashlib.sha256(content_token.encode("ascii")).hexdigest()
@@ -70,9 +74,11 @@ def create_launch(
         "content_id": _string_attr(content_id),
         "content_format": _string_attr(content_format),
         "editor_app_id": _string_attr(editor_app_id),
-        "source_key": _string_attr(source_key),
-        "source_sha256": _string_attr(source_sha256),
-        "source_files_json": _string_attr(_files_json(source_files)),
+        "source_bucket": _string_attr(source.bucket),
+        "source_key": _string_attr(source.key),
+        "source_sha256": _string_attr(source.sha256),
+        "source_files_json": _string_attr(_files_json(list(source.files))),
+        "source_version": _number_attr(source.version),
         "expires_at_epoch": _number_attr(content_expires_at),
         "ttl_epoch": _number_attr(
             content_expires_at + AUTHORING_EDITOR_TTL_GRACE_SECONDS
@@ -172,12 +178,17 @@ def get_editor_file(
         editor,
         _item_string(item, "content_format"),
     )
-    current_source_key, _, current_sha256 = _editor_source(backend, editor)
-    if current_source_key != _item_string(item, "source_key"):
-        raise RuntimeError("Authoring Editor source key changed during a live session")
-    if current_sha256 != _item_string(item, "source_sha256"):
-        raise RuntimeError("Authoring Editor source changed during a live session")
+    # Revalidate that the app is still a visible/published Authoring app, but
+    # keep serving the immutable source version pinned when the session began.
+    resolve_authoring_app_source(
+        backend,
+        editor,
+        require_master_data_target=False,
+    )
 
+    source_bucket = _item_string(item, "source_bucket")
+    if source_bucket not in {backend._upload_bucket, backend._published_bucket}:
+        raise RuntimeError("Authoring Editor session contains an unexpected source bucket")
     normalized = backend._normalize_content_path(path)
     expected_files = _item_files(item, "source_files_json")
     if normalized not in expected_files:
@@ -186,12 +197,12 @@ def get_editor_file(
             "authoring_editor_file_not_found",
             "Authoring Editor file was not found.",
         )
-    zip_bytes, actual_files, _ = backend._read_zip_object(
-        bucket=backend._upload_bucket,
+    zip_bytes, actual_files, actual_sha256 = backend._read_zip_object(
+        bucket=source_bucket,
         key=_item_string(item, "source_key"),
         expected_sha256=_item_string(item, "source_sha256"),
     )
-    if actual_files != expected_files:
+    if actual_files != expected_files or actual_sha256 != _item_string(item, "source_sha256"):
         raise RuntimeError("Authoring Editor ZIP manifest does not match session metadata")
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
         try:
@@ -203,27 +214,3 @@ def get_editor_file(
                 "Authoring Editor file was not found.",
             ) from exc
     return data, _content_type(normalized)
-
-
-def _editor_source(
-    backend: Any,
-    editor: dict[str, Any],
-) -> tuple[str, list[str], str]:
-    if _item_string(editor, "source_kind") != "builtin":
-        raise ApiProblem(
-            409,
-            "editor_launch_source_unsupported",
-            "This Editor source type is not yet supported for Authoring launch.",
-        )
-    builtin_id = _item_string(editor, "builtin_id")
-    builtin_version = _optional_number(editor, "builtin_version")
-    template = backend._hosted_builtin_templates().get(builtin_id)
-    if template is None or builtin_version != template.get("version"):
-        raise RuntimeError("Installed Authoring Editor references an unsupported template version")
-    source_key = template.get("source_key")
-    if not isinstance(source_key, str) or not source_key:
-        raise RuntimeError("Authoring Editor template has no immutable source key")
-    _, files, sha256 = backend._read_parent_source(editor)
-    if not files or "index.html" not in files:
-        raise RuntimeError("Authoring Editor source must contain index.html")
-    return source_key, files, sha256
