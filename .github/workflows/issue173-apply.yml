@@ -25,6 +25,29 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/issue173_apply.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''text = replace_once(
+              text,
+              "    _, app = _owned_editable_app(backend, auth_subject, app_id)\\n",
+              "    _, app = _author_editable_app(backend, auth_subject, app_id)\\n",
+              "managed app detail author check",
+          )'''
+          new = '''old = """def get_managed_app(backend: Any, auth_subject: str, app_id: str) -> dict[str, Any]:
+              _, app = _owned_editable_app(backend, auth_subject, app_id)
+              payload = _managed_payload(backend, app)
+          """
+          new = """def get_managed_app(backend: Any, auth_subject: str, app_id: str) -> dict[str, Any]:
+              _, app = _author_editable_app(backend, auth_subject, app_id)
+              payload = _managed_payload(backend, app)
+          """
+          text = replace_once(text, old, new, "managed app detail author check")'''
+          if text.count(old) != 1:
+              raise RuntimeError(f'apply-script patch expected one target, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
           python .github/issue173_apply.py
           python -m compileall -q backend/src backend/tests
           python -m unittest discover -s backend/tests -v
