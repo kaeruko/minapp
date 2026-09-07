@@ -5,7 +5,7 @@ import 'api.dart';
 import 'hosted_api.dart';
 import 'hosted_app_webview.dart';
 import 'hosted_authoring_contract_api.dart';
-import 'hosted_authoring_projects_page.dart';
+import 'hosted_authoring_editor_action.dart';
 
 class HostedApp extends StatelessWidget {
   const HostedApp({
@@ -900,45 +900,19 @@ class _HostedGroupPageState extends State<HostedGroupPage> {
     if (contract == null || contract.edits.isEmpty) {
       throw StateError('Selected app is not an Authoring Editor.');
     }
-    String? contentFormat;
-    if (contract.edits.length == 1) {
-      contentFormat = contract.edits.single;
-    } else {
-      contentFormat = await showDialog<String>(
-        context: context,
-        builder: (BuildContext dialogContext) => SimpleDialog(
-          title: const Text('作る形式を選ぶ'),
-          children: contract.edits
-              .map(
-                (String format) => SimpleDialogOption(
-                  onPressed: () => Navigator.of(dialogContext).pop(format),
-                  child: Text(format),
-                ),
-              )
-              .toList(growable: false),
-        ),
-      );
-    }
-    if (contentFormat == null || !mounted) return;
-
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (BuildContext context) => HostedAuthoringProjectsPage(
-          baseUri: widget.api.baseUri,
-          accessToken: widget.session.accessToken,
-          groupId: widget.group.groupId,
-          editorAppId: app.appId,
-          runtimeTransport: widget.api.runtimeClient,
-          definition: HostedAuthoringProjectDefinition(
-            contentFormat: contentFormat!,
-            pageTitle: app.title,
-            collectionTitle: '作品',
-            emptyTitle: 'まだ作品がありません',
-            emptyBody: '新しい作品を作ると、このEditorで編集できます。',
-          ),
-          errorMessage: hostedMessageFor,
-        ),
-      ),
+    await openHostedAuthoringProjects(
+      context: context,
+      baseUri: widget.api.baseUri,
+      accessToken: widget.session.accessToken,
+      groupId: widget.group.groupId,
+      editorAppId: app.appId,
+      runtimeTransport: widget.api.runtimeClient,
+      editorFormats: contract.edits,
+      errorMessage: hostedMessageFor,
+      pageTitle: app.title,
+      collectionTitle: '作品',
+      emptyTitle: 'まだ作品がありません',
+      emptyBody: '新しい作品を作ると、このEditorで編集できます。',
     );
     if (mounted) await _load();
   }

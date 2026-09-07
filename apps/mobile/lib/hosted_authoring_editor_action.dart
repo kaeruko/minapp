@@ -4,6 +4,67 @@ import 'hosted_authoring_contract_api.dart';
 import 'hosted_authoring_projects_page.dart';
 import 'hosted_runtime_bridge.dart';
 
+Future<void> openHostedAuthoringProjects({
+  required BuildContext context,
+  required Uri baseUri,
+  required String accessToken,
+  required String groupId,
+  required String editorAppId,
+  required HostedRuntimeTransport runtimeTransport,
+  required List<String> editorFormats,
+  required HostedAuthoringErrorMessage errorMessage,
+  required String pageTitle,
+  required String collectionTitle,
+  required String emptyTitle,
+  required String emptyBody,
+}) async {
+  if (editorFormats.isEmpty) {
+    throw StateError('Selected app is not an Authoring Editor.');
+  }
+
+  String? contentFormat;
+  if (editorFormats.length == 1) {
+    contentFormat = editorFormats.single;
+  } else {
+    contentFormat = await showDialog<String>(
+      context: context,
+      builder: (BuildContext dialogContext) => SimpleDialog(
+        title: const Text('どの作品形式を編集する？'),
+        children: editorFormats
+            .map(
+              (String format) => SimpleDialogOption(
+                key: Key('hosted-authoring-format-$format'),
+                onPressed: () => Navigator.of(dialogContext).pop(format),
+                child: Text(format),
+              ),
+            )
+            .toList(growable: false),
+      ),
+    );
+  }
+  if (contentFormat == null || !context.mounted) return;
+
+  await Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(
+      builder: (BuildContext context) => HostedAuthoringProjectsPage(
+        baseUri: baseUri,
+        accessToken: accessToken,
+        groupId: groupId,
+        editorAppId: editorAppId,
+        runtimeTransport: runtimeTransport,
+        definition: HostedAuthoringProjectDefinition(
+          contentFormat: contentFormat!,
+          pageTitle: pageTitle,
+          collectionTitle: collectionTitle,
+          emptyTitle: emptyTitle,
+          emptyBody: emptyBody,
+        ),
+        errorMessage: errorMessage,
+      ),
+    ),
+  );
+}
+
 class HostedAuthoringEditorAction extends StatefulWidget {
   const HostedAuthoringEditorAction({
     required this.baseUri,
@@ -98,55 +159,27 @@ class _HostedAuthoringEditorActionState
     }
   }
 
-  Future<String?> _chooseEditorFormat(List<String> formats) async {
-    if (formats.isEmpty) return null;
-    if (formats.length == 1) return formats.single;
-    if (!mounted) return null;
-    return showDialog<String>(
-      context: context,
-      builder: (BuildContext dialogContext) => SimpleDialog(
-        title: const Text('どの作品形式を編集する？'),
-        children: formats
-            .map(
-              (String format) => SimpleDialogOption(
-                key: Key('hosted-authoring-format-$format'),
-                onPressed: () => Navigator.of(dialogContext).pop(format),
-                child: Text(format),
-              ),
-            )
-            .toList(growable: false),
-      ),
-    );
-  }
-
   Future<void> _openProjects() async {
     if (_busy) return;
     final List<String> formats = _editorFormats ?? const <String>[];
-    final String? contentFormat = await _chooseEditorFormat(formats);
-    if (contentFormat == null || !mounted) return;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(
-          builder: (BuildContext context) => HostedAuthoringProjectsPage(
-            baseUri: widget.baseUri,
-            accessToken: widget.accessToken,
-            groupId: widget.groupId,
-            editorAppId: widget.editorAppId,
-            runtimeTransport: widget.runtimeTransport,
-            definition: HostedAuthoringProjectDefinition(
-              contentFormat: contentFormat,
-              pageTitle: widget.pageTitle,
-              collectionTitle: widget.collectionTitle,
-              emptyTitle: widget.emptyTitle,
-              emptyBody: widget.emptyBody,
-            ),
-            errorMessage: widget.errorMessage,
-          ),
-        ),
+      await openHostedAuthoringProjects(
+        context: context,
+        baseUri: widget.baseUri,
+        accessToken: widget.accessToken,
+        groupId: widget.groupId,
+        editorAppId: widget.editorAppId,
+        runtimeTransport: widget.runtimeTransport,
+        editorFormats: formats,
+        errorMessage: widget.errorMessage,
+        pageTitle: widget.pageTitle,
+        collectionTitle: widget.collectionTitle,
+        emptyTitle: widget.emptyTitle,
+        emptyBody: widget.emptyBody,
       );
     } catch (error) {
       if (mounted) setState(() => _error = widget.errorMessage(error));
