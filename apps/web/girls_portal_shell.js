@@ -129,20 +129,20 @@
     previewPanel.classList.add("hidden");
   }
 
-  function ownerGroups() {
+  function activeGroups() {
     return [...uploadGroup.options].map((option) => {
       if (!ID_PATTERN.test(option.value)) {
-        throw new Error("Girls portal received an invalid owner group id.");
+        throw new Error("Girls portal received an invalid active group id.");
       }
       if (option.textContent === null || option.textContent.trim().length === 0) {
-        throw new Error("Girls portal received an owner group without a name.");
+        throw new Error("Girls portal received an active group without a name.");
       }
       return { groupId: option.value, name: option.textContent.trim() };
     });
   }
 
   function syncGroupLabels() {
-    const groups = ownerGroups();
+    const groups = activeGroups();
     if (groups.length === 0) {
       shellGroupName.textContent = "グループなし";
       homeGroupSummary.textContent = "追加できるグループがありません";
@@ -321,35 +321,63 @@
     return await hostedRequest(path, "POST");
   }
 
-  function validateGroupAppsPayload(payload, group) {
+  function validateManagedAppsPayload(payload) {
     const keys = Object.keys(payload);
     if (keys.length !== 1 || keys[0] !== "apps") {
-      throw new Error(`Hosted apps response for ${group.name} has invalid fields.`);
+      throw new Error("Managed Girls apps response has invalid fields.");
     }
     if (!Array.isArray(payload.apps)) {
-      throw new Error(`Hosted apps response for ${group.name} has no apps list.`);
+      throw new Error("Managed Girls apps response has no apps list.");
     }
+    const allowedFields = new Set([
+      "app_id", "group_id", "owner_user_id", "title", "source_kind", "created_at",
+      "builtin_id", "builtin_asset_path", "parent_app_id", "source_sha256",
+      "source_updated_at", "published_sha256", "published_at", "deletion_state",
+      "builtin_version", "source_revision", "published_version", "editable",
+      "visibility", "stats", "group_name",
+    ]);
     return payload.apps.map((rawApp) => {
-      const app = requirePlainObject(rawApp, "Hosted app");
-      for (const field of ["app_id", "group_id", "title", "source_kind", "created_at"]) {
-        if (!(field in app)) throw new Error(`Hosted app is missing field: ${field}`);
+      const app = requirePlainObject(rawApp, "Managed Girls app");
+      const actual = Object.keys(app);
+      for (const field of [
+        "app_id", "group_id", "owner_user_id", "title", "source_kind", "created_at",
+        "editable", "visibility", "stats", "group_name",
+      ]) {
+        if (!actual.includes(field)) throw new Error(`Managed Girls app is missing field: ${field}`);
       }
-      if (!ID_PATTERN.test(app.app_id)) throw new Error("Hosted app has an invalid app_id.");
-      if (app.group_id !== group.groupId) throw new Error("Hosted app group_id mismatch.");
-      requireString(app.title, "Hosted app title");
-      requireString(app.created_at, "Hosted app created_at");
+      for (const field of actual) {
+        if (!allowedFields.has(field)) throw new Error(`Managed Girls app contained unexpected field: ${field}`);
+      }
+      if (!ID_PATTERN.test(app.app_id)) throw new Error("Managed Girls app has an invalid app_id.");
+      if (!ID_PATTERN.test(app.group_id)) throw new Error("Managed Girls app has an invalid group_id.");
+      if (!ID_PATTERN.test(app.owner_user_id)) throw new Error("Managed Girls app has an invalid owner_user_id.");
+      const title = requireString(app.title, "Managed Girls app title");
+      const groupName = requireString(app.group_name, "Managed Girls app group_name");
+      const createdAt = requireString(app.created_at, "Managed Girls app created_at");
+      if (Number.isNaN(Date.parse(createdAt))) throw new Error("Managed Girls app created_at is invalid.");
+      if (typeof app.editable !== "boolean") throw new Error("Managed Girls app editable is invalid.");
+      if (app.visibility !== "visible" && app.visibility !== "hidden") {
+        throw new Error("Managed Girls app visibility is invalid.");
+      }
+      const stats = requirePlainObject(app.stats, "Managed Girls app stats");
+      requireExactFields(stats, ["total_plays", "unique_users", "monthly_plays"], "Managed Girls app stats");
+      for (const field of ["total_plays", "unique_users", "monthly_plays"]) {
+        if (!Number.isInteger(stats[field]) || stats[field] < 0) {
+          throw new Error(`Managed Girls app stats ${field} is invalid.`);
+        }
+      }
       const publishedVersion = app.published_version;
-      if (publishedVersion !== null && publishedVersion !== undefined &&
-          (!Number.isInteger(publishedVersion) || publishedVersion < 1)) {
-        throw new Error("Hosted app has an invalid published_version.");
+      if (publishedVersion !== undefined && (!Number.isInteger(publishedVersion) || publishedVersion < 1)) {
+        throw new Error("Managed Girls app published_version is invalid.");
       }
       return {
         appId: app.app_id,
-        groupId: group.groupId,
-        title: app.title,
-        groupName: group.name,
-        createdAt: app.created_at,
-        published: Number.isInteger(publishedVersion) && publishedVersion >= 1,
+        groupId: app.group_id,
+        ownerUserId: app.owner_user_id,
+        title,
+        groupName,
+        createdAt,
+        published: Number.isInteger(publishedVersion),
       };
     });
   }
@@ -376,7 +404,7 @@
       if (generation !== previewGeneration) return;
       requireExactFields(
         payload,
-        ["app_id", "group_id", "source_revision", "content_path", "expires_in"],
+        ["app_id", "group_id", "source_revision", "content_path", "expires_in", "runtime_token", "runtime_expires_in"],
         "Draft preview session response",
       );
       if (requireString(payload.app_id, "preview app_id") !== app.appId) {
@@ -387,6 +415,8 @@
       }
       requirePositiveInteger(payload.source_revision, "preview source_revision");
       requirePositiveInteger(payload.expires_in, "preview expires_in");
+      requireString(payload.runtime_token, "preview runtime_token");
+      requirePositiveInteger(payload.runtime_expires_in, "preview runtime_expires_in");
       const contentPath = requireString(payload.content_path, "preview content_path");
       if (!PREVIEW_CONTENT_PATH_PATTERN.test(contentPath)) {
         throw new Error("Preview session returned an invalid content path.");
@@ -458,22 +488,14 @@
     appList.replaceChildren();
 
     try {
-      const groups = ownerGroups();
-      if (groups.length === 0) {
-        appsStatus.textContent = "自分がオーナーのグループがまだありません。Girlsアプリでグループを作ってね。";
-        return;
-      }
-      const results = await Promise.all(groups.map(async (group) => {
-        const payload = await hostedGet(`/hosted/groups/${group.groupId}/apps`);
-        return validateGroupAppsPayload(payload, group);
-      }));
+      const payload = await hostedGet("/hosted/my/apps");
       if (generation !== appsLoadGeneration) return;
-      const apps = results.flat();
+      const apps = validateManagedAppsPayload(payload);
       apps.sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
       renderApps(apps);
       appsStatus.textContent = apps.length === 0
-        ? "まだ追加したアプリはありません。"
-        : `${apps.length}個のアプリがあります。`;
+        ? "まだ自分で作ったアプリはありません。"
+        : `${apps.length}個の自分のアプリがあります。`;
     } catch (error) {
       if (generation !== appsLoadGeneration) return;
       setMessage(appsError, errorMessage(error));

@@ -354,7 +354,7 @@ class HostedGroupApp {
     required this.publishedVersion,
     this.builtinId,
     this.builtinAssetPath,
-    this.ownerUserId,
+    required this.ownerUserId,
   });
 
   final String appId;
@@ -365,7 +365,7 @@ class HostedGroupApp {
   final int? publishedVersion;
   final String? builtinId;
   final String? builtinAssetPath;
-  final String? ownerUserId;
+  final String ownerUserId;
 
   bool get isPublished => publishedVersion != null;
 
@@ -403,6 +403,7 @@ class HostedGroupApp {
       'title',
       'source_kind',
       'created_at',
+      'owner_user_id',
     ]) {
       if (!actual.contains(field)) {
         throw FormatException('Hosted group app is missing field: $field.');
@@ -413,10 +414,6 @@ class HostedGroupApp {
         (publishedVersion is! int || publishedVersion < 1)) {
       throw const FormatException('Hosted group app has invalid published_version.');
     }
-    final String? ownerUserId = _optionalString(json, 'owner_user_id');
-    if (ownerUserId != null && !_hostedHexIdPattern.hasMatch(ownerUserId)) {
-      throw const FormatException('Hosted group app has invalid owner_user_id.');
-    }
     return HostedGroupApp(
       appId: _requireHexId(json, 'app_id'),
       groupId: _requireHexId(json, 'group_id'),
@@ -426,7 +423,7 @@ class HostedGroupApp {
       publishedVersion: publishedVersion as int?,
       builtinId: _optionalString(json, 'builtin_id'),
       builtinAssetPath: _optionalString(json, 'builtin_asset_path'),
-      ownerUserId: ownerUserId,
+      ownerUserId: _requireHexId(json, 'owner_user_id'),
     );
   }
 }

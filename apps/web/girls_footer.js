@@ -151,7 +151,6 @@
   const appsStatus = document.getElementById("girls-apps-status");
   const appsError = document.getElementById("girls-apps-error");
   const appsRefresh = document.getElementById("girls-apps-refresh");
-  const uploadGroup = document.getElementById("girls-upload-group");
   const logoutButton = document.getElementById("girls-logout");
   const previewPanel = document.getElementById("girls-preview-panel");
   const previewClose = document.getElementById("girls-preview-close");
@@ -161,7 +160,6 @@
     [appsStatus, "#girls-apps-status", HTMLElement],
     [appsError, "#girls-apps-error", HTMLElement],
     [appsRefresh, "#girls-apps-refresh", HTMLButtonElement],
-    [uploadGroup, "#girls-upload-group", HTMLSelectElement],
     [logoutButton, "#girls-logout", HTMLButtonElement],
     [previewPanel, "#girls-preview-panel", HTMLElement],
     [previewClose, "#girls-preview-close", HTMLButtonElement],
@@ -305,64 +303,63 @@
     return payload;
   }
 
-  function ownerGroups() {
-    return [...uploadGroup.options].map((option) => {
-      if (!ID_PATTERN.test(option.value)) {
-        throw new Error("Girls portal contains an invalid owner group id.");
-      }
-      const name = option.textContent === null ? "" : option.textContent.trim();
-      if (name.length === 0) throw new Error("Girls portal contains an owner group without a name.");
-      return { groupId: option.value, name };
-    });
-  }
-
   async function loadAppMetadata() {
-    const groups = ownerGroups();
-    const [managedPayload, groupResults] = await Promise.all([
-      apiRequest("/hosted/my/apps"),
-      Promise.all(groups.map(async (group) => {
-        const payload = await apiRequest(`/hosted/groups/${group.groupId}/apps`);
-        if (!Array.isArray(payload.apps)) {
-          throw new Error(`Hosted apps response for ${group.name} has no apps list.`);
-        }
-        return payload.apps.map((rawApp) => {
-          const app = requirePlainObject(rawApp, "Hosted app");
-          if (!ID_PATTERN.test(app.app_id)) throw new Error("Hosted app has an invalid app_id.");
-          if (app.group_id !== group.groupId) throw new Error("Hosted app group_id mismatch.");
-          const title = requireString(app.title, "Hosted app title");
-          const createdAt = requireString(app.created_at, "Hosted app created_at");
-          const parsedDate = new Date(createdAt);
-          if (Number.isNaN(parsedDate.getTime())) throw new Error("Hosted app created_at is invalid.");
-          return {
-            appId: app.app_id,
-            groupId: group.groupId,
-            groupName: group.name,
-            title,
-            dateLabel: parsedDate.toLocaleDateString("ja-JP"),
-            thumbnailUrl: optionalThumbnailUrl(app.thumbnail_url, "Hosted app thumbnail_url"),
-          };
-        });
-      })),
-    ]);
-
-    if (!Array.isArray(managedPayload.apps)) {
-      throw new Error("Managed Girls apps response has no apps list.");
+    const managedPayload = await apiRequest("/hosted/my/apps");
+    const keys = Object.keys(managedPayload);
+    if (keys.length !== 1 || keys[0] !== "apps" || !Array.isArray(managedPayload.apps)) {
+      throw new Error("Managed Girls apps response has invalid fields.");
     }
+    const allowedFields = new Set([
+      "app_id", "group_id", "owner_user_id", "title", "source_kind", "created_at",
+      "builtin_id", "builtin_asset_path", "parent_app_id", "source_sha256",
+      "source_updated_at", "published_sha256", "published_at", "deletion_state",
+      "builtin_version", "source_revision", "published_version", "editable",
+      "visibility", "stats", "group_name",
+    ]);
+    const apps = [];
     const managedById = new Map();
     for (const rawManaged of managedPayload.apps) {
       const managed = requirePlainObject(rawManaged, "Managed Girls app");
+      const actual = Object.keys(managed);
+      for (const field of [
+        "app_id", "group_id", "owner_user_id", "title", "source_kind", "created_at",
+        "editable", "visibility", "stats", "group_name",
+      ]) {
+        if (!actual.includes(field)) throw new Error(`Managed Girls app is missing field: ${field}`);
+      }
+      for (const field of actual) {
+        if (!allowedFields.has(field)) throw new Error(`Managed Girls app contained unexpected field: ${field}`);
+      }
       if (!ID_PATTERN.test(managed.app_id)) throw new Error("Managed Girls app has an invalid app_id.");
+      if (!ID_PATTERN.test(managed.group_id)) throw new Error("Managed Girls app has an invalid group_id.");
+      if (!ID_PATTERN.test(managed.owner_user_id)) throw new Error("Managed Girls app has an invalid owner_user_id.");
       if (managed.visibility !== "visible" && managed.visibility !== "hidden") {
         throw new Error("Managed Girls app has an invalid visibility state.");
       }
+      if (typeof managed.editable !== "boolean") throw new Error("Managed Girls app has invalid editable.");
+      const title = requireString(managed.title, "Managed Girls app title");
+      const groupName = requireString(managed.group_name, "Managed Girls app group_name");
+      const createdAt = requireString(managed.created_at, "Managed Girls app created_at");
+      const parsedDate = new Date(createdAt);
+      if (Number.isNaN(parsedDate.getTime())) throw new Error("Managed Girls app created_at is invalid.");
+      requirePlainObject(managed.stats, "Managed Girls app stats");
+      const app = {
+        appId: managed.app_id,
+        groupId: managed.group_id,
+        ownerUserId: managed.owner_user_id,
+        groupName,
+        title,
+        dateLabel: parsedDate.toLocaleDateString("ja-JP"),
+        thumbnailUrl: optionalThumbnailUrl(managed.thumbnail_url, "Managed Girls app thumbnail_url"),
+      };
+      apps.push(app);
       managedById.set(managed.app_id, {
         appId: managed.app_id,
         visibility: managed.visibility,
-        thumbnailUrl: optionalThumbnailUrl(managed.thumbnail_url, "Managed Girls app thumbnail_url"),
+        thumbnailUrl: app.thumbnailUrl,
       });
     }
-
-    return { apps: groupResults.flat(), managedById };
+    return { apps, managedById };
   }
 
   function cardIdentity(card) {

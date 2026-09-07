@@ -232,9 +232,8 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
   Future<void> _openUploadPortal() async {
     final List<HostedGroup>? groups = _groups;
     if (groups == null) return;
-    final bool hasOwnedGroup = groups.any((HostedGroup group) => group.isOwner);
-    if (!hasOwnedGroup) {
-      setState(() => _error = 'アプリを追加するには、自分がオーナーのグループが必要です。');
+    if (groups.isEmpty) {
+      setState(() => _error = 'アプリを追加するには、参加中のグループが必要です。');
       return;
     }
 

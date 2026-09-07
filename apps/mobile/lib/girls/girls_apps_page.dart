@@ -43,7 +43,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
   late final GirlsAppManagementApi _managementApi;
   late final GirlsBuiltinInstallApi _builtinInstallApi;
   List<ManagedGirlsApp>? _apps;
-  List<HostedGroup>? _ownerGroups;
+  List<HostedGroup>? _activeGroups;
   bool _busy = false;
   String? _error;
 
@@ -76,9 +76,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       );
       if (!mounted) return;
       setState(() {
-        _ownerGroups = groups
-            .where((HostedGroup group) => group.isOwner)
-            .toList(growable: false);
+        _activeGroups = groups;
         _apps = apps;
       });
     } catch (error) {
@@ -89,10 +87,10 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
   }
 
   Future<void> _openUploadPortal() async {
-    final List<HostedGroup>? ownerGroups = _ownerGroups;
-    if (ownerGroups == null) return;
-    if (ownerGroups.isEmpty) {
-      setState(() => _error = 'アプリを追加するには、自分がオーナーのグループが必要です。');
+    final List<HostedGroup>? activeGroups = _activeGroups;
+    if (activeGroups == null) return;
+    if (activeGroups.isEmpty) {
+      setState(() => _error = 'アプリを追加するには、参加中のグループが必要です。');
       return;
     }
 
@@ -149,7 +147,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
     );
   }
 
-  Future<HostedGroup?> _chooseOwnerGroup(List<HostedGroup> groups) async {
+  Future<HostedGroup?> _chooseActiveGroup(List<HostedGroup> groups) async {
     if (groups.length == 1) return groups.single;
     return showDialog<HostedGroup>(
       context: context,
@@ -169,8 +167,8 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
 
   Future<void> _openNovelMaker() async {
     final List<ManagedGirlsApp>? apps = _apps;
-    final List<HostedGroup>? ownerGroups = _ownerGroups;
-    if (apps == null || ownerGroups == null) return;
+    final List<HostedGroup>? activeGroups = _activeGroups;
+    if (apps == null || activeGroups == null) return;
 
     final List<ManagedGirlsApp> installedEditors = apps
         .where(
@@ -186,11 +184,11 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       return;
     }
 
-    if (ownerGroups.isEmpty) {
-      setState(() => _error = 'ノベルゲームメーカーを追加するには、自分がオーナーのグループが必要です。');
+    if (activeGroups.isEmpty) {
+      setState(() => _error = 'ノベルゲームメーカーを追加するには、参加中のグループが必要です。');
       return;
     }
-    final HostedGroup? group = await _chooseOwnerGroup(ownerGroups);
+    final HostedGroup? group = await _chooseActiveGroup(activeGroups);
     if (group == null || !mounted) return;
 
     setState(() {
