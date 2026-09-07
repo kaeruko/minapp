@@ -27,8 +27,12 @@ from hosted_authoring_backend import (
 
 _CONTENT_ID_RE = r"([0-9a-f]{32})"
 _GROUP_ID_RE = r"([0-9a-f]{32})"
+_APP_ID_RE = r"([0-9a-f]{32})"
 _PROJECTS_RE = re.compile(r"^/hosted/authoring/projects$")
 _GROUP_APPS_RE = re.compile(rf"^/hosted/authoring/groups/{_GROUP_ID_RE}/apps$")
+_GROUP_APP_CONTRACT_RE = re.compile(
+    rf"^/hosted/authoring/groups/{_GROUP_ID_RE}/apps/{_APP_ID_RE}/contract$"
+)
 _GROUP_PROJECTS_RE = re.compile(rf"^/hosted/authoring/groups/{_GROUP_ID_RE}/projects$")
 _PROJECT_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}$")
 _DOCUMENT_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/document$")
@@ -44,6 +48,17 @@ class AuthoringBackend(Protocol):
         group_id: str,
         content_format: str,
         document: dict[str, Any],
+    ) -> dict[str, Any]: ...
+
+    def register_authoring_contract(
+        self,
+        auth_subject: str,
+        group_id: str,
+        app_id: str,
+        *,
+        edits: list[str],
+        accepts: list[str],
+        master_data_element_id: str | None,
     ) -> dict[str, Any]: ...
 
     def list_authoring_apps(
@@ -254,6 +269,44 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
                 group_id,
                 content_format,
                 document,
+            ),
+        )
+
+    contract_match = _GROUP_APP_CONTRACT_RE.fullmatch(path)
+    if contract_match is not None:
+        if method != "POST":
+            return None
+        _require_no_query(event)
+        payload = _authoring_json_body(event)
+        _require_fields(
+            payload,
+            required={"edits", "accepts", "master_data_element_id"},
+        )
+        edits = payload["edits"]
+        accepts = payload["accepts"]
+        target = payload["master_data_element_id"]
+        if not isinstance(edits, list) or not isinstance(accepts, list):
+            raise ApiProblem(
+                400,
+                "invalid_authoring_contract",
+                "edits and accepts must be arrays.",
+            )
+        if target is not None and not isinstance(target, str):
+            raise ApiProblem(
+                400,
+                "invalid_authoring_contract",
+                "master_data_element_id must be a string or null.",
+            )
+        group_id, app_id = contract_match.groups()
+        return _json_response(
+            200,
+            _get_backend().register_authoring_contract(
+                _auth_subject(event),
+                group_id,
+                app_id,
+                edits=edits,
+                accepts=accepts,
+                master_data_element_id=target,
             ),
         )
 

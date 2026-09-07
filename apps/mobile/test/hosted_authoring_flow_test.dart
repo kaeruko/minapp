@@ -10,6 +10,8 @@ import 'package:minapp_mobile/hosted_authoring_projects_api.dart';
 const String _groupId = '22222222222222222222222222222222';
 const String _contentId = '33333333333333333333333333333333';
 const String _editorAppId = '44444444444444444444444444444444';
+const String _publishedAppId = '55555555555555555555555555555555';
+const String _playerAppId = '66666666666666666666666666666666';
 const String _contentFormat = 'example/quiz@1';
 const String _runtimeToken = 'RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR';
 const String _authoringToken = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
@@ -76,6 +78,9 @@ Map<String, Object?> _published({required int revision}) => <String, Object?>{
       'content_format': _contentFormat,
       'published_version': 1,
       'source_revision': revision,
+      'published_app_id': _publishedAppId,
+      'player_app_id': _playerAppId,
+      'player_source_version': 2,
       'assets': <Object?>[],
       'published_at': '2026-09-06T10:20:00Z',
     };
@@ -221,6 +226,10 @@ void main() {
       }),
     );
     expect(bridgePublish['ok'], isTrue);
+    final Map<String, Object?> result =
+        bridgePublish['result']! as Map<String, Object?>;
+    expect(result['published_app_id'], _publishedAppId);
+    expect(result['player_app_id'], _playerAppId);
 
     expect(
       requests.map((http.Request request) => request.url.path).toList(),

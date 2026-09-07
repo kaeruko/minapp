@@ -166,7 +166,7 @@ class HostedAuthoringLaunchTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 404)
         self.assertEqual(caught.exception.error, "authoring_editor_content_not_found")
 
-    def test_non_builtin_editor_source_fails_without_partial_capabilities(self) -> None:
+    def test_unpublished_third_party_editor_fails_without_partial_capabilities(self) -> None:
         editor_item = self.metadata.items[(f"APP#{self.editor['app_id']}", "META")]
         group_item = self.metadata.items[
             (f"GROUP#{self.group['group_id']}", f"APP#{self.editor['app_id']}")
@@ -182,7 +182,7 @@ class HostedAuthoringLaunchTests(unittest.TestCase):
                 self.project["content_id"],
                 self.editor["app_id"],
             )
-        self.assertEqual(caught.exception.error, "editor_launch_source_unsupported")
+        self.assertEqual(caught.exception.error, "authoring_app_unpublished")
         self.assertEqual(set(self.metadata.items), before_keys)
 
 

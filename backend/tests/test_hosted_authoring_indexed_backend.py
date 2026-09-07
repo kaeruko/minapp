@@ -9,11 +9,14 @@ if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
 
 from aws_backend import _string_attr  # noqa: E402
+from errors import ApiProblem  # noqa: E402
+import hosted_app_management  # noqa: E402
 from hosted_authoring_indexed_backend import HostedAuthoringIndexedBackend  # noqa: E402
 from hosted_legal import PRIVACY_VERSION, TERMS_VERSION  # noqa: E402
+import hosted_upload  # noqa: E402
 from test_hosted_authoring_backend import AuthoringFakeDynamoDb  # noqa: E402
 from test_hosted_backend import FakeCognito  # noqa: E402
-from test_hosted_catalog_backend import FakeS3  # noqa: E402
+from test_hosted_catalog_backend import FakeS3, source_zip  # noqa: E402
 
 
 class HostedAuthoringIndexedBackendTests(unittest.TestCase):
@@ -56,6 +59,22 @@ class HostedAuthoringIndexedBackendTests(unittest.TestCase):
                     }
                 ],
             },
+        )
+
+    def _join_bob(self) -> str:
+        self.backend.register("bob", "secret12", TERMS_VERSION, PRIVACY_VERSION)
+        bob = self.cognito.users["bob"]["sub"]
+        invite = self.backend.create_invite(self.subject, self.group["group_id"])
+        self.backend.join_group(bob, invite["code"])
+        return bob
+
+    def _upload_editor(self) -> dict[str, object]:
+        return hosted_upload.create_uploaded_app(
+            self.backend,
+            self.subject,
+            self.group["group_id"],
+            "Quiz Editor",
+            source_zip("<!doctype html><h1>quiz-editor-v1</h1>"),
         )
 
     def test_create_writes_group_index_in_same_metadata_transaction(self) -> None:
@@ -105,6 +124,101 @@ class HostedAuthoringIndexedBackendTests(unittest.TestCase):
                 "accepts": ["minapp/novel@1"],
             },
         )
+
+    def test_third_party_contract_is_hidden_until_published_then_visible_to_member(self) -> None:
+        uploaded = self._upload_editor()
+        group_id = str(self.group["group_id"])
+        app_id = str(uploaded["app_id"])
+        contract = self.backend.register_authoring_contract(
+            self.subject,
+            group_id,
+            app_id,
+            edits=["example/quiz@1"],
+            accepts=[],
+            master_data_element_id=None,
+        )
+        self.assertEqual(contract["edits"], ["example/quiz@1"])
+        self.assertEqual(self.backend.list_authoring_apps(self.subject, group_id), [])
+
+        self.backend.publish_app(self.subject, group_id, app_id, 1)
+        bob = self._join_bob()
+        apps = self.backend.list_authoring_apps(bob, group_id)
+        self.assertEqual(
+            apps,
+            [
+                {
+                    "app_id": app_id,
+                    "group_id": group_id,
+                    "title": "Quiz Editor",
+                    "edits": ["example/quiz@1"],
+                    "accepts": [],
+                }
+            ],
+        )
+
+    def test_hidden_third_party_authoring_app_is_not_discoverable(self) -> None:
+        uploaded = self._upload_editor()
+        group_id = str(self.group["group_id"])
+        app_id = str(uploaded["app_id"])
+        self.backend.register_authoring_contract(
+            self.subject,
+            group_id,
+            app_id,
+            edits=["example/quiz@1"],
+            accepts=[],
+            master_data_element_id=None,
+        )
+        self.backend.publish_app(self.subject, group_id, app_id, 1)
+        hosted_app_management.set_visibility(
+            self.backend,
+            self.subject,
+            app_id,
+            hidden=True,
+        )
+        self.assertEqual(self.backend.list_authoring_apps(self.subject, group_id), [])
+
+    def test_non_owner_cannot_register_contract_for_another_users_app(self) -> None:
+        uploaded = self._upload_editor()
+        bob = self._join_bob()
+        with self.assertRaises(ApiProblem) as caught:
+            self.backend.register_authoring_contract(
+                bob,
+                self.group["group_id"],
+                str(uploaded["app_id"]),
+                edits=["example/quiz@1"],
+                accepts=[],
+                master_data_element_id=None,
+            )
+        self.assertEqual(caught.exception.status_code, 403)
+        self.assertEqual(caught.exception.error, "forbidden")
+
+    def test_player_contract_requires_explicit_master_data_target(self) -> None:
+        uploaded = self._upload_editor()
+        with self.assertRaises(ApiProblem) as caught:
+            self.backend.register_authoring_contract(
+                self.subject,
+                self.group["group_id"],
+                str(uploaded["app_id"]),
+                edits=[],
+                accepts=["example/quiz@1"],
+                master_data_element_id=None,
+            )
+        self.assertEqual(caught.exception.status_code, 400)
+        self.assertEqual(caught.exception.error, "invalid_authoring_contract")
+
+    def test_contract_rejects_duplicate_or_unversioned_formats(self) -> None:
+        uploaded = self._upload_editor()
+        for edits in (["example/quiz@1", "example/quiz@1"], ["not-versioned"]):
+            with self.subTest(edits=edits):
+                with self.assertRaises(ApiProblem):
+                    self.backend.register_authoring_contract(
+                        self.subject,
+                        self.group["group_id"],
+                        str(uploaded["app_id"]),
+                        edits=edits,
+                        accepts=[],
+                        master_data_element_id=None,
+                    )
 
     def test_corrupt_authoring_app_contract_fails_instead_of_disappearing(self) -> None:
         group_id = str(self.group["group_id"])

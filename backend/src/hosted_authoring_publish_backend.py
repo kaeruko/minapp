@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import uuid
+import zipfile
 from typing import Any
 
 from aws_backend import _aws_error_code, _item_string, _string_attr
 from errors import ApiProblem
+from hosted_authoring_app_source import resolve_authoring_app_source
 from hosted_authoring_backend import (
     MAX_AUTHORING_ASSET_BYTES,
     MAX_AUTHORING_DOCUMENT_BYTES,
@@ -20,8 +24,15 @@ from hosted_authoring_backend import (
     _validate_content_id,
     _validate_expected_revision,
 )
-from hosted_catalog_backend import _optional_number
+from hosted_authoring_preview import _compile_index_html, _require_player_support
+from hosted_catalog_backend import (
+    _files_json,
+    _item_files,
+    _optional_number,
+    _optional_string,
+)
 from hosted_platform_backend import _now_iso, _number_attr
+from phase2_backend import MAX_ZIP_BYTES, _safe_zip_paths
 
 MAX_AUTHORING_PUBLISHED_VERSIONS = 20
 
@@ -37,7 +48,7 @@ class AuthoringPublishCleanupError(RuntimeError):
 
 
 class HostedAuthoringPublishBackend(HostedAuthoringBackend):
-    """Materializes immutable Authoring revisions, then advances a publish pointer."""
+    """Publish immutable Authoring revisions as ordinary Hosted app artifacts."""
 
     def _owned_content(
         self,
@@ -117,10 +128,28 @@ class HostedAuthoringPublishBackend(HostedAuthoringBackend):
                 raise RuntimeError("Authoring revision asset size does not match manifest")
             asset_bytes[path] = data
 
+        player_selection = self._selected_player(current)
+        artifact_bytes, artifact_files = self._materialize_app_artifact(
+            document=document,
+            assets=asset_bytes,
+            selection=player_selection,
+        )
+        artifact_sha256 = hashlib.sha256(artifact_bytes).hexdigest()
+
         group_id = _item_string(current, "group_id")
         content_format = _item_string(current, "content_format")
+        owner_user_id = _item_string(current, "owner_user_id")
+        published_app_id = _optional_string(current, "published_app_id")
+        first_publish = published_app_id is None
+        if first_publish:
+            self._require_app_capacity(group_id)
+            published_app_id = uuid.uuid4().hex
+        assert published_app_id is not None
+
         written: list[tuple[str, str]] = []
         try:
+            # Keep the immutable Authoring publication materialization for
+            # revision history while also producing the normal app ZIP boundary.
             document_key = self._published_document_key(
                 group_id,
                 content_id,
@@ -170,30 +199,41 @@ class HostedAuthoringPublishBackend(HostedAuthoringBackend):
                     "revision": _asset_manifest_int(source_asset, "revision"),
                 }
 
-            verified_document = self._read_published_object(
-                key=document_key,
-                expected_sha256=document_sha256,
-                max_bytes=MAX_AUTHORING_DOCUMENT_BYTES,
+            artifact_key = self._published_source_key(
+                group_id,
+                published_app_id,
+                next_version,
             )
-            if verified_document != document_bytes:
-                raise RuntimeError("Published Authoring document changed during materialization")
-            for path, asset in published_assets.items():
-                verified_asset = self._read_published_object(
-                    key=_asset_manifest_string(asset, "key"),
-                    expected_sha256=_asset_manifest_string(asset, "sha256"),
-                    max_bytes=MAX_AUTHORING_ASSET_BYTES,
-                )
-                if len(verified_asset) != _asset_manifest_int(asset, "bytes"):
-                    raise RuntimeError(f"Published Authoring asset size mismatch: {path}")
+            artifact_s3_version_id = self._put_immutable_zip(
+                bucket=self._published_bucket,
+                key=artifact_key,
+                zip_bytes=artifact_bytes,
+                sha256=artifact_sha256,
+            )
+            written.append((artifact_key, artifact_s3_version_id))
+
+            # Read the finished ZIP through the same primitive used by Runtime
+            # before any pointer becomes visible.
+            verified_zip, verified_files, verified_sha256 = self._read_zip_object(
+                bucket=self._published_bucket,
+                key=artifact_key,
+                expected_sha256=artifact_sha256,
+            )
+            if (
+                verified_zip != artifact_bytes
+                or verified_files != artifact_files
+                or verified_sha256 != artifact_sha256
+            ):
+                raise RuntimeError("Published Authoring app artifact changed during verification")
 
             published_at = _now_iso()
-            manifest = {
+            authoring_manifest = {
                 "pk": _string_attr(f"CONTENT#{content_id}"),
                 "sk": _string_attr(f"PUBLISHED#{next_version:06d}"),
                 "entity": _string_attr("authoring_published_version"),
                 "content_id": _string_attr(content_id),
                 "group_id": _string_attr(group_id),
-                "owner_user_id": _string_attr(_item_string(current, "owner_user_id")),
+                "owner_user_id": _string_attr(owner_user_id),
                 "content_format": _string_attr(content_format),
                 "published_version": _number_attr(next_version),
                 "source_revision": _number_attr(expected_revision),
@@ -201,15 +241,40 @@ class HostedAuthoringPublishBackend(HostedAuthoringBackend):
                 "document_sha256": _string_attr(document_sha256),
                 "document_bytes": _number_attr(len(document_bytes)),
                 "assets_json": _string_attr(_assets_json(published_assets)),
+                "published_app_id": _string_attr(published_app_id),
+                "player_app_id": _string_attr(player_selection["player_app_id"]),
+                "player_source_version": _number_attr(player_selection["player_source_version"]),
+                "artifact_key": _string_attr(artifact_key),
+                "artifact_sha256": _string_attr(artifact_sha256),
+                "artifact_files_json": _string_attr(_files_json(artifact_files)),
                 "published_at": _string_attr(published_at),
             }
+            app_manifest = self._published_manifest(
+                app_id=published_app_id,
+                group_id=group_id,
+                version=next_version,
+                source_revision=expected_revision,
+                published_key=artifact_key,
+                s3_version_id=artifact_s3_version_id,
+                sha256=artifact_sha256,
+                files=artifact_files,
+                published_at=published_at,
+            )
             self._commit_publish_pointer(
+                current=current,
                 content_id=content_id,
                 expected_revision=expected_revision,
                 previous_version=previous_version,
                 next_version=next_version,
+                published_app_id=published_app_id,
                 published_at=published_at,
-                manifest=manifest,
+                player_selection=player_selection,
+                artifact_key=artifact_key,
+                artifact_sha256=artifact_sha256,
+                artifact_files=artifact_files,
+                authoring_manifest=authoring_manifest,
+                app_manifest=app_manifest,
+                first_publish=first_publish,
             )
         except Exception as original_error:
             self._cleanup_uncommitted_published(written, original_error)
@@ -221,63 +286,303 @@ class HostedAuthoringPublishBackend(HostedAuthoringBackend):
             "content_format": content_format,
             "published_version": next_version,
             "source_revision": expected_revision,
+            "published_app_id": published_app_id,
+            "player_app_id": player_selection["player_app_id"],
+            "player_source_version": player_selection["player_source_version"],
             "assets": _public_assets(published_assets),
             "published_at": published_at,
         }
 
+    def _selected_player(self, current: dict[str, Any]) -> dict[str, Any]:
+        content_id = _item_string(current, "content_id")
+        selection = self._get_item(pk=f"CONTENT#{content_id}", sk="PLAYER")
+        if selection is None:
+            raise ApiProblem(
+                409,
+                "authoring_player_not_selected",
+                "Preview this project with a compatible Player before publishing.",
+            )
+        if _item_string(selection, "entity") != "authoring_player_selection":
+            raise RuntimeError("Authoring Player selection has an unexpected entity")
+        for field in ("content_id", "group_id", "content_format"):
+            if _item_string(selection, field) != _item_string(current, field):
+                raise RuntimeError(f"Authoring Player selection scope mismatch: {field}")
+        if _item_string(selection, "user_id") != _item_string(current, "owner_user_id"):
+            raise RuntimeError("Authoring Player selection owner no longer matches content")
+
+        player_app_id = _item_string(selection, "player_app_id")
+        player = self._require_app_in_group(
+            player_app_id,
+            _item_string(current, "group_id"),
+        )
+        self._require_not_deleting(player)
+        _require_player_support(player, _item_string(current, "content_format"))
+        current_source = resolve_authoring_app_source(
+            self,
+            player,
+            require_master_data_target=True,
+        )
+        selected_target = _item_string(selection, "master_data_element_id")
+        if current_source.master_data_element_id != selected_target:
+            raise ApiProblem(
+                409,
+                "authoring_player_selection_changed",
+                "The selected Player contract changed; preview again before publishing.",
+            )
+
+        source_bucket = _item_string(selection, "player_source_bucket")
+        if source_bucket not in {self._upload_bucket, self._published_bucket}:
+            raise RuntimeError("Authoring Player selection contains an unexpected source bucket")
+        source_key = _item_string(selection, "player_source_key")
+        source_sha256 = _item_string(selection, "player_source_sha256")
+        source_files = _item_files(selection, "player_source_files_json")
+        _, actual_files, actual_sha256 = self._read_zip_object(
+            bucket=source_bucket,
+            key=source_key,
+            expected_sha256=source_sha256,
+        )
+        if actual_files != source_files or actual_sha256 != source_sha256:
+            raise RuntimeError("Selected immutable Player source no longer matches metadata")
+        return {
+            "player_app_id": player_app_id,
+            "player_source_bucket": source_bucket,
+            "player_source_key": source_key,
+            "player_source_sha256": source_sha256,
+            "player_source_files": source_files,
+            "player_source_version": _required_item_number(
+                selection,
+                "player_source_version",
+            ),
+            "master_data_element_id": selected_target,
+        }
+
+    def _materialize_app_artifact(
+        self,
+        *,
+        document: dict[str, Any],
+        assets: dict[str, bytes],
+        selection: dict[str, Any],
+    ) -> tuple[bytes, list[str]]:
+        source_files = list(selection["player_source_files"])
+        collisions = sorted(set(source_files).intersection(assets))
+        if collisions:
+            raise ApiProblem(
+                409,
+                "authoring_publish_asset_collision",
+                f"Authoring asset path collides with Player source: {collisions[0]}",
+            )
+        source_zip, actual_files, actual_sha256 = self._read_zip_object(
+            bucket=str(selection["player_source_bucket"]),
+            key=str(selection["player_source_key"]),
+            expected_sha256=str(selection["player_source_sha256"]),
+        )
+        if actual_files != source_files or actual_sha256 != selection["player_source_sha256"]:
+            raise RuntimeError("Selected Player source changed during Authoring publish")
+
+        output = io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(source_zip)) as source_archive, zipfile.ZipFile(
+            output,
+            "w",
+            compression=zipfile.ZIP_DEFLATED,
+        ) as target_archive:
+            for path in sorted(source_files):
+                try:
+                    data = source_archive.read(path)
+                except KeyError as exc:
+                    raise RuntimeError("Selected Player ZIP manifest is inconsistent") from exc
+                if path == "index.html":
+                    data = _compile_index_html(
+                        data,
+                        document,
+                        str(selection["master_data_element_id"]),
+                    )
+                self._write_deterministic_zip_entry(target_archive, path, data)
+            for path in sorted(assets):
+                self._write_deterministic_zip_entry(target_archive, path, assets[path])
+
+        artifact = output.getvalue()
+        if len(artifact) > MAX_ZIP_BYTES:
+            raise ApiProblem(
+                413,
+                "authoring_published_app_too_large",
+                f"Published Authoring app ZIP must be at most {MAX_ZIP_BYTES} bytes.",
+            )
+        files = _safe_zip_paths(artifact)
+        return artifact, files
+
+    @staticmethod
+    def _write_deterministic_zip_entry(
+        archive: zipfile.ZipFile,
+        path: str,
+        data: bytes,
+    ) -> None:
+        info = zipfile.ZipInfo(path, date_time=(1980, 1, 1, 0, 0, 0))
+        info.compress_type = zipfile.ZIP_DEFLATED
+        info.external_attr = 0o644 << 16
+        archive.writestr(info, data)
+
     def _commit_publish_pointer(
         self,
         *,
+        current: dict[str, Any],
         content_id: str,
         expected_revision: int,
         previous_version: int,
         next_version: int,
+        published_app_id: str,
         published_at: str,
-        manifest: dict[str, Any],
+        player_selection: dict[str, Any],
+        artifact_key: str,
+        artifact_sha256: str,
+        artifact_files: list[str],
+        authoring_manifest: dict[str, Any],
+        app_manifest: dict[str, Any],
+        first_publish: bool,
     ) -> None:
         values = {
             ":expected_revision": _number_attr(expected_revision),
             ":next_version": _number_attr(next_version),
             ":published_revision": _number_attr(expected_revision),
             ":published_at": _string_attr(published_at),
+            ":published_app_id": _string_attr(published_app_id),
+            ":player_app_id": _string_attr(str(player_selection["player_app_id"])),
+            ":player_source_version": _number_attr(int(player_selection["player_source_version"])),
         }
         if previous_version == 0:
             pointer_condition = "attribute_not_exists(published_version)"
         else:
             pointer_condition = "published_version = :previous_version"
             values[":previous_version"] = _number_attr(previous_version)
-        try:
-            self._dynamodb.transact_write_items(
-                TransactItems=[
+
+        operations: list[dict[str, Any]] = [
+            {
+                "Put": {
+                    "TableName": self._table_name,
+                    "Item": authoring_manifest,
+                    "ConditionExpression": "attribute_not_exists(pk)",
+                }
+            },
+            {
+                "Put": {
+                    "TableName": self._table_name,
+                    "Item": app_manifest,
+                    "ConditionExpression": "attribute_not_exists(pk)",
+                }
+            },
+            {
+                "Update": {
+                    "TableName": self._table_name,
+                    "Key": {
+                        "pk": _string_attr(f"CONTENT#{content_id}"),
+                        "sk": _string_attr("META"),
+                    },
+                    "UpdateExpression": (
+                        "SET published_version = :next_version, "
+                        "published_revision = :published_revision, "
+                        "published_app_id = :published_app_id, "
+                        "published_player_app_id = :player_app_id, "
+                        "published_player_source_version = :player_source_version, "
+                        "published_at = :published_at"
+                    ),
+                    "ConditionExpression": (
+                        "draft_revision = :expected_revision AND "
+                        "attribute_not_exists(deletion_state) AND "
+                        f"{pointer_condition}"
+                    ),
+                    "ExpressionAttributeValues": values,
+                }
+            },
+        ]
+
+        if first_publish:
+            created_at = _item_string(current, "created_at")
+            common = {
+                "entity": _string_attr("app"),
+                "app_id": _string_attr(published_app_id),
+                "group_id": _string_attr(_item_string(current, "group_id")),
+                "title": _string_attr(f"作品 {content_id[:8]}"),
+                "owner_user_id": _string_attr(_item_string(current, "owner_user_id")),
+                "source_kind": _string_attr("authoring"),
+                "editable": {"BOOL": False},
+                "authoring_content_id": _string_attr(content_id),
+                "authoring_content_format": _string_attr(_item_string(current, "content_format")),
+                "published_version": _number_attr(next_version),
+                "published_key": _string_attr(artifact_key),
+                "published_sha256": _string_attr(artifact_sha256),
+                "published_files_json": _string_attr(_files_json(artifact_files)),
+                "published_at": _string_attr(published_at),
+                "created_at": _string_attr(created_at),
+            }
+            app_meta = {
+                "pk": _string_attr(f"APP#{published_app_id}"),
+                "sk": _string_attr("META"),
+                **common,
+            }
+            group_index = {
+                "pk": _string_attr(f"GROUP#{_item_string(current, 'group_id')}"),
+                "sk": _string_attr(f"APP#{published_app_id}"),
+                **common,
+            }
+            operations.extend(
+                [
                     {
                         "Put": {
                             "TableName": self._table_name,
-                            "Item": manifest,
+                            "Item": app_meta,
                             "ConditionExpression": "attribute_not_exists(pk)",
                         }
                     },
                     {
-                        "Update": {
+                        "Put": {
                             "TableName": self._table_name,
-                            "Key": {
-                                "pk": _string_attr(f"CONTENT#{content_id}"),
-                                "sk": _string_attr("META"),
-                            },
-                            "UpdateExpression": (
-                                "SET published_version = :next_version, "
-                                "published_revision = :published_revision, "
-                                "published_at = :published_at"
-                            ),
-                            "ConditionExpression": (
-                                "draft_revision = :expected_revision AND "
-                                "attribute_not_exists(deletion_state) AND "
-                                f"{pointer_condition}"
-                            ),
-                            "ExpressionAttributeValues": values,
+                            "Item": group_index,
+                            "ConditionExpression": "attribute_not_exists(pk)",
                         }
                     },
                 ]
             )
+        else:
+            app_meta = self._get_item(pk=f"APP#{published_app_id}", sk="META")
+            group_index = self._get_item(
+                pk=f"GROUP#{_item_string(current, 'group_id')}",
+                sk=f"APP#{published_app_id}",
+            )
+            if app_meta is None or group_index is None:
+                raise RuntimeError("Published Authoring app metadata is missing")
+            for item in (app_meta, group_index):
+                if _item_string(item, "authoring_content_id") != content_id:
+                    raise RuntimeError("Published app no longer belongs to this Authoring content")
+                if _optional_number(item, "published_version") != previous_version:
+                    raise RuntimeError("Published app version no longer matches Authoring content")
+                replacement = dict(item)
+                replacement.update(
+                    {
+                        "published_version": _number_attr(next_version),
+                        "published_key": _string_attr(artifact_key),
+                        "published_sha256": _string_attr(artifact_sha256),
+                        "published_files_json": _string_attr(_files_json(artifact_files)),
+                        "published_at": _string_attr(published_at),
+                    }
+                )
+                operations.append(
+                    {
+                        "Put": {
+                            "TableName": self._table_name,
+                            "Item": replacement,
+                            "ConditionExpression": (
+                                "authoring_content_id = :content_id AND "
+                                "published_version = :previous_version"
+                            ),
+                            "ExpressionAttributeValues": {
+                                ":content_id": _string_attr(content_id),
+                                ":previous_version": _number_attr(previous_version),
+                            },
+                        }
+                    }
+                )
+
+        try:
+            self._dynamodb.transact_write_items(TransactItems=operations)
         except Exception as exc:
             if _aws_error_code(exc) == "TransactionCanceledException":
                 raise ApiProblem(

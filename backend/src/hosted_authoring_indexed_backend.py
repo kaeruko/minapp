@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import uuid
 from typing import Any
 
-from aws_backend import _item_string, _string_attr
+from aws_backend import _aws_error_code, _item_string, _string_attr
 from errors import ApiProblem
+from hosted_app_management import _visibility
 from hosted_authoring_backend import (
     HostedAuthoringBackend,
     _assets_json,
@@ -14,7 +16,10 @@ from hosted_authoring_backend import (
     _validate_content_id,
     validate_content_format,
 )
+from hosted_catalog_backend import _optional_number
 from hosted_platform_backend import _now_iso, _number_attr
+
+_MASTER_DATA_ELEMENT_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.:-]{0,127}$")
 
 
 def _contract_formats(item: dict[str, Any], field: str) -> tuple[str, ...]:
@@ -29,12 +34,11 @@ def _contract_formats(item: dict[str, Any], field: str) -> tuple[str, ...]:
         raise RuntimeError(f"Authoring app {field}_json is invalid JSON") from exc
     if (
         not isinstance(value, list)
-        or not value
         or any(not isinstance(content_format, str) for content_format in value)
         or len(set(value)) != len(value)
     ):
         raise RuntimeError(
-            f"Authoring app {field}_json must be a unique non-empty string list"
+            f"Authoring app {field}_json must be a unique string list"
         )
     for content_format in value:
         try:
@@ -46,17 +50,19 @@ def _contract_formats(item: dict[str, Any], field: str) -> tuple[str, ...]:
     return tuple(value)
 
 
+def _validate_contract_input(value: Any, field: str) -> tuple[str, ...]:
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise ApiProblem(400, "invalid_authoring_contract", f"{field} must be a string array.")
+    if len(set(value)) != len(value):
+        raise ApiProblem(400, "invalid_authoring_contract", f"{field} must not contain duplicates.")
+    validated: list[str] = []
+    for content_format in value:
+        validated.append(validate_content_format(content_format))
+    return tuple(validated)
+
+
 class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
-    """Authoring storage with explicit group discovery indexes.
-
-    Content indexes are written in the same DynamoDB transaction as content
-    metadata and revision 1. Listing never scans the metadata table and never
-    silently skips a stale/corrupt index entry owned by the current user.
-
-    Authoring app discovery is also group-scoped. It exposes only app identity,
-    title, and validated ``edits``/``accepts`` contracts; source locations and
-    credentials stay server-side.
-    """
+    """Authoring storage with explicit group discovery indexes."""
 
     def create_authoring_project(
         self,
@@ -123,6 +129,97 @@ class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
             raise
         return self._public_project(meta)
 
+    def register_authoring_contract(
+        self,
+        auth_subject: str,
+        group_id: str,
+        app_id: str,
+        *,
+        edits: list[str],
+        accepts: list[str],
+        master_data_element_id: str | None,
+    ) -> dict[str, Any]:
+        user, _ = self._require_owned_app(
+            auth_subject,
+            group_id,
+            app_id,
+            editable=True,
+        )
+        edit_formats = _validate_contract_input(edits, "edits")
+        accept_formats = _validate_contract_input(accepts, "accepts")
+        if not edit_formats and not accept_formats:
+            raise ApiProblem(
+                400,
+                "invalid_authoring_contract",
+                "At least one edits or accepts content format is required.",
+            )
+        if accept_formats:
+            if (
+                not isinstance(master_data_element_id, str)
+                or _MASTER_DATA_ELEMENT_ID_RE.fullmatch(master_data_element_id) is None
+            ):
+                raise ApiProblem(
+                    400,
+                    "invalid_authoring_contract",
+                    "Player contracts require a valid master_data_element_id.",
+                )
+            target_attribute: dict[str, Any] = _string_attr(master_data_element_id)
+        else:
+            if master_data_element_id is not None:
+                raise ApiProblem(
+                    400,
+                    "invalid_authoring_contract",
+                    "master_data_element_id is only valid when accepts is non-empty.",
+                )
+            target_attribute = {"NULL": True}
+
+        values = {
+            ":edits": _string_attr(json.dumps(edit_formats, separators=(",", ":"))),
+            ":accepts": _string_attr(json.dumps(accept_formats, separators=(",", ":"))),
+            ":target": target_attribute,
+            ":editable": {"BOOL": True},
+        }
+        updates = []
+        for pk, sk in (
+            (f"APP#{app_id}", "META"),
+            (f"GROUP#{group_id}", f"APP#{app_id}"),
+        ):
+            updates.append(
+                {
+                    "Update": {
+                        "TableName": self._table_name,
+                        "Key": {"pk": _string_attr(pk), "sk": _string_attr(sk)},
+                        "UpdateExpression": (
+                            "SET edits_json = :edits, accepts_json = :accepts, "
+                            "master_data_element_id = :target"
+                        ),
+                        "ConditionExpression": (
+                            "editable = :editable AND attribute_not_exists(deletion_state)"
+                        ),
+                        "ExpressionAttributeValues": values,
+                    }
+                }
+            )
+        try:
+            self._dynamodb.transact_write_items(TransactItems=updates)
+        except Exception as exc:
+            if _aws_error_code(exc) == "TransactionCanceledException":
+                raise ApiProblem(
+                    409,
+                    "authoring_contract_update_conflict",
+                    "The app changed while its Authoring contract was being registered.",
+                ) from exc
+            raise
+
+        return {
+            "app_id": app_id,
+            "group_id": group_id,
+            "edits": list(edit_formats),
+            "accepts": list(accept_formats),
+            "master_data_element_id": master_data_element_id,
+            "owner_user_id": user.user_id,
+        }
+
     def list_authoring_apps(
         self,
         auth_subject: str,
@@ -145,6 +242,20 @@ class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
             accepts = _contract_formats(item, "accepts")
             if not edits and not accepts:
                 continue
+
+            source_kind = _item_string(item, "source_kind")
+            if source_kind == "builtin":
+                pass
+            elif source_kind in {"upload", "fork"}:
+                if _visibility(item) != "visible":
+                    continue
+                if _optional_number(item, "published_version") is None:
+                    continue
+            else:
+                raise RuntimeError(
+                    f"Authoring app has unsupported source kind: {source_kind!r}"
+                )
+
             apps.append(
                 {
                     "app_id": _item_string(item, "app_id"),
