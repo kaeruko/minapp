@@ -32,7 +32,13 @@ class _NoopRuntimeTransport implements HostedRuntimeTransport {
   }
 }
 
-HostedAuthoringContractApi _contractApi({required bool editor}) {
+HostedAuthoringContractApi _contractApi({
+  required bool editor,
+  List<String>? editorFormats,
+}) {
+  final List<String> edits = editor
+      ? (editorFormats ?? const <String>['example/quiz@1'])
+      : const <String>[];
   return HostedAuthoringContractApi(
     baseUri: Uri.parse('https://hosted.example.test'),
     client: MockClient((http.Request request) async {
@@ -48,7 +54,7 @@ HostedAuthoringContractApi _contractApi({required bool editor}) {
               'app_id': _appId,
               'group_id': _groupId,
               'title': editor ? 'Quiz Editor' : 'Quiz Player',
-              'edits': editor ? <String>['example/quiz@1'] : <String>[],
+              'edits': edits,
               'accepts': editor ? <String>[] : <String>['example/quiz@1'],
             },
           ],
@@ -98,6 +104,33 @@ void main() {
     );
     expect(find.text('作品を編集'), findsOneWidget);
     expect(find.byKey(const Key('non-editor-actions')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('multiple Editor formats require explicit shared selection', (
+    WidgetTester tester,
+  ) async {
+    final HostedAuthoringContractApi contractApi = _contractApi(
+      editor: true,
+      editorFormats: const <String>['example/quiz@1', 'example/quiz@2'],
+    );
+    addTearDown(contractApi.close);
+
+    await tester.pumpWidget(_subject(contractApi: contractApi));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('hosted-authoring-open-projects')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('どの作品形式を編集する？'), findsOneWidget);
+    expect(
+      find.byKey(const Key('hosted-authoring-format-example/quiz@1')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('hosted-authoring-format-example/quiz@2')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
