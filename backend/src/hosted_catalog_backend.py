@@ -160,14 +160,34 @@ class HostedCatalogBackend(HostedPlatformBackend):
         apps.sort(key=lambda app: (app["title"], app["app_id"]))
         return apps
 
+    def _require_app_management_access(
+        self,
+        auth_subject: str,
+        group_id: str,
+        app_id: str,
+        *,
+        editable: bool,
+    ) -> tuple[Any, dict[str, Any]]:
+        user = self._user_by_auth_subject(auth_subject)
+        membership = self._require_active_membership(user.user_id, group_id)
+        app = self._require_app_in_group(app_id, group_id)
+        if (
+            _item_string(app, "owner_user_id") != user.user_id
+            and _item_string(membership, "role") != "owner"
+        ):
+            raise ApiProblem(403, "forbidden", "このアプリを管理する権限がありません。")
+        if editable:
+            self._require_editable_app(app)
+        return user, app
+
     def install_builtin(
         self,
         auth_subject: str,
         group_id: str,
         builtin_id: str,
     ) -> dict[str, Any]:
-        owner = self._user_by_auth_subject(auth_subject)
-        self._require_owner_group(owner.user_id, group_id)
+        creator = self._user_by_auth_subject(auth_subject)
+        self._require_active_membership(creator.user_id, group_id)
         template = BUILTIN_TEMPLATES.get(builtin_id)
         if template is None:
             raise ApiProblem(404, "builtin_not_found", "指定されたビルトインアプリはありません。")
@@ -184,7 +204,7 @@ class HostedCatalogBackend(HostedPlatformBackend):
             "app_id": _string_attr(app_id),
             "group_id": _string_attr(group_id),
             "title": _string_attr(str(template["title"])),
-            "owner_user_id": _string_attr(owner.user_id),
+            "owner_user_id": _string_attr(creator.user_id),
             "source_kind": _string_attr("builtin"),
             "builtin_id": _string_attr(builtin_id),
             "builtin_version": _number_attr(int(template["version"])),
@@ -212,8 +232,8 @@ class HostedCatalogBackend(HostedPlatformBackend):
         app_id: str,
         title: str,
     ) -> dict[str, Any]:
-        owner = self._user_by_auth_subject(auth_subject)
-        self._require_owner_group(owner.user_id, group_id)
+        creator = self._user_by_auth_subject(auth_subject)
+        self._require_active_membership(creator.user_id, group_id)
         parent = self._require_app_in_group(app_id, group_id)
         self._require_not_deleting(parent)
         self._require_app_capacity(group_id)
@@ -229,7 +249,7 @@ class HostedCatalogBackend(HostedPlatformBackend):
             "app_id": _string_attr(new_app_id),
             "group_id": _string_attr(group_id),
             "title": _string_attr(title),
-            "owner_user_id": _string_attr(owner.user_id),
+            "owner_user_id": _string_attr(creator.user_id),
             "source_kind": _string_attr("fork"),
             "parent_app_id": _string_attr(app_id),
             "editable": {"BOOL": True},
@@ -291,10 +311,9 @@ class HostedCatalogBackend(HostedPlatformBackend):
         group_id: str,
         app_id: str,
     ) -> tuple[bytes, dict[str, Any]]:
-        owner = self._user_by_auth_subject(auth_subject)
-        self._require_owner_group(owner.user_id, group_id)
-        app = self._require_app_in_group(app_id, group_id)
-        self._require_editable_app(app)
+        _, app = self._require_app_management_access(
+            auth_subject, group_id, app_id, editable=True
+        )
         source_bytes, files, sha256 = self._read_current_source(app)
         return source_bytes, {
             "revision": self._source_revision(app),
@@ -315,10 +334,9 @@ class HostedCatalogBackend(HostedPlatformBackend):
         files = _safe_zip_paths(zip_bytes)
         sha256 = hashlib.sha256(zip_bytes).hexdigest()
 
-        owner = self._user_by_auth_subject(auth_subject)
-        self._require_owner_group(owner.user_id, group_id)
-        app = self._require_app_in_group(app_id, group_id)
-        self._require_editable_app(app)
+        _, app = self._require_app_management_access(
+            auth_subject, group_id, app_id, editable=True
+        )
         current_revision = self._source_revision(app)
         if current_revision != expected_revision:
             raise ApiProblem(409, "source_revision_stale", "Source revision is stale; fetch the latest source first.")
@@ -418,10 +436,9 @@ class HostedCatalogBackend(HostedPlatformBackend):
     ) -> dict[str, Any]:
         if not isinstance(expected_revision, int) or isinstance(expected_revision, bool) or expected_revision < 1:
             raise ApiProblem(400, "invalid_source_revision", "source revision must be a positive integer.")
-        owner = self._user_by_auth_subject(auth_subject)
-        self._require_owner_group(owner.user_id, group_id)
-        app = self._require_app_in_group(app_id, group_id)
-        self._require_editable_app(app)
+        _, app = self._require_app_management_access(
+            auth_subject, group_id, app_id, editable=True
+        )
         current_revision = self._source_revision(app)
         if current_revision != expected_revision:
             raise ApiProblem(409, "source_revision_stale", "Source revision is stale; fetch the latest source first.")
@@ -588,9 +605,9 @@ class HostedCatalogBackend(HostedPlatformBackend):
         return data, _content_type(normalized)
 
     def delete_hosted_app(self, auth_subject: str, group_id: str, app_id: str) -> None:
-        owner = self._user_by_auth_subject(auth_subject)
-        self._require_owner_group(owner.user_id, group_id)
-        self._require_app_in_group(app_id, group_id)
+        self._require_app_management_access(
+            auth_subject, group_id, app_id, editable=False
+        )
 
         deleting_at = _now_iso()
         try:
@@ -1130,6 +1147,7 @@ class HostedCatalogBackend(HostedPlatformBackend):
         result: dict[str, Any] = {
             "app_id": _item_string(item, "app_id"),
             "group_id": _item_string(item, "group_id"),
+            "owner_user_id": _item_string(item, "owner_user_id"),
             "title": _item_string(item, "title"),
             "source_kind": _item_string(item, "source_kind"),
             "created_at": _item_string(item, "created_at"),
