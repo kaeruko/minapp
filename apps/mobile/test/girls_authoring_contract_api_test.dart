@@ -58,6 +58,55 @@ void main() {
     expect(apps.last.accepts, <String>['example/quiz@1']);
   });
 
+  test('resolver matches exact content format without builtin ids', () {
+    const GirlsAuthoringAppContract editor = GirlsAuthoringAppContract(
+      appId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      groupId: groupId,
+      title: 'Third-party Quiz Editor',
+      edits: <String>['example/quiz@1'],
+      accepts: <String>[],
+    );
+    const GirlsAuthoringAppContract player = GirlsAuthoringAppContract(
+      appId: 'cccccccccccccccccccccccccccccccc',
+      groupId: groupId,
+      title: 'Third-party Quiz Player',
+      edits: <String>[],
+      accepts: <String>['example/quiz@1'],
+    );
+    const GirlsAuthoringAppContract other = GirlsAuthoringAppContract(
+      appId: 'dddddddddddddddddddddddddddddddd',
+      groupId: groupId,
+      title: 'Novel Tool',
+      edits: <String>['minapp/novel@1'],
+      accepts: <String>['minapp/novel@1'],
+    );
+
+    expect(
+      GirlsAuthoringResolver.editorsFor(
+        const <GirlsAuthoringAppContract>[editor, player, other],
+        'example/quiz@1',
+      ).map((GirlsAuthoringAppContract app) => app.appId),
+      <String>[editor.appId],
+    );
+    expect(
+      GirlsAuthoringResolver.playersFor(
+        const <GirlsAuthoringAppContract>[editor, player, other],
+        'example/quiz@1',
+      ).map((GirlsAuthoringAppContract app) => app.appId),
+      <String>[player.appId],
+    );
+  });
+
+  test('resolver rejects malformed format instead of broad matching', () {
+    expect(
+      () => GirlsAuthoringResolver.editorsFor(
+        const <GirlsAuthoringAppContract>[],
+        'quiz-v1',
+      ),
+      throwsArgumentError,
+    );
+  });
+
   test('rejects duplicate app ids instead of choosing one', () async {
     final MockClient client = MockClient((http.Request request) async {
       return http.Response(
