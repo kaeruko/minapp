@@ -7,7 +7,10 @@ param(
     [string]$AwsRegion = 'us-west-2',
 
     [ValidateNotNullOrEmpty()]
-    [string]$AwsProfile = 'minapp-admin'
+    [string]$AwsProfile = 'minapp-admin',
+
+    [ValidateNotNull()]
+    [string[]]$AllowedReplacementAddresses = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -52,6 +55,57 @@ function Invoke-ExternalCapture {
     return $text.Trim()
 }
 
+function Invoke-ExternalCaptureSeparated {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $FilePath
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    foreach ($argument in $Arguments) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) {
+            throw "$Context could not start '$FilePath'."
+        }
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+        $exitCode = $process.ExitCode
+    }
+    finally {
+        $process.Dispose()
+    }
+
+    if ($exitCode -ne 0) {
+        $diagnostic = if ([string]::IsNullOrWhiteSpace($stderr)) { '<empty stderr>' } else { $stderr.Trim() }
+        throw "$Context failed with exit code $exitCode`: $diagnostic"
+    }
+    if ([string]::IsNullOrWhiteSpace($stdout)) {
+        $diagnostic = if ([string]::IsNullOrWhiteSpace($stderr)) { '<empty stderr>' } else { $stderr.Trim() }
+        throw "$Context returned empty stdout. stderr: $diagnostic"
+    }
+
+    return [pscustomobject]@{
+        Stdout = $stdout.Trim()
+        Stderr = $stderr.Trim()
+    }
+}
+
 function Get-TerraformOutput {
     param(
         [Parameter(Mandatory = $true)]
@@ -76,6 +130,16 @@ if (-not (Test-Path -LiteralPath $backendConfig -PathType Leaf)) {
 }
 if (-not (Test-Path -LiteralPath $smokeScript -PathType Leaf)) {
     throw "Hosted Runtime bridge smoke script is missing: $smokeScript"
+}
+
+$allowedReplacementSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+foreach ($address in $AllowedReplacementAddresses) {
+    if ([string]::IsNullOrWhiteSpace($address)) {
+        throw 'AllowedReplacementAddresses must not contain an empty address.'
+    }
+    if (-not $allowedReplacementSet.Add($address)) {
+        throw "AllowedReplacementAddresses contains a duplicate address: $address"
+    }
 }
 
 $previousProfile = $env:AWS_PROFILE
@@ -136,34 +200,54 @@ try {
         ) `
         -Context 'Hosted Terraform plan'
 
-    Write-Host '[5/8] Reject every destroy/replacement action before apply'
-    $planJsonText = Invoke-ExternalCapture `
+    Write-Host '[5/8] Reject unapproved destroy/replacement actions before apply'
+    $planCapture = Invoke-ExternalCaptureSeparated `
         -FilePath 'terraform' `
         -Arguments @("-chdir=$hostedDir", 'show', '-json', $planPath) `
         -Context 'Hosted saved plan JSON'
+    if (-not [string]::IsNullOrWhiteSpace($planCapture.Stderr)) {
+        Write-Warning "terraform show emitted stderr while producing valid stdout: $($planCapture.Stderr)"
+    }
     try {
-        $plan = $planJsonText | ConvertFrom-Json -Depth 100
+        $plan = $planCapture.Stdout | ConvertFrom-Json -Depth 100
     }
     catch {
-        throw 'Hosted saved plan could not be decoded as Terraform JSON.'
+        $stderrDiagnostic = if ([string]::IsNullOrWhiteSpace($planCapture.Stderr)) { '<empty stderr>' } else { $planCapture.Stderr }
+        throw "Hosted saved plan could not be decoded as Terraform JSON: $($_.Exception.Message) stderr: $stderrDiagnostic"
     }
 
-    $destructive = @(
-        $plan.resource_changes |
-            Where-Object {
-                $actions = @($_.change.actions)
-                $actions -contains 'delete'
-            }
+    $approvedReplacementSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    $blockedDestructive = @()
+    foreach ($change in @($plan.resource_changes)) {
+        $actions = @($change.change.actions)
+        if ($actions -notcontains 'delete') {
+            continue
+        }
+
+        $address = [string]$change.address
+        $isReplacement = $actions -contains 'create'
+        if ($isReplacement -and $allowedReplacementSet.Contains($address)) {
+            [void]$approvedReplacementSet.Add($address)
+            continue
+        }
+
+        $blockedDestructive += [pscustomobject]@{
+            Address = $address
+            Actions = ($actions -join ',')
+        }
+    }
+
+    if ($blockedDestructive.Count -ne 0) {
+        $details = ($blockedDestructive | ForEach-Object { "$($_.Address) [$($_.Actions)]" }) -join '; '
+        throw "Hosted plan contains unapproved destroy/replacement actions. Apply stopped. $details"
+    }
+
+    $unusedReplacementApprovals = @(
+        $allowedReplacementSet |
+            Where-Object { -not $approvedReplacementSet.Contains($_) }
     )
-    if ($destructive.Count -ne 0) {
-        $details = @(
-            $destructive |
-                ForEach-Object {
-                    $actions = @($_.change.actions) -join ','
-                    "$($_.address) [$actions]"
-                }
-        ) -join '; '
-        throw "Hosted plan contains destroy/replacement actions. Apply stopped. $details"
+    if ($unusedReplacementApprovals.Count -ne 0) {
+        throw "Allowed replacement address was not present as an exact create+delete replacement. Apply stopped. $($unusedReplacementApprovals -join '; ')"
     }
 
     $creates = @(
@@ -174,7 +258,11 @@ try {
         $plan.resource_changes |
             Where-Object { @($_.change.actions) -contains 'update' }
     ).Count
-    Write-Host "  saved plan accepted: creates=$creates updates=$updates destroys=0"
+    $replacements = $approvedReplacementSet.Count
+    Write-Host "  saved plan accepted: creates=$creates updates=$updates approved_replacements=$replacements unapproved_destroys=0"
+    foreach ($address in $approvedReplacementSet) {
+        Write-Host "  approved replacement: $address"
+    }
 
     Write-Host '[6/8] Apply the exact saved plan'
     Invoke-External `
@@ -212,7 +300,7 @@ try {
 
     Write-Host ''
     Write-Host 'Issue #87 Hosted dev acceptance passed.'
-    Write-Host 'Verified: saved plan destroys=0 -> apply -> real AWS launch/state/revocation -> Cognito/DynamoDB/S3 cleanup.'
+    Write-Host 'Verified: saved plan has no unapproved destroys -> exact saved-plan apply -> real AWS launch/state/revocation -> Cognito/DynamoDB/S3 cleanup.'
 }
 finally {
     if (Test-Path -LiteralPath $planPath -PathType Leaf) {
