@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'hosted_api.dart';
 import 'hosted_app.dart';
+import 'hosted_group_management_page.dart';
 import 'hosted_my_apps_page.dart';
 
 class HostedNormalApp extends StatelessWidget {
@@ -99,6 +100,17 @@ class _HostedNormalAuthenticatedHome extends StatelessWidget {
     );
   }
 
+  Future<void> _openGroupManagement(BuildContext context) {
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => HostedGroupManagementPage(
+          api: api,
+          session: session,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -113,11 +125,26 @@ class _HostedNormalAuthenticatedHome extends StatelessWidget {
           right: 16,
           bottom: 16,
           child: SafeArea(
-            child: FloatingActionButton.extended(
-              key: const Key('hosted-my-apps-open'),
-              onPressed: () => _openMyApps(context),
-              icon: const Icon(Icons.manage_accounts_rounded),
-              label: const Text('自分のアプリ'),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                FloatingActionButton.small(
+                  key: const Key('hosted-group-management-open'),
+                  heroTag: 'hosted-group-management',
+                  onPressed: () => _openGroupManagement(context),
+                  tooltip: 'グループ管理',
+                  child: const Icon(Icons.admin_panel_settings_rounded),
+                ),
+                const SizedBox(height: 10),
+                FloatingActionButton.extended(
+                  key: const Key('hosted-my-apps-open'),
+                  heroTag: 'hosted-my-apps',
+                  onPressed: () => _openMyApps(context),
+                  icon: const Icon(Icons.manage_accounts_rounded),
+                  label: const Text('自分のアプリ'),
+                ),
+              ],
             ),
           ),
         ),
