@@ -5,8 +5,8 @@ import stat
 import zipfile
 from pathlib import PurePosixPath
 
+from app_zip import safe_zip_paths
 from errors import ApiProblem
-from phase2_backend import _safe_zip_paths
 
 
 def _is_desktop_packaging_metadata(parts: list[str]) -> bool:
@@ -116,7 +116,7 @@ def _unwrap_single_top_level_folder(zip_bytes: bytes) -> tuple[bytes, list[str]]
                 normalized.writestr(relative, archive.read(info))
 
     normalized_bytes = output.getvalue()
-    return normalized_bytes, _safe_zip_paths(normalized_bytes)
+    return normalized_bytes, safe_zip_paths(normalized_bytes)
 
 
 def normalize_uploaded_zip(zip_bytes: bytes) -> tuple[bytes, list[str]]:
@@ -131,7 +131,7 @@ def normalize_uploaded_zip(zip_bytes: bytes) -> tuple[bytes, list[str]]:
     """
     initial_error: ApiProblem | None = None
     try:
-        return zip_bytes, _safe_zip_paths(zip_bytes)
+        return zip_bytes, safe_zip_paths(zip_bytes)
     except ApiProblem as exc:
         if exc.error not in {"index_missing", "unsupported_file_type"}:
             raise
@@ -141,7 +141,7 @@ def normalize_uploaded_zip(zip_bytes: bytes) -> tuple[bytes, list[str]]:
     candidate = zip_bytes if cleaned is None else cleaned
 
     try:
-        files = _safe_zip_paths(candidate)
+        files = safe_zip_paths(candidate)
         return candidate, files
     except ApiProblem as exc:
         if exc.error != "index_missing":
