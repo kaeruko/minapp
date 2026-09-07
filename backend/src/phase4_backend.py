@@ -5,9 +5,10 @@ import json
 import uuid
 from typing import Any
 
+from app_zip import safe_zip_paths
 from aws_backend import _item_string, _string_attr
 from errors import ApiProblem
-from phase2_backend import _now_iso, _optional_item_string, _safe_zip_paths
+from phase2_backend import _now_iso, _optional_item_string
 from phase3_backend import Phase3AwsBackend
 
 
@@ -85,7 +86,7 @@ class Phase4AwsBackend(Phase3AwsBackend):
                 "下書きまたは確認待ちの更新版があります。先にその版を公開申請・確認してください。",
             )
 
-        files = _safe_zip_paths(zip_bytes)
+        files = safe_zip_paths(zip_bytes)
         version_id = uuid.uuid4().hex
         created_at = _now_iso()
         digest = hashlib.sha256(zip_bytes).hexdigest()
