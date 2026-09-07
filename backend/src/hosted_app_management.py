@@ -48,6 +48,29 @@ def _author_editable_app(
     )
 
 
+def _author_detail_app(
+    backend: Any,
+    auth_subject: str,
+    app_id: str,
+) -> tuple[Any, dict[str, Any]]:
+    app = backend._get_item(pk=f"APP#{app_id}", sk="META")
+    if app is None:
+        raise ApiProblem(404, "app_not_found", "指定されたアプリはありません。")
+    group_id = _item_string(app, "group_id")
+    user, app = backend._require_app_author_access(
+        auth_subject,
+        group_id,
+        app_id,
+        editable=False,
+    )
+    if app.get("editable", {}).get("BOOL") is True:
+        return user, app
+    if _optional_string(app, "edits_json") is not None:
+        return user, app
+    backend._require_editable_app(app)
+    raise RuntimeError("Unreachable non-editable app detail path")
+
+
 def _stats(backend: Any, app_id: str) -> dict[str, int]:
     stats_pk = f"APPSTATS#{app_id}"
     total_item = backend._get_item(pk=stats_pk, sk="TOTAL")
@@ -131,7 +154,7 @@ def _published_history(backend: Any, app_id: str) -> list[dict[str, Any]]:
 
 
 def get_managed_app(backend: Any, auth_subject: str, app_id: str) -> dict[str, Any]:
-    _, app = _author_editable_app(backend, auth_subject, app_id)
+    _, app = _author_detail_app(backend, auth_subject, app_id)
     payload = _managed_payload(backend, app)
     payload["source_history"] = _source_history(backend, app_id)
     payload["published_history"] = _published_history(backend, app_id)

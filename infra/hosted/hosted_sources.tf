@@ -11,18 +11,30 @@ locals {
     shiba-game = {
       version    = 1
       source_dir = abspath("${path.module}/../../apps/mobile/assets/builtin/shiba_donguri")
+      excludes   = []
     }
     shiba-goshujin = {
       version    = 1
       source_dir = abspath("${path.module}/../../apps/mobile/assets/builtin/shiba_goshujin")
+      excludes   = []
     }
     novel-starter = {
       version    = 4
       source_dir = "${local.minapp_apps_source_root}/novel_starter"
+      excludes = [
+        "README.md",
+        "test_player_runtime_ready.js",
+        "test_story_validator.js",
+      ]
     }
     novel-editor = {
       version    = 1
       source_dir = "${local.minapp_apps_source_root}/novel_editor"
+      excludes = [
+        "test_asset_tools.js",
+        "test_editor_core.js",
+        "test_host_authoring_roundtrip.py",
+      ]
     }
   }
 }
@@ -35,6 +47,7 @@ data "archive_file" "hosted_builtin_source" {
 
   type        = "zip"
   source_dir  = each.value.source_dir
+  excludes    = each.value.excludes
   output_path = "${path.module}/minapp-hosted-builtin-${each.key}-v${each.value.version}.zip"
 }
 
