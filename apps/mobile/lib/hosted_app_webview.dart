@@ -8,6 +8,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'hosted_authoring_bridge.dart';
 import 'hosted_authoring_launch_client.dart';
+import 'hosted_authoring_preview_bridge.dart';
 import 'hosted_runtime_bridge.dart';
 
 final RegExp _previewTokenPattern = RegExp(r'^[A-Za-z0-9_-]{32,128}$');
@@ -29,7 +30,8 @@ class HostedAppWebViewPage extends StatefulWidget {
   })  : sessionContentUri = null,
         sessionRuntimeToken = null,
         authoringLaunch = null,
-        authoringTransport = null;
+        authoringTransport = null,
+        authoringPreviewHost = null;
 
   const HostedAppWebViewPage.session({
     required this.title,
@@ -41,19 +43,22 @@ class HostedAppWebViewPage extends StatefulWidget {
         sessionContentUri = contentUri,
         sessionRuntimeToken = runtimeToken,
         authoringLaunch = null,
-        authoringTransport = null;
+        authoringTransport = null,
+        authoringPreviewHost = null;
 
   HostedAppWebViewPage.authoring({
     required this.title,
     required HostedAuthoringLaunchGrant launch,
     required this.runtimeTransport,
     required HostedAuthoringTransport authoringTransport,
+    required HostedAuthoringPreviewHost authoringPreviewHost,
     super.key,
   })  : launch = null,
         sessionContentUri = launch.contentUri,
         sessionRuntimeToken = launch.runtimeToken,
         authoringLaunch = launch,
-        authoringTransport = authoringTransport;
+        authoringTransport = authoringTransport,
+        authoringPreviewHost = authoringPreviewHost;
 
   final String title;
   final HostedLaunchGrant? launch;
@@ -62,6 +67,7 @@ class HostedAppWebViewPage extends StatefulWidget {
   final HostedRuntimeTransport runtimeTransport;
   final HostedAuthoringLaunchGrant? authoringLaunch;
   final HostedAuthoringTransport? authoringTransport;
+  final HostedAuthoringPreviewHost? authoringPreviewHost;
 
   Uri get contentUri {
     final HostedLaunchGrant? launchGrant = launch;
@@ -101,9 +107,12 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
   late final bool Function(Uri target) _allowsNavigation;
   late final HostedBridgeSession _bridgeSession;
   late final HostedAuthoringBridgeSession? _authoringBridgeSession;
+  late final HostedAuthoringPreviewBridgeSession? _authoringPreviewBridgeSession;
   final HostedBridgeDocumentInjector _injector = HostedBridgeDocumentInjector();
   final HostedAuthoringBridgeDocumentInjector _authoringInjector =
       HostedAuthoringBridgeDocumentInjector();
+  final HostedAuthoringPreviewBridgeDocumentInjector _authoringPreviewInjector =
+      HostedAuthoringPreviewBridgeDocumentInjector();
 
   @override
   void initState() {
@@ -129,14 +138,23 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
     final HostedAuthoringLaunchGrant? authoringLaunch = widget.authoringLaunch;
     if (authoringLaunch == null) {
       _authoringBridgeSession = null;
+      _authoringPreviewBridgeSession = null;
     } else {
       final HostedAuthoringTransport? authoringTransport = widget.authoringTransport;
       if (authoringTransport == null) {
         throw StateError('Authoring WebView has no Authoring transport.');
       }
+      final HostedAuthoringPreviewHost? authoringPreviewHost =
+          widget.authoringPreviewHost;
+      if (authoringPreviewHost == null) {
+        throw StateError('Authoring WebView has no Preview host action.');
+      }
       _authoringBridgeSession = HostedAuthoringBridgeSession(
         transport: authoringTransport,
         authoringToken: authoringLaunch.authoringToken,
+      );
+      _authoringPreviewBridgeSession = HostedAuthoringPreviewBridgeSession(
+        preview: authoringPreviewHost,
       );
     }
     _prepareWebView();
@@ -178,6 +196,12 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
         await controller.addJavaScriptChannel(
           'MinAppAuthoringBridge',
           onMessageReceived: _onAuthoringBridgeMessage,
+        );
+      }
+      if (_authoringPreviewBridgeSession != null) {
+        await controller.addJavaScriptChannel(
+          'MinAppAuthoringPreviewBridge',
+          onMessageReceived: _onAuthoringPreviewBridgeMessage,
         );
       }
       await controller.clearLocalStorage();
@@ -320,6 +344,11 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
           _authoringInjector.scriptForFinishedDocument(),
         );
       }
+      if (_authoringPreviewBridgeSession != null) {
+        await controller.runJavaScript(
+          _authoringPreviewInjector.scriptForFinishedDocument(),
+        );
+      }
     } catch (error, stackTrace) {
       _failBridgeOrPage(
         context: 'Hosted bridge injection failed.',
@@ -394,6 +423,47 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
     } catch (error, stackTrace) {
       _failBridgeOrPage(
         context: 'Authoring bridge request processing failed.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _onAuthoringPreviewBridgeMessage(JavaScriptMessage message) async {
+    if (_bridgeFailed) {
+      return;
+    }
+    final HostedAuthoringPreviewBridgeSession? previewBridgeSession =
+        _authoringPreviewBridgeSession;
+    if (previewBridgeSession == null) {
+      _failBridgeOrPage(
+        context: 'Authoring Preview bridge received a message outside Authoring mode.',
+        error: StateError('Authoring Preview bridge is not enabled for this WebView.'),
+        stackTrace: StackTrace.current,
+      );
+      return;
+    }
+    final WebViewController? controller = _controller;
+    if (controller == null) {
+      _failBridgeOrPage(
+        context: 'Authoring Preview bridge received a message before WebView initialization completed.',
+        error: StateError('WebView controller is not ready.'),
+        stackTrace: StackTrace.current,
+      );
+      return;
+    }
+
+    try {
+      final Map<String, Object?> response =
+          await previewBridgeSession.handleMessage(message.message);
+      final String encoded = jsonEncode(response);
+      await controller.runJavaScript(
+        'window.__minappAuthoringPreviewBridgeReceive && '
+        'window.__minappAuthoringPreviewBridgeReceive($encoded);',
+      );
+    } catch (error, stackTrace) {
+      _failBridgeOrPage(
+        context: 'Authoring Preview bridge request processing failed.',
         error: error,
         stackTrace: stackTrace,
       );
