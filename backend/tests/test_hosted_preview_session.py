@@ -44,10 +44,10 @@ class HostedPreviewSessionTests(unittest.TestCase):
 
         with patch.object(
             hosted_preview_session,
-            "_owned_editable_app",
+            "_author_editable_app",
             return_value=(user, app),
         ):
-            result = hosted_preview_session.create_preview_session(
+            result = hosted_preview_session.create_author_preview_session(
                 backend,
                 "sub-owner",
                 "3" * 32,

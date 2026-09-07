@@ -9,18 +9,18 @@ from aws_backend import _item_string, _string_attr
 from hosted_app_management import (
     PREVIEW_SESSION_SECONDS,
     PREVIEW_TTL_GRACE_SECONDS,
-    _owned_editable_app,
+    _author_editable_app,
 )
 from hosted_catalog_backend import _files_json
 from hosted_platform_backend import RUNTIME_SESSION_TTL_SECONDS, _number_attr
 
 
-def create_preview_session(
+def _create_preview_session_for_authorized_app(
     backend: Any,
-    auth_subject: str,
+    user: Any,
+    app: dict[str, Any],
     app_id: str,
 ) -> dict[str, Any]:
-    user, app = _owned_editable_app(backend, auth_subject, app_id)
     group_id = _item_string(app, "group_id")
     source_revision = backend._source_revision(app)
 
@@ -81,3 +81,27 @@ def create_preview_session(
         "runtime_token": runtime_token,
         "runtime_expires_in": RUNTIME_SESSION_TTL_SECONDS,
     }
+
+
+def create_author_preview_session(
+    backend: Any,
+    auth_subject: str,
+    app_id: str,
+) -> dict[str, Any]:
+    user, app = _author_editable_app(backend, auth_subject, app_id)
+    return _create_preview_session_for_authorized_app(backend, user, app, app_id)
+
+
+def create_group_preview_session(
+    backend: Any,
+    auth_subject: str,
+    group_id: str,
+    app_id: str,
+) -> dict[str, Any]:
+    user, app = backend._require_app_management_access(
+        auth_subject,
+        group_id,
+        app_id,
+        editable=True,
+    )
+    return _create_preview_session_for_authorized_app(backend, user, app, app_id)

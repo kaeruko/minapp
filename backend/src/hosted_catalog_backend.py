@@ -160,6 +160,25 @@ class HostedCatalogBackend(HostedPlatformBackend):
         apps.sort(key=lambda app: (app["title"], app["app_id"]))
         return apps
 
+    def _require_app_management_access_for_user(
+        self,
+        user_id: str,
+        group_id: str,
+        app_id: str,
+        *,
+        editable: bool,
+    ) -> dict[str, Any]:
+        membership = self._require_active_membership(user_id, group_id)
+        app = self._require_app_in_group(app_id, group_id)
+        if (
+            _item_string(app, "owner_user_id") != user_id
+            and _item_string(membership, "role") != "owner"
+        ):
+            raise ApiProblem(403, "forbidden", "このアプリを管理する権限がありません。")
+        if editable:
+            self._require_editable_app(app)
+        return app
+
     def _require_app_management_access(
         self,
         auth_subject: str,
@@ -169,15 +188,12 @@ class HostedCatalogBackend(HostedPlatformBackend):
         editable: bool,
     ) -> tuple[Any, dict[str, Any]]:
         user = self._user_by_auth_subject(auth_subject)
-        membership = self._require_active_membership(user.user_id, group_id)
-        app = self._require_app_in_group(app_id, group_id)
-        if (
-            _item_string(app, "owner_user_id") != user.user_id
-            and _item_string(membership, "role") != "owner"
-        ):
-            raise ApiProblem(403, "forbidden", "このアプリを管理する権限がありません。")
-        if editable:
-            self._require_editable_app(app)
+        app = self._require_app_management_access_for_user(
+            user.user_id,
+            group_id,
+            app_id,
+            editable=editable,
+        )
         return user, app
 
     def _require_app_author_access(

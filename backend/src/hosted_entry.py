@@ -33,6 +33,12 @@ _LAUNCH_SESSION_RE = re.compile(
     rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/launch-session$"
 )
 _GROUP_APP_UPLOAD_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/upload$")
+_GROUP_APP_VISIBILITY_RE = re.compile(
+    rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/visibility$"
+)
+_GROUP_APP_PREVIEW_SESSION_RE = re.compile(
+    rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/preview-session$"
+)
 _MY_APP_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}$")
 _MY_APP_VISIBILITY_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/visibility$")
 _MY_APP_THUMBNAIL_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/thumbnail$")
@@ -187,6 +193,27 @@ def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
             ),
         )
 
+    group_visibility_match = _GROUP_APP_VISIBILITY_RE.fullmatch(path)
+    if method == "POST" and group_visibility_match is not None:
+        payload = _json_body(event)
+        _require_fields(payload, required={"hidden"})
+        hidden = payload["hidden"]
+        if not isinstance(hidden, bool):
+            raise ApiProblem(400, "invalid_request", "hidden must be a boolean.")
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
+        group_id, app_id = group_visibility_match.groups()
+        return _json_response(
+            200,
+            hosted_app_management.set_group_visibility(
+                backend,
+                auth_subject,
+                group_id,
+                app_id,
+                hidden=hidden,
+            ),
+        )
+
     thumbnail_match = _MY_APP_THUMBNAIL_RE.fullmatch(path)
     if thumbnail_match is not None:
         auth_subject = _auth_subject(event)
@@ -220,10 +247,27 @@ def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
         backend = _get_backend()
         return _json_response(
             201,
-            hosted_preview_session.create_preview_session(
+            hosted_preview_session.create_author_preview_session(
                 backend,
                 auth_subject,
                 preview_match.group(1),
+            ),
+        )
+
+    group_preview_match = _GROUP_APP_PREVIEW_SESSION_RE.fullmatch(path)
+    if method == "POST" and group_preview_match is not None:
+        payload = _json_body(event)
+        _require_fields(payload, required=set())
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
+        group_id, app_id = group_preview_match.groups()
+        return _json_response(
+            201,
+            hosted_preview_session.create_group_preview_session(
+                backend,
+                auth_subject,
+                group_id,
+                app_id,
             ),
         )
     return None

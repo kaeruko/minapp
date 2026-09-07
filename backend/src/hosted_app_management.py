@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import io
-import secrets
 import time
 import zipfile
 from datetime import datetime, timezone
@@ -32,24 +31,21 @@ def _visibility(item: dict[str, Any]) -> str:
     return value
 
 
-def _owned_editable_app(
+def _author_editable_app(
     backend: Any,
     auth_subject: str,
     app_id: str,
 ) -> tuple[Any, dict[str, Any]]:
-    user = backend._user_by_auth_subject(auth_subject)
     app = backend._get_item(pk=f"APP#{app_id}", sk="META")
     if app is None:
         raise ApiProblem(404, "app_not_found", "指定されたアプリはありません。")
-    if app.get("editable", {}).get("BOOL") is not True:
-        raise ApiProblem(409, "app_not_manageable", "このアプリはマイアプリから管理できません。")
-    if _item_string(app, "owner_user_id") != user.user_id:
-        raise ApiProblem(403, "forbidden", "このアプリを管理する権限がありません。")
     group_id = _item_string(app, "group_id")
-    backend._require_active_membership(user.user_id, group_id)
-    if _optional_string(app, "deletion_state") is not None:
-        raise ApiProblem(409, "app_deleting", "このアプリは削除処理中です。")
-    return user, app
+    return backend._require_app_author_access(
+        auth_subject,
+        group_id,
+        app_id,
+        editable=True,
+    )
 
 
 def _stats(backend: Any, app_id: str) -> dict[str, int]:
@@ -135,21 +131,20 @@ def _published_history(backend: Any, app_id: str) -> list[dict[str, Any]]:
 
 
 def get_managed_app(backend: Any, auth_subject: str, app_id: str) -> dict[str, Any]:
-    _, app = _owned_editable_app(backend, auth_subject, app_id)
+    _, app = _author_editable_app(backend, auth_subject, app_id)
     payload = _managed_payload(backend, app)
     payload["source_history"] = _source_history(backend, app_id)
     payload["published_history"] = _published_history(backend, app_id)
     return payload
 
 
-def set_visibility(
+def _set_visibility_authorized(
     backend: Any,
-    auth_subject: str,
-    app_id: str,
+    app: dict[str, Any],
     *,
     hidden: bool,
 ) -> dict[str, Any]:
-    _, app = _owned_editable_app(backend, auth_subject, app_id)
+    app_id = _item_string(app, "app_id")
     group_id = _item_string(app, "group_id")
     updated_at = _now_iso()
 
@@ -197,43 +192,32 @@ def set_visibility(
     return _managed_payload(backend, refreshed)
 
 
-def create_preview_session(
+def set_visibility(
     backend: Any,
     auth_subject: str,
     app_id: str,
+    *,
+    hidden: bool,
 ) -> dict[str, Any]:
-    user, app = _owned_editable_app(backend, auth_subject, app_id)
-    group_id = _item_string(app, "group_id")
-    source_revision = backend._source_revision(app)
+    _, app = _author_editable_app(backend, auth_subject, app_id)
+    return _set_visibility_authorized(backend, app, hidden=hidden)
 
-    _, files, sha256 = backend._read_current_source(app)
-    source_key = _item_string(app, "source_key")
 
-    token = secrets.token_urlsafe(32)
-    token_hash = hashlib.sha256(token.encode("ascii")).hexdigest()
-    expires_at_epoch = int(time.time()) + PREVIEW_SESSION_SECONDS
-    session = {
-        "pk": _string_attr(f"HOSTEDPREVIEW#{token_hash}"),
-        "sk": _string_attr("META"),
-        "entity": _string_attr("hosted_preview_session"),
-        "user_id": _string_attr(user.user_id),
-        "group_id": _string_attr(group_id),
-        "app_id": _string_attr(app_id),
-        "source_revision": _number_attr(source_revision),
-        "source_key": _string_attr(source_key),
-        "source_sha256": _string_attr(sha256),
-        "source_files_json": _string_attr(_files_json(files)),
-        "expires_at_epoch": _number_attr(expires_at_epoch),
-        "ttl_epoch": _number_attr(expires_at_epoch + PREVIEW_TTL_GRACE_SECONDS),
-    }
-    backend._transact_put_new([session])
-    return {
-        "app_id": app_id,
-        "group_id": group_id,
-        "source_revision": source_revision,
-        "content_path": f"/hosted/preview/{token}/index.html",
-        "expires_in": PREVIEW_SESSION_SECONDS,
-    }
+def set_group_visibility(
+    backend: Any,
+    auth_subject: str,
+    group_id: str,
+    app_id: str,
+    *,
+    hidden: bool,
+) -> dict[str, Any]:
+    _, app = backend._require_app_management_access(
+        auth_subject,
+        group_id,
+        app_id,
+        editable=True,
+    )
+    return _set_visibility_authorized(backend, app, hidden=hidden)
 
 
 def get_preview_file(
@@ -251,14 +235,12 @@ def get_preview_file(
     user_id = _item_string(session, "user_id")
     group_id = _item_string(session, "group_id")
     app_id = _item_string(session, "app_id")
-    backend._require_active_membership(user_id, group_id)
-    app = backend._require_app_in_group(app_id, group_id)
-    if app.get("editable", {}).get("BOOL") is not True:
-        raise ApiProblem(409, "app_not_manageable", "このアプリはプレビューできません。")
-    if _item_string(app, "owner_user_id") != user_id:
-        raise ApiProblem(403, "forbidden", "このアプリをプレビューする権限がありません。")
-    if _optional_string(app, "deletion_state") is not None:
-        raise ApiProblem(409, "app_deleting", "このアプリは削除処理中です。")
+    backend._require_app_management_access_for_user(
+        user_id,
+        group_id,
+        app_id,
+        editable=True,
+    )
 
     normalized = backend._normalize_content_path(path)
     expected_files = _item_files(session, "source_files_json")
