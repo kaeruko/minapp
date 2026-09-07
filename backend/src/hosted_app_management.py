@@ -278,27 +278,34 @@ def record_launch(
     month = datetime.now(timezone.utc).strftime("%Y-%m")
     stats_pk = f"APPSTATS#{app_id}"
 
-    def update(sk: str, entity: str, extra_set: str, extra_values: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "Update": {
-                "TableName": backend._table_name,
-                "Key": {"pk": _string_attr(stats_pk), "sk": _string_attr(sk)},
-                "UpdateExpression": (
-                    "SET entity = if_not_exists(entity, :entity), "
-                    "app_id = if_not_exists(app_id, :app_id), "
-                    "group_id = if_not_exists(group_id, :group_id), "
-                    f"{extra_set}, updated_at = :updated_at ADD play_count :one"
-                ),
-                "ExpressionAttributeValues": {
-                    ":entity": _string_attr(entity),
-                    ":app_id": _string_attr(app_id),
-                    ":group_id": _string_attr(group_id),
-                    ":updated_at": _string_attr(now),
-                    ":one": _number_attr(1),
-                    **extra_values,
-                },
-            }
+    def update(
+        sk: str,
+        entity: str,
+        extra_set: str,
+        extra_values: dict[str, Any],
+        extra_names: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        operation: dict[str, Any] = {
+            "TableName": backend._table_name,
+            "Key": {"pk": _string_attr(stats_pk), "sk": _string_attr(sk)},
+            "UpdateExpression": (
+                "SET entity = if_not_exists(entity, :entity), "
+                "app_id = if_not_exists(app_id, :app_id), "
+                "group_id = if_not_exists(group_id, :group_id), "
+                f"{extra_set}, updated_at = :updated_at ADD play_count :one"
+            ),
+            "ExpressionAttributeValues": {
+                ":entity": _string_attr(entity),
+                ":app_id": _string_attr(app_id),
+                ":group_id": _string_attr(group_id),
+                ":updated_at": _string_attr(now),
+                ":one": _number_attr(1),
+                **extra_values,
+            },
         }
+        if extra_names:
+            operation["ExpressionAttributeNames"] = extra_names
+        return {"Update": operation}
 
     backend._dynamodb.transact_write_items(
         TransactItems=[
@@ -306,8 +313,9 @@ def record_launch(
             update(
                 f"MONTH#{month}",
                 "app_stats_month",
-                "month = if_not_exists(month, :month)",
+                "#month = if_not_exists(#month, :month)",
                 {":month": _string_attr(month)},
+                {"#month": "month"},
             ),
             update(
                 f"USER#{user_id}",
