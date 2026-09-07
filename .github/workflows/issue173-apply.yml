@@ -49,6 +49,59 @@ jobs:
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
           PY
           python .github/issue173_apply.py
+          python - <<'PY'
+          from pathlib import Path
+
+          thumbnail = Path('backend/src/hosted_thumbnail.py')
+          text = thumbnail.read_text(encoding='utf-8')
+          old_import = 'from hosted_app_management import _owned_editable_app\n'
+          if text.count(old_import) != 1:
+              raise RuntimeError(f'thumbnail import expected one target, found {text.count(old_import)}')
+          text = text.replace(
+              old_import,
+              'from hosted_app_management import _author_editable_app\n',
+              1,
+          )
+          count = text.count('_owned_editable_app(backend, auth_subject, app_id)')
+          if count != 2:
+              raise RuntimeError(f'thumbnail calls expected two targets, found {count}')
+          text = text.replace(
+              '_owned_editable_app(backend, auth_subject, app_id)',
+              '_author_editable_app(backend, auth_subject, app_id)',
+          )
+          thumbnail.write_text(text, encoding='utf-8')
+
+          regression = Path('backend/tests/test_hosted_managed_preview_authorization.py')
+          text = regression.read_text(encoding='utf-8')
+          old = '''        visible = set_group_visibility(
+              self.backend,
+              self.alice,
+              self.group_id,
+              self.bob_app["app_id"],
+              hidden=False,
+          )
+          self.assertEqual(visible["visibility"], "visible")
+          self.assertEqual(visible["owner_user_id"], self.bob_app["owner_user_id"])
+          '''
+          new = '''        admin_hidden = set_group_visibility(
+              self.backend,
+              self.alice,
+              self.group_id,
+              self.bob_app["app_id"],
+              hidden=True,
+          )
+          self.assertEqual(admin_hidden["visibility"], "hidden")
+          self.assertEqual(admin_hidden["owner_user_id"], self.bob_app["owner_user_id"])
+          '''
+          if text.count(old) != 1:
+              raise RuntimeError(f'visibility regression expected one target, found {text.count(old)}')
+          regression.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          for source in Path('backend/src').glob('*.py'):
+              body = source.read_text(encoding='utf-8')
+              if '_owned_editable_app' in body:
+                  raise RuntimeError(f'legacy managed-app helper remains in {source.name}')
+          PY
           python -m compileall -q backend/src backend/tests
           python -m unittest discover -s backend/tests -v
           rm .github/issue173_apply.py .github/workflows/issue173-apply.yml
