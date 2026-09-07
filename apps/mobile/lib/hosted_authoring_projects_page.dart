@@ -10,12 +10,6 @@ import 'hosted_authoring_projects_api.dart';
 import 'hosted_authoring_resolver.dart';
 import 'hosted_runtime_bridge.dart';
 
-typedef HostedAuthoringProjectTitle = String Function(
-  Map<String, Object?> document,
-);
-typedef HostedAuthoringInitialDocument = Map<String, Object?> Function(
-  String title,
-);
 typedef HostedAuthoringErrorMessage = String Function(Object error);
 typedef HostedAuthoringInstallPlayer = Future<String?> Function(
   BuildContext context,
@@ -26,12 +20,8 @@ class HostedAuthoringProjectDefinition {
     required this.contentFormat,
     required this.pageTitle,
     required this.collectionTitle,
-    required this.defaultProjectTitle,
-    required this.createDialogTitle,
     required this.emptyTitle,
     required this.emptyBody,
-    required this.projectTitle,
-    required this.initialDocument,
     this.projectIcon = Icons.edit_note_rounded,
     this.installCompatiblePlayer,
   });
@@ -39,13 +29,9 @@ class HostedAuthoringProjectDefinition {
   final String contentFormat;
   final String pageTitle;
   final String collectionTitle;
-  final String defaultProjectTitle;
-  final String createDialogTitle;
   final String emptyTitle;
   final String emptyBody;
   final IconData projectIcon;
-  final HostedAuthoringProjectTitle projectTitle;
-  final HostedAuthoringInitialDocument initialDocument;
   final HostedAuthoringInstallPlayer? installCompatiblePlayer;
 }
 
@@ -83,7 +69,7 @@ class _HostedAuthoringProjectsPageState
   late final HostedAuthoringPreviewApiClient _previewApi;
   late final HostedAuthoringApiClient _authoringTransport;
 
-  List<HostedAuthoringProject>? _projects;
+  List<HostedAuthoringProjectSummary>? _projects;
   bool _busy = false;
   String? _error;
 
@@ -142,28 +128,12 @@ class _HostedAuthoringProjectsPageState
         contentFormat: widget.definition.contentFormat,
       );
 
-      final List<HostedAuthoringProjectSummary> summaries =
+      final List<HostedAuthoringProjectSummary> projects =
           await _projectsApi.listProjects(
         accessToken: widget.accessToken,
         groupId: widget.groupId,
         contentFormat: widget.definition.contentFormat,
       );
-      final List<HostedAuthoringProject> projects = <HostedAuthoringProject>[];
-      for (final HostedAuthoringProjectSummary summary in summaries) {
-        final HostedAuthoringProject project = await _projectsApi.loadProject(
-          accessToken: widget.accessToken,
-          contentId: summary.contentId,
-        );
-        if (project.summary.groupId != widget.groupId ||
-            project.summary.contentFormat != widget.definition.contentFormat ||
-            project.summary.draftRevision != summary.draftRevision) {
-          throw const FormatException(
-            'Authoring project changed while the project list was loading.',
-          );
-        }
-        widget.definition.projectTitle(project.document);
-        projects.add(project);
-      }
       if (mounted) setState(() => _projects = projects);
     } catch (error) {
       if (mounted) setState(() => _error = widget.errorMessage(error));
@@ -172,58 +142,23 @@ class _HostedAuthoringProjectsPageState
     }
   }
 
-  Future<String?> _askForTitle() async {
-    String value = widget.definition.defaultProjectTitle;
-    return showDialog<String>(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: Text(widget.definition.createDialogTitle),
-        content: TextFormField(
-          key: const Key('hosted-authoring-new-title'),
-          initialValue: value,
-          maxLength: 100,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'タイトル'),
-          onChanged: (String next) => value = next,
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('やめる'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(value),
-            child: const Text('つくる'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _createProject() async {
     if (_busy) return;
-    final String? rawTitle = await _askForTitle();
-    if (rawTitle == null || !mounted) return;
-    final String title = rawTitle.trim();
-    if (title.isEmpty || title.length > 100) return;
-
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      final Map<String, Object?> document =
-          widget.definition.initialDocument(title);
       final HostedAuthoringProjectSummary created =
           await _projectsApi.createProject(
         accessToken: widget.accessToken,
         groupId: widget.groupId,
         contentFormat: widget.definition.contentFormat,
-        document: document,
+        document: <String, Object?>{},
       );
       if (!mounted) return;
       setState(() => _busy = false);
-      await _openEditor(created.contentId, title);
+      await _openEditor(created.contentId);
       if (mounted) await _loadProjects();
     } catch (error) {
       if (mounted) setState(() => _error = widget.errorMessage(error));
@@ -232,7 +167,7 @@ class _HostedAuthoringProjectsPageState
     }
   }
 
-  Future<void> _openEditor(String contentId, String title) async {
+  Future<void> _openEditor(String contentId) async {
     if (_busy) return;
     setState(() {
       _busy = true;
@@ -257,7 +192,7 @@ class _HostedAuthoringProjectsPageState
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (BuildContext context) => HostedAppWebViewPage.authoring(
-            title: '$title（編集）',
+            title: '${widget.definition.pageTitle}（編集）',
             launch: launch,
             runtimeTransport: widget.runtimeTransport,
             authoringTransport: _authoringTransport,
@@ -331,7 +266,7 @@ class _HostedAuthoringProjectsPageState
     return installedMatches.single;
   }
 
-  Future<void> _previewProject(HostedAuthoringProject project) async {
+  Future<void> _previewProject(HostedAuthoringProjectSummary project) async {
     if (_busy) return;
     setState(() {
       _busy = true;
@@ -342,9 +277,9 @@ class _HostedAuthoringProjectsPageState
       if (player == null) return;
       final HostedAuthoringPreviewGrant preview = await _previewApi.createPreview(
         accessToken: widget.accessToken,
-        contentId: project.summary.contentId,
+        contentId: project.contentId,
         playerAppId: player.appId,
-        expectedRevision: project.summary.draftRevision,
+        expectedRevision: project.draftRevision,
       );
       if (preview.contentFormat != widget.definition.contentFormat) {
         throw const FormatException(
@@ -352,12 +287,11 @@ class _HostedAuthoringProjectsPageState
         );
       }
       if (!mounted) return;
-      final String title = widget.definition.projectTitle(project.document);
       setState(() => _busy = false);
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (BuildContext context) => HostedAppWebViewPage.session(
-            title: '$title（下書きプレビュー）',
+            title: '${widget.definition.pageTitle}（下書きプレビュー）',
             contentUri: preview.contentUri,
             runtimeToken: preview.runtimeToken,
             runtimeTransport: widget.runtimeTransport,
@@ -373,7 +307,7 @@ class _HostedAuthoringProjectsPageState
 
   @override
   Widget build(BuildContext context) {
-    final List<HostedAuthoringProject>? projects = _projects;
+    final List<HostedAuthoringProjectSummary>? projects = _projects;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.definition.pageTitle),
@@ -430,55 +364,43 @@ class _HostedAuthoringProjectsPageState
                 )
               else
                 ...projects.map(
-                  (HostedAuthoringProject project) {
-                    final String title =
-                        widget.definition.projectTitle(project.document);
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Card(
-                        child: ListTile(
-                          key: Key(
-                            'hosted-authoring-project-${project.summary.contentId}',
-                          ),
-                          leading: CircleAvatar(
-                            child: Icon(widget.definition.projectIcon),
-                          ),
-                          title: Text(
-                            title,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                          subtitle: Text(
-                            '下書き revision ${project.summary.draftRevision}',
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: <Widget>[
-                              IconButton(
-                                key: Key(
-                                  'hosted-authoring-preview-${project.summary.contentId}',
-                                ),
-                                tooltip: '下書きをプレビュー',
-                                onPressed: _busy
-                                    ? null
-                                    : () => _previewProject(project),
-                                icon: const Icon(
-                                  Icons.play_circle_outline_rounded,
-                                ),
-                              ),
-                              const Icon(Icons.edit_rounded),
-                            ],
-                          ),
-                          enabled: !_busy,
-                          onTap: _busy
-                              ? null
-                              : () => _openEditor(
-                                    project.summary.contentId,
-                                    title,
-                                  ),
+                  (HostedAuthoringProjectSummary project) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Card(
+                      child: ListTile(
+                        key: Key(
+                          'hosted-authoring-project-${project.contentId}',
                         ),
+                        leading: CircleAvatar(
+                          child: Icon(widget.definition.projectIcon),
+                        ),
+                        title: const Text(
+                          '作品',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: Text(
+                          '下書き revision ${project.draftRevision}',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            IconButton(
+                              key: Key(
+                                'hosted-authoring-preview-${project.contentId}',
+                              ),
+                              tooltip: '下書きをプレビュー',
+                              onPressed:
+                                  _busy ? null : () => _previewProject(project),
+                              icon: const Icon(Icons.play_circle_outline_rounded),
+                            ),
+                            const Icon(Icons.edit_rounded),
+                          ],
+                        ),
+                        enabled: !_busy,
+                        onTap: _busy ? null : () => _openEditor(project.contentId),
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
             ],
           ),
