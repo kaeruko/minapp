@@ -7,6 +7,8 @@ import 'package:minapp_mobile/hosted_authoring_bridge.dart';
 
 const String _contentId = '33333333333333333333333333333333';
 const String _editorAppId = '44444444444444444444444444444444';
+const String _publishedAppId = '55555555555555555555555555555555';
+const String _playerAppId = '66666666666666666666666666666666';
 const String _groupId = '22222222222222222222222222222222';
 const String _token = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
@@ -35,6 +37,9 @@ Map<String, Object?> _published({required int revision}) => <String, Object?>{
       'content_format': 'minapp/novel@1',
       'published_version': 1,
       'source_revision': revision,
+      'published_app_id': _publishedAppId,
+      'player_app_id': _playerAppId,
+      'player_source_version': 4,
       'assets': <Object?>[],
       'published_at': '2026-09-06T10:20:00Z',
     };
@@ -141,6 +146,9 @@ void main() {
     expect(loaded['draft_revision'], 7);
     expect(saved['draft_revision'], 8);
     expect(published['source_revision'], 8);
+    expect(published['published_app_id'], _publishedAppId);
+    expect(published['player_app_id'], _playerAppId);
+    expect(published['player_source_version'], 4);
     expect(
       requests.map((http.Request request) => request.url.path).toList(),
       <String>[
@@ -149,6 +157,23 @@ void main() {
         '/hosted/authoring/session/$_token/document',
         '/hosted/authoring/session/$_token/publish',
       ],
+    );
+  });
+
+  test('publish response rejects invalid normal app identity', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      final Map<String, Object?> response = _published(revision: 8);
+      response['published_app_id'] = 'not-an-id';
+      return _json(201, response);
+    });
+    final HostedAuthoringApiClient api = HostedAuthoringApiClient(
+      baseUri: Uri.parse('https://hosted.example.test'),
+      client: client,
+    );
+
+    await expectLater(
+      api.publishProject(_token, expectedRevision: 8),
+      throwsA(isA<ArgumentError>()),
     );
   });
 
