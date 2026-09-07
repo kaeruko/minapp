@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -54,6 +55,40 @@ class FakeAuthoringTransport implements HostedAuthoringTransport {
   }
 
   @override
+  Future<HostedAuthoringAssetData> getAsset(
+    String authoringToken, {
+    required String path,
+  }) async {
+    calls.add('getAsset:$authoringToken:$path');
+    return HostedAuthoringAssetData(
+      bytes: Uint8List.fromList(<int>[1, 2, 3]),
+      contentType: 'image/png',
+    );
+  }
+
+  @override
+  Future<Map<String, Object?>> saveAsset(
+    String authoringToken, {
+    required int expectedRevision,
+    required String path,
+    required Uint8List bytes,
+  }) async {
+    calls.add(
+        'saveAsset:$authoringToken:$expectedRevision:$path:${base64Encode(bytes)}');
+    return _project(revision: expectedRevision + 1);
+  }
+
+  @override
+  Future<Map<String, Object?>> deleteAsset(
+    String authoringToken, {
+    required int expectedRevision,
+    required String path,
+  }) async {
+    calls.add('deleteAsset:$authoringToken:$expectedRevision:$path');
+    return _project(revision: expectedRevision + 1);
+  }
+
+  @override
   Future<Map<String, Object?>> saveDocument(
     String authoringToken, {
     required int expectedRevision,
@@ -74,13 +109,17 @@ class FakeAuthoringTransport implements HostedAuthoringTransport {
 }
 
 void main() {
-  test('session mint is JWT-authenticated and capability calls carry no content id', () async {
+  test(
+      'session mint is JWT-authenticated and capability calls carry no content id',
+      () async {
     final List<http.Request> requests = <http.Request>[];
     final MockClient client = MockClient((http.Request request) async {
       requests.add(request);
-      if (request.url.path == '/hosted/authoring/projects/$_contentId/session') {
+      if (request.url.path ==
+          '/hosted/authoring/projects/$_contentId/session') {
         expect(request.headers['authorization'], 'Bearer owner-token');
-        expect(jsonDecode(request.body), <String, Object?>{'editor_app_id': _editorAppId});
+        expect(jsonDecode(request.body),
+            <String, Object?>{'editor_app_id': _editorAppId});
         return _json(201, <String, Object?>{
           'token': _token,
           'expires_in': 600,
@@ -114,7 +153,8 @@ void main() {
       }
       if (request.url.path == '/hosted/authoring/session/$_token/publish') {
         expect(request.headers['authorization'], isNull);
-        expect(jsonDecode(request.body), <String, Object?>{'expected_revision': 8});
+        expect(jsonDecode(request.body),
+            <String, Object?>{'expected_revision': 8});
         return _json(201, _published(revision: 8));
       }
       fail('Unexpected request: ${request.method} ${request.url}');
@@ -160,6 +200,66 @@ void main() {
     );
   });
 
+  test('asset API uses the scoped token with exact MIME and revision headers',
+      () async {
+    final List<http.Request> requests = <http.Request>[];
+    final MockClient client = MockClient((http.Request request) async {
+      requests.add(request);
+      expect(request.headers['authorization'], isNull);
+      if (request.method == 'GET') {
+        return http.Response.bytes(
+          <int>[1, 2, 3],
+          200,
+          headers: const <String, String>{'content-type': 'image/png'},
+        );
+      }
+      if (request.method == 'POST') {
+        expect(request.headers['content-type'], 'image/png');
+        expect(request.headers['x-minapp-expected-revision'], '7');
+        expect(request.bodyBytes, <int>[4, 5, 6]);
+        return _json(200, _project(revision: 8));
+      }
+      if (request.method == 'DELETE') {
+        expect(request.headers['x-minapp-expected-revision'], '8');
+        return _json(200, _project(revision: 9));
+      }
+      fail('Unexpected asset request ${request.method}');
+    });
+    final HostedAuthoringApiClient api = HostedAuthoringApiClient(
+      baseUri: Uri.parse('https://hosted.example.test'),
+      client: client,
+    );
+
+    final HostedAuthoringAssetData asset = await api.getAsset(
+      _token,
+      path: 'images/face.png',
+    );
+    final Map<String, Object?> saved = await api.saveAsset(
+      _token,
+      expectedRevision: 7,
+      path: 'images/face.png',
+      bytes: Uint8List.fromList(<int>[4, 5, 6]),
+    );
+    final Map<String, Object?> deleted = await api.deleteAsset(
+      _token,
+      expectedRevision: 8,
+      path: 'images/face.png',
+    );
+
+    expect(asset.bytes, <int>[1, 2, 3]);
+    expect(asset.contentType, 'image/png');
+    expect(saved['draft_revision'], 8);
+    expect(deleted['draft_revision'], 9);
+    expect(
+      requests.map((http.Request request) => request.url.path).toList(),
+      <String>[
+        '/hosted/authoring/session/$_token/assets/images/face.png',
+        '/hosted/authoring/session/$_token/assets/images/face.png',
+        '/hosted/authoring/session/$_token/assets/images/face.png',
+      ],
+    );
+  });
+
   test('publish response rejects invalid normal app identity', () async {
     final MockClient client = MockClient((http.Request request) async {
       final Map<String, Object?> response = _published(revision: 8);
@@ -177,7 +277,8 @@ void main() {
     );
   });
 
-  test('session response cannot silently change content or editor scope', () async {
+  test('session response cannot silently change content or editor scope',
+      () async {
     final MockClient client = MockClient((http.Request request) async => _json(
           201,
           <String, Object?>{
@@ -204,7 +305,8 @@ void main() {
     );
   });
 
-  test('bridge load save and publish always use the bound authoring token', () async {
+  test('bridge load save and publish always use the bound authoring token',
+      () async {
     final FakeAuthoringTransport transport = FakeAuthoringTransport();
     final HostedAuthoringBridgeSession bridge = HostedAuthoringBridgeSession(
       transport: transport,
@@ -216,6 +318,33 @@ void main() {
         'version': 1,
         'id': '1',
         'method': 'authoring.load',
+      }),
+    );
+    final Map<String, Object?> getAsset = await bridge.handleMessage(
+      jsonEncode(<String, Object?>{
+        'version': 1,
+        'id': 'asset-get',
+        'method': 'authoring.getAsset',
+        'path': 'images/face.png',
+      }),
+    );
+    final Map<String, Object?> saveAsset = await bridge.handleMessage(
+      jsonEncode(<String, Object?>{
+        'version': 1,
+        'id': 'asset-save',
+        'method': 'authoring.saveAsset',
+        'path': 'images/face.png',
+        'expectedRevision': 7,
+        'dataBase64': base64Encode(<int>[4, 5, 6]),
+      }),
+    );
+    final Map<String, Object?> deleteAsset = await bridge.handleMessage(
+      jsonEncode(<String, Object?>{
+        'version': 1,
+        'id': 'asset-delete',
+        'method': 'authoring.deleteAsset',
+        'path': 'images/face.png',
+        'expectedRevision': 8,
       }),
     );
     final Map<String, Object?> save = await bridge.handleMessage(
@@ -237,19 +366,31 @@ void main() {
     );
 
     expect(load['ok'], isTrue);
+    expect(getAsset['ok'], isTrue);
+    expect(saveAsset['ok'], isTrue);
+    expect(deleteAsset['ok'], isTrue);
     expect(save['ok'], isTrue);
     expect(publish['ok'], isTrue);
+    expect(
+      (getAsset['result']! as Map<String, Object?>)['dataBase64'],
+      base64Encode(<int>[1, 2, 3]),
+    );
     expect(
       transport.calls,
       <String>[
         'load:$_token',
+        'getAsset:$_token:images/face.png',
+        'saveAsset:$_token:7:images/face.png:${base64Encode(<int>[4, 5, 6])}',
+        'deleteAsset:$_token:8:images/face.png',
         'save:$_token:7:1',
         'publish:$_token:8',
       ],
     );
   });
 
-  test('publish rejects identity scope and data fields instead of ignoring them', () async {
+  test(
+      'publish rejects identity scope and data fields instead of ignoring them',
+      () async {
     final FakeAuthoringTransport transport = FakeAuthoringTransport();
     final HostedAuthoringBridgeSession bridge = HostedAuthoringBridgeSession(
       transport: transport,
@@ -267,12 +408,14 @@ void main() {
     );
 
     expect(response['ok'], isFalse);
-    final Map<String, Object?> error = response['error']! as Map<String, Object?>;
+    final Map<String, Object?> error =
+        response['error']! as Map<String, Object?>;
     expect(error['code'], 'invalid_authoring_bridge_request');
     expect(transport.calls, isEmpty);
   });
 
-  test('bridge rejects identity and scope fields instead of ignoring them', () async {
+  test('bridge rejects identity and scope fields instead of ignoring them',
+      () async {
     final FakeAuthoringTransport transport = FakeAuthoringTransport();
     final HostedAuthoringBridgeSession bridge = HostedAuthoringBridgeSession(
       transport: transport,
@@ -289,15 +432,22 @@ void main() {
     );
 
     expect(response['ok'], isFalse);
-    final Map<String, Object?> error = response['error']! as Map<String, Object?>;
+    final Map<String, Object?> error =
+        response['error']! as Map<String, Object?>;
     expect(error['code'], 'invalid_authoring_bridge_request');
     expect(transport.calls, isEmpty);
   });
 
-  test('bootstrap exposes minapp.authoring without embedding credentials or token', () {
+  test(
+      'bootstrap exposes minapp.authoring without embedding credentials or token',
+      () {
     final String script = HostedAuthoringBridgeProtocol.bootstrapJavaScript;
     expect(script, contains('authoring.load'));
     expect(script, contains('authoring.save'));
+    expect(script, contains('authoring.getAsset'));
+    expect(script, contains('authoring.saveAsset'));
+    expect(script, contains('authoring.deleteAsset'));
+    expect(script, contains('Uint8Array'));
     expect(script, contains('authoring.publish'));
     expect(script, contains('Object.assign({}, current, { authoring })'));
     expect(script, isNot(contains(_token)));

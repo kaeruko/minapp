@@ -103,6 +103,10 @@ class HostedAuthoringWebBridgeTests(unittest.TestCase):
         self.assertIn("window.beforeBridge = true", source)
         self.assertIn("minapp.web", source)
         self.assertIn("authoring.preview", source)
+        self.assertIn("authoring.getAsset", source)
+        self.assertIn("authoring.saveAsset", source)
+        self.assertIn("authoring.deleteAsset", source)
+        self.assertIn("Uint8Array", source)
         self.assertIn("userState.set", source)
         self.assertIn("https://portal.example.test", source)
         self.assertIn(launch["web_bridge_nonce"], source)
@@ -192,7 +196,7 @@ class HostedAuthoringWebEntryTests(unittest.TestCase):
             "content_id": "3" * 32,
             "content_format": "example/quiz@1",
             "editor_app_id": "4" * 32,
-            "allowed_operations": ["load", "save_document", "preview_request", "publish_request"],
+            "allowed_operations": ["load", "save_document", "get_asset", "save_asset", "delete_asset", "preview_request", "publish_request"],
             "web_bridge_nonce": "n" * 43,
         }
         with patch.object(

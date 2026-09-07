@@ -81,6 +81,7 @@ def _bootstrap_javascript(parent_origin: str, bridge_nonce: str) -> str:
   const NONCE = {nonce_json};
   const REQUEST_ID = /^[A-Za-z0-9_-]{{1,64}}$/;
   const STATE_KEY = /^[a-z][a-z0-9_.-]{{0,63}}$/;
+  const ASSET_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'mp3', 'm4a', 'ogg', 'wav']);
 
   if (window.parent === window) {{
     throw new Error('Web Authoring bridge requires a parent iframe host.');
@@ -175,6 +176,45 @@ def _bootstrap_javascript(parent_origin: str, bridge_nonce: str) -> str:
     }}
     return key;
   }};
+  const validateAssetPath = (path) => {{
+    if (typeof path !== 'string' || path.length === 0 || path.length > 256 ||
+        path.startsWith('/') || path.includes('\\') || path.includes('\0')) {{
+      throw new MinAppError(0, 'invalid_authoring_asset_path', 'Authoring asset path is invalid.');
+    }}
+    const parts = path.split('/');
+    if (parts.some((part) => part === '' || part === '.' || part === '..')) {{
+      throw new MinAppError(0, 'invalid_authoring_asset_path', 'Authoring asset path is invalid.');
+    }}
+    const name = parts[parts.length - 1];
+    const dot = name.lastIndexOf('.');
+    const extension = dot < 0 ? '' : name.slice(dot + 1).toLowerCase();
+    if (!ASSET_EXTENSIONS.has(extension)) {{
+      throw new MinAppError(0, 'unsupported_authoring_asset_type', 'Authoring asset type is not supported.');
+    }}
+    return path;
+  }};
+  const encodeAssetBytes = (bytes) => {{
+    if (!(bytes instanceof Uint8Array) || bytes.length === 0) {{
+      throw new MinAppError(0, 'invalid_authoring_asset_data', 'Authoring asset bytes must be a non-empty Uint8Array.');
+    }}
+    let binary = '';
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) {{
+      binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+    }}
+    return btoa(binary);
+  }};
+  const decodeAssetResult = (result) => {{
+    if (!isPlainObject(result) ||
+        Object.keys(result).sort().join(',') !== 'contentType,dataBase64' ||
+        typeof result.dataBase64 !== 'string' || result.dataBase64.length === 0 ||
+        typeof result.contentType !== 'string' || result.contentType.length === 0) {{
+      throw new MinAppError(0, 'invalid_bridge_response', 'Authoring asset response is invalid.');
+    }}
+    const binary = atob(result.dataBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return Object.freeze({{ bytes, contentType: result.contentType }});
+  }};
   const validateRevision = (options) => {{
     const revision = options && options.expectedRevision;
     if (!Number.isInteger(revision) || revision < 1) {{
@@ -213,6 +253,30 @@ def _bootstrap_javascript(parent_origin: str, bridge_nonce: str) -> str:
   }});
   const authoring = Object.freeze({{
     load: () => send({{ method: 'authoring.load' }}),
+    getAsset: (path) => {{
+      try {{ return send({{ method: 'authoring.getAsset', path: validateAssetPath(path) }}).then(decodeAssetResult); }}
+      catch (error) {{ return Promise.reject(error); }}
+    }},
+    saveAsset: (path, bytes, options) => {{
+      let expectedRevision;
+      let normalizedPath;
+      let dataBase64;
+      try {{
+        normalizedPath = validateAssetPath(path);
+        dataBase64 = encodeAssetBytes(bytes);
+        expectedRevision = validateRevision(options);
+      }} catch (error) {{ return Promise.reject(error); }}
+      return send({{ method: 'authoring.saveAsset', path: normalizedPath, expectedRevision, dataBase64 }});
+    }},
+    deleteAsset: (path, options) => {{
+      let expectedRevision;
+      let normalizedPath;
+      try {{
+        normalizedPath = validateAssetPath(path);
+        expectedRevision = validateRevision(options);
+      }} catch (error) {{ return Promise.reject(error); }}
+      return send({{ method: 'authoring.deleteAsset', path: normalizedPath, expectedRevision }});
+    }},
     save: (data, options) => {{
       if (!isPlainObject(data)) {{
         return Promise.reject(new MinAppError(0, 'invalid_master_data', 'Authoring save data must be an object.'));

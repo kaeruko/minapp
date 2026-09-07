@@ -32,7 +32,19 @@ function jsonResponse(status, payload) {
   };
 }
 
-function emptyResponse(status = 204) {
+function binaryResponse(status, bytes, contentType) {
+  const data = Uint8Array.from(bytes);
+  return {
+    status,
+    ok: status >= 200 && status < 300,
+    headers: { get(name) { return name.toLowerCase() === "content-type" ? contentType : null; } },
+    async arrayBuffer() { return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength); },
+    async text() { return ""; },
+    async json() { throw new Error("binary response"); },
+  };
+}
+
+  function emptyResponse(status = 204) {
   return {
     status,
     ok: status >= 200 && status < 300,
@@ -53,7 +65,7 @@ function launchPayload() {
     content_id: CONTENT_ID,
     content_format: "example/quiz@1",
     editor_app_id: EDITOR_ID,
-    allowed_operations: ["load", "save_document", "preview_request", "publish_request"],
+    allowed_operations: ["load", "save_document", "get_asset", "save_asset", "delete_asset", "preview_request", "publish_request"],
     web_bridge_nonce: NONCE,
   };
 }
@@ -70,7 +82,7 @@ function launchGrant() {
     contentId: CONTENT_ID,
     contentFormat: "example/quiz@1",
     editorAppId: EDITOR_ID,
-    allowedOperations: Object.freeze(["load", "save_document", "preview_request", "publish_request"]),
+    allowedOperations: Object.freeze(["load", "save_document", "get_asset", "save_asset", "delete_asset", "preview_request", "publish_request"]),
     webBridgeNonce: NONCE,
   };
 }
@@ -231,6 +243,52 @@ test("Authoring load uses only the scoped session token and returns to the exact
   assert.equal(messages[0].message.ok, true);
   assert.equal(messages[0].message.id, "req1");
   assert.deepEqual(messages[0].message.result.document, { questions: [] });
+});
+
+test("Asset bridge keeps scope in trusted parent and preserves bytes/MIME/revisions", async () => {
+  const { frame, messages } = fakeFrame();
+  const target = fakeEventTarget();
+  const calls = [];
+  const adapter = new WebAuthoringHostAdapter({
+    frame,
+    apiOrigin: API_ORIGIN,
+    launch: launchGrant(),
+    previewHandler: async () => null,
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      if (options.method === "GET") return binaryResponse(200, [1, 2, 3], "image/png");
+      if (options.method === "POST") {
+        assert.equal(options.headers["Content-Type"], "image/png");
+        assert.equal(options.headers["x-minapp-expected-revision"], "7");
+        assert.deepEqual(Array.from(options.body), [4, 5, 6]);
+        return jsonResponse(200, { content_id: CONTENT_ID, group_id: "2".repeat(32), content_format: "example/quiz@1", status: "draft", draft_revision: 8, assets: [], created_at: "2026-09-07T00:00:00Z", updated_at: "2026-09-07T00:00:01Z" });
+      }
+      assert.equal(options.method, "DELETE");
+      assert.equal(options.headers["x-minapp-expected-revision"], "8");
+      return jsonResponse(200, { content_id: CONTENT_ID, group_id: "2".repeat(32), content_format: "example/quiz@1", status: "draft", draft_revision: 9, assets: [], created_at: "2026-09-07T00:00:00Z", updated_at: "2026-09-07T00:00:02Z" });
+    },
+    eventTarget: target,
+  });
+
+  await adapter.handleMessageEvent({ source: frame.contentWindow, origin: "null", data: request("authoring.getAsset", { path: "images/face.png" }, "asset-get") });
+  await adapter.handleMessageEvent({ source: frame.contentWindow, origin: "null", data: request("authoring.saveAsset", { path: "images/face.png", expectedRevision: 7, dataBase64: "BAUG" }, "asset-save") });
+  await adapter.handleMessageEvent({ source: frame.contentWindow, origin: "null", data: request("authoring.deleteAsset", { path: "images/face.png", expectedRevision: 8 }, "asset-delete") });
+
+  assert.equal(calls.length, 3);
+  for (const call of calls) {
+    assert.equal(call.url, `${API_ORIGIN}/hosted/authoring/session/${AUTHORING_TOKEN}/assets/images/face.png`);
+    assert.equal(call.options.headers.Authorization, undefined);
+  }
+  assert.deepEqual(messages[0].message.result, { dataBase64: "AQID", contentType: "image/png" });
+  assert.equal(messages[1].message.result.draft_revision, 8);
+  assert.equal(messages[2].message.result.draft_revision, 9);
+});
+
+test("Asset bridge rejects unsafe path before any fetch", async () => {
+  assert.throws(
+    () => decodeBridgeRequest(request("authoring.getAsset", { path: "../face.png" }), NONCE),
+    (error) => error instanceof WebAuthoringBridgeProtocolError && error.code === "invalid_authoring_asset_path",
+  );
 });
 
 test("Backend Authoring error status/code/message are preserved", async () => {
