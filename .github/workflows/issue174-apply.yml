@@ -29,13 +29,39 @@ jobs:
           from pathlib import Path
           path = Path('.github/issue174_apply.py')
           text = path.read_text(encoding='utf-8')
+
           old = 'text = replace_once(text, "      await loadOwnerGroups();\\n", "      await loadActiveGroups();\\n", "web active group loader call")'
           new = '''count = text.count("      await loadOwnerGroups();\\n")
           if count != 2:
               raise RuntimeError(f"web active group loader calls: expected 2, found {count}")
           text = text.replace("      await loadOwnerGroups();\\n", "      await loadActiveGroups();\\n")'''
           if text.count(old) != 1:
-              raise RuntimeError(f'apply-script patch expected one target, found {text.count(old)}')
+              raise RuntimeError(f'loader-call patch expected one target, found {text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = '''def replace_between(text: str, start: str, end: str, replacement: str, label: str) -> str:
+              start_count = text.count(start)
+              end_count = text.count(end)
+              if start_count != 1 or end_count != 1:
+                  raise RuntimeError(
+                      f"{label}: expected one start/end marker, found {start_count}/{end_count}"
+                  )
+              left, tail = text.split(start, 1)
+              _, right = tail.split(end, 1)
+              return left + replacement + end + right
+          '''
+          new = '''def replace_between(text: str, start: str, end: str, replacement: str, label: str) -> str:
+              start_count = text.count(start)
+              if start_count != 1:
+                  raise RuntimeError(f"{label}: expected one start marker, found {start_count}")
+              left, tail = text.split(start, 1)
+              if end not in tail:
+                  raise RuntimeError(f"{label}: end marker was not found after start marker")
+              _, right = tail.split(end, 1)
+              return left + replacement + end + right
+          '''
+          if text.count(old) != 1:
+              raise RuntimeError(f'replace-between patch expected one target, found {text.count(old)}')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
           PY
           python .github/issue174_apply.py
