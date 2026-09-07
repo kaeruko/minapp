@@ -47,6 +47,7 @@ jobs:
           ]:
               replace_once(path, "FilePicker.platform.saveFile(", "FilePicker.saveFile(")
               replace_once(path, "final HostedSourceDownload download =", "final GirlsSourceDownload download =")
+              replace_once(path, "final String? savedPath = await FilePicker.saveFile(", "final Uri? savedPath = await FilePicker.saveFile(")
 
           replace_once(
               "apps/mobile/lib/girls/girls_group_app_management_page.dart",
