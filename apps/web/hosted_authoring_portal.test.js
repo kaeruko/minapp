@@ -44,6 +44,63 @@ function projectPayload(overrides = {}) {
   };
 }
 
+function fakeClassList() {
+  const values = new Set();
+  return {
+    add(value) { values.add(value); },
+    remove(value) { values.delete(value); },
+    contains(value) { return values.has(value); },
+  };
+}
+
+function fakeElement() {
+  const listeners = new Map();
+  return {
+    listeners,
+    children: [],
+    options: [],
+    value: "",
+    textContent: "",
+    disabled: false,
+    open: false,
+    classList: fakeClassList(),
+    addEventListener(type, listener) { listeners.set(type, listener); },
+    removeAttribute() {},
+    setAttribute() {},
+    replaceChildren(...children) { this.children = children; },
+    appendChild(child) { this.children.push(child); return child; },
+    showModal() { this.open = true; },
+    close() { this.open = false; },
+  };
+}
+
+function fakeController() {
+  return new portal.HostedAuthoringPortalController({
+    sourceGroupSelect: fakeElement(),
+    groupSelect: fakeElement(),
+    editorSelect: fakeElement(),
+    refreshButton: fakeElement(),
+    createButton: fakeElement(),
+    statusElement: fakeElement(),
+    errorElement: fakeElement(),
+    projectList: fakeElement(),
+    editorDialog: fakeElement(),
+    editorTitle: fakeElement(),
+    editorFrame: fakeElement(),
+    editorCloseButton: fakeElement(),
+    playerDialog: fakeElement(),
+    playerOptions: fakeElement(),
+    playerCancelButton: fakeElement(),
+    previewDialog: fakeElement(),
+    previewTitle: fakeElement(),
+    previewFrame: fakeElement(),
+    previewCloseButton: fakeElement(),
+    getApiOrigin: async () => API_ORIGIN,
+    getAccessToken: () => "jwt-owner",
+    fetchImpl: async () => { throw new Error("unexpected fetch"); },
+  });
+}
+
 test("editorChoices exposes each exact edits contract and excludes player-only apps", () => {
   const choices = portal.editorChoices([
     {
@@ -155,6 +212,46 @@ test("backend Authoring status/code/message are preserved by portal requests", a
       error.code === "revision_conflict" &&
       error.message === "Expected revision no longer matches.",
   );
+});
+
+test("Portal fails explicitly when no compatible Player is available", async () => {
+  const controller = fakeController();
+  await assert.rejects(
+    () => controller.choosePlayer([], FORMAT),
+    (error) => error instanceof webAuthoring.HostedWebApiError &&
+      error.status === 409 &&
+      error.code === "authoring_player_unavailable",
+  );
+});
+
+test("Portal requires explicit user selection when multiple Players are compatible", async () => {
+  const controller = fakeController();
+  const oldDocument = globalThis.document;
+  globalThis.document = {
+    createElement(tag) {
+      assert.equal(tag, "button");
+      return fakeElement();
+    },
+  };
+  try {
+    const first = { appId: PLAYER_ID, title: "Player A", accepts: [FORMAT] };
+    const second = { appId: "6".repeat(32), title: "Player B", accepts: [FORMAT] };
+    const selectionPromise = controller.choosePlayer([first, second], FORMAT);
+
+    assert.equal(controller.playerDialog.open, true);
+    assert.equal(controller.playerOptions.children.length, 2);
+    assert.equal(controller.playerResolver instanceof Function, true);
+
+    const secondButton = controller.playerOptions.children[1];
+    assert.equal(secondButton.textContent, "Player B");
+    secondButton.listeners.get("click")();
+
+    const selected = await selectionPromise;
+    assert.equal(selected, second);
+    assert.equal(controller.playerDialog.open, false);
+  } finally {
+    globalThis.document = oldDocument;
+  }
 });
 
 test("Girls production route installs Web Authoring without weakening iframe sandbox", () => {
