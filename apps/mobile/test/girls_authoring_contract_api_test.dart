@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:minapp_mobile/girls/girls_authoring_contract_api.dart';
+import 'package:minapp_mobile/girls/girls_authoring_resolver.dart';
 
 void main() {
   final Uri baseUri = Uri.parse('https://girls-api.example.com');
