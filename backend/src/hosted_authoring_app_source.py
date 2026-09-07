@@ -27,9 +27,9 @@ def resolve_authoring_app_source(
 ) -> AuthoringAppSource:
     """Resolve one immutable source revision for Editor/Player execution.
 
-    Built-ins use the immutable template ZIP in the upload bucket. Third-party
-    editable apps use their currently published immutable artifact; draft source
-    is never exposed through Authoring execution.
+    Built-ins use their immutable template ZIP. Third-party editable apps are
+    resolved through the current published manifest back to the exact immutable
+    source revision that was published. A later draft is never exposed.
     """
 
     source_kind = _item_string(app, "source_kind")
@@ -78,24 +78,61 @@ def resolve_authoring_app_source(
             "This Authoring app is not publicly available.",
         )
 
+    app_id = _item_string(app, "app_id")
+    group_id = _item_string(app, "group_id")
     published_version = _optional_number(app, "published_version")
-    published_key = _optional_string(app, "published_key")
     published_sha256 = _optional_string(app, "published_sha256")
-    if published_version is None or published_key is None or published_sha256 is None:
+    if published_version is None or published_sha256 is None:
         raise ApiProblem(
             409,
             "authoring_app_unpublished",
             "This Authoring app must be published before other users can run it.",
         )
-    files = _item_files(app, "published_files_json")
-    zip_bytes, actual_files, actual_sha256 = backend._read_zip_object(
-        bucket=backend._published_bucket,
-        key=published_key,
-        expected_sha256=published_sha256,
+
+    published_manifest = backend._get_item(
+        pk=f"APP#{app_id}",
+        sk=f"PUBLISHED#{published_version:06d}",
     )
-    del zip_bytes
-    if actual_files != files or actual_sha256 != published_sha256:
-        raise RuntimeError("Published Authoring app source does not match metadata")
+    if published_manifest is None:
+        raise RuntimeError("Published Authoring app manifest is missing")
+    if _item_string(published_manifest, "entity") != "hosted_published_version":
+        raise RuntimeError("Published Authoring app manifest has an unexpected entity")
+    if _item_string(published_manifest, "app_id") != app_id or _item_string(
+        published_manifest, "group_id"
+    ) != group_id:
+        raise RuntimeError("Published Authoring app manifest scope is invalid")
+    source_revision = _optional_number(published_manifest, "source_revision")
+    if source_revision is None:
+        raise RuntimeError("Published Authoring app manifest has no source revision")
+    if _item_string(published_manifest, "sha256") != published_sha256:
+        raise RuntimeError("Published Authoring app checksum no longer matches its pointer")
+
+    source_manifest = backend._get_item(
+        pk=f"APP#{app_id}",
+        sk=f"SOURCE#{source_revision:06d}",
+    )
+    if source_manifest is None:
+        raise RuntimeError("Published Authoring app source manifest is missing")
+    if _item_string(source_manifest, "entity") != "hosted_source_revision":
+        raise RuntimeError("Published Authoring source manifest has an unexpected entity")
+    if _item_string(source_manifest, "app_id") != app_id or _item_string(
+        source_manifest, "group_id"
+    ) != group_id:
+        raise RuntimeError("Published Authoring source manifest scope is invalid")
+    source_sha256 = _item_string(source_manifest, "source_sha256")
+    if source_sha256 != published_sha256:
+        raise RuntimeError("Published Authoring artifact differs from its source revision")
+    files = _item_files(source_manifest, "source_files_json")
+    if files != _item_files(published_manifest, "published_files_json"):
+        raise RuntimeError("Published Authoring file manifest differs from its source revision")
+    source_key = _item_string(source_manifest, "source_key")
+    _, actual_files, actual_sha256 = backend._read_zip_object(
+        bucket=backend._upload_bucket,
+        key=source_key,
+        expected_sha256=source_sha256,
+    )
+    if actual_files != files or actual_sha256 != source_sha256:
+        raise RuntimeError("Immutable Authoring source revision does not match metadata")
     _require_index(files)
 
     target = _optional_contract_string(app, "master_data_element_id")
@@ -106,10 +143,10 @@ def resolve_authoring_app_source(
             "The selected Player does not declare a Master Data injection target.",
         )
     return AuthoringAppSource(
-        bucket=backend._published_bucket,
-        key=published_key,
+        bucket=backend._upload_bucket,
+        key=source_key,
         files=tuple(files),
-        sha256=published_sha256,
+        sha256=source_sha256,
         version=int(published_version),
         master_data_element_id=target,
     )
