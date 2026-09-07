@@ -24,9 +24,23 @@
   const AUTHORING_METHODS = new Set([
     "authoring.load",
     "authoring.save",
+    "authoring.getAsset",
+    "authoring.saveAsset",
+    "authoring.deleteAsset",
     "authoring.preview",
     "authoring.publish",
   ]);
+  const AUTHORING_ASSET_CONTENT_TYPES = Object.freeze({
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    webp: "image/webp",
+    mp3: "audio/mpeg",
+    m4a: "audio/mp4",
+    ogg: "audio/ogg",
+    wav: "audio/wav",
+  });
   const RUNTIME_METHODS = new Set([
     "state.get",
     "state.set",
@@ -129,6 +143,101 @@
       throw new Error("Hosted API origin must be an HTTPS origin without path/query/fragment.");
     }
     return url.origin;
+  }
+
+  function validateAuthoringAssetPath(value) {
+  if (typeof value !== "string" || value.length === 0 || value.length > 256 ||
+      value.startsWith("/") || value.includes("\\") || value.includes("\0")) {
+    throw new Error("Authoring asset path is invalid.");
+  }
+  const parts = value.split("/");
+  if (parts.some((part) => part === "" || part === "." || part === "..")) {
+    throw new Error("Authoring asset path is invalid.");
+  }
+  const name = parts[parts.length - 1];
+  const dot = name.lastIndexOf(".");
+  const extension = dot < 0 ? "" : name.slice(dot + 1).toLowerCase();
+  if (!Object.prototype.hasOwnProperty.call(AUTHORING_ASSET_CONTENT_TYPES, extension)) {
+    throw new Error("Authoring asset type is not supported.");
+  }
+  return value;
+}
+
+  function authoringAssetContentType(path) {
+    const normalized = validateAuthoringAssetPath(path);
+    const name = normalized.split("/").at(-1);
+    return AUTHORING_ASSET_CONTENT_TYPES[name.slice(name.lastIndexOf(".") + 1).toLowerCase()];
+  }
+
+  function authoringAssetApiPath(token, path) {
+    const encoded = validateAuthoringAssetPath(path).split("/").map(encodeURIComponent).join("/");
+    return `/hosted/authoring/session/${token}/assets/${encoded}`;
+  }
+
+  function decodeBase64Bytes(value) {
+    if (typeof value !== "string" || value.length === 0) throw new Error("Authoring asset data must be non-empty base64.");
+    let binary;
+    try { binary = atob(value); }
+    catch (error) { throw new Error("Authoring asset data must be valid base64.", { cause: error }); }
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    if (bytes.length === 0) throw new Error("Authoring asset data must not be empty.");
+    return bytes;
+  }
+
+  function encodeBase64Bytes(bytes) {
+    let binary = "";
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+    }
+    return btoa(binary);
+  }
+
+  async function assetRequest({ apiOrigin, fetchImpl, authoringToken, method, path, expectedRevision = null, dataBase64 = null }) {
+    const origin = validateApiOrigin(apiOrigin);
+    validateFetch(fetchImpl);
+    validateToken(authoringToken, "authoringToken");
+    const normalizedPath = validateAuthoringAssetPath(path);
+    if (!["GET", "POST", "DELETE"].includes(method)) throw new TypeError("Unsupported asset request method.");
+    if ((method === "POST" || method === "DELETE") && (!Number.isInteger(expectedRevision) || expectedRevision < 1)) {
+      throw new Error("expectedRevision must be a positive integer.");
+    }
+    const url = new URL(authoringAssetApiPath(authoringToken, normalizedPath), `${origin}/`);
+    if (url.origin !== origin) throw new Error("Authoring asset path escaped configured origin.");
+    const headers = { Accept: method === "GET" ? "*/*" : "application/json" };
+    const options = { method, headers, cache: "no-store", credentials: "omit" };
+    if (method === "POST" || method === "DELETE") headers["x-minapp-expected-revision"] = String(expectedRevision);
+    if (method === "POST") {
+      headers["Content-Type"] = authoringAssetContentType(normalizedPath);
+      options.body = decodeBase64Bytes(dataBase64);
+    }
+    let response;
+    try { response = await fetchImpl(url.toString(), options); }
+    catch (error) { throw new HostedWebApiError(0, "host_adapter_request_failed", String(error)); }
+    if (method === "GET" && response.ok) {
+      const rawContentType = response.headers.get("content-type");
+      const contentType = rawContentType === null ? "" : rawContentType.split(";", 1)[0].trim().toLowerCase();
+      const expectedContentType = authoringAssetContentType(normalizedPath);
+      if (contentType !== expectedContentType) {
+        throw new HostedWebApiError(response.status, "invalid_api_response", `Authoring asset Content-Type must be ${expectedContentType}.`);
+      }
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      return Object.freeze({ dataBase64: encodeBase64Bytes(bytes), contentType });
+    }
+    const payload = await decodeJsonResponse(response, `Authoring asset ${method}`);
+    requireExactFields(
+      payload,
+      ["content_id", "group_id", "content_format", "status", "draft_revision", "assets", "created_at", "updated_at"],
+      `Authoring asset ${method} response`,
+    );
+    if (!Number.isInteger(payload.draft_revision) || payload.draft_revision !== expectedRevision + 1) {
+      throw new HostedWebApiError(
+        response.status,
+        "invalid_api_response",
+        "Authoring asset mutation did not advance exactly one draft revision.",
+      );
+    }
+    return payload;
   }
 
   function validateAccessToken(value) {
@@ -298,7 +407,7 @@
         allowedOperations.some((value) => typeof value !== "string" || value.length === 0)) {
       throw new Error("Web Authoring launch allowed_operations is invalid.");
     }
-    const requiredOperations = ["load", "save_document", "preview_request", "publish_request"];
+    const requiredOperations = ["load", "save_document", "get_asset", "save_asset", "delete_asset", "preview_request", "publish_request"];
     for (const operation of requiredOperations) {
       if (!allowedOperations.includes(operation)) {
         throw new Error(`Web Authoring launch is missing required operation: ${operation}.`);
@@ -473,15 +582,52 @@
     }
 
     if (data.method === "authoring.load") {
-      try {
-        requireExactFields(data, common, "Authoring load request");
-      } catch (error) {
-        throw protocolError("invalid_bridge_request", "Authoring load request fields are invalid.", id);
-      }
-      return Object.freeze({ id, method: data.method });
+    try {
+      requireExactFields(data, common, "Authoring load request");
+    } catch (error) {
+      throw protocolError("invalid_bridge_request", "Authoring load request fields are invalid.", id);
     }
+    return Object.freeze({ id, method: data.method });
+  }
 
-    const expected = data.method === "authoring.save"
+  if (data.method === "authoring.getAsset") {
+    try {
+      requireExactFields(data, [...common, "path"], "Authoring getAsset request");
+      return Object.freeze({ id, method: data.method, path: validateAuthoringAssetPath(data.path) });
+    } catch (error) {
+      throw protocolError("invalid_authoring_asset_path", "Authoring asset path is invalid or unsupported.", id);
+    }
+  }
+
+  if (data.method === "authoring.saveAsset" || data.method === "authoring.deleteAsset") {
+    const expectedAssetFields = data.method === "authoring.saveAsset"
+      ? [...common, "path", "expectedRevision", "dataBase64"]
+      : [...common, "path", "expectedRevision"];
+    try {
+      requireExactFields(data, expectedAssetFields, "Authoring asset request");
+    } catch (error) {
+      throw protocolError("invalid_bridge_request", "Authoring asset request fields are invalid.", id);
+    }
+    if (!Number.isInteger(data.expectedRevision) || data.expectedRevision < 1) {
+      throw protocolError("invalid_expected_revision", "expectedRevision must be a positive integer.", id);
+    }
+    let normalizedPath;
+    try { normalizedPath = validateAuthoringAssetPath(data.path); }
+    catch (error) { throw protocolError("invalid_authoring_asset_path", "Authoring asset path is invalid or unsupported.", id); }
+    if (data.method === "authoring.saveAsset") {
+      try { decodeBase64Bytes(data.dataBase64); }
+      catch (error) { throw protocolError("invalid_authoring_asset_data", error.message, id); }
+    }
+    return Object.freeze({
+      id,
+      method: data.method,
+      path: normalizedPath,
+      expectedRevision: data.expectedRevision,
+      ...(data.method === "authoring.saveAsset" ? { dataBase64: data.dataBase64 } : {}),
+    });
+  }
+
+  const expected = data.method === "authoring.save"
       ? [...common, "expectedRevision", "data"]
       : [...common, "expectedRevision"];
     try {
@@ -672,8 +818,38 @@
           context: "Authoring load",
         });
       }
-      if (request.method === "authoring.save") {
-        return await jsonRequest({
+      if (request.method === "authoring.getAsset") {
+      return await assetRequest({
+        apiOrigin: this.apiOrigin,
+        fetchImpl: this.fetchImpl,
+        authoringToken: this.launch.authoringToken,
+        method: "GET",
+        path: request.path,
+      });
+    }
+    if (request.method === "authoring.saveAsset") {
+      return await assetRequest({
+        apiOrigin: this.apiOrigin,
+        fetchImpl: this.fetchImpl,
+        authoringToken: this.launch.authoringToken,
+        method: "POST",
+        path: request.path,
+        expectedRevision: request.expectedRevision,
+        dataBase64: request.dataBase64,
+      });
+    }
+    if (request.method === "authoring.deleteAsset") {
+      return await assetRequest({
+        apiOrigin: this.apiOrigin,
+        fetchImpl: this.fetchImpl,
+        authoringToken: this.launch.authoringToken,
+        method: "DELETE",
+        path: request.path,
+        expectedRevision: request.expectedRevision,
+      });
+    }
+    if (request.method === "authoring.save") {
+      return await jsonRequest({
           apiOrigin: this.apiOrigin,
           fetchImpl: this.fetchImpl,
           method: "POST",

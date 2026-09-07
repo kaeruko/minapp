@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -9,6 +10,17 @@ const int hostedAuthoringBridgeVersion = 1;
 final RegExp _authoringIdPattern = RegExp(r'^[0-9a-f]{32}$');
 final RegExp _authoringTokenPattern = RegExp(r'^[A-Za-z0-9_-]{32,64}$');
 final RegExp _authoringRequestIdPattern = RegExp(r'^[A-Za-z0-9_-]{1,64}$');
+const Map<String, String> _authoringAssetContentTypes = <String, String>{
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4',
+  '.ogg': 'audio/ogg',
+  '.wav': 'audio/wav',
+};
 
 class HostedAuthoringGrant {
   const HostedAuthoringGrant({
@@ -28,8 +40,35 @@ class HostedAuthoringGrant {
   final List<String> allowedOperations;
 }
 
+class HostedAuthoringAssetData {
+  HostedAuthoringAssetData(
+      {required Uint8List bytes, required this.contentType})
+      : bytes = Uint8List.fromList(bytes);
+
+  final Uint8List bytes;
+  final String contentType;
+}
+
 abstract interface class HostedAuthoringTransport {
   Future<Map<String, Object?>> loadProject(String authoringToken);
+
+  Future<HostedAuthoringAssetData> getAsset(
+    String authoringToken, {
+    required String path,
+  });
+
+  Future<Map<String, Object?>> saveAsset(
+    String authoringToken, {
+    required int expectedRevision,
+    required String path,
+    required Uint8List bytes,
+  });
+
+  Future<Map<String, Object?>> deleteAsset(
+    String authoringToken, {
+    required int expectedRevision,
+    required String path,
+  });
 
   Future<Map<String, Object?>> saveDocument(
     String authoringToken, {
@@ -80,9 +119,11 @@ class HostedAuthoringApiClient implements HostedAuthoringTransport {
     final String token = _requiredString(payload, 'token');
     _validateAuthoringToken(token);
     final String returnedContentId = _requiredString(payload, 'content_id');
-    final String returnedEditorAppId = _requiredString(payload, 'editor_app_id');
+    final String returnedEditorAppId =
+        _requiredString(payload, 'editor_app_id');
     if (returnedContentId != contentId || returnedEditorAppId != editorAppId) {
-      throw const FormatException('Authoring session response changed the requested scope.');
+      throw const FormatException(
+          'Authoring session response changed the requested scope.');
     }
     final List<String> allowedOperations = _requiredStringList(
       payload,
@@ -106,6 +147,105 @@ class HostedAuthoringApiClient implements HostedAuthoringTransport {
       path: '/hosted/authoring/session/$authoringToken',
     );
     _validateProjectPayload(payload, includeDocument: true);
+    return payload;
+  }
+
+  @override
+  Future<HostedAuthoringAssetData> getAsset(
+    String authoringToken, {
+    required String path,
+  }) async {
+    _validateAuthoringToken(authoringToken);
+    final String normalizedPath = _validateAuthoringAssetPath(path);
+    final String expectedContentType =
+        _authoringAssetContentType(normalizedPath);
+    final Uri uri = _baseUri
+        .resolve(_authoringAssetApiPath(authoringToken, normalizedPath));
+    final http.Response response = await _client.get(
+      uri,
+      headers: const <String, String>{'Accept': '*/*'},
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw _apiException(response.statusCode, _decodeJsonObject(response));
+    }
+    final String? rawContentType = response.headers['content-type'];
+    final String contentType = rawContentType == null
+        ? ''
+        : rawContentType.split(';').first.trim().toLowerCase();
+    if (contentType != expectedContentType) {
+      throw FormatException(
+        'Authoring asset response Content-Type must be $expectedContentType.',
+      );
+    }
+    return HostedAuthoringAssetData(
+      bytes: response.bodyBytes,
+      contentType: contentType,
+    );
+  }
+
+  @override
+  Future<Map<String, Object?>> saveAsset(
+    String authoringToken, {
+    required int expectedRevision,
+    required String path,
+    required Uint8List bytes,
+  }) async {
+    _validateAuthoringToken(authoringToken);
+    _validateExpectedRevision(expectedRevision);
+    final String normalizedPath = _validateAuthoringAssetPath(path);
+    final String contentType = _authoringAssetContentType(normalizedPath);
+    final Uri uri = _baseUri
+        .resolve(_authoringAssetApiPath(authoringToken, normalizedPath));
+    final http.Response response = await _client.post(
+      uri,
+      headers: <String, String>{
+        'Accept': 'application/json',
+        'Content-Type': contentType,
+        'x-minapp-expected-revision': '$expectedRevision',
+      },
+      body: bytes,
+    );
+    final Map<String, Object?> payload = _decodeJsonObject(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw _apiException(response.statusCode, payload);
+    }
+    _validateProjectPayload(payload, includeDocument: false);
+    if (payload['draft_revision'] != expectedRevision + 1) {
+      throw const FormatException(
+        'Authoring asset mutation did not advance exactly one draft revision.',
+      );
+    }
+    return payload;
+  }
+
+  @override
+  Future<Map<String, Object?>> deleteAsset(
+    String authoringToken, {
+    required int expectedRevision,
+    required String path,
+  }) async {
+    _validateAuthoringToken(authoringToken);
+    _validateExpectedRevision(expectedRevision);
+    final String normalizedPath = _validateAuthoringAssetPath(path);
+    final Uri uri = _baseUri
+        .resolve(_authoringAssetApiPath(authoringToken, normalizedPath));
+    final http.Response response = await _client.delete(
+      uri,
+      headers: <String, String>{
+        'Accept': 'application/json',
+        'x-minapp-expected-revision': '$expectedRevision',
+      },
+    );
+    final Map<String, Object?> payload = _decodeJsonObject(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw _apiException(response.statusCode, payload);
+    }
+    _validateProjectPayload(payload, includeDocument: false);
+    if (payload['draft_revision'] != expectedRevision + 1) {
+      throw const FormatException(
+        'Authoring asset mutation did not advance exactly one draft revision.',
+      );
+    }
     return payload;
   }
 
@@ -168,7 +308,8 @@ class HostedAuthoringApiClient implements HostedAuthoringTransport {
 
     final http.Response response;
     if (method == 'GET') {
-      if (body != null) throw ArgumentError('GET request must not contain a body.');
+      if (body != null)
+        throw ArgumentError('GET request must not contain a body.');
       response = await _client.get(uri, headers: headers);
     } else if (method == 'POST') {
       response = await _client.post(
@@ -214,7 +355,8 @@ class HostedAuthoringApiClient implements HostedAuthoringTransport {
       throw const FormatException('Authoring project assets must be a list.');
     }
     if (includeDocument && payload['document'] is! Map<String, Object?>) {
-      throw const FormatException('Authoring project document must be an object.');
+      throw const FormatException(
+          'Authoring project document must be an object.');
     }
   }
 
@@ -237,7 +379,8 @@ class HostedAuthoringApiClient implements HostedAuthoringTransport {
     );
     _validateId(_requiredString(payload, 'content_id'), 'content_id');
     _validateId(_requiredString(payload, 'group_id'), 'group_id');
-    _validateId(_requiredString(payload, 'published_app_id'), 'published_app_id');
+    _validateId(
+        _requiredString(payload, 'published_app_id'), 'published_app_id');
     _validateId(_requiredString(payload, 'player_app_id'), 'player_app_id');
     _requiredString(payload, 'content_format');
     _requiredPositiveInt(payload, 'published_version');
@@ -259,7 +402,8 @@ class HostedAuthoringApiClient implements HostedAuthoringTransport {
     }
     final Object? decoded = jsonDecode(response.body);
     if (decoded is! Map<String, Object?>) {
-      throw const FormatException('Authoring API returned an unexpected JSON payload.');
+      throw const FormatException(
+          'Authoring API returned an unexpected JSON payload.');
     }
     return decoded;
   }
@@ -315,12 +459,16 @@ class HostedAuthoringBridgeRequest {
     required this.method,
     this.expectedRevision,
     this.document,
+    this.assetPath,
+    this.assetBytes,
   });
 
   final String id;
   final String method;
   final int? expectedRevision;
   final Map<String, Object?>? document;
+  final String? assetPath;
+  final Uint8List? assetBytes;
 }
 
 class HostedAuthoringBridgeProtocol {
@@ -333,7 +481,8 @@ class HostedAuthoringBridgeProtocol {
     } on FormatException catch (error) {
       throw HostedAuthoringBridgeProtocolException(
         code: 'invalid_authoring_bridge_request',
-        message: 'Authoring bridge request must be valid JSON: ${error.message}',
+        message:
+            'Authoring bridge request must be valid JSON: ${error.message}',
       );
     }
     if (decoded is! Map<String, Object?>) {
@@ -342,11 +491,13 @@ class HostedAuthoringBridgeProtocol {
         message: 'Authoring bridge request must be a JSON object.',
       );
     }
-    final String? id = decoded['id'] is String ? decoded['id']! as String : null;
+    final String? id =
+        decoded['id'] is String ? decoded['id']! as String : null;
     if (decoded['version'] != hostedAuthoringBridgeVersion) {
       throw HostedAuthoringBridgeProtocolException(
         code: 'unsupported_authoring_bridge_version',
-        message: 'Authoring bridge version must be $hostedAuthoringBridgeVersion.',
+        message:
+            'Authoring bridge version must be $hostedAuthoringBridgeVersion.',
         requestId: id,
       );
     }
@@ -359,6 +510,9 @@ class HostedAuthoringBridgeProtocol {
     final Object? rawMethod = decoded['method'];
     if (rawMethod != 'authoring.load' &&
         rawMethod != 'authoring.save' &&
+        rawMethod != 'authoring.getAsset' &&
+        rawMethod != 'authoring.saveAsset' &&
+        rawMethod != 'authoring.deleteAsset' &&
         rawMethod != 'authoring.publish') {
       throw HostedAuthoringBridgeProtocolException(
         code: 'unsupported_authoring_bridge_method',
@@ -374,6 +528,82 @@ class HostedAuthoringBridgeProtocol {
         id,
       );
       return HostedAuthoringBridgeRequest(id: id, method: rawMethod as String);
+    }
+
+    if (rawMethod == 'authoring.getAsset') {
+      _requireBridgeFields(
+        decoded,
+        const <String>{'version', 'id', 'method', 'path'},
+        id,
+      );
+      return HostedAuthoringBridgeRequest(
+        id: id,
+        method: rawMethod as String,
+        assetPath: _bridgeAssetPath(decoded['path'], id),
+      );
+    }
+
+    if (rawMethod == 'authoring.saveAsset' ||
+        rawMethod == 'authoring.deleteAsset') {
+      final Set<String> expectedFields = rawMethod == 'authoring.saveAsset'
+          ? const <String>{
+              'version',
+              'id',
+              'method',
+              'path',
+              'expectedRevision',
+              'dataBase64'
+            }
+          : const <String>{
+              'version',
+              'id',
+              'method',
+              'path',
+              'expectedRevision'
+            };
+      _requireBridgeFields(decoded, expectedFields, id);
+      final Object? rawRevision = decoded['expectedRevision'];
+      if (rawRevision is! int || rawRevision is bool || rawRevision < 1) {
+        throw HostedAuthoringBridgeProtocolException(
+          code: 'invalid_expected_revision',
+          message: 'expectedRevision must be a positive integer.',
+          requestId: id,
+        );
+      }
+      Uint8List? assetBytes;
+      if (rawMethod == 'authoring.saveAsset') {
+        final Object? encoded = decoded['dataBase64'];
+        if (encoded is! String || encoded.isEmpty) {
+          throw HostedAuthoringBridgeProtocolException(
+            code: 'invalid_authoring_asset_data',
+            message: 'Authoring asset data must be non-empty base64.',
+            requestId: id,
+          );
+        }
+        try {
+          assetBytes = base64Decode(encoded);
+        } on FormatException {
+          throw HostedAuthoringBridgeProtocolException(
+            code: 'invalid_authoring_asset_data',
+            message: 'Authoring asset data must be valid base64.',
+            requestId: id,
+          );
+        }
+        if (assetBytes.isEmpty) {
+          throw HostedAuthoringBridgeProtocolException(
+            code: 'invalid_authoring_asset_data',
+            message: 'Authoring asset data must not be empty.',
+            requestId: id,
+          );
+        }
+      }
+      return HostedAuthoringBridgeRequest(
+        id: id,
+        method: rawMethod as String,
+        expectedRevision: rawRevision,
+        assetPath: _bridgeAssetPath(decoded['path'], id),
+        assetBytes: assetBytes,
+      );
     }
 
     final Set<String> expectedFields = rawMethod == 'authoring.save'
@@ -410,6 +640,25 @@ class HostedAuthoringBridgeProtocol {
       expectedRevision: rawRevision,
       document: rawData,
     );
+  }
+
+  static String _bridgeAssetPath(Object? value, String id) {
+    if (value is! String) {
+      throw HostedAuthoringBridgeProtocolException(
+        code: 'invalid_authoring_asset_path',
+        message: 'Authoring asset path is invalid.',
+        requestId: id,
+      );
+    }
+    try {
+      return _validateAuthoringAssetPath(value);
+    } on ArgumentError {
+      throw HostedAuthoringBridgeProtocolException(
+        code: 'invalid_authoring_asset_path',
+        message: 'Authoring asset path is invalid or unsupported.',
+        requestId: id,
+      );
+    }
   }
 
   static Map<String, Object?> success(String id, Object? result) =>
@@ -518,8 +767,80 @@ class HostedAuthoringBridgeProtocol {
     return expectedRevision;
   };
 
+  const ASSET_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'mp3', 'm4a', 'ogg', 'wav']);
+  const validateAssetPath = (path) => {
+    if (typeof path !== 'string' || path.length === 0 || path.length > 256 ||
+        path.startsWith('/') || path.includes('\\') || path.includes('\0')) {
+      throw new MinAppAuthoringError(0, 'invalid_authoring_asset_path', 'Authoring asset path is invalid.');
+    }
+    const parts = path.split('/');
+    if (parts.some((part) => part === '' || part === '.' || part === '..')) {
+      throw new MinAppAuthoringError(0, 'invalid_authoring_asset_path', 'Authoring asset path is invalid.');
+    }
+    const name = parts[parts.length - 1];
+    const dot = name.lastIndexOf('.');
+    const extension = dot < 0 ? '' : name.slice(dot + 1).toLowerCase();
+    if (!ASSET_EXTENSIONS.has(extension)) {
+      throw new MinAppAuthoringError(0, 'unsupported_authoring_asset_type', 'Authoring asset type is not supported.');
+    }
+    return path;
+  };
+  const encodeAssetBytes = (bytes) => {
+    if (!(bytes instanceof Uint8Array) || bytes.length === 0) {
+      throw new MinAppAuthoringError(0, 'invalid_authoring_asset_data', 'Authoring asset bytes must be a non-empty Uint8Array.');
+    }
+    let binary = '';
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+    }
+    return btoa(binary);
+  };
+  const decodeAssetResult = (result) => {
+    if (!result || typeof result !== 'object' || Array.isArray(result) ||
+        Object.keys(result).sort().join(',') !== 'contentType,dataBase64' ||
+        typeof result.dataBase64 !== 'string' || result.dataBase64.length === 0 ||
+        typeof result.contentType !== 'string' || result.contentType.length === 0) {
+      throw new MinAppAuthoringError(0, 'invalid_bridge_response', 'Authoring asset response is invalid.');
+    }
+    const binary = atob(result.dataBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return Object.freeze({ bytes, contentType: result.contentType });
+  };
+
   const authoring = Object.freeze({
     load: () => send({ method: 'authoring.load' }),
+    getAsset: (path) => {
+      try {
+        return send({ method: 'authoring.getAsset', path: validateAssetPath(path) }).then(decodeAssetResult);
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    },
+    saveAsset: (path, bytes, options) => {
+      let expectedRevision;
+      let normalizedPath;
+      let dataBase64;
+      try {
+        normalizedPath = validateAssetPath(path);
+        dataBase64 = encodeAssetBytes(bytes);
+        expectedRevision = validateExpectedRevision(options);
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      return send({ method: 'authoring.saveAsset', path: normalizedPath, expectedRevision, dataBase64 });
+    },
+    deleteAsset: (path, options) => {
+      let expectedRevision;
+      let normalizedPath;
+      try {
+        normalizedPath = validateAssetPath(path);
+        expectedRevision = validateExpectedRevision(options);
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      return send({ method: 'authoring.deleteAsset', path: normalizedPath, expectedRevision });
+    },
     save: (data, options) => {
       if (!data || typeof data !== 'object' || Array.isArray(data)) {
         return Promise.reject(new MinAppAuthoringError(
@@ -568,7 +889,8 @@ class HostedAuthoringBridgeProtocol {
         expected.difference(payload.keys.toSet()).isNotEmpty) {
       throw HostedAuthoringBridgeProtocolException(
         code: 'invalid_authoring_bridge_request',
-        message: 'Authoring bridge request fields do not match the method contract.',
+        message:
+            'Authoring bridge request fields do not match the method contract.',
         requestId: id,
       );
     }
@@ -604,7 +926,8 @@ class HostedAuthoringBridgeSession {
         id: request.id,
         status: 409,
         code: 'duplicate_request_id',
-        message: 'An Authoring bridge request with this id is already in flight.',
+        message:
+            'An Authoring bridge request with this id is already in flight.',
       );
     }
 
@@ -612,11 +935,53 @@ class HostedAuthoringBridgeSession {
       final Object? result;
       if (request.method == 'authoring.load') {
         result = await _transport.loadProject(_authoringToken);
+      } else if (request.method == 'authoring.getAsset') {
+        final String? assetPath = request.assetPath;
+        if (assetPath == null) {
+          throw StateError('Validated Authoring getAsset request lost path.');
+        }
+        final HostedAuthoringAssetData asset = await _transport.getAsset(
+          _authoringToken,
+          path: assetPath,
+        );
+        result = <String, Object?>{
+          'dataBase64': base64Encode(asset.bytes),
+          'contentType': asset.contentType,
+        };
+      } else if (request.method == 'authoring.saveAsset') {
+        final int? expectedRevision = request.expectedRevision;
+        final String? assetPath = request.assetPath;
+        final Uint8List? assetBytes = request.assetBytes;
+        if (expectedRevision == null ||
+            assetPath == null ||
+            assetBytes == null) {
+          throw StateError(
+              'Validated Authoring saveAsset request lost required fields.');
+        }
+        result = await _transport.saveAsset(
+          _authoringToken,
+          expectedRevision: expectedRevision,
+          path: assetPath,
+          bytes: assetBytes,
+        );
+      } else if (request.method == 'authoring.deleteAsset') {
+        final int? expectedRevision = request.expectedRevision;
+        final String? assetPath = request.assetPath;
+        if (expectedRevision == null || assetPath == null) {
+          throw StateError(
+              'Validated Authoring deleteAsset request lost required fields.');
+        }
+        result = await _transport.deleteAsset(
+          _authoringToken,
+          expectedRevision: expectedRevision,
+          path: assetPath,
+        );
       } else if (request.method == 'authoring.save') {
         final int? expectedRevision = request.expectedRevision;
         final Map<String, Object?>? document = request.document;
         if (expectedRevision == null || document == null) {
-          throw StateError('Validated Authoring save request lost required fields.');
+          throw StateError(
+              'Validated Authoring save request lost required fields.');
         }
         result = await _transport.saveDocument(
           _authoringToken,
@@ -626,14 +991,16 @@ class HostedAuthoringBridgeSession {
       } else if (request.method == 'authoring.publish') {
         final int? expectedRevision = request.expectedRevision;
         if (expectedRevision == null) {
-          throw StateError('Validated Authoring publish request lost expectedRevision.');
+          throw StateError(
+              'Validated Authoring publish request lost expectedRevision.');
         }
         result = await _transport.publishProject(
           _authoringToken,
           expectedRevision: expectedRevision,
         );
       } else {
-        throw StateError('Validated Authoring bridge request has an unsupported method.');
+        throw StateError(
+            'Validated Authoring bridge request has an unsupported method.');
       }
       return HostedAuthoringBridgeProtocol.success(request.id, result);
     } on ApiException catch (error) {
@@ -685,6 +1052,41 @@ void _validateAuthoringToken(String token) {
 String _validatedAuthoringToken(String token) {
   _validateAuthoringToken(token);
   return token;
+}
+
+String _validateAuthoringAssetPath(String path) {
+  if (path.isEmpty ||
+      path.length > 256 ||
+      path.contains('\\') ||
+      path.contains('\u0000') ||
+      path.startsWith('/')) {
+    throw ArgumentError.value(
+        path, 'path', 'is not a valid Authoring asset path');
+  }
+  final List<String> parts = path.split('/');
+  if (parts.any((String part) => part.isEmpty || part == '.' || part == '..')) {
+    throw ArgumentError.value(
+        path, 'path', 'is not a valid Authoring asset path');
+  }
+  _authoringAssetContentType(path);
+  return parts.join('/');
+}
+
+String _authoringAssetContentType(String path) {
+  final String name = path.split('/').last;
+  final int dot = name.lastIndexOf('.');
+  final String suffix = dot < 0 ? '' : name.substring(dot).toLowerCase();
+  final String? contentType = _authoringAssetContentTypes[suffix];
+  if (contentType == null) {
+    throw ArgumentError.value(
+        path, 'path', 'has an unsupported Authoring asset type');
+  }
+  return contentType;
+}
+
+String _authoringAssetApiPath(String token, String path) {
+  final String encodedPath = path.split('/').map(Uri.encodeComponent).join('/');
+  return '/hosted/authoring/session/$token/assets/$encodedPath';
 }
 
 void _validateExpectedRevision(int value) {
