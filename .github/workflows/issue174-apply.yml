@@ -25,6 +25,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/issue174_apply.py')
+          text = path.read_text(encoding='utf-8')
+          old = 'text = replace_once(text, "      await loadOwnerGroups();\\n", "      await loadActiveGroups();\\n", "web active group loader call")'
+          new = '''count = text.count("      await loadOwnerGroups();\\n")
+          if count != 2:
+              raise RuntimeError(f"web active group loader calls: expected 2, found {count}")
+          text = text.replace("      await loadOwnerGroups();\\n", "      await loadActiveGroups();\\n")'''
+          if text.count(old) != 1:
+              raise RuntimeError(f'apply-script patch expected one target, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
           python .github/issue174_apply.py
           node --check apps/web/girls_portal.js
           node --check apps/web/girls_portal_shell.js
