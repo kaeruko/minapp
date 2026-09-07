@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:minapp_mobile/api.dart';
 import 'package:minapp_mobile/hosted_authoring_projects_api.dart';
 
 const String _groupId = '22222222222222222222222222222222';
@@ -155,6 +156,55 @@ void main() {
     await expectLater(
       api.loadProject(accessToken: 'owner-token', contentId: _contentId),
       throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('delete sends only authenticated content scope and accepts 204', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'DELETE');
+      expect(request.url.path, '/hosted/authoring/projects/$_contentId');
+      expect(request.url.query, isEmpty);
+      expect(request.headers['authorization'], 'Bearer owner-token');
+      expect(request.body, isEmpty);
+      return http.Response('', 204);
+    });
+    final HostedAuthoringProjectsApi api = HostedAuthoringProjectsApi(
+      baseUri: Uri.parse('https://hosted.example.test'),
+      client: client,
+    );
+
+    await api.deleteProject(
+      accessToken: 'owner-token',
+      contentId: _contentId,
+    );
+  });
+
+  test('delete preserves backend error instead of treating it as success', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      return _json(409, <String, Object?>{
+        'error': 'content_not_editable',
+        'message': 'Authoring content is not in a deletable state.',
+      });
+    });
+    final HostedAuthoringProjectsApi api = HostedAuthoringProjectsApi(
+      baseUri: Uri.parse('https://hosted.example.test'),
+      client: client,
+    );
+
+    await expectLater(
+      api.deleteProject(
+        accessToken: 'owner-token',
+        contentId: _contentId,
+      ),
+      throwsA(
+        isA<ApiException>()
+            .having((ApiException error) => error.statusCode, 'statusCode', 409)
+            .having(
+              (ApiException error) => error.code,
+              'code',
+              'content_not_editable',
+            ),
+      ),
     );
   });
 }
