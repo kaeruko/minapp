@@ -5,6 +5,7 @@ import pathlib
 import sys
 import unittest
 from typing import Any
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -76,6 +77,19 @@ class HostedUserStateBackendTest(unittest.TestCase):
     def setUp(self) -> None:
         self.backend = HarnessBackend()
 
+    def _put_shared_state(self, key: str, value: Any) -> None:
+        row = {
+            "pk": {"S": "GROUP#group#APP#app"},
+            "sk": {"S": f"STATE#{key}"},
+            "entity": {"S": "runtime_state"},
+            "key": {"S": key},
+            "value_json": {"S": json.dumps(value)},
+            "updated_at": {"S": "2026-09-06T08:00:00Z"},
+        }
+        self.backend._runtime_dynamodb.items[
+            ("GROUP#group#APP#app", f"STATE#{key}")
+        ] = row
+
     def test_same_key_is_private_per_runtime_session_user(self) -> None:
         self.backend.set_runtime_user_state("token-a", "progress", {"scene": "a"})
         self.backend.set_runtime_user_state("token-b", "progress", {"scene": "b"})
@@ -95,22 +109,55 @@ class HostedUserStateBackendTest(unittest.TestCase):
         self.assertNotIn(("GROUP#group#APP#app", "STATE#progress"), keys)
 
     def test_shared_state_row_is_not_reinterpreted_as_user_state(self) -> None:
-        shared_item = {
-            "pk": {"S": "GROUP#group#APP#app"},
-            "sk": {"S": "STATE#progress"},
-            "entity": {"S": "runtime_state"},
-            "key": {"S": "progress"},
-            "value_json": {"S": json.dumps({"scope": "shared"})},
-            "updated_at": {"S": "2026-09-06T08:00:00Z"},
-        }
-        self.backend._runtime_dynamodb.items[
-            ("GROUP#group#APP#app", "STATE#progress")
-        ] = shared_item
+        self._put_shared_state("progress", {"scope": "shared"})
 
         with self.assertRaises(ApiProblem) as caught:
             self.backend.get_runtime_user_state("token-a", "progress")
         self.assertEqual(caught.exception.status_code, 404)
         self.assertEqual(caught.exception.error, "state_not_found")
+
+    def test_private_key_quota_failure_does_not_fall_back_to_shared_state(self) -> None:
+        self._put_shared_state("progress", {"scope": "shared"})
+
+        with patch("hosted_user_state_backend.MAX_USER_STATE_KEYS_PER_USER_APP", 0):
+            with self.assertRaises(ApiProblem) as caught:
+                self.backend.set_runtime_user_state("token-a", "progress", {"scope": "user"})
+
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(caught.exception.error, "runtime_user_key_limit_reached")
+        self.assertNotIn(
+            ("GROUP#group#APP#app", "USER#user-a#STATE#progress"),
+            self.backend._runtime_dynamodb.items,
+        )
+        self.assertEqual(
+            json.loads(
+                self.backend._runtime_dynamodb.items[
+                    ("GROUP#group#APP#app", "STATE#progress")
+                ]["value_json"]["S"]
+            ),
+            {"scope": "shared"},
+        )
+
+    def test_private_storage_quota_has_a_distinct_error(self) -> None:
+        with patch("hosted_user_state_backend.MAX_USER_STATE_BYTES_PER_USER_APP", 1):
+            with self.assertRaises(ApiProblem) as caught:
+                self.backend.set_runtime_user_state("token-a", "progress", "too-large")
+
+        self.assertEqual(caught.exception.status_code, 413)
+        self.assertEqual(caught.exception.error, "runtime_user_storage_limit_reached")
+
+    def test_private_key_quota_is_per_user(self) -> None:
+        with patch("hosted_user_state_backend.MAX_USER_STATE_KEYS_PER_USER_APP", 1):
+            self.backend.set_runtime_user_state("token-a", "first", 1)
+            with self.assertRaises(ApiProblem) as caught:
+                self.backend.set_runtime_user_state("token-a", "second", 2)
+            self.backend.set_runtime_user_state("token-b", "second", 2)
+
+        self.assertEqual(caught.exception.error, "runtime_user_key_limit_reached")
+        self.assertEqual(
+            self.backend.get_runtime_user_state("token-b", "second")["value"],
+            2,
+        )
 
     def test_delete_only_removes_current_users_private_key(self) -> None:
         self.backend.set_runtime_user_state("token-a", "progress", 1)
