@@ -7,6 +7,8 @@ import '../hosted_authoring_launch_client.dart';
 import '../hosted_authoring_preview_client.dart';
 import 'api.dart';
 import 'girls_app_core.dart' as core;
+import 'girls_authoring_contract_api.dart';
+import 'girls_authoring_resolver.dart';
 import 'girls_builtin_install_api.dart';
 import 'girls_novel_authoring_api.dart';
 import 'hosted_girls_api.dart';
@@ -34,6 +36,7 @@ class GirlsNovelProjectsPage extends StatefulWidget {
 class _GirlsNovelProjectsPageState extends State<GirlsNovelProjectsPage> {
   late final http.Client _client;
   late final GirlsNovelAuthoringApi _projectsApi;
+  late final GirlsAuthoringContractApi _contractApi;
   late final GirlsBuiltinInstallApi _builtinInstallApi;
   late final HostedAuthoringLaunchApiClient _launchApi;
   late final HostedAuthoringPreviewApiClient _previewApi;
@@ -46,9 +49,12 @@ class _GirlsNovelProjectsPageState extends State<GirlsNovelProjectsPage> {
   @override
   void initState() {
     super.initState();
-    _validateEditorApp();
     _client = http.Client();
     _projectsApi = GirlsNovelAuthoringApi(
+      baseUri: widget.api.baseUri,
+      client: _client,
+    );
+    _contractApi = GirlsAuthoringContractApi(
       baseUri: widget.api.baseUri,
       client: _client,
     );
@@ -77,11 +83,11 @@ class _GirlsNovelProjectsPageState extends State<GirlsNovelProjectsPage> {
     super.dispose();
   }
 
-  void _validateEditorApp() {
-    final HostedGroupApp app = widget.editorApp;
-    if (app.builtinId != novelEditorBuiltinId || app.sourceKind != 'builtin') {
-      throw StateError('Novel Authoring page requires the installed novel-editor builtin.');
-    }
+  Future<List<GirlsAuthoringAppContract>> _authoringContracts() {
+    return _contractApi.listApps(
+      accessToken: widget.session.accessToken,
+      groupId: widget.editorApp.groupId,
+    );
   }
 
   Future<void> _loadProjects() async {
@@ -91,6 +97,14 @@ class _GirlsNovelProjectsPageState extends State<GirlsNovelProjectsPage> {
       _error = null;
     });
     try {
+      final List<GirlsAuthoringAppContract> contracts =
+          await _authoringContracts();
+      GirlsAuthoringResolver.requireEditor(
+        apps: contracts,
+        appId: widget.editorApp.appId,
+        contentFormat: minappNovelContentFormat,
+      );
+
       final List<GirlsNovelProjectSummary> summaries =
           await _projectsApi.listProjects(
         accessToken: widget.session.accessToken,
@@ -214,24 +228,39 @@ class _GirlsNovelProjectsPageState extends State<GirlsNovelProjectsPage> {
     }
   }
 
-  Future<HostedGroupApp?> _resolveNovelPlayer() async {
-    final List<HostedGroupApp> groupApps = await widget.api.listGroupApps(
-      accessToken: widget.session.accessToken,
-      groupId: widget.editorApp.groupId,
-    );
-    final List<HostedGroupApp> players = groupApps
-        .where(
-          (HostedGroupApp app) =>
-              app.sourceKind == 'builtin' &&
-              app.builtinId == novelPlayerBuiltinId,
-        )
-        .toList(growable: false);
-    if (players.length > 1) {
-      throw const FormatException(
-        'The Novel Player builtin is installed more than once in this group.',
-      );
-    }
+  Future<GirlsAuthoringAppContract?> _chooseCompatiblePlayer(
+    List<GirlsAuthoringAppContract> players,
+  ) async {
+    if (players.isEmpty) return null;
     if (players.length == 1) return players.single;
+    if (!mounted) return null;
+
+    return showDialog<GirlsAuthoringAppContract>(
+      context: context,
+      builder: (BuildContext dialogContext) => SimpleDialog(
+        title: const Text('どのプレイヤーで確認する？'),
+        children: players
+            .map(
+              (GirlsAuthoringAppContract player) => SimpleDialogOption(
+                key: Key('girls-authoring-player-${player.appId}'),
+                onPressed: () => Navigator.of(dialogContext).pop(player),
+                child: Text(player.title),
+              ),
+            )
+            .toList(growable: false),
+      ),
+    );
+  }
+
+  Future<GirlsAuthoringAppContract?> _resolveNovelPlayer() async {
+    List<GirlsAuthoringAppContract> contracts = await _authoringContracts();
+    List<GirlsAuthoringAppContract> players = GirlsAuthoringResolver.playersFor(
+      contracts,
+      minappNovelContentFormat,
+    );
+    final GirlsAuthoringAppContract? selected =
+        await _chooseCompatiblePlayer(players);
+    if (selected != null || players.isNotEmpty) return selected;
     if (!mounted) return null;
 
     final bool? install = await showDialog<bool>(
@@ -239,7 +268,7 @@ class _GirlsNovelProjectsPageState extends State<GirlsNovelProjectsPage> {
       builder: (BuildContext dialogContext) => AlertDialog(
         title: const Text('プレビュー用プレイヤーを追加する？'),
         content: const Text(
-          '下書きを実際のノベル画面で確認するには、公式プレイヤー「ひみつの放課後」がこのグループに必要です。追加してプレビューしますか？',
+          'この作品形式を再生できるプレイヤーがまだありません。公式プレイヤー「ひみつの放課後」を追加してプレビューしますか？',
         ),
         actions: <Widget>[
           TextButton(
@@ -256,10 +285,26 @@ class _GirlsNovelProjectsPageState extends State<GirlsNovelProjectsPage> {
     );
     if (install != true || !mounted) return null;
 
-    return _builtinInstallApi.installNovelPlayer(
+    final HostedGroupApp installed = await _builtinInstallApi.installNovelPlayer(
       accessToken: widget.session.accessToken,
       groupId: widget.editorApp.groupId,
     );
+    contracts = await _authoringContracts();
+    players = GirlsAuthoringResolver.playersFor(
+      contracts,
+      minappNovelContentFormat,
+    );
+    final List<GirlsAuthoringAppContract> installedMatches = players
+        .where(
+          (GirlsAuthoringAppContract player) => player.appId == installed.appId,
+        )
+        .toList(growable: false);
+    if (installedMatches.length != 1) {
+      throw const FormatException(
+        'Installed Player did not appear exactly once with the required Authoring accepts contract.',
+      );
+    }
+    return installedMatches.single;
   }
 
   Future<void> _previewProject(GirlsNovelProject project) async {
@@ -269,7 +314,7 @@ class _GirlsNovelProjectsPageState extends State<GirlsNovelProjectsPage> {
       _error = null;
     });
     try {
-      final HostedGroupApp? player = await _resolveNovelPlayer();
+      final GirlsAuthoringAppContract? player = await _resolveNovelPlayer();
       if (player == null) return;
       final HostedAuthoringPreviewGrant preview = await _previewApi.createPreview(
         accessToken: widget.session.accessToken,
