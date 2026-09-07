@@ -80,7 +80,6 @@ class HostedLegalBackend(HostedCatalogBackend):
         user = self._user_by_auth_subject(auth_subject)
         self._require_active_membership(user.user_id, group_id)
         app = self._require_app_in_group(app_id, group_id)
-        self._require_not_deleting(app)
         if _item_string(app, "owner_user_id") != user.user_id:
             raise ApiProblem(403, "forbidden", "このアプリを管理する権限がありません。")
         if editable:
