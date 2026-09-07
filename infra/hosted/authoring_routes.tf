@@ -1,6 +1,7 @@
 locals {
   hosted_authoring_routes = toset([
     "POST /hosted/authoring/projects",
+    "GET /hosted/authoring/groups/{group_id}/apps",
     "GET /hosted/authoring/groups/{group_id}/projects",
     "GET /hosted/authoring/projects/{content_id}",
     "POST /hosted/authoring/projects/{content_id}/document",
