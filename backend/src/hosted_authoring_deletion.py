@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from aws_backend import _aws_error_code, _item_string, _string_attr
@@ -53,6 +52,7 @@ def delete_authoring_project(
             raise RuntimeError("Deleted Authoring tombstone has an invalid deletion state")
         return
 
+    retrying = status == "deleting" and deletion_state == "deleting"
     if status == "draft":
         if deletion_state is not None:
             raise RuntimeError("Draft Authoring content unexpectedly has deletion_state")
@@ -63,6 +63,7 @@ def delete_authoring_project(
             raise RuntimeError("Authoring content disappeared while deletion was starting")
         status = _item_string(current, "status")
         deletion_state = _optional_string(current, "deletion_state")
+        retrying = False
 
     if status != "deleting" or deletion_state != "deleting":
         raise ApiProblem(
@@ -88,6 +89,7 @@ def delete_authoring_project(
             bucket=bucket,
             key=key,
             expected_sha256=sha256,
+            allow_missing=retrying,
         )
 
     child_items = [*revision_manifests, *published_manifests]
@@ -319,11 +321,12 @@ def _delete_exact_versioned_object(
     bucket: str,
     key: str,
     expected_sha256: str,
+    allow_missing: bool,
 ) -> None:
     try:
         head = backend._s3.head_object(Bucket=bucket, Key=key)
     except Exception as exc:
-        if _aws_error_code(exc) in _MISSING_OBJECT_CODES:
+        if allow_missing and _aws_error_code(exc) in _MISSING_OBJECT_CODES:
             # A retry may reach an object whose exact version was already
             # physically removed by an earlier attempt.
             return
