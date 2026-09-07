@@ -247,16 +247,20 @@ class _HostedManagedAppDetailPageState
       return;
     }
 
-    final FilePickerResult? result = await FilePicker.platform.pickFiles(
+    final PlatformFile? file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: const <String>['zip'],
-      withData: true,
     );
-    if (result == null || !mounted) return;
-    final PlatformFile file = result.files.single;
-    final Uint8List? bytes = file.bytes;
-    if (bytes == null) {
-      setState(() => _error = '選択したZIPを読み込めませんでした。');
+    if (file == null || !mounted) return;
+    if (file.extension?.toLowerCase() != 'zip') {
+      setState(() => _error = '拡張子 .zip のファイルを選んでください。');
+      return;
+    }
+    late final Uint8List bytes;
+    try {
+      bytes = await file.readAsBytes();
+    } catch (error) {
+      if (mounted) setState(() => _error = '選択したZIPを読み込めませんでした: $error');
       return;
     }
     if (bytes.isEmpty || bytes.length > maxHostedZipUploadBytes) {
