@@ -10,8 +10,8 @@ BACKEND_SRC = Path(__file__).resolve().parents[1] / "src"
 if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
 
+from app_zip import content_type as _content_type, safe_zip_paths as _safe_zip_paths  # noqa: E402
 from errors import ApiProblem  # noqa: E402
-from phase2_backend import _content_type, _safe_zip_paths  # noqa: E402
 
 
 def _zip(entries: dict[str, bytes]) -> bytes:

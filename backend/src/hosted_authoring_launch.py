@@ -8,6 +8,7 @@ import time
 import zipfile
 from typing import Any
 
+from app_zip import content_type as _content_type
 from aws_backend import _item_string, _string_attr
 from errors import ApiProblem
 from hosted_authoring_app_source import resolve_authoring_app_source
@@ -21,7 +22,6 @@ from hosted_authoring_web_bridge import (
     validate_host_adapter,
 )
 from hosted_catalog_backend import (
-    _content_type,
     _files_json,
     _item_files,
     _optional_number,

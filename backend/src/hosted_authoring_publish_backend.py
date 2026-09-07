@@ -7,6 +7,7 @@ import uuid
 import zipfile
 from typing import Any
 
+from app_zip import MAX_ZIP_BYTES, safe_zip_paths as _safe_zip_paths
 from aws_backend import _aws_error_code, _item_string, _string_attr
 from errors import ApiProblem
 from hosted_authoring_app_source import resolve_authoring_app_source
@@ -32,7 +33,6 @@ from hosted_catalog_backend import (
     _optional_string,
 )
 from hosted_platform_backend import _now_iso, _number_attr
-from phase2_backend import MAX_ZIP_BYTES, _safe_zip_paths
 
 MAX_AUTHORING_PUBLISHED_VERSIONS = 20
 

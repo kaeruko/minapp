@@ -8,10 +8,10 @@ import zipfile
 from datetime import datetime, timezone
 from typing import Any
 
+from app_zip import content_type as _content_type
 from aws_backend import _item_string, _string_attr
 from errors import ApiProblem
 from hosted_catalog_backend import (
-    _content_type,
     _files_json,
     _item_files,
     _optional_number,
