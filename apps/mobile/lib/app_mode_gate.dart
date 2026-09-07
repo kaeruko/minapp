@@ -8,14 +8,14 @@ import 'session_app.dart';
 import 'tenant_store.dart';
 import 'ugc_safety.dart';
 
-/// Loads the Hosted API endpoint only after Hosted mode is selected.
 typedef HostedBaseUriLoader = Future<Uri> Function();
+typedef MinAppDirectoryLoader = Future<MinAppDirectory> Function();
 
 class MinAppModeGate extends StatefulWidget {
   const MinAppModeGate({
     required this.modeStore,
     required this.hostedBaseUriLoader,
-    required this.directory,
+    required this.directoryLoader,
     required this.tenantStore,
     required this.apiFactory,
     this.officialJoinBaseUri,
@@ -27,7 +27,7 @@ class MinAppModeGate extends StatefulWidget {
 
   final MinAppLaunchModeStore modeStore;
   final HostedBaseUriLoader hostedBaseUriLoader;
-  final MinAppDirectory directory;
+  final MinAppDirectoryLoader directoryLoader;
   final TenantStore tenantStore;
   final MinAppApiFactory apiFactory;
   final Uri? officialJoinBaseUri;
@@ -132,8 +132,8 @@ class _MinAppModeGateState extends State<MinAppModeGate> {
 
     switch (_mode) {
       case MinAppLaunchMode.classroom:
-        return MinApp(
-          directory: widget.directory,
+        return _ClassroomModeLoader(
+          loader: widget.directoryLoader,
           tenantStore: widget.tenantStore,
           apiFactory: widget.apiFactory,
           officialJoinBaseUri: widget.officialJoinBaseUri,
@@ -158,6 +158,92 @@ class _MinAppModeGateState extends State<MinAppModeGate> {
           home: _ModeSelectionPage(onSelected: _selectMode),
         );
     }
+  }
+}
+
+class _ClassroomModeLoader extends StatefulWidget {
+  const _ClassroomModeLoader({
+    required this.loader,
+    required this.tenantStore,
+    required this.apiFactory,
+    required this.officialJoinBaseUri,
+    required this.creatorPortalBaseUri,
+    required this.webViewDataClearer,
+    required this.creatorSafetyStore,
+    required this.onChangeMode,
+  });
+
+  final MinAppDirectoryLoader loader;
+  final TenantStore tenantStore;
+  final MinAppApiFactory apiFactory;
+  final Uri? officialJoinBaseUri;
+  final Uri? creatorPortalBaseUri;
+  final WebViewDataClearer? webViewDataClearer;
+  final CreatorSafetyStore? creatorSafetyStore;
+  final Future<void> Function() onChangeMode;
+
+  @override
+  State<_ClassroomModeLoader> createState() => _ClassroomModeLoaderState();
+}
+
+class _ClassroomModeLoaderState extends State<_ClassroomModeLoader> {
+  MinAppDirectory? _directory;
+  Object? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final MinAppDirectory directory = await widget.loader();
+      if (!mounted) return;
+      setState(() {
+        _directory = directory;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const _LoadingApp();
+    final Object? error = _error;
+    if (error != null) {
+      return _ModeDependencyErrorApp(
+        title: '教室Directoryを確認できません',
+        error: error,
+        onRetry: _load,
+        onChangeMode: widget.onChangeMode,
+      );
+    }
+    final MinAppDirectory? directory = _directory;
+    if (directory == null) {
+      throw StateError('Classroom Directory loader completed without a client.');
+    }
+    return MinApp(
+      directory: directory,
+      tenantStore: widget.tenantStore,
+      apiFactory: widget.apiFactory,
+      officialJoinBaseUri: widget.officialJoinBaseUri,
+      creatorPortalBaseUri: widget.creatorPortalBaseUri,
+      webViewDataClearer: widget.webViewDataClearer,
+      creatorSafetyStore: widget.creatorSafetyStore,
+      onChangeMode: widget.onChangeMode,
+    );
   }
 }
 
@@ -205,44 +291,14 @@ class _HostedModeLoaderState extends State<_HostedModeLoader> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: Scaffold(body: Center(child: CircularProgressIndicator())),
-      );
-    }
+    if (_loading) return const _LoadingApp();
     final Object? error = _error;
     if (error != null) {
-      return MaterialApp(
-        title: 'みんアプ',
-        debugShowCheckedModeBanner: false,
-        home: Scaffold(
-          appBar: AppBar(title: const Text('みんアプ')),
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    const Icon(Icons.cloud_off_rounded, size: 48),
-                    const SizedBox(height: 12),
-                    const Text('Hosted環境を確認できません'),
-                    const SizedBox(height: 8),
-                    SelectableText(error.toString(), textAlign: TextAlign.center),
-                    const SizedBox(height: 18),
-                    FilledButton(onPressed: _load, child: const Text('もう一度確認')),
-                    TextButton(
-                      onPressed: widget.onChangeMode,
-                      child: const Text('利用方法を切り替える'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+      return _ModeDependencyErrorApp(
+        title: 'Hosted環境を確認できません',
+        error: error,
+        onRetry: _load,
+        onChangeMode: widget.onChangeMode,
       );
     }
     final Uri? baseUri = _baseUri;
@@ -252,6 +308,67 @@ class _HostedModeLoaderState extends State<_HostedModeLoader> {
     return HostedApp(
       api: HostedApi(baseUri: baseUri),
       onChangeMode: widget.onChangeMode,
+    );
+  }
+}
+
+class _LoadingApp extends StatelessWidget {
+  const _LoadingApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(body: Center(child: CircularProgressIndicator())),
+    );
+  }
+}
+
+class _ModeDependencyErrorApp extends StatelessWidget {
+  const _ModeDependencyErrorApp({
+    required this.title,
+    required this.error,
+    required this.onRetry,
+    required this.onChangeMode,
+  });
+
+  final String title;
+  final Object error;
+  final Future<void> Function() onRetry;
+  final Future<void> Function() onChangeMode;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'みんアプ',
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        appBar: AppBar(title: const Text('みんアプ')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const Icon(Icons.cloud_off_rounded, size: 48),
+                  const SizedBox(height: 12),
+                  Text(title),
+                  const SizedBox(height: 8),
+                  SelectableText(error.toString(), textAlign: TextAlign.center),
+                  const SizedBox(height: 18),
+                  FilledButton(onPressed: onRetry, child: const Text('もう一度確認')),
+                  TextButton(
+                    onPressed: onChangeMode,
+                    child: const Text('利用方法を切り替える'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
