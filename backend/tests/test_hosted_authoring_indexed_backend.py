@@ -71,6 +71,50 @@ class HostedAuthoringIndexedBackendTests(unittest.TestCase):
         self.assertEqual(index["entity"], {"S": "authoring_content_index"})
         self.assertEqual(index["content_format"], {"S": "minapp/novel@1"})
 
+    def test_list_authoring_apps_returns_contracts_not_ordinary_apps(self) -> None:
+        group_id = str(self.group["group_id"])
+        editor = self.backend.install_builtin(self.subject, group_id, "novel-editor")
+        player = self.backend.install_builtin(self.subject, group_id, "novel-starter")
+        self.backend.install_builtin(self.subject, group_id, "shiba-game")
+
+        apps = self.backend.list_authoring_apps(self.subject, group_id)
+
+        self.assertEqual(
+            {app["app_id"] for app in apps},
+            {editor["app_id"], player["app_id"]},
+        )
+        editor_contract = next(app for app in apps if app["app_id"] == editor["app_id"])
+        player_contract = next(app for app in apps if app["app_id"] == player["app_id"])
+        self.assertEqual(
+            editor_contract,
+            {
+                "app_id": editor["app_id"],
+                "group_id": group_id,
+                "title": "ノベルゲームメーカー",
+                "edits": ["minapp/novel@1"],
+                "accepts": [],
+            },
+        )
+        self.assertEqual(
+            player_contract,
+            {
+                "app_id": player["app_id"],
+                "group_id": group_id,
+                "title": "ひみつの放課後",
+                "edits": [],
+                "accepts": ["minapp/novel@1"],
+            },
+        )
+
+    def test_corrupt_authoring_app_contract_fails_instead_of_disappearing(self) -> None:
+        group_id = str(self.group["group_id"])
+        editor = self.backend.install_builtin(self.subject, group_id, "novel-editor")
+        index = self.metadata.items[(f"GROUP#{group_id}", f"APP#{editor['app_id']}")]
+        index["edits_json"] = _string_attr('["not-versioned"]')
+
+        with self.assertRaisesRegex(RuntimeError, "invalid edits content format"):
+            self.backend.list_authoring_apps(self.subject, group_id)
+
     def test_list_uses_group_index_and_returns_public_project_metadata(self) -> None:
         first = self._create("作品A")
         second = self._create("作品B")
