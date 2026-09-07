@@ -83,6 +83,7 @@ class HostedLegalDeletionRetryTests(unittest.TestCase):
         )
         app_id = forked["app_id"]
         runtime_rows = self._put_runtime_rows(group["group_id"], app_id)
+        shared_row, *private_rows = runtime_rows
 
         original_delete = self.s3.delete_object
         failed = False
@@ -100,8 +101,9 @@ class HostedLegalDeletionRetryTests(unittest.TestCase):
 
         app_item = self.dynamo.items[(f"APP#{app_id}", "META")]
         self.assertEqual(app_item["deletion_state"]["S"], "deleting")
-        for row in runtime_rows:
+        for row in private_rows:
             self.assertNotIn(row, self.dynamo.items)
+        self.assertIn(shared_row, self.dynamo.items)
 
         self.s3.delete_object = original_delete  # type: ignore[method-assign]
         self.backend.delete_hosted_app(subject, group["group_id"], app_id)
