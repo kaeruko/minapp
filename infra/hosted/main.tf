@@ -385,7 +385,7 @@ resource "aws_apigatewayv2_api" "api" {
   cors_configuration {
     allow_origins = local.cors_allowed_origins
     allow_methods = ["DELETE", "GET", "OPTIONS", "PATCH", "POST"]
-    allow_headers = ["authorization", "content-type"]
+    allow_headers = ["authorization", "content-type", "x-minapp-expected-revision"]
     max_age       = 600
   }
 }
