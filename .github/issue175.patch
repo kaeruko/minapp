@@ -1,0 +1,110 @@
+diff --git a/backend/src/hosted_catalog_backend.py b/backend/src/hosted_catalog_backend.py
+--- a/backend/src/hosted_catalog_backend.py
++++ b/backend/src/hosted_catalog_backend.py
+@@ -9,6 +9,11 @@ import uuid
+ import zipfile
+ from pathlib import PurePosixPath
+ from typing import Any
+ 
++from app_zip import (
++    MAX_ZIP_BYTES,
++    content_type as _content_type,
++    safe_zip_paths as _safe_zip_paths,
++)
+ from aws_backend import _aws_error_code, _item_string, _required_env, _string_attr
+ from errors import ApiProblem
+ from hosted_platform_backend import (
+@@ -20,7 +25,6 @@ from hosted_platform_backend import (
+     _runtime_token_hash,
+     _validate_state_key,
+ )
+-from phase2_backend import MAX_ZIP_BYTES, _content_type, _safe_zip_paths
+ 
+ MAX_APPS_PER_GROUP = 20
+ MAX_RUNTIME_KEYS_PER_APP = 64
+diff --git a/backend/src/hosted_authoring_publish_backend.py b/backend/src/hosted_authoring_publish_backend.py
+--- a/backend/src/hosted_authoring_publish_backend.py
++++ b/backend/src/hosted_authoring_publish_backend.py
+@@ -7,6 +7,7 @@ import uuid
+ import zipfile
+ from typing import Any
+ 
++from app_zip import MAX_ZIP_BYTES, safe_zip_paths as _safe_zip_paths
+ from aws_backend import _aws_error_code, _item_string, _string_attr
+ from errors import ApiProblem
+ from hosted_authoring_app_source import resolve_authoring_app_source
+@@ -32,7 +33,6 @@ from hosted_catalog_backend import (
+     _optional_string,
+ )
+ from hosted_platform_backend import _now_iso, _number_attr
+-from phase2_backend import MAX_ZIP_BYTES, _safe_zip_paths
+ 
+ MAX_AUTHORING_PUBLISHED_VERSIONS = 20
+ 
+diff --git a/backend/src/hosted_app_management.py b/backend/src/hosted_app_management.py
+--- a/backend/src/hosted_app_management.py
++++ b/backend/src/hosted_app_management.py
+@@ -8,10 +8,10 @@ import zipfile
+ from datetime import datetime, timezone
+ from typing import Any
+ 
++from app_zip import content_type as _content_type
+ from aws_backend import _item_string, _string_attr
+ from errors import ApiProblem
+ from hosted_catalog_backend import (
+-    _content_type,
+     _files_json,
+     _item_files,
+     _optional_number,
+diff --git a/backend/src/hosted_authoring_launch.py b/backend/src/hosted_authoring_launch.py
+--- a/backend/src/hosted_authoring_launch.py
++++ b/backend/src/hosted_authoring_launch.py
+@@ -8,6 +8,7 @@ import time
+ import zipfile
+ from typing import Any
+ 
++from app_zip import content_type as _content_type
+ from aws_backend import _item_string, _string_attr
+ from errors import ApiProblem
+ from hosted_authoring_app_source import resolve_authoring_app_source
+@@ -21,7 +22,6 @@ from hosted_authoring_web_bridge import (
+     validate_host_adapter,
+ )
+ from hosted_catalog_backend import (
+-    _content_type,
+     _files_json,
+     _item_files,
+     _optional_number,
+diff --git a/backend/src/hosted_authoring_preview.py b/backend/src/hosted_authoring_preview.py
+--- a/backend/src/hosted_authoring_preview.py
++++ b/backend/src/hosted_authoring_preview.py
+@@ -8,6 +8,7 @@ import time
+ import zipfile
+ from typing import Any
+ 
++from app_zip import content_type as _content_type
+ from aws_backend import _item_string, _string_attr
+ from errors import ApiProblem
+ from hosted_app_management import PREVIEW_SESSION_SECONDS, PREVIEW_TTL_GRACE_SECONDS
+@@ -21,7 +22,7 @@ from hosted_authoring_backend import (
+     _required_item_number,
+     validate_content_format,
+ )
+-from hosted_catalog_backend import _content_type, _files_json, _item_files, _optional_number
++from hosted_catalog_backend import _files_json, _item_files, _optional_number
+ from hosted_platform_backend import RUNTIME_SESSION_TTL_SECONDS, _now_iso, _number_attr
+ 
+ 
+diff --git a/backend/tests/test_phase2_backend.py b/backend/tests/test_phase2_backend.py
+--- a/backend/tests/test_phase2_backend.py
++++ b/backend/tests/test_phase2_backend.py
+@@ -10,8 +10,8 @@ BACKEND_SRC = Path(__file__).resolve().parents[1] / "src"
+ if str(BACKEND_SRC) not in sys.path:
+     sys.path.insert(0, str(BACKEND_SRC))
+ 
++from app_zip import content_type as _content_type, safe_zip_paths as _safe_zip_paths  # noqa: E402
+ from errors import ApiProblem  # noqa: E402
+-from phase2_backend import _content_type, _safe_zip_paths  # noqa: E402
+ 
+ 
+ def _zip(entries: dict[str, bytes]) -> bytes:
