@@ -49,7 +49,7 @@ class HostedPreviewEntryTests(unittest.TestCase):
     def tearDown(self) -> None:
         hosted_entry._BACKEND = None
 
-    def test_owner_preview_session_requires_empty_body_and_authenticated_subject(self) -> None:
+    def test_author_preview_session_requires_empty_body_and_authenticated_subject(self) -> None:
         app_id = "3" * 32
         expected = {
             "app_id": app_id,
@@ -62,7 +62,7 @@ class HostedPreviewEntryTests(unittest.TestCase):
         }
         with patch.object(
             hosted_entry.hosted_preview_session,
-            "create_preview_session",
+            "create_author_preview_session",
             return_value=expected,
         ) as create:
             response = hosted_entry.lambda_handler(
@@ -79,11 +79,11 @@ class HostedPreviewEntryTests(unittest.TestCase):
         self.assertEqual(json.loads(response["body"]), expected)
         create.assert_called_once_with(self.backend, "sub-owner", app_id)
 
-    def test_owner_preview_session_rejects_unknown_body_fields(self) -> None:
+    def test_author_preview_session_rejects_unknown_body_fields(self) -> None:
         app_id = "3" * 32
         with patch.object(
             hosted_entry.hosted_preview_session,
-            "create_preview_session",
+            "create_author_preview_session",
         ) as create:
             response = hosted_entry.lambda_handler(
                 event(
@@ -116,6 +116,67 @@ class HostedPreviewEntryTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 200)
         self.assertTrue(response["isBase64Encoded"])
         get_preview.assert_called_once_with(self.backend, token, "index.html")
+
+
+    def test_group_management_preview_session_binds_group_and_app(self) -> None:
+        group_id = "2" * 32
+        app_id = "3" * 32
+        expected = {
+            "app_id": app_id,
+            "group_id": group_id,
+            "source_revision": 4,
+            "content_path": "/hosted/preview/" + "A" * 43 + "/index.html",
+            "expires_in": 600,
+            "runtime_token": "B" * 43,
+            "runtime_expires_in": 600,
+        }
+        with patch.object(
+            hosted_entry.hosted_preview_session,
+            "create_group_preview_session",
+            return_value=expected,
+        ) as create:
+            response = hosted_entry.lambda_handler(
+                event(
+                    "POST",
+                    f"/hosted/groups/{group_id}/apps/{app_id}/preview-session",
+                    body={},
+                    auth=True,
+                ),
+                None,
+            )
+
+        self.assertEqual(response["statusCode"], 201)
+        self.assertEqual(json.loads(response["body"]), expected)
+        create.assert_called_once_with(self.backend, "sub-owner", group_id, app_id)
+
+    def test_group_management_visibility_binds_group_and_app(self) -> None:
+        group_id = "2" * 32
+        app_id = "3" * 32
+        expected = {"app_id": app_id, "group_id": group_id, "visibility": "hidden"}
+        with patch.object(
+            hosted_entry.hosted_app_management,
+            "set_group_visibility",
+            return_value=expected,
+        ) as set_visibility:
+            response = hosted_entry.lambda_handler(
+                event(
+                    "POST",
+                    f"/hosted/groups/{group_id}/apps/{app_id}/visibility",
+                    body={"hidden": True},
+                    auth=True,
+                ),
+                None,
+            )
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(json.loads(response["body"]), expected)
+        set_visibility.assert_called_once_with(
+            self.backend,
+            "sub-owner",
+            group_id,
+            app_id,
+            hidden=True,
+        )
 
 
 if __name__ == "__main__":
