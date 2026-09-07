@@ -87,18 +87,20 @@ window.addEventListener('minappready', async () => {
   const project = await minapp.authoring.load();
 
   // Only exactly {} is a new-project initialization target.
-  let document = project.document;
-  if (Object.keys(document).length === 0) {
-    document = {
+  let masterData = project.document;
+  if (Object.keys(masterData).length === 0) {
+    masterData = {
       schema_version: 1,
       content_format: 'example/quiz@1',
       questions: []
     };
   }
 
-  document.querySelector?.('#unused'); // application-specific UI goes here
-
-  document.getElementById?.('unused'); // no platform schema assumptions
+  document.querySelector('#save').addEventListener('click', async () => {
+    await minapp.authoring.save(masterData, {
+      expectedRevision: project.draft_revision,
+    });
+  });
 });
 </script>
 ```
@@ -214,6 +216,16 @@ Never expose these to Editor or Player JavaScript:
 - Editor source-management rights merely because the Editor can be used.
 
 Do not silently recover by changing format, Player, Editor, revision, API, backend, storage location, or source version. Preserve the original platform error and stop.
+
+## 9. Host Adapter support in this slice
+
+The implemented interactive Authoring Host Adapter in this slice is Flutter `HostedAppWebViewPage.authoring`. It injects the scoped Runtime and Authoring bridges into the Editor WebView while the trusted Flutter layer retains authentication credentials.
+
+Preview selection is currently Host-driven from `HostedAuthoringProjectsPage`; the Editor JavaScript bridge in this slice exposes `load`, `save`, and `publish`. The broader #161 contract still tracks exposing Host-driven Preview as `minapp.authoring.preview(...)`.
+
+A Web Portal iframe Authoring Host Adapter is not implemented by this slice. Unsupported hosts must not silently fall back to Flutter-specific assumptions, another backend, or direct credential access. Web Portal support remains tracked by #161.
+
+Project-level Authoring deletion is also outside this slice: asset deletion exists, but idempotent deletion of a whole `content_id` and all Draft/Published artifacts remains tracked by #161.
 
 ## Reference test
 
