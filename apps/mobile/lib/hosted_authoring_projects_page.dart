@@ -357,6 +357,55 @@ class _HostedAuthoringProjectsPageState
     }
   }
 
+  Future<void> _deleteProject(HostedAuthoringProjectSummary project) async {
+    if (_busy || !mounted) return;
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('この作品を削除しますか？'),
+        content: const Text(
+          '公開済みの場合は公開アプリも削除されます。この操作は取り消せません。',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            key: const Key('hosted-authoring-delete-confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('削除する'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await _projectsApi.deleteProject(
+        accessToken: widget.accessToken,
+        contentId: project.contentId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _projects = _projects
+            ?.where(
+              (HostedAuthoringProjectSummary item) =>
+                  item.contentId != project.contentId,
+            )
+            .toList(growable: false);
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = widget.errorMessage(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<HostedAuthoringProjectSummary>? projects = _projects;
@@ -444,6 +493,15 @@ class _HostedAuthoringProjectsPageState
                               onPressed:
                                   _busy ? null : () => _previewProject(project),
                               icon: const Icon(Icons.play_circle_outline_rounded),
+                            ),
+                            IconButton(
+                              key: Key(
+                                'hosted-authoring-delete-${project.contentId}',
+                              ),
+                              tooltip: '作品を削除',
+                              onPressed:
+                                  _busy ? null : () => _deleteProject(project),
+                              icon: const Icon(Icons.delete_outline_rounded),
                             ),
                             const Icon(Icons.edit_rounded),
                           ],
