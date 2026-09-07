@@ -56,6 +56,7 @@ $productionAssets = @(
     "girls_portal.css",
     "girls_portal_base.css",
     "girls_footer.css",
+    "hosted_authoring_portal.css",
     "girls_sidebar_art.css",
     "girls-assets\login\frame.png",
     "girls-assets\login\pattern.png",
@@ -90,6 +91,9 @@ $productionAssets = @(
     "portal_shell.js",
     "girls_portal.js",
     "girls_portal_shell.js",
+    "authoring_host_adapter.js",
+    "hosted_authoring_portal.js",
+    "girls_authoring_portal.js",
     "girls_footer.js"
 )
 
