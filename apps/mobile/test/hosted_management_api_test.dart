@@ -12,30 +12,31 @@ const String _appId = '22222222222222222222222222222222';
 const String _userId = '33333333333333333333333333333333';
 
 http.Response _json(int statusCode, Object body) => http.Response(
-      jsonEncode(body),
-      statusCode,
-      headers: const <String, String>{'content-type': 'application/json'},
-    );
+  jsonEncode(body),
+  statusCode,
+  headers: const <String, String>{'content-type': 'application/json'},
+);
 
 Map<String, Object?> _managedAppJson() => <String, Object?>{
-      'app_id': _appId,
-      'group_id': _groupId,
-      'title': 'テストアプリ',
-      'source_kind': 'upload',
-      'created_at': '2026-09-07T00:00:00Z',
-      'published_version': 2,
-      'owner_user_id': _userId,
-      'source_revision': 3,
-      'source_updated_at': '2026-09-07T01:00:00Z',
-      'published_at': '2026-09-07T02:00:00Z',
-      'visibility': 'visible',
-      'group_name': 'テストグループ',
-      'stats': <String, Object?>{
-        'total_plays': 8,
-        'unique_users': 4,
-        'monthly_plays': 5,
-      },
-    };
+  'app_id': _appId,
+  'group_id': _groupId,
+  'title': 'テストアプリ',
+  'source_kind': 'upload',
+  'created_at': '2026-09-07T00:00:00Z',
+  'published_version': 2,
+  'owner_user_id': _userId,
+  'source_revision': 3,
+  'source_updated_at': '2026-09-07T01:00:00Z',
+  'published_at': '2026-09-07T02:00:00Z',
+  'editable': true,
+  'visibility': 'visible',
+  'group_name': 'テストグループ',
+  'stats': <String, Object?>{
+    'total_plays': 8,
+    'unique_users': 4,
+    'monthly_plays': 5,
+  },
+};
 
 void main() {
   test('shared app management lists the authenticated user apps', () async {
@@ -90,10 +91,7 @@ void main() {
   test('member removal requires an exact 204 response', () async {
     final MockClient client = MockClient((http.Request request) async {
       expect(request.method, 'DELETE');
-      expect(
-        request.url.path,
-        '/hosted/groups/$_groupId/members/$_userId',
-      );
+      expect(request.url.path, '/hosted/groups/$_groupId/members/$_userId');
       expect(request.headers['authorization'], 'Bearer $_token');
       return http.Response('', 204);
     });

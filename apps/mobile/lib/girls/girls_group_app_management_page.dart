@@ -9,6 +9,7 @@ import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
 import 'girls_app_preview_api.dart';
 import 'hosted_girls_api.dart';
+import 'hosted_girls_upload_api.dart';
 
 const Color _cream = Color(0xFFFFFAF0);
 const Color _ink = Color(0xFF604943);
@@ -125,7 +126,7 @@ class _GirlsGroupAppManagementPageState
       _error = null;
     });
     try {
-      final HostedSourceDownload download = await _managementApi.downloadSource(
+      final GirlsSourceDownload download = await _managementApi.downloadSource(
         accessToken: widget.session.accessToken,
         groupId: widget.group.groupId,
         appId: app.appId,
@@ -135,15 +136,14 @@ class _GirlsGroupAppManagementPageState
           'Downloaded source revision ${download.revision} does not match the loaded revision ${app.sourceRevision}.',
         );
       }
-      final String? savedPath = await FilePicker.platform.saveFile(
+      final Uri? savedPath = await FilePicker.saveFile(
         dialogTitle: 'ZIPを保存',
         fileName: 'minapp-${app.appId}.zip',
         bytes: download.bytes,
       );
       if (!mounted || savedPath == null) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ZIPを保存しました。')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('ZIPを保存しました。')));
     } catch (error) {
       if (mounted) setState(() => _error = core.girlsMessageFor(error));
     } finally {
@@ -223,12 +223,12 @@ class _GirlsGroupAppManagementPageState
       _error = null;
     });
     try {
-      final GirlsAppTestSession launch =
-          await _previewApi.createGroupDraftPreview(
-        accessToken: widget.session.accessToken,
-        groupId: widget.group.groupId,
-        appId: app.appId,
-      );
+      final GirlsAppTestSession launch = await _previewApi
+          .createGroupDraftPreview(
+            accessToken: widget.session.accessToken,
+            groupId: widget.group.groupId,
+            appId: app.appId,
+          );
       if (launch.sourceRevision != app.sourceRevision) {
         throw StateError(
           'Preview revision ${launch.sourceRevision} does not match the loaded revision ${app.sourceRevision}.',
@@ -268,9 +268,7 @@ class _GirlsGroupAppManagementPageState
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(hidden ? 'アプリを非表示にしました。' : 'アプリを再表示しました。'),
-        ),
+        SnackBar(content: Text(hidden ? 'アプリを非表示にしました。' : 'アプリを再表示しました。')),
       );
       await _load();
     } catch (error) {

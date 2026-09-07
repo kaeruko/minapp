@@ -178,8 +178,9 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
         )
         .toList(growable: false);
     if (installedEditors.isNotEmpty) {
-      final ManagedGirlsApp? editor =
-          await _chooseInstalledNovelEditor(installedEditors);
+      final ManagedGirlsApp? editor = await _chooseInstalledNovelEditor(
+        installedEditors,
+      );
       if (editor != null && mounted) await _openDetail(editor);
       return;
     }
@@ -197,10 +198,11 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
     });
     String? installedAppId;
     try {
-      final HostedGroupApp installed = await _builtinInstallApi.installNovelEditor(
-        accessToken: widget.session.accessToken,
-        groupId: group.groupId,
-      );
+      final HostedGroupApp installed = await _builtinInstallApi
+          .installNovelEditor(
+            accessToken: widget.session.accessToken,
+            groupId: group.groupId,
+          );
       installedAppId = installed.appId;
     } catch (error) {
       if (mounted) setState(() => _error = core.girlsMessageFor(error));
@@ -394,6 +396,43 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
     }
   }
 
+  Future<void> _downloadZip() async {
+    final ManagedGirlsAppDetail? detail = _detail;
+    final int? revision = detail?.summary.sourceRevision;
+    if (detail == null || revision == null) {
+      setState(() => _error = '保存するrevisionを確認できません。');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final GirlsSourceDownload download = await _managementApi.downloadSource(
+        accessToken: widget.session.accessToken,
+        groupId: detail.summary.app.groupId,
+        appId: detail.summary.app.appId,
+      );
+      if (download.revision != revision) {
+        throw StateError(
+          'Downloaded source revision ${download.revision} does not match $revision.',
+        );
+      }
+      final Uri? savedPath = await FilePicker.saveFile(
+        dialogTitle: 'ZIPを保存',
+        fileName: 'minapp-${detail.summary.app.appId}.zip',
+        bytes: download.bytes,
+      );
+      if (!mounted || savedPath == null) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('ZIPを保存しました。')));
+    } catch (error) {
+      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _updateZip() async {
     final ManagedGirlsAppDetail? detail = _detail;
     final int? revision = detail?.summary.sourceRevision;
@@ -486,6 +525,45 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
     }
   }
 
+  Future<void> _delete() async {
+    final ManagedGirlsAppDetail? detail = _detail;
+    if (detail == null) return;
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('このアプリを削除する？'),
+        content: Text('「${detail.summary.app.title}」を削除します。この操作は取り消せません。'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('やめる'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('削除する'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await _managementApi.deleteApp(
+        accessToken: widget.session.accessToken,
+        groupId: detail.summary.app.groupId,
+        appId: detail.summary.app.appId,
+      );
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (error) {
+      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ManagedGirlsAppDetail? detail = _detail;
@@ -524,6 +602,13 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
                 detail: detail,
               ),
               const SizedBox(height: 14),
+              OutlinedButton.icon(
+                key: const Key('girls-app-download-source'),
+                onPressed: _busy ? null : _downloadZip,
+                icon: const Icon(Icons.download_rounded),
+                label: const Text('現在のZIPを保存'),
+              ),
+              const SizedBox(height: 8),
               Row(
                 children: <Widget>[
                   Expanded(
@@ -537,8 +622,9 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
               ),
               const SizedBox(height: 8),
               FilledButton.icon(
-                onPressed:
-                    _busy || detail.summary.sourceRevision == null ? null : _publish,
+                onPressed: _busy || detail.summary.sourceRevision == null
+                    ? null
+                    : _publish,
                 icon: const Icon(Icons.cloud_upload_rounded),
                 label: const Text('最新版を公開'),
               ),
@@ -551,6 +637,16 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
                       : Icons.visibility_off_rounded,
                 ),
                 label: Text(detail.summary.isHidden ? '再公開する' : '非表示にする'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('girls-app-delete'),
+                onPressed: _busy ? null : _delete,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFA04455),
+                ),
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text('アプリを削除'),
               ),
               const SizedBox(height: 24),
               const Text(
@@ -610,8 +706,8 @@ class _AppSummary extends StatelessWidget {
     final String status = app.isHidden
         ? '非公開'
         : app.app.isPublished
-            ? '公開中'
-            : '下書き';
+        ? '公開中'
+        : '下書き';
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -654,10 +750,7 @@ class _AppSummary extends StatelessWidget {
                 ),
               ),
               Expanded(
-                child: _Stat(
-                  label: '今月',
-                  value: '${app.stats.monthlyPlays}回',
-                ),
+                child: _Stat(label: '今月', value: '${app.stats.monthlyPlays}回'),
               ),
             ],
           ),
@@ -711,8 +804,8 @@ class _ManagedAppCard extends StatelessWidget {
     final String status = app.isHidden
         ? '非公開'
         : app.app.isPublished
-            ? '公開中'
-            : '下書き';
+        ? '公開中'
+        : '下書き';
     return Material(
       color: Colors.white.withValues(alpha: .9),
       borderRadius: BorderRadius.circular(20),
@@ -724,8 +817,7 @@ class _ManagedAppCard extends StatelessWidget {
           child: Row(
             children: <Widget>[
               CircleAvatar(
-                backgroundColor:
-                    app.isHidden ? const Color(0xFFE9E2E0) : _pink,
+                backgroundColor: app.isHidden ? const Color(0xFFE9E2E0) : _pink,
                 foregroundColor: _lavender,
                 child: const Icon(Icons.apps_rounded),
               ),
@@ -776,9 +868,8 @@ class _EmptyApps extends StatelessWidget {
   Future<void> _copyPrompt(BuildContext context, String prompt) async {
     await Clipboard.setData(ClipboardData(text: prompt));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('AIに貼る文章をコピーしたよ♡')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('AIに貼る文章をコピーしたよ♡')));
   }
 
   String _ideaPrompt(String idea) =>
@@ -1036,10 +1127,7 @@ class _ErrorCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFFFB8C5)),
       ),
-      child: Text(
-        message,
-        style: const TextStyle(color: Color(0xFF9E3348)),
-      ),
+      child: Text(message, style: const TextStyle(color: Color(0xFF9E3348))),
     );
   }
 }

@@ -6,6 +6,7 @@ import 'api.dart';
 import 'builtin_apps.dart';
 import 'builtin_webview.dart';
 import 'hosted_app_webview.dart';
+import 'girls_group_app_management_page.dart';
 import 'hosted_girls_api.dart';
 
 const Color _lavender = Color(0xFFB39DDB);
@@ -45,9 +46,9 @@ class GirlsApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: const Color(0xFFFFF8FB),
         textTheme: ThemeData.light().textTheme.apply(
-              bodyColor: _text,
-              displayColor: _text,
-            ),
+          bodyColor: _text,
+          displayColor: _text,
+        ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white.withValues(alpha: .82),
@@ -459,9 +460,7 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
         title: Text(legal.title),
         content: SizedBox(
           width: 560,
-          child: SingleChildScrollView(
-            child: SelectableText(legal.body),
-          ),
+          child: SingleChildScrollView(child: SelectableText(legal.body)),
         ),
         actions: <Widget>[
           FilledButton(
@@ -523,7 +522,8 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                             enableSuggestions: false,
                             decoration: InputDecoration(
                               labelText: 'Login ID / ユーザー名',
-                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                              floatingLabelBehavior:
+                                  FloatingLabelBehavior.always,
                               prefixIcon: const Icon(
                                 Icons.key_rounded,
                                 color: _lavender,
@@ -563,7 +563,8 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                             obscureText: true,
                             decoration: InputDecoration(
                               labelText: 'パスワード',
-                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                              floatingLabelBehavior:
+                                  FloatingLabelBehavior.always,
                               prefixIcon: const Icon(
                                 Icons.favorite_border_rounded,
                                 color: Color(0xFFD59AB6),
@@ -607,7 +608,8 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                               obscureText: true,
                               decoration: InputDecoration(
                                 labelText: 'パスワードをもう一度入力してください',
-                                floatingLabelBehavior: FloatingLabelBehavior.always,
+                                floatingLabelBehavior:
+                                    FloatingLabelBehavior.always,
                                 prefixIcon: const Icon(
                                   Icons.favorite_rounded,
                                   color: Color(0xFFD59AB6),
@@ -672,7 +674,8 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                controlAffinity: ListTileControlAffinity.leading,
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
                               ),
                               Wrap(
                                 alignment: WrapAlignment.center,
@@ -759,8 +762,8 @@ class _GirlsAuthPageState extends State<GirlsAuthPage> {
                                 _busy
                                     ? '確認しています…'
                                     : _creating
-                                        ? '新規登録する'
-                                        : 'ログイン',
+                                    ? '新規登録する'
+                                    : 'ログイン',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w900,
@@ -1156,7 +1159,8 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
                                 const SizedBox(width: 15),
                                 const Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: <Widget>[
                                       Text(
                                         'どのグループで遊ぶ？',
@@ -1293,10 +1297,8 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
   Future<void> _launchBuiltin(BuiltInApp app) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (BuildContext context) => BuiltInWebViewPage(
-          title: app.title,
-          assetPath: app.assetPath,
-        ),
+        builder: (BuildContext context) =>
+            BuiltInWebViewPage(title: app.title, assetPath: app.assetPath),
       ),
     );
   }
@@ -1331,6 +1333,25 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
     } finally {
       if (mounted) setState(() => _launchingAppId = null);
     }
+  }
+
+  Future<void> _openManagedApp(HostedGroupApp app) async {
+    if (!widget.group.isOwner || !app.editable) {
+      throw StateError(
+        'Group app management requires owner role and editable app.',
+      );
+    }
+    final bool? changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (BuildContext context) => GirlsGroupAppManagementPage(
+          api: widget.api,
+          session: widget.session,
+          group: widget.group,
+          appId: app.appId,
+        ),
+      ),
+    );
+    if (changed == true && mounted) await _loadApps();
   }
 
   Future<void> _issueGroupId() async {
@@ -1486,6 +1507,9 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
                                   app: app,
                                   loading: _launchingAppId == app.appId,
                                   onTap: () => _launchHostedApp(app),
+                                  onManage: widget.group.isOwner && app.editable
+                                      ? () => _openManagedApp(app)
+                                      : null,
                                 ),
                               ),
                             ),
@@ -1623,9 +1647,7 @@ class _GroupTile extends StatelessWidget {
               CircleAvatar(
                 backgroundColor: group.isOwner ? _pink : _blue,
                 child: Icon(
-                  group.isOwner
-                      ? Icons.favorite_rounded
-                      : Icons.groups_rounded,
+                  group.isOwner ? Icons.favorite_rounded : Icons.groups_rounded,
                   color: Colors.white,
                 ),
               ),
@@ -1778,11 +1800,13 @@ class _HostedAppTile extends StatelessWidget {
     required this.app,
     required this.loading,
     required this.onTap,
+    required this.onManage,
   });
 
   final HostedGroupApp app;
   final bool loading;
   final VoidCallback onTap;
+  final VoidCallback? onManage;
 
   @override
   Widget build(BuildContext context) {
@@ -1820,6 +1844,16 @@ class _HostedAppTile extends StatelessWidget {
                   ],
                 ),
               ),
+              if (onManage != null)
+                IconButton(
+                  key: ValueKey<String>('girls-group-manage-${app.appId}'),
+                  tooltip: 'グループ管理',
+                  onPressed: loading ? null : onManage,
+                  icon: const Icon(
+                    Icons.settings_rounded,
+                    color: _lavenderDark,
+                  ),
+                ),
               if (loading)
                 const SizedBox.square(
                   dimension: 20,
@@ -1887,11 +1921,7 @@ class _EmptyGroups extends StatelessWidget {
       ),
       child: const Column(
         children: <Widget>[
-          Icon(
-            Icons.favorite_border_rounded,
-            color: _lavender,
-            size: 36,
-          ),
+          Icon(Icons.favorite_border_rounded, color: _lavender, size: 36),
           SizedBox(height: 8),
           Text(
             'まだグループがないよ。\n友達のグループに入るか、新しくつくってみよう！',

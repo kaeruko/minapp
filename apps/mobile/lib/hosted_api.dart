@@ -31,11 +31,11 @@ class HostedLegalText {
   final String body;
 
   factory HostedLegalText.fromJson(Map<String, Object?> json) {
-    _requireExactFields(
-      json,
-      const <String>{'version', 'title', 'body'},
-      'Hosted legal text',
-    );
+    _requireExactFields(json, const <String>{
+      'version',
+      'title',
+      'body',
+    }, 'Hosted legal text');
     return HostedLegalText(
       version: _requiredString(json, 'version'),
       title: _requiredString(json, 'title'),
@@ -58,11 +58,12 @@ class HostedLegalBundle {
   final HostedLegalText privacy;
 
   factory HostedLegalBundle.fromJson(Map<String, Object?> json) {
-    _requireExactFields(
-      json,
-      const <String>{'effective_date', 'support_email', 'terms', 'privacy'},
-      'Hosted legal bundle',
-    );
+    _requireExactFields(json, const <String>{
+      'effective_date',
+      'support_email',
+      'terms',
+      'privacy',
+    }, 'Hosted legal bundle');
     return HostedLegalBundle(
       effectiveDate: _requiredString(json, 'effective_date'),
       supportEmail: _requiredString(json, 'support_email'),
@@ -84,18 +85,14 @@ class HostedRegistrationResult {
   final String recoveryCode;
 
   factory HostedRegistrationResult.fromJson(Map<String, Object?> json) {
-    _requireExactFields(
-      json,
-      const <String>{
-        'user_id',
-        'login_id',
-        'role',
-        'status',
-        'recovery_code',
-        'legal',
-      },
-      'Hosted registration response',
-    );
+    _requireExactFields(json, const <String>{
+      'user_id',
+      'login_id',
+      'role',
+      'status',
+      'recovery_code',
+      'legal',
+    }, 'Hosted registration response');
     final String role = _requiredString(json, 'role');
     final String status = _requiredString(json, 'status');
     if (role != 'user' || status != 'active') {
@@ -104,11 +101,11 @@ class HostedRegistrationResult {
       );
     }
     final Map<String, Object?> legal = _requiredObject(json, 'legal');
-    _requireExactFields(
-      legal,
-      const <String>{'terms_version', 'privacy_version', 'accepted_at'},
-      'Hosted registration legal receipt',
-    );
+    _requireExactFields(legal, const <String>{
+      'terms_version',
+      'privacy_version',
+      'accepted_at',
+    }, 'Hosted registration legal receipt');
     _requiredString(legal, 'terms_version');
     _requiredString(legal, 'privacy_version');
     _requiredString(legal, 'accepted_at');
@@ -130,11 +127,10 @@ class HostedRecoveryResult {
   final String recoveryCode;
 
   factory HostedRecoveryResult.fromJson(Map<String, Object?> json) {
-    _requireExactFields(
-      json,
-      const <String>{'login_id', 'recovery_code'},
-      'Hosted recovery response',
-    );
+    _requireExactFields(json, const <String>{
+      'login_id',
+      'recovery_code',
+    }, 'Hosted recovery response');
     return HostedRecoveryResult(
       loginId: _requiredString(json, 'login_id'),
       recoveryCode: _requiredString(json, 'recovery_code'),
@@ -149,15 +145,16 @@ class HostedEmailStatus {
   final bool verified;
 
   factory HostedEmailStatus.fromJson(Map<String, Object?> json) {
-    _requireExactFields(
-      json,
-      const <String>{'email', 'verified'},
-      'Hosted email status',
-    );
+    _requireExactFields(json, const <String>{
+      'email',
+      'verified',
+    }, 'Hosted email status');
     final String? email = _optionalString(json, 'email');
     final Object? verified = json['verified'];
     if (verified is! bool) {
-      throw const FormatException('Hosted email status has invalid verified value.');
+      throw const FormatException(
+        'Hosted email status has invalid verified value.',
+      );
     }
     if (verified && email == null) {
       throw const FormatException(
@@ -180,11 +177,12 @@ class HostedEmailLinkResult extends HostedEmailStatus {
   final String? destination;
 
   factory HostedEmailLinkResult.fromJson(Map<String, Object?> json) {
-    _requireExactFields(
-      json,
-      const <String>{'email', 'verified', 'code_sent', 'destination'},
-      'Hosted email link result',
-    );
+    _requireExactFields(json, const <String>{
+      'email',
+      'verified',
+      'code_sent',
+      'destination',
+    }, 'Hosted email link result');
     final Object? verified = json['verified'];
     final Object? codeSent = json['code_sent'];
     if (verified is! bool || codeSent is! bool) {
@@ -229,7 +227,9 @@ class HostedGroup {
       throw FormatException('Hosted group returned unsupported role: $role.');
     }
     if (status != 'active') {
-      throw FormatException('Hosted group returned unsupported status: $status.');
+      throw FormatException(
+        'Hosted group returned unsupported status: $status.',
+      );
     }
     return HostedGroup(
       groupId: _requireHexId(json, 'group_id'),
@@ -256,15 +256,18 @@ class HostedMember {
   bool get isOwner => role == 'owner';
 
   factory HostedMember.fromJson(Map<String, Object?> json) {
-    _requireExactFields(
-      json,
-      const <String>{'user_id', 'login_id', 'role', 'status'},
-      'Hosted member',
-    );
+    _requireExactFields(json, const <String>{
+      'user_id',
+      'login_id',
+      'role',
+      'status',
+    }, 'Hosted member');
     final String role = _requiredString(json, 'role');
     final String status = _requiredString(json, 'status');
     if ((role != 'owner' && role != 'member') || status != 'active') {
-      throw FormatException('Hosted member returned unsupported role/status: $role/$status.');
+      throw FormatException(
+        'Hosted member returned unsupported role/status: $role/$status.',
+      );
     }
     return HostedMember(
       userId: _requireHexId(json, 'user_id'),
@@ -289,18 +292,23 @@ class HostedInvite {
   final int validForSeconds;
 
   factory HostedInvite.fromJson(Map<String, Object?> json) {
-    _requireExactFields(
-      json,
-      const <String>{'group_id', 'code', 'expires_at', 'valid_for_seconds'},
-      'Hosted invite',
-    );
+    _requireExactFields(json, const <String>{
+      'group_id',
+      'code',
+      'expires_at',
+      'valid_for_seconds',
+    }, 'Hosted invite');
     final String code = _requiredString(json, 'code');
     if (!_inviteCodePattern.hasMatch(code.toUpperCase())) {
-      throw const FormatException('Hosted invite returned an invalid group code.');
+      throw const FormatException(
+        'Hosted invite returned an invalid group code.',
+      );
     }
     final Object? validForSeconds = json['valid_for_seconds'];
     if (validForSeconds is! int || validForSeconds <= 0) {
-      throw const FormatException('Hosted invite has invalid valid_for_seconds.');
+      throw const FormatException(
+        'Hosted invite has invalid valid_for_seconds.',
+      );
     }
     return HostedInvite(
       groupId: _requireHexId(json, 'group_id'),
@@ -355,6 +363,8 @@ class HostedGroupApp {
     this.builtinId,
     this.builtinAssetPath,
     required this.ownerUserId,
+    required this.editable,
+    required this.sourceRevision,
   });
 
   final String appId;
@@ -366,6 +376,8 @@ class HostedGroupApp {
   final String? builtinId;
   final String? builtinAssetPath;
   final String ownerUserId;
+  final bool editable;
+  final int? sourceRevision;
 
   bool get isPublished => publishedVersion != null;
 
@@ -412,7 +424,25 @@ class HostedGroupApp {
     final Object? publishedVersion = json['published_version'];
     if (publishedVersion != null &&
         (publishedVersion is! int || publishedVersion < 1)) {
-      throw const FormatException('Hosted group app has invalid published_version.');
+      throw const FormatException(
+        'Hosted group app has invalid published_version.',
+      );
+    }
+    final Object? editable = json['editable'];
+    if (editable is! bool) {
+      throw const FormatException('Hosted group app has invalid editable.');
+    }
+    final Object? sourceRevision = json['source_revision'];
+    if (sourceRevision != null &&
+        (sourceRevision is! int || sourceRevision < 1)) {
+      throw const FormatException(
+        'Hosted group app has invalid source_revision.',
+      );
+    }
+    if (editable && sourceRevision == null) {
+      throw const FormatException(
+        'Editable hosted group app has no source_revision.',
+      );
     }
     return HostedGroupApp(
       appId: _requireHexId(json, 'app_id'),
@@ -424,6 +454,8 @@ class HostedGroupApp {
       builtinId: _optionalString(json, 'builtin_id'),
       builtinAssetPath: _optionalString(json, 'builtin_asset_path'),
       ownerUserId: _requireHexId(json, 'owner_user_id'),
+      editable: editable,
+      sourceRevision: sourceRevision as int?,
     );
   }
 }
@@ -484,16 +516,16 @@ abstract interface class HostedPlatformApi {
 
 class HostedApi implements HostedPlatformApi {
   HostedApi({required Uri baseUri, http.Client? client})
-      : _baseUri = _validateBaseUri(baseUri),
-        _client = client ?? http.Client(),
-        _authClient = MinAppApiClient(
-          baseUri: _validateBaseUri(baseUri),
-          client: client,
-        ),
-        runtimeClient = HostedApiClient(
-          baseUri: _validateBaseUri(baseUri),
-          client: client,
-        );
+    : _baseUri = _validateBaseUri(baseUri),
+      _client = client ?? http.Client(),
+      _authClient = MinAppApiClient(
+        baseUri: _validateBaseUri(baseUri),
+        client: client,
+      ),
+      runtimeClient = HostedApiClient(
+        baseUri: _validateBaseUri(baseUri),
+        client: client,
+      );
 
   final Uri _baseUri;
   final http.Client _client;
@@ -545,7 +577,10 @@ class HostedApi implements HostedPlatformApi {
     required String recoveryCode,
     required String newPassword,
   }) async {
-    final String normalized = recoveryCode.replaceAll('-', '').trim().toUpperCase();
+    final String normalized = recoveryCode
+        .replaceAll('-', '')
+        .trim()
+        .toUpperCase();
     if (!_recoveryCodePattern.hasMatch(normalized)) {
       throw ArgumentError.value(
         recoveryCode,
@@ -581,7 +616,9 @@ class HostedApi implements HostedPlatformApi {
     required String accessToken,
     required String name,
   }) async {
-    if (name.isEmpty || name != name.trim() || name.length > maxHostedGroupNameLength) {
+    if (name.isEmpty ||
+        name != name.trim() ||
+        name.length > maxHostedGroupNameLength) {
       throw ArgumentError.value(name, 'name', 'invalid Hosted group name');
     }
     return HostedGroup.fromJson(
@@ -697,8 +734,12 @@ class HostedApi implements HostedPlatformApi {
         body: <String, Object?>{'builtin_id': builtinId},
       ),
     );
-    if (app.groupId != groupId || app.sourceKind != 'builtin' || app.builtinId != builtinId) {
-      throw const FormatException('Builtin install response changed the requested scope.');
+    if (app.groupId != groupId ||
+        app.sourceKind != 'builtin' ||
+        app.builtinId != builtinId) {
+      throw const FormatException(
+        'Builtin install response changed the requested scope.',
+      );
     }
     return app;
   }
@@ -731,8 +772,13 @@ class HostedApi implements HostedPlatformApi {
     required String email,
   }) async {
     final String normalized = email.trim().toLowerCase();
-    if (normalized.length > maxHostedEmailLength || !_emailPattern.hasMatch(normalized)) {
-      throw ArgumentError.value(email, 'email', 'must be a valid email address');
+    if (normalized.length > maxHostedEmailLength ||
+        !_emailPattern.hasMatch(normalized)) {
+      throw ArgumentError.value(
+        email,
+        'email',
+        'must be a valid email address',
+      );
     }
     return HostedEmailLinkResult.fromJson(
       await _jsonRequest(
@@ -750,7 +796,11 @@ class HostedApi implements HostedPlatformApi {
   }) async {
     final String normalized = code.trim();
     if (!_emailVerificationCodePattern.hasMatch(normalized)) {
-      throw ArgumentError.value(code, 'code', 'must be a 6-digit verification code');
+      throw ArgumentError.value(
+        code,
+        'code',
+        'must be a 6-digit verification code',
+      );
     }
     return HostedEmailStatus.fromJson(
       await _jsonRequest(
@@ -771,10 +821,16 @@ class HostedApi implements HostedPlatformApi {
     if (!path.startsWith('/')) {
       throw ArgumentError.value(path, 'path', 'API path must start with /.');
     }
-    final Map<String, String> headers = <String, String>{'Accept': 'application/json'};
+    final Map<String, String> headers = <String, String>{
+      'Accept': 'application/json',
+    };
     if (accessToken != null) {
       if (accessToken.isEmpty) {
-        throw ArgumentError.value(accessToken, 'accessToken', 'must not be empty');
+        throw ArgumentError.value(
+          accessToken,
+          'accessToken',
+          'must not be empty',
+        );
       }
       headers['Authorization'] = 'Bearer $accessToken';
     }
@@ -784,7 +840,8 @@ class HostedApi implements HostedPlatformApi {
     late final http.Response response;
     switch (method) {
       case 'GET':
-        if (body != null) throw ArgumentError('GET request must not contain a body.');
+        if (body != null)
+          throw ArgumentError('GET request must not contain a body.');
         response = await _client.get(uri, headers: headers);
       case 'POST':
         response = await _client.post(
@@ -804,10 +861,18 @@ class HostedApi implements HostedPlatformApi {
     required String accessToken,
   }) async {
     if (method != 'DELETE') {
-      throw ArgumentError.value(method, 'method', 'Unsupported empty-response method.');
+      throw ArgumentError.value(
+        method,
+        'method',
+        'Unsupported empty-response method.',
+      );
     }
     if (accessToken.isEmpty) {
-      throw ArgumentError.value(accessToken, 'accessToken', 'must not be empty');
+      throw ArgumentError.value(
+        accessToken,
+        'accessToken',
+        'must not be empty',
+      );
     }
     final http.Response response = await _client.delete(
       _baseUri.resolve(path),
@@ -824,8 +889,11 @@ class HostedApi implements HostedPlatformApi {
 
   Map<String, Object?> _decodeJsonResponse(http.Response response) {
     final String? contentType = response.headers['content-type'];
-    if (contentType == null || !contentType.toLowerCase().startsWith('application/json')) {
-      throw FormatException('API returned a non-JSON response (HTTP ${response.statusCode}).');
+    if (contentType == null ||
+        !contentType.toLowerCase().startsWith('application/json')) {
+      throw FormatException(
+        'API returned a non-JSON response (HTTP ${response.statusCode}).',
+      );
     }
     final Object? decoded = jsonDecode(response.body);
     if (decoded is! Map<String, Object?>) {
@@ -834,8 +902,13 @@ class HostedApi implements HostedPlatformApi {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final Object? code = decoded['error'];
       final Object? message = decoded['message'];
-      if (code is! String || code.isEmpty || message is! String || message.isEmpty) {
-        throw const FormatException('API error response is missing error or message.');
+      if (code is! String ||
+          code.isEmpty ||
+          message is! String ||
+          message.isEmpty) {
+        throw const FormatException(
+          'API error response is missing error or message.',
+        );
       }
       throw ApiException(
         statusCode: response.statusCode,
@@ -857,12 +930,16 @@ List<T> _objectList<T>(
   if (raw is! List<Object?>) {
     throw FormatException('Hosted $key response has no $key list.');
   }
-  return raw.map((Object? value) {
-    if (value is! Map<String, Object?>) {
-      throw FormatException('Hosted $key response contains a non-object item.');
-    }
-    return parse(value);
-  }).toList(growable: false);
+  return raw
+      .map((Object? value) {
+        if (value is! Map<String, Object?>) {
+          throw FormatException(
+            'Hosted $key response contains a non-object item.',
+          );
+        }
+        return parse(value);
+      })
+      .toList(growable: false);
 }
 
 Uri _validateBaseUri(Uri uri) {
@@ -893,7 +970,9 @@ void _validateHostedId(String value, String label) {
 String _requireHexId(Map<String, Object?> json, String key) {
   final String value = _requiredString(json, key);
   if (!_hostedHexIdPattern.hasMatch(value)) {
-    throw FormatException('JSON field $key must be a 32-character lowercase hexadecimal ID.');
+    throw FormatException(
+      'JSON field $key must be a 32-character lowercase hexadecimal ID.',
+    );
   }
   return value;
 }
@@ -910,7 +989,9 @@ String? _optionalString(Map<String, Object?> json, String key) {
   final Object? value = json[key];
   if (value == null) return null;
   if (value is! String || value.isEmpty) {
-    throw FormatException('JSON field $key must be a non-empty string when present.');
+    throw FormatException(
+      'JSON field $key must be a non-empty string when present.',
+    );
   }
   return value;
 }
