@@ -104,7 +104,7 @@ def resolve_authoring_app_source(
     source_revision = _optional_number(published_manifest, "source_revision")
     if source_revision is None:
         raise RuntimeError("Published Authoring app manifest has no source revision")
-    if _item_string(published_manifest, "sha256") != published_sha256:
+    if _item_string(published_manifest, "published_sha256") != published_sha256:
         raise RuntimeError("Published Authoring app checksum no longer matches its pointer")
 
     source_manifest = backend._get_item(
