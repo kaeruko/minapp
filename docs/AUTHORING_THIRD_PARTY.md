@@ -82,12 +82,14 @@ Minimal outline:
 <!doctype html>
 <meta charset="utf-8">
 <button id="save">Save</button>
+<button id="preview">Preview</button>
 <script>
 window.addEventListener('minappready', async () => {
   const project = await minapp.authoring.load();
 
   // Only exactly {} is a new-project initialization target.
   let masterData = project.document;
+  let revision = project.draft_revision;
   if (Object.keys(masterData).length === 0) {
     masterData = {
       schema_version: 1,
@@ -97,9 +99,14 @@ window.addEventListener('minappready', async () => {
   }
 
   document.querySelector('#save').addEventListener('click', async () => {
-    await minapp.authoring.save(masterData, {
-      expectedRevision: project.draft_revision,
+    const saved = await minapp.authoring.save(masterData, {
+      expectedRevision: revision,
     });
+    revision = saved.draft_revision;
+  });
+
+  document.querySelector('#preview').addEventListener('click', async () => {
+    await minapp.authoring.preview({ expectedRevision: revision });
   });
 });
 </script>
@@ -164,7 +171,29 @@ A later unpublished Editor draft is never served to another user. A live Editor 
 
 The Host resolves Players only by exact `content_format` / `accepts`. If multiple compatible Players exist, the user must choose explicitly; the first result is not selected implicitly.
 
-Creating Preview validates the selected Player and records the exact immutable Player source used for that Preview. Preview uses the current Draft revision and an isolated preview Runtime namespace, so it does not mutate production `minapp.state` or `minapp.userState`.
+An Editor requests Preview with only the revision it intends to preview:
+
+```js
+const result = await minapp.authoring.preview({
+  expectedRevision: currentDraftRevision,
+});
+```
+
+The child Editor cannot provide `content_id`, `player_app_id`, a user identity, credentials, or a backend/storage selector. The trusted Host already knows the work from the Editor launch, resolves compatible Players, asks the user when more than one Player is available, retains the Cognito JWT, and calls the authenticated Preview API itself.
+
+If the user cancels Player selection, Preview resolves to `null`. After a Preview is opened and then closed, the Editor receives only non-secret selection metadata:
+
+```json
+{
+  "content_format": "example/quiz@1",
+  "draft_revision": 7,
+  "player_app_id": "..."
+}
+```
+
+Preview/API errors preserve their platform status, code, and message. The Host does not switch to another Player, format, API, backend, or revision after an error.
+
+Creating Preview validates the selected Player and records the exact immutable Player source used for that Preview. Preview uses the requested Draft revision and an isolated preview Runtime namespace, so it does not mutate production `minapp.state` or `minapp.userState`.
 
 The explicit Preview selection is also the Player selection used by the subsequent v1 Publish. Publish without a recorded compatible Player selection fails with `authoring_player_not_selected`; the platform does not pick a candidate automatically.
 
@@ -219,9 +248,9 @@ Do not silently recover by changing format, Player, Editor, revision, API, backe
 
 ## 9. Host Adapter support in this slice
 
-The implemented interactive Authoring Host Adapter in this slice is Flutter `HostedAppWebViewPage.authoring`. It injects the scoped Runtime and Authoring bridges into the Editor WebView while the trusted Flutter layer retains authentication credentials.
+The implemented interactive Authoring Host Adapter is Flutter `HostedAppWebViewPage.authoring`. It injects the scoped Runtime, Authoring, and Authoring Preview bridges into the Editor WebView while the trusted Flutter layer retains authentication credentials.
 
-Preview selection is currently Host-driven from `HostedAuthoringProjectsPage`; the Editor JavaScript bridge in this slice exposes `load`, `save`, and `publish`. The broader #161 contract still tracks exposing Host-driven Preview as `minapp.authoring.preview(...)`.
+The Flutter path now supports `minapp.authoring.load`, `save`, `preview`, and `publish`. `preview` is Host-driven: Editor JavaScript supplies only `expectedRevision`; compatible Player discovery, explicit selection, authenticated Preview creation, and Preview presentation stay in `HostedAuthoringProjectsPage` / the trusted Host.
 
 A Web Portal iframe Authoring Host Adapter is not implemented by this slice. Unsupported hosts must not silently fall back to Flutter-specific assumptions, another backend, or direct credential access. Web Portal support remains tracked by #161.
 
@@ -246,4 +275,6 @@ Alice uploads Editor + Player
 -> Bob republishes to the same published_app_id
 ```
 
-The same test also verifies that Alice's later unpublished Editor draft is not exposed to Bob and that Bob cannot manage Alice's Editor source.
+`apps/mobile/test/hosted_authoring_preview_bridge_test.dart` additionally verifies that Editor JavaScript cannot select a different work or Player through Preview and that Preview errors preserve their diagnostics.
+
+The roundtrip test also verifies that Alice's later unpublished Editor draft is not exposed to Bob and that Bob cannot manage Alice's Editor source.

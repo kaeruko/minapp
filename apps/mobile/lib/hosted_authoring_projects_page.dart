@@ -5,6 +5,7 @@ import 'hosted_app_webview.dart';
 import 'hosted_authoring_bridge.dart';
 import 'hosted_authoring_contract_api.dart';
 import 'hosted_authoring_launch_client.dart';
+import 'hosted_authoring_preview_bridge.dart';
 import 'hosted_authoring_preview_client.dart';
 import 'hosted_authoring_projects_api.dart';
 import 'hosted_authoring_resolver.dart';
@@ -182,6 +183,7 @@ class _HostedAuthoringProjectsPageState
       if (launch.contentFormat != widget.definition.contentFormat ||
           !launch.allowedOperations.contains('load') ||
           !launch.allowedOperations.contains('save_document') ||
+          !launch.allowedOperations.contains('preview_request') ||
           !launch.allowedOperations.contains('publish_request')) {
         throw const FormatException(
           'Editor launch returned an incompatible Authoring capability.',
@@ -196,6 +198,8 @@ class _HostedAuthoringProjectsPageState
             launch: launch,
             runtimeTransport: widget.runtimeTransport,
             authoringTransport: _authoringTransport,
+            authoringPreviewHost: (int expectedRevision) =>
+                _previewFromEditor(contentId, expectedRevision),
           ),
         ),
       );
@@ -266,6 +270,71 @@ class _HostedAuthoringProjectsPageState
     return installedMatches.single;
   }
 
+  Future<HostedAuthoringPreviewGrant?> _createPreview({
+    required String contentId,
+    required int expectedRevision,
+  }) async {
+    final HostedAuthoringAppContract? player = await _resolvePlayer();
+    if (player == null) return null;
+    final HostedAuthoringPreviewGrant preview = await _previewApi.createPreview(
+      accessToken: widget.accessToken,
+      contentId: contentId,
+      playerAppId: player.appId,
+      expectedRevision: expectedRevision,
+    );
+    if (preview.contentFormat != widget.definition.contentFormat) {
+      throw const FormatException(
+        'Preview returned an incompatible content format.',
+      );
+    }
+    return preview;
+  }
+
+  Future<void> _showPreview(HostedAuthoringPreviewGrant preview) async {
+    if (!mounted) {
+      throw const HostedAuthoringPreviewHostException(
+        statusCode: 409,
+        code: 'authoring_host_unavailable',
+        message: 'The Authoring Host is no longer active.',
+      );
+    }
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => HostedAppWebViewPage.session(
+          title: '${widget.definition.pageTitle}（下書きプレビュー）',
+          contentUri: preview.contentUri,
+          runtimeToken: preview.runtimeToken,
+          runtimeTransport: widget.runtimeTransport,
+        ),
+      ),
+    );
+  }
+
+  Future<Object?> _previewFromEditor(
+    String contentId,
+    int expectedRevision,
+  ) async {
+    try {
+      final HostedAuthoringPreviewGrant? preview = await _createPreview(
+        contentId: contentId,
+        expectedRevision: expectedRevision,
+      );
+      if (preview == null) return null;
+      await _showPreview(preview);
+      return <String, Object?>{
+        'content_format': preview.contentFormat,
+        'draft_revision': preview.draftRevision,
+        'player_app_id': preview.playerAppId,
+      };
+    } on StateError catch (error) {
+      throw HostedAuthoringPreviewHostException(
+        statusCode: 409,
+        code: 'authoring_player_unavailable',
+        message: error.toString(),
+      );
+    }
+  }
+
   Future<void> _previewProject(HostedAuthoringProjectSummary project) async {
     if (_busy) return;
     setState(() {
@@ -273,31 +342,14 @@ class _HostedAuthoringProjectsPageState
       _error = null;
     });
     try {
-      final HostedAuthoringAppContract? player = await _resolvePlayer();
-      if (player == null) return;
-      final HostedAuthoringPreviewGrant preview = await _previewApi.createPreview(
-        accessToken: widget.accessToken,
+      final HostedAuthoringPreviewGrant? preview = await _createPreview(
         contentId: project.contentId,
-        playerAppId: player.appId,
         expectedRevision: project.draftRevision,
       );
-      if (preview.contentFormat != widget.definition.contentFormat) {
-        throw const FormatException(
-          'Preview returned an incompatible content format.',
-        );
-      }
+      if (preview == null) return;
       if (!mounted) return;
       setState(() => _busy = false);
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(
-          builder: (BuildContext context) => HostedAppWebViewPage.session(
-            title: '${widget.definition.pageTitle}（下書きプレビュー）',
-            contentUri: preview.contentUri,
-            runtimeToken: preview.runtimeToken,
-            runtimeTransport: widget.runtimeTransport,
-          ),
-        ),
-      );
+      await _showPreview(preview);
     } catch (error) {
       if (mounted) setState(() => _error = widget.errorMessage(error));
     } finally {
