@@ -50,34 +50,6 @@ class GirlsAuthoringAppContract {
   }
 }
 
-class GirlsAuthoringResolver {
-  const GirlsAuthoringResolver._();
-
-  static List<GirlsAuthoringAppContract> editorsFor(
-    Iterable<GirlsAuthoringAppContract> apps,
-    String contentFormat,
-  ) {
-    _validateContentFormat(contentFormat);
-    return List<GirlsAuthoringAppContract>.unmodifiable(
-      apps.where(
-        (GirlsAuthoringAppContract app) => app.editsFormat(contentFormat),
-      ),
-    );
-  }
-
-  static List<GirlsAuthoringAppContract> playersFor(
-    Iterable<GirlsAuthoringAppContract> apps,
-    String contentFormat,
-  ) {
-    _validateContentFormat(contentFormat);
-    return List<GirlsAuthoringAppContract>.unmodifiable(
-      apps.where(
-        (GirlsAuthoringAppContract app) => app.acceptsFormat(contentFormat),
-      ),
-    );
-  }
-}
-
 class GirlsAuthoringContractApi {
   GirlsAuthoringContractApi({required Uri baseUri, http.Client? client})
       : _baseUri = _validateBaseUri(baseUri),
@@ -196,16 +168,6 @@ List<String> _requiredFormats(Map<String, Object?> json, String key) {
     formats.add(value);
   }
   return formats;
-}
-
-void _validateContentFormat(String value) {
-  if (!_contentFormatPattern.hasMatch(value)) {
-    throw ArgumentError.value(
-      value,
-      'contentFormat',
-      'must be a namespaced versioned content format',
-    );
-  }
 }
 
 String _requiredId(Map<String, Object?> json, String key) {
