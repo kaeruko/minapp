@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import uuid
 from typing import Any
 
@@ -16,12 +17,45 @@ from hosted_authoring_backend import (
 from hosted_platform_backend import _now_iso, _number_attr
 
 
-class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
-    """Authoring storage with an explicit group -> content discovery index.
+def _contract_formats(item: dict[str, Any], field: str) -> tuple[str, ...]:
+    raw = item.get(f"{field}_json")
+    if raw is None:
+        return ()
+    if not isinstance(raw, dict) or not isinstance(raw.get("S"), str):
+        raise RuntimeError(f"Authoring app {field}_json is not a DynamoDB string")
+    try:
+        value = json.loads(raw["S"])
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Authoring app {field}_json is invalid JSON") from exc
+    if (
+        not isinstance(value, list)
+        or not value
+        or any(not isinstance(content_format, str) for content_format in value)
+        or len(set(value)) != len(value)
+    ):
+        raise RuntimeError(
+            f"Authoring app {field}_json must be a unique non-empty string list"
+        )
+    for content_format in value:
+        try:
+            validate_content_format(content_format)
+        except ApiProblem as exc:
+            raise RuntimeError(
+                f"Authoring app declares an invalid {field} content format"
+            ) from exc
+    return tuple(value)
 
-    The index is written in the same DynamoDB transaction as content metadata
-    and revision 1. Listing never scans the metadata table and never silently
-    skips a stale/corrupt index entry owned by the current user.
+
+class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
+    """Authoring storage with explicit group discovery indexes.
+
+    Content indexes are written in the same DynamoDB transaction as content
+    metadata and revision 1. Listing never scans the metadata table and never
+    silently skips a stale/corrupt index entry owned by the current user.
+
+    Authoring app discovery is also group-scoped. It exposes only app identity,
+    title, and validated ``edits``/``accepts`` contracts; source locations and
+    credentials stay server-side.
     """
 
     def create_authoring_project(
@@ -88,6 +122,41 @@ class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
             self._cleanup_after_failed_commit(document_key, original_error)
             raise
         return self._public_project(meta)
+
+    def list_authoring_apps(
+        self,
+        auth_subject: str,
+        group_id: str,
+    ) -> list[dict[str, Any]]:
+        user = self._user_by_auth_subject(auth_subject)
+        self._require_active_membership(user.user_id, group_id)
+
+        apps: list[dict[str, Any]] = []
+        for item in self._group_app_items(group_id):
+            if _item_string(item, "group_id") != group_id:
+                raise RuntimeError("Authoring group app index has a mismatched group")
+            deletion_state = item.get("deletion_state", {}).get("S")
+            if deletion_state is not None:
+                if deletion_state != "deleting":
+                    raise RuntimeError("Authoring group app index has an invalid deletion state")
+                continue
+
+            edits = _contract_formats(item, "edits")
+            accepts = _contract_formats(item, "accepts")
+            if not edits and not accepts:
+                continue
+            apps.append(
+                {
+                    "app_id": _item_string(item, "app_id"),
+                    "group_id": group_id,
+                    "title": _item_string(item, "title"),
+                    "edits": list(edits),
+                    "accepts": list(accepts),
+                }
+            )
+
+        apps.sort(key=lambda app: (app["title"], app["app_id"]))
+        return apps
 
     def list_authoring_projects(
         self,
