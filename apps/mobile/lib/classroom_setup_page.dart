@@ -11,6 +11,7 @@ class ClassroomSetupPage extends StatefulWidget {
     required this.tenantStore,
     required this.onConfigured,
     this.officialJoinBaseUri,
+    this.onChangeMode,
     super.key,
   });
 
@@ -18,6 +19,7 @@ class ClassroomSetupPage extends StatefulWidget {
   final TenantStore tenantStore;
   final ValueChanged<ConfiguredTenant> onConfigured;
   final Uri? officialJoinBaseUri;
+  final Future<void> Function()? onChangeMode;
 
   @override
   State<ClassroomSetupPage> createState() => _ClassroomSetupPageState();
@@ -134,6 +136,14 @@ class _ClassroomSetupPageState extends State<ClassroomSetupPage> {
                             : const Icon(Icons.arrow_forward),
                         label: const Text('この教室を使う'),
                       ),
+                      if (widget.onChangeMode != null) ...<Widget>[
+                        const SizedBox(height: 8),
+                        TextButton(
+                          key: const Key('classroom-change-mode'),
+                          onPressed: _busy ? null : widget.onChangeMode,
+                          child: const Text('利用方法を切り替える'),
+                        ),
+                      ],
                     ],
                   ),
                 ),
