@@ -48,10 +48,10 @@ CSP and related browser security headers.
 
 ## IAM boundary
 
-The Hosted identity Lambda can read the two exact built-in template objects and
-can get/put/delete only the `hosted/drafts/*` and `hosted/published/*` prefixes.
-It has no S3 bucket-list or wildcard action. Buckets remain private with public
-access blocked.
+The Hosted identity Lambda can read only the exact built-in template objects
+declared by Hosted Terraform and can get/put/delete only the `hosted/drafts/*`
+and `hosted/published/*` prefixes. It has no S3 bucket-list or wildcard action.
+Buckets remain private with public access blocked.
 
 ## AWS smoke
 
