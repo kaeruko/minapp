@@ -24,6 +24,7 @@ _ALLOWED_OPERATIONS = (
     "get_asset",
     "save_asset",
     "delete_asset",
+    "preview_request",
     "publish_request",
 )
 
