@@ -227,6 +227,9 @@ class HostedAuthoringApiClient implements HostedAuthoringTransport {
         'content_format',
         'published_version',
         'source_revision',
+        'published_app_id',
+        'player_app_id',
+        'player_source_version',
         'assets',
         'published_at',
       },
@@ -234,9 +237,12 @@ class HostedAuthoringApiClient implements HostedAuthoringTransport {
     );
     _validateId(_requiredString(payload, 'content_id'), 'content_id');
     _validateId(_requiredString(payload, 'group_id'), 'group_id');
+    _validateId(_requiredString(payload, 'published_app_id'), 'published_app_id');
+    _validateId(_requiredString(payload, 'player_app_id'), 'player_app_id');
     _requiredString(payload, 'content_format');
     _requiredPositiveInt(payload, 'published_version');
     _requiredPositiveInt(payload, 'source_revision');
+    _requiredPositiveInt(payload, 'player_source_version');
     _requiredString(payload, 'published_at');
     if (payload['assets'] is! List<Object?>) {
       throw const FormatException('Authoring publish assets must be a list.');
