@@ -1,6 +1,6 @@
 # Third-party Authoring Editor / Player contract
 
-Tracks #161. This document describes the Hosted v1 contract implemented by the platform. Format-specific schema belongs to the Editor/Player author, not to the Host.
+Tracks #161. This document describes the Hosted v1 contract implemented by the platform. Format-specific schema belongs to the Editor/Player author, not to the Host. Follow-up Web Portal Host Adapter work is tracked by #167.
 
 ## Identities
 
@@ -246,13 +246,19 @@ Never expose these to Editor or Player JavaScript:
 
 Do not silently recover by changing format, Player, Editor, revision, API, backend, storage location, or source version. Preserve the original platform error and stop.
 
-## 9. Host Adapter support in this slice
+## 9. Host Adapter support
 
-The implemented interactive Authoring Host Adapter is Flutter `HostedAppWebViewPage.authoring`. It injects the scoped Runtime, Authoring, and Authoring Preview bridges into the Editor WebView while the trusted Flutter layer retains authentication credentials.
+Flutter `HostedAppWebViewPage.authoring` is the implemented native Host Adapter. It injects scoped Runtime, Authoring, and Authoring Preview bridges into the Editor WebView while the trusted Flutter layer retains authentication credentials.
 
-The Flutter path now supports `minapp.authoring.load`, `save`, `preview`, and `publish`. `preview` is Host-driven: Editor JavaScript supplies only `expectedRevision`; compatible Player discovery, explicit selection, authenticated Preview creation, and Preview presentation stay in `HostedAuthoringProjectsPage` / the trusted Host.
+The Flutter path supports `minapp.authoring.load`, `save`, `preview`, and `publish`. `preview` is Host-driven: Editor JavaScript supplies only `expectedRevision`; compatible Player discovery, explicit selection, authenticated Preview creation, and Preview presentation stay in `HostedAuthoringProjectsPage` / the trusted Host.
 
-A Web Portal iframe Authoring Host Adapter is not implemented by this slice. Unsupported hosts must not silently fall back to Flutter-specific assumptions, another backend, or direct credential access. Web Portal support remains tracked by #161.
+The Web Portal Host Adapter foundation is implemented under #167. A Web launch must be requested explicitly with `host_adapter: "web"`; native launches are not silently converted. Before any capability is created, the backend validates the configured trusted Portal origin. Only the Web launch receives a per-launch bridge nonce, and only its Editor `index.html` receives the Web `postMessage` bootstrap. Other source files and native Editor content remain unchanged.
+
+The Web child receives the same `minapp.state`, `minapp.userState`, and `minapp.authoring.load/save/preview/publish` surface. The injected HTML contains the trusted Portal origin and the per-launch nonce, but does not contain the Cognito JWT, AWS credentials, Runtime token, or Authoring token. Those capability tokens remain in the parent Portal adapter.
+
+The parent accepts a bridge request only when it comes from the exact Editor iframe window, the sandboxed child origin is still opaque (`"null"`), the launch nonce matches, the protocol version/request id are valid, and the method-specific fields are exact. In particular, `authoring.preview` carries only `expectedRevision`; the child cannot supply another `content_id`, `player_app_id`, API, or backend. Parent-to-child replies use `postMessage(..., "*")` because the sandboxed child has an opaque origin; the child accepts them only from its trusted configured Portal origin with the same nonce/version/request id.
+
+`apps/web/authoring_host_adapter.js` provides the reusable trusted-parent transport and discovery/Preview helpers. Production Web Portal project-list/editor-selection UI wiring is still tracked by #167. Until a Portal route explicitly installs this adapter, that route must not fall back to native assumptions, direct child credentials, or another storage/API path.
 
 ## 10. Delete an Authoring Project
 
@@ -295,5 +301,7 @@ Alice uploads Editor + Player
 `apps/mobile/test/hosted_authoring_preview_bridge_test.dart` additionally verifies that Editor JavaScript cannot select a different work or Player through Preview and that Preview errors preserve their diagnostics.
 
 `backend/tests/test_hosted_authoring_deletion.py` verifies unpublished cleanup, retry after a partial S3 failure, physical removal of exact versioned Authoring objects, and deletion of the linked normal Hosted app for a published work. `backend/tests/test_hosted_authoring_delete_entry.py` verifies that the deployed Hosted entrypoint accepts only the authenticated bodyless/queryless DELETE route.
+
+`backend/tests/test_hosted_authoring_web_bridge.py` verifies explicit Web launch, pre-capability Portal-origin validation, Web-only bootstrap injection, native-content non-regression, and absence of Runtime/Authoring capability tokens from the injected Editor HTML. `apps/web/authoring_host_adapter.test.js` verifies iframe/source/origin/nonce scoping, exact method schemas, child inability to smuggle content/player selectors, Runtime/User State capability routing, and preservation of backend Authoring errors.
 
 The roundtrip test also verifies that Alice's later unpublished Editor draft is not exposed to Bob and that Bob cannot manage Alice's Editor source.

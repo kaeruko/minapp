@@ -16,6 +16,7 @@ from hosted_authoring_entry import (
 import hosted_authoring_launch
 import hosted_authoring_preview
 import hosted_authoring_session
+from hosted_authoring_web_bridge import HOST_ADAPTER_NATIVE, validate_host_adapter
 import hosted_handler
 
 _CONTENT_ID_RE = r"([0-9a-f]{32})"
@@ -41,16 +42,32 @@ def _get_backend() -> Any:
     return _BACKEND
 
 
-def _editor_app_id(payload: dict[str, Any]) -> str:
-    _require_fields(payload, required={"editor_app_id"})
-    editor_app_id = payload["editor_app_id"]
-    if not isinstance(editor_app_id, str) or re.fullmatch(r"[0-9a-f]{32}", editor_app_id) is None:
+def _validated_editor_app_id(value: Any) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{32}", value) is None:
         raise ApiProblem(
             400,
             "invalid_request",
             "editor_app_id must be a 32-character lowercase hexadecimal ID.",
         )
-    return editor_app_id
+    return value
+
+
+def _editor_app_id(payload: dict[str, Any]) -> str:
+    _require_fields(payload, required={"editor_app_id"})
+    return _validated_editor_app_id(payload["editor_app_id"])
+
+
+def _launch_parameters(payload: dict[str, Any]) -> tuple[str, str]:
+    _require_fields(
+        payload,
+        required={"editor_app_id"},
+        optional={"host_adapter"},
+    )
+    editor_app_id = _validated_editor_app_id(payload["editor_app_id"])
+    raw_host_adapter = payload.get("host_adapter", HOST_ADAPTER_NATIVE)
+    if not isinstance(raw_host_adapter, str):
+        raise ApiProblem(400, "invalid_request", "host_adapter must be a string.")
+    return editor_app_id, validate_host_adapter(raw_host_adapter)
 
 
 def _player_app_id(payload: dict[str, Any]) -> str:
@@ -116,13 +133,15 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
         if method != "POST":
             return None
         payload = _authoring_json_body(event)
+        editor_app_id, host_adapter = _launch_parameters(payload)
         return _json_response(
             201,
             hosted_authoring_launch.create_launch(
                 _get_backend(),
                 _auth_subject(event),
                 create_launch_match.group(1),
-                _editor_app_id(payload),
+                editor_app_id,
+                host_adapter=host_adapter,
             ),
         )
 
