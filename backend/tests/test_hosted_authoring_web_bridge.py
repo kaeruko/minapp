@@ -163,6 +163,13 @@ class HostedAuthoringWebBridgeTests(unittest.TestCase):
 
 
 class HostedAuthoringWebEntryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.backend = object()
+        hosted_authoring_capability_entry._BACKEND = self.backend
+
+    def tearDown(self) -> None:
+        hosted_authoring_capability_entry._BACKEND = None
+
     def event(self, payload: dict[str, object]) -> dict[str, object]:
         return {
             "rawPath": "/hosted/authoring/projects/" + "3" * 32 + "/launch",
@@ -200,7 +207,7 @@ class HostedAuthoringWebEntryTests(unittest.TestCase):
         assert response is not None
         self.assertEqual(response["statusCode"], 201)
         create_launch.assert_called_once_with(
-            unittest.mock.ANY,
+            self.backend,
             "sub-owner",
             "3" * 32,
             "4" * 32,
