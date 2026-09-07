@@ -39,6 +39,38 @@ class FakeAuthoringBackend:
             "updated_at": "2026-09-06T09:00:00Z",
         }
 
+    def list_authoring_apps(
+        self,
+        auth_subject: str,
+        group_id: str,
+    ) -> list[dict[str, Any]]:
+        self.calls.append(("apps", auth_subject, group_id))
+        return [
+            {
+                "app_id": "4" * 32,
+                "group_id": group_id,
+                "title": "Quiz Editor",
+                "edits": ["example/quiz@1"],
+                "accepts": [],
+            },
+            {
+                "app_id": "5" * 32,
+                "group_id": group_id,
+                "title": "Quiz Player",
+                "edits": [],
+                "accepts": ["example/quiz@1"],
+            },
+        ]
+
+    def list_authoring_projects(
+        self,
+        auth_subject: str,
+        group_id: str,
+        content_format: str | None = None,
+    ) -> list[dict[str, Any]]:
+        self.calls.append(("projects", auth_subject, group_id, content_format))
+        return []
+
     def load_authoring_project(self, auth_subject: str, content_id: str) -> dict[str, Any]:
         self.calls.append(("load", auth_subject, content_id))
         return {
@@ -132,6 +164,7 @@ def event(
     content_type: str | None = None,
     base64_encoded: bool = False,
     extra_headers: dict[str, str] | None = None,
+    query: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     headers: dict[str, str] = {}
     if content_type is not None:
@@ -150,6 +183,8 @@ def event(
         result["body"] = body
     if base64_encoded:
         result["isBase64Encoded"] = True
+    if query is not None:
+        result["queryStringParameters"] = query
     return result
 
 
@@ -192,6 +227,49 @@ class HostedAuthoringEntryTests(unittest.TestCase):
         self.assertEqual(load_response["statusCode"], 200)
         self.assertEqual(json.loads(load_response["body"])["document"], {"version": 1})
         self.assertEqual(self.backend.calls[1], ("load", "sub-owner", self.content_id))
+
+    def test_group_authoring_apps_route_uses_authenticated_subject(self) -> None:
+        response = abuse_entry.hosted_lambda_handler(
+            event("GET", f"/hosted/authoring/groups/{self.group_id}/apps"),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 200)
+        payload = json.loads(response["body"])
+        self.assertEqual(
+            payload,
+            {
+                "apps": [
+                    {
+                        "app_id": "4" * 32,
+                        "group_id": self.group_id,
+                        "title": "Quiz Editor",
+                        "edits": ["example/quiz@1"],
+                        "accepts": [],
+                    },
+                    {
+                        "app_id": "5" * 32,
+                        "group_id": self.group_id,
+                        "title": "Quiz Player",
+                        "edits": [],
+                        "accepts": ["example/quiz@1"],
+                    },
+                ]
+            },
+        )
+        self.assertEqual(self.backend.calls, [("apps", "sub-owner", self.group_id)])
+
+    def test_group_authoring_apps_rejects_query_before_backend(self) -> None:
+        response = abuse_entry.hosted_lambda_handler(
+            event(
+                "GET",
+                f"/hosted/authoring/groups/{self.group_id}/apps",
+                query={"content_format": "example/quiz@1"},
+            ),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 400)
+        self.assertEqual(json.loads(response["body"])["error"], "invalid_request")
+        self.assertEqual(self.backend.calls, [])
 
     def test_document_save_passes_explicit_expected_revision(self) -> None:
         response = abuse_entry.hosted_lambda_handler(
