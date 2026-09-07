@@ -1,0 +1,63 @@
+name: Issue 174 finish ownership UI
+
+on:
+  push:
+    branches:
+      - chatgpt/issue-174-active-member-ui
+    paths:
+      - .github/issue174_finish.py
+      - .github/workflows/issue174-finish.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: chatgpt/issue-174-active-member-ui
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          cache: true
+      - name: Apply migration
+        run: python .github/issue174_finish.py
+      - name: Format Dart
+        run: |
+          dart format \
+            apps/mobile/lib/hosted_api.dart \
+            apps/mobile/lib/hosted_app_management_api.dart \
+            apps/mobile/lib/girls/girls_app_preview_api.dart \
+            apps/mobile/lib/girls/girls_app_core.dart \
+            apps/mobile/lib/girls/girls_apps_page.dart \
+            apps/mobile/lib/girls/girls_group_app_management_page.dart
+      - name: Check Web syntax
+        run: |
+          node --check apps/web/girls_portal.js
+          node --check apps/web/girls_portal_shell.js
+          node --check apps/web/girls_footer.js
+          node --check apps/web/single_html_zip.js
+      - name: Resolve Flutter packages
+        working-directory: apps/mobile
+        run: flutter pub get
+      - name: Analyze Flutter
+        working-directory: apps/mobile
+        run: flutter analyze
+      - name: Test Flutter
+        working-directory: apps/mobile
+        run: flutter test
+      - name: Commit generated change
+        run: |
+          set -euo pipefail
+          rm .github/issue174_finish.py .github/workflows/issue174-finish.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "No generated changes"; exit 1; }
+          git commit -m "#174 finish Girls author and group-admin UI"
+          git push origin HEAD:chatgpt/issue-174-active-member-ui
