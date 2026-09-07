@@ -1,0 +1,194 @@
+name: Issue 180 Authoring assets v2
+
+on:
+  push:
+    branches:
+      - chatgpt/issue-180-authoring-assets
+    paths:
+      - '.github/workflows/issue180-assets-v2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: chatgpt/issue-180-authoring-assets
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          cache: true
+
+      - name: Apply generic asset bridge
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          import subprocess
+          import textwrap
+
+          old = subprocess.check_output([
+              'git', 'show',
+              'a42cb2520fadf3b3d2569889113b0d4b76b4cf2f:.github/workflows/issue180-assets.yml',
+          ], text=True)
+          marker = "      - name: Apply asset bridge implementation\n        shell: python\n        run: |\n"
+          end_marker = "      - name: Test backend Web bridge\n"
+          if old.count(marker) != 1 or old.count(end_marker) != 1:
+              raise RuntimeError('Cannot extract the reviewed #180 migration script')
+          block = old.split(marker, 1)[1].split(end_marker, 1)[0]
+          script = textwrap.dedent(block)
+
+          original_helper = '''def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f'{path}: expected one match, found {count}: {old[:100]!r}')
+              p.write_text(text.replace(old, new, 1))
+          '''
+          fuzzy_helper = '''def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count == 1:
+                  p.write_text(text.replace(old, new, 1))
+                  return
+              # The reviewed one-shot patch contained a few display-only
+              # indentation offsets. Fall back only by ignoring leading
+              # whitespace on each line; all non-leading source text remains
+              # exact and the whole multi-line block must still be unique.
+              parts = []
+              for line in old.splitlines(keepends=True):
+                  body = line.lstrip(' \\t')
+                  prefix = r'[ \\t]*' if body != line else ''
+                  parts.append(prefix + re.escape(body))
+              pattern = ''.join(parts)
+              matches = list(re.finditer(pattern, text, re.MULTILINE))
+              if len(matches) != 1:
+                  raise RuntimeError(
+                      f'{path}: exact matches={count}, whitespace-safe matches={len(matches)}: {old[:100]!r}'
+                  )
+              match = matches[0]
+              p.write_text(text[:match.start()] + new + text[match.end():])
+          '''
+          if script.count(original_helper) != 1:
+              raise RuntimeError('Migration helper definition changed unexpectedly')
+          script = script.replace(original_helper, fuzzy_helper, 1)
+          script = script.replace(
+              "rawContentType.split(';', 1).first.trim().toLowerCase()",
+              "rawContentType.split(';').first.trim().toLowerCase()",
+          )
+          script = script.replace(
+              "Path('.github/workflows/issue180-assets.yml').unlink()",
+              "Path('.github/workflows/issue180-assets.yml').unlink(missing_ok=True)",
+          )
+
+          namespace = {'__name__': '__issue180_migration__'}
+          exec(compile(script, 'issue180-reviewed-migration.py', 'exec'), namespace)
+          replace_once = namespace['replace_once']
+
+          # A successful mutation must advance exactly one revision. Do not
+          # accept a structurally valid but semantically shifted backend reply.
+          native_path = Path('apps/mobile/lib/hosted_authoring_bridge.dart')
+          native = native_path.read_text()
+          for method in ('saveAsset', 'deleteAsset'):
+              pattern = re.compile(
+                  rf"(Future<Map<String, Object\?>> {method}\(.*?"
+                  r"_validateProjectPayload\(payload, includeDocument: false\);\n)"
+                  r"([ \t]+return payload;)",
+                  re.DOTALL,
+              )
+              replacement = (
+                  r"\1"
+                  "    if (payload['draft_revision'] != expectedRevision + 1) {\n"
+                  "      throw const FormatException(\n"
+                  "        'Authoring asset mutation did not advance exactly one draft revision.',\n"
+                  "      );\n"
+                  "    }\n"
+                  r"\2"
+              )
+              native, count = pattern.subn(replacement, native, count=1)
+              if count != 1:
+                  raise RuntimeError(f'Native {method} revision check insertion failed: {count}')
+          native_path.write_text(native)
+
+          web_path = Path('apps/web/authoring_host_adapter.js')
+          web = web_path.read_text()
+          old_tail = '''    return await decodeJsonResponse(response, `Authoring asset ${method}`);
+            }
+          '''
+          new_tail = '''    const payload = await decodeJsonResponse(response, `Authoring asset ${method}`);
+              requireExactFields(
+                payload,
+                ["content_id", "group_id", "content_format", "status", "draft_revision", "assets", "created_at", "updated_at"],
+                `Authoring asset ${method} response`,
+              );
+              if (!Number.isInteger(payload.draft_revision) || payload.draft_revision !== expectedRevision + 1) {
+                throw new HostedWebApiError(
+                  response.status,
+                  "invalid_api_response",
+                  "Authoring asset mutation did not advance exactly one draft revision.",
+                );
+              }
+              return payload;
+            }
+          '''
+          # Use the same leading-whitespace-safe helper as the reviewed patch.
+          web_path.write_text(web)
+          replace_once(str(web_path), old_tail, new_tail)
+
+          docs = Path('docs/AUTHORING_THIRD_PARTY.md')
+          text = docs.read_text()
+          old_flutter = "The Flutter path supports `minapp.authoring.load`, `save`, `preview`, and `publish`. `preview` is Host-driven: Editor JavaScript supplies only `expectedRevision`; compatible Player discovery, explicit selection, authenticated Preview creation, and Preview presentation stay in `HostedAuthoringProjectsPage` / the trusted Host."
+          new_flutter = "The Flutter path supports `minapp.authoring.load`, `save`, `getAsset`, `saveAsset`, `deleteAsset`, `preview`, and `publish`. Asset reads/writes are bound to the current Authoring session: Editor JavaScript supplies only a validated relative asset path, `Uint8Array` bytes for writes, and `expectedRevision` for mutations. The trusted Host retains the Authoring token and backend URL. `preview` is Host-driven: Editor JavaScript supplies only `expectedRevision`; compatible Player discovery, explicit selection, authenticated Preview creation, and Preview presentation stay in `HostedAuthoringProjectsPage` / the trusted Host."
+          old_web = "The Web child receives the same `minapp.state`, `minapp.userState`, and `minapp.authoring.load/save/preview/publish` surface. The injected HTML contains the trusted Portal origin and the per-launch nonce, but does not contain the Cognito JWT, AWS credentials, Runtime token, or Authoring token. Those capability tokens remain in the parent Portal adapter."
+          new_web = "The Web child receives the same `minapp.state`, `minapp.userState`, and `minapp.authoring.load/save/getAsset/saveAsset/deleteAsset/preview/publish` surface. `getAsset` returns `{ bytes: Uint8Array, contentType }`; `saveAsset` accepts only a non-empty `Uint8Array`. Base64 exists only as the bridge transport representation and is not a second child API. The injected HTML contains the trusted Portal origin and the per-launch nonce, but does not contain the Cognito JWT, AWS credentials, Runtime token, Authoring token, or backend selector. Those capability tokens remain in the parent Portal adapter."
+          if text.count(old_flutter) != 1 or text.count(old_web) != 1:
+              raise RuntimeError('Authoring documentation anchors changed unexpectedly')
+          text = text.replace(old_flutter, new_flutter, 1).replace(old_web, new_web, 1)
+          docs.write_text(text)
+
+          # The migration workflow is intentionally one-shot and must not
+          # become part of the product source tree.
+          Path('.github/workflows/issue180-assets-v2.yml').unlink()
+
+      - name: Test backend Web bridge
+        run: python -m unittest backend.tests.test_hosted_authoring_web_bridge -v
+
+      - name: Test Web Host Adapter
+        run: node --test apps/web/authoring_host_adapter.test.js
+
+      - name: Check Python and JavaScript syntax
+        run: |
+          python -m py_compile backend/src/hosted_authoring_web_bridge.py backend/tests/test_hosted_authoring_web_bridge.py
+          node --check apps/web/authoring_host_adapter.js
+          node --check apps/web/authoring_host_adapter.test.js
+
+      - name: Resolve Flutter packages
+        working-directory: apps/mobile
+        run: flutter pub get
+
+      - name: Format and test Native Authoring bridge
+        working-directory: apps/mobile
+        run: |
+          dart format --output=none --set-exit-if-changed lib/hosted_authoring_bridge.dart test/hosted_authoring_bridge_test.dart
+          flutter test test/hosted_authoring_bridge_test.dart
+
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "#180 expose scoped Authoring asset bridge"
+          git push origin HEAD:chatgpt/issue-180-authoring-assets
