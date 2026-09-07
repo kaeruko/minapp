@@ -13,6 +13,7 @@ import 'ui.dart';
 
 typedef MinAppApiFactory = MinAppApi Function(Uri baseUri);
 typedef WebViewDataClearer = Future<void> Function();
+typedef MinAppModeChanger = Future<void> Function();
 
 class MinApp extends StatelessWidget {
   const MinApp({
@@ -23,6 +24,7 @@ class MinApp extends StatelessWidget {
     this.creatorPortalBaseUri,
     this.webViewDataClearer,
     this.creatorSafetyStore,
+    this.onChangeMode,
     super.key,
   });
 
@@ -33,6 +35,7 @@ class MinApp extends StatelessWidget {
   final Uri? creatorPortalBaseUri;
   final WebViewDataClearer? webViewDataClearer;
   final CreatorSafetyStore? creatorSafetyStore;
+  final MinAppModeChanger? onChangeMode;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +58,7 @@ class MinApp extends StatelessWidget {
         creatorPortalBaseUri: creatorPortalBaseUri,
         webViewDataClearer: webViewDataClearer ?? clearMinAppWebViewData,
         creatorSafetyStore: creatorSafetyStore ?? MemoryCreatorSafetyStore(),
+        onChangeMode: onChangeMode,
       ),
     );
   }
@@ -69,6 +73,7 @@ class _SessionRoot extends StatefulWidget {
     required this.creatorPortalBaseUri,
     required this.webViewDataClearer,
     required this.creatorSafetyStore,
+    required this.onChangeMode,
   });
 
   final MinAppDirectory directory;
@@ -78,6 +83,7 @@ class _SessionRoot extends StatefulWidget {
   final Uri? creatorPortalBaseUri;
   final WebViewDataClearer webViewDataClearer;
   final CreatorSafetyStore creatorSafetyStore;
+  final MinAppModeChanger? onChangeMode;
 
   @override
   State<_SessionRoot> createState() => _SessionRootState();
@@ -207,6 +213,7 @@ class _SessionRootState extends State<_SessionRoot> {
         tenantStore: widget.tenantStore,
         officialJoinBaseUri: widget.officialJoinBaseUri,
         onConfigured: _onConfigured,
+        onChangeMode: widget.onChangeMode,
       );
     }
 
