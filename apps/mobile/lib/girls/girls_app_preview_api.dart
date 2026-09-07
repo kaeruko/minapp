@@ -35,9 +35,9 @@ class GirlsAppTestSession {
 
 class GirlsAppPreviewApi {
   GirlsAppPreviewApi({required Uri baseUri, http.Client? client})
-      : _baseUri = _validateBaseUri(baseUri),
-        _client = client ?? http.Client(),
-        _ownsClient = client == null;
+    : _baseUri = _validateBaseUri(baseUri),
+      _client = client ?? http.Client(),
+      _ownsClient = client == null;
 
   final Uri _baseUri;
   final http.Client _client;
@@ -60,11 +60,11 @@ class GirlsAppPreviewApi {
       path: '/hosted/groups/$groupId/apps/$appId/published-session',
       accessToken: accessToken,
     );
-    _requireExactFields(
-      content,
-      const <String>{'content_path', 'published_version', 'expires_in'},
-      'Published test session response',
-    );
+    _requireExactFields(content, const <String>{
+      'content_path',
+      'published_version',
+      'expires_in',
+    }, 'Published test session response');
     final String contentPath = _requiredString(content, 'content_path');
     if (!_publishedContentPathPattern.hasMatch(contentPath)) {
       throw const FormatException(
@@ -96,38 +96,58 @@ class GirlsAppPreviewApi {
     required String accessToken,
     required String groupId,
     required String appId,
+  }) {
+    return _createDraftPreview(
+      accessToken: accessToken,
+      groupId: groupId,
+      appId: appId,
+      path: '/hosted/my/apps/$appId/preview-session',
+    );
+  }
+
+  Future<GirlsAppTestSession> createGroupDraftPreview({
+    required String accessToken,
+    required String groupId,
+    required String appId,
+  }) {
+    return _createDraftPreview(
+      accessToken: accessToken,
+      groupId: groupId,
+      appId: appId,
+      path: '/hosted/groups/$groupId/apps/$appId/preview-session',
+    );
+  }
+
+  Future<GirlsAppTestSession> _createDraftPreview({
+    required String accessToken,
+    required String groupId,
+    required String appId,
+    required String path,
   }) async {
     _validateToken(accessToken);
     _validateId(groupId, 'groupId');
     _validateId(appId, 'appId');
 
     final Map<String, Object?> content = await _postEmpty(
-      path: '/hosted/my/apps/$appId/preview-session',
+      path: path,
       accessToken: accessToken,
     );
-    _requireExactFields(
-      content,
-      const <String>{
-        'app_id',
-        'group_id',
-        'source_revision',
-        'content_path',
-        'expires_in',
-        'runtime_token',
-        'runtime_expires_in',
-      },
-      'Draft preview session response',
-    );
+    _requireExactFields(content, const <String>{
+      'app_id',
+      'group_id',
+      'source_revision',
+      'content_path',
+      'expires_in',
+      'runtime_token',
+      'runtime_expires_in',
+    }, 'Draft preview session response');
     if (_requiredString(content, 'app_id') != appId ||
         _requiredString(content, 'group_id') != groupId) {
       throw const FormatException(
         'Draft preview session returned a different app or group.',
       );
     }
-    final int sourceRevision = _requiredPositiveInt(
-      content,
-      'source_revision',
-    );
+    final int sourceRevision = _requiredPositiveInt(content, 'source_revision');
     final String contentPath = _requiredString(content, 'content_path');
     if (!_previewContentPathPattern.hasMatch(contentPath)) {
       throw const FormatException(
@@ -165,11 +185,10 @@ class GirlsAppPreviewApi {
       path: '/hosted/groups/$groupId/apps/$appId/runtime-session',
       accessToken: accessToken,
     );
-    _requireExactFields(
-      payload,
-      const <String>{'token', 'expires_in'},
-      'Runtime test session response',
-    );
+    _requireExactFields(payload, const <String>{
+      'token',
+      'expires_in',
+    }, 'Runtime test session response');
     final String token = _requiredString(payload, 'token');
     if (!_runtimeTokenPattern.hasMatch(token)) {
       throw const FormatException(
@@ -210,11 +229,10 @@ class GirlsAppPreviewApi {
       throw const FormatException('API returned an unexpected JSON payload.');
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      _requireExactFields(
-        decoded,
-        const <String>{'error', 'message'},
-        'API error response',
-      );
+      _requireExactFields(decoded, const <String>{
+        'error',
+        'message',
+      }, 'API error response');
       final Object? error = decoded['error'];
       final Object? message = decoded['message'];
       if (error is! String ||

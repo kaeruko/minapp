@@ -563,12 +563,12 @@
     };
   }
 
-  async function loadOwnerGroups() {
+  async function loadActiveGroups() {
     const payload = await apiRequest("/hosted/groups", { authenticated: true });
     requireExactFields(payload, ["groups"], "Hosted groups response");
     if (!Array.isArray(payload.groups)) throw new Error("Hosted groups response has no groups list.");
 
-    const owners = [];
+    const groups = [];
     for (const rawGroup of payload.groups) {
       const group = requirePlainObject(rawGroup, "Hosted group");
       const allowedFields = new Set(["group_id", "name", "role", "status", "visibility"]);
@@ -583,20 +583,20 @@
       requireString(group.name, "Hosted group name");
       if (!["owner", "member"].includes(group.role)) throw new Error(`Unsupported hosted group role: ${String(group.role)}`);
       if (group.status !== "active") throw new Error(`Unsupported hosted group status: ${String(group.status)}`);
-      if (group.role === "owner") owners.push(group);
+      groups.push(group);
     }
 
     uploadGroup.replaceChildren();
-    for (const group of owners) {
+    for (const group of groups) {
       const option = document.createElement("option");
       option.value = group.group_id;
       option.textContent = group.name;
       uploadGroup.append(option);
     }
-    uploadGroup.disabled = owners.length === 0;
-    uploadSubmit.disabled = owners.length === 0;
-    if (owners.length === 0) {
-      setMessage(uploadError, "アプリを追加するには、自分がオーナーのグループが必要です。Girlsアプリで先にグループを作ってください。");
+    uploadGroup.disabled = groups.length === 0;
+    uploadSubmit.disabled = groups.length === 0;
+    if (groups.length === 0) {
+      setMessage(uploadError, "アプリを追加するには、参加中のグループが必要です。Girlsアプリでグループを作るか参加してください。");
     } else {
       setMessage(uploadError, null);
     }
@@ -605,7 +605,7 @@
   async function enterWorkspace(token, authenticatedLoginId) {
     storeAuthentication(token, authenticatedLoginId);
     try {
-      await loadOwnerGroups();
+      await loadActiveGroups();
     } catch (error) {
       if (error instanceof GirlsApiError && error.status === 401) {
         clearAuthentication();
@@ -891,7 +891,7 @@
     }
     currentLoginId = validateLoginId(storedLoginId);
     try {
-      await loadOwnerGroups();
+      await loadActiveGroups();
       setOnlyPanel(uploadPanel);
     } catch (error) {
       if (error instanceof GirlsApiError && error.status === 401) {

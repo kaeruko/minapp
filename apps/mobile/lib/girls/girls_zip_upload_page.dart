@@ -11,13 +11,13 @@ class GirlsZipUploadPage extends StatefulWidget {
   const GirlsZipUploadPage({
     required this.api,
     required this.session,
-    required this.ownerGroups,
+    required this.activeGroups,
     super.key,
   });
 
   final HostedGirlsApi api;
   final AuthenticatedSession session;
-  final List<HostedGroup> ownerGroups;
+  final List<HostedGroup> activeGroups;
 
   @override
   State<GirlsZipUploadPage> createState() => _GirlsZipUploadPageState();
@@ -36,10 +36,10 @@ class _GirlsZipUploadPageState extends State<GirlsZipUploadPage> {
   @override
   void initState() {
     super.initState();
-    if (widget.ownerGroups.isEmpty) {
-      throw ArgumentError('GirlsZipUploadPage requires at least one owner group.');
+    if (widget.activeGroups.isEmpty) {
+      throw ArgumentError('GirlsZipUploadPage requires at least one active group.');
     }
-    _groupId = widget.ownerGroups.first.groupId;
+    _groupId = widget.activeGroups.first.groupId;
     _uploadApi = HostedGirlsUploadApi(baseUri: widget.api.baseUri);
   }
 
@@ -174,7 +174,7 @@ class _GirlsZipUploadPageState extends State<GirlsZipUploadPage> {
                 key: const Key('girls-zip-group'),
                 initialValue: _groupId,
                 decoration: const InputDecoration(labelText: '追加するグループ'),
-                items: widget.ownerGroups
+                items: widget.activeGroups
                     .map(
                       (HostedGroup group) => DropdownMenuItem<String>(
                         value: group.groupId,

@@ -8,6 +8,19 @@ import 'hosted_api.dart';
 
 const int maxHostedZipUploadBytes = 2 * 1024 * 1024;
 final RegExp _managedIdPattern = RegExp(r'^[0-9a-f]{32}$');
+final RegExp _sha256Pattern = RegExp(r'^[0-9a-f]{64}$');
+
+class HostedSourceDownload {
+  const HostedSourceDownload({
+    required this.bytes,
+    required this.revision,
+    required this.sha256,
+  });
+
+  final Uint8List bytes;
+  final int revision;
+  final String sha256;
+}
 
 class HostedAppStats {
   const HostedAppStats({
@@ -169,7 +182,9 @@ class HostedPublishedHistoryItem {
         publishedAt.isEmpty ||
         sha256 is! String ||
         sha256.length != 64) {
-      throw const FormatException('Managed published history entry is invalid.');
+      throw const FormatException(
+        'Managed published history entry is invalid.',
+      );
     }
     return HostedPublishedHistoryItem(
       version: version,
@@ -198,31 +213,35 @@ class ManagedHostedAppDetail {
     }
     return ManagedHostedAppDetail(
       summary: ManagedHostedApp.fromJson(json),
-      sourceHistory: rawSource.map((Object? value) {
-        if (value is! Map<String, Object?>) {
-          throw const FormatException(
-            'Managed source history contains a non-object.',
-          );
-        }
-        return HostedSourceHistoryItem.fromJson(value);
-      }).toList(growable: false),
-      publishedHistory: rawPublished.map((Object? value) {
-        if (value is! Map<String, Object?>) {
-          throw const FormatException(
-            'Managed published history contains a non-object.',
-          );
-        }
-        return HostedPublishedHistoryItem.fromJson(value);
-      }).toList(growable: false),
+      sourceHistory: rawSource
+          .map((Object? value) {
+            if (value is! Map<String, Object?>) {
+              throw const FormatException(
+                'Managed source history contains a non-object.',
+              );
+            }
+            return HostedSourceHistoryItem.fromJson(value);
+          })
+          .toList(growable: false),
+      publishedHistory: rawPublished
+          .map((Object? value) {
+            if (value is! Map<String, Object?>) {
+              throw const FormatException(
+                'Managed published history contains a non-object.',
+              );
+            }
+            return HostedPublishedHistoryItem.fromJson(value);
+          })
+          .toList(growable: false),
     );
   }
 }
 
 class HostedAppManagementApi {
   HostedAppManagementApi({required Uri baseUri, http.Client? client})
-      : _baseUri = _validateBaseUri(baseUri),
-        _client = client ?? http.Client(),
-        _ownsClient = client == null;
+    : _baseUri = _validateBaseUri(baseUri),
+      _client = client ?? http.Client(),
+      _ownsClient = client == null;
 
   final Uri _baseUri;
   final http.Client _client;
@@ -248,14 +267,16 @@ class HostedAppManagementApi {
     if (rawApps is! List<Object?>) {
       throw const FormatException('Managed apps response has no apps list.');
     }
-    return rawApps.map((Object? value) {
-      if (value is! Map<String, Object?>) {
-        throw const FormatException(
-          'Managed apps response contains a non-object.',
-        );
-      }
-      return ManagedHostedApp.fromJson(value);
-    }).toList(growable: false);
+    return rawApps
+        .map((Object? value) {
+          if (value is! Map<String, Object?>) {
+            throw const FormatException(
+              'Managed apps response contains a non-object.',
+            );
+          }
+          return ManagedHostedApp.fromJson(value);
+        })
+        .toList(growable: false);
   }
 
   Future<ManagedHostedAppDetail> getApp({
@@ -282,6 +303,75 @@ class HostedAppManagementApi {
       await _jsonRequest(
         method: 'POST',
         path: '/hosted/my/apps/$appId/visibility',
+        accessToken: accessToken,
+        body: <String, Object?>{'hidden': hidden},
+      ),
+    );
+  }
+
+  Future<HostedSourceDownload> downloadSource({
+    required String accessToken,
+    required String groupId,
+    required String appId,
+  }) async {
+    _validateToken(accessToken);
+    _validateId(groupId, 'groupId');
+    _validateId(appId, 'appId');
+    final http.Response response = await _client.get(
+      _baseUri.resolve('/hosted/groups/$groupId/apps/$appId/source'),
+      headers: <String, String>{
+        'Accept': 'application/zip',
+        'Authorization': 'Bearer $accessToken',
+      },
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      _decodeJsonResponse(response);
+      throw StateError('Unreachable source download error path.');
+    }
+    final String contentType = (response.headers['content-type'] ?? '')
+        .split(';')
+        .first
+        .trim()
+        .toLowerCase();
+    if (contentType != 'application/zip') {
+      throw FormatException(
+        'Source download returned unexpected content type: $contentType.',
+      );
+    }
+    if (response.bodyBytes.isEmpty ||
+        response.bodyBytes.length > maxHostedZipUploadBytes) {
+      throw const FormatException(
+        'Source download returned an invalid ZIP size.',
+      );
+    }
+    final int? revision = int.tryParse(
+      response.headers['x-minapp-source-revision'] ?? '',
+    );
+    final String sha256 = response.headers['x-minapp-source-sha256'] ?? '';
+    if (revision == null || revision < 1 || !_sha256Pattern.hasMatch(sha256)) {
+      throw const FormatException(
+        'Source download metadata headers are invalid.',
+      );
+    }
+    return HostedSourceDownload(
+      bytes: Uint8List.fromList(response.bodyBytes),
+      revision: revision,
+      sha256: sha256,
+    );
+  }
+
+  Future<ManagedHostedApp> setGroupHidden({
+    required String accessToken,
+    required String groupId,
+    required String appId,
+    required bool hidden,
+  }) async {
+    _validateId(groupId, 'groupId');
+    _validateId(appId, 'appId');
+    return ManagedHostedApp.fromJson(
+      await _jsonRequest(
+        method: 'POST',
+        path: '/hosted/groups/$groupId/apps/$appId/visibility',
         accessToken: accessToken,
         body: <String, Object?>{'hidden': hidden},
       ),
@@ -315,9 +405,7 @@ class HostedAppManagementApi {
     final Uri uri = _baseUri
         .resolve('/hosted/groups/$groupId/apps/$appId/source')
         .replace(
-          queryParameters: <String, String>{
-            'revision': '$expectedRevision',
-          },
+          queryParameters: <String, String>{'revision': '$expectedRevision'},
         );
     final http.Response response = await _client.post(
       uri,
@@ -366,6 +454,31 @@ class HostedAppManagementApi {
       throw const FormatException('Publish returned invalid version metadata.');
     }
     return version;
+  }
+
+  Future<void> deleteApp({
+    required String accessToken,
+    required String groupId,
+    required String appId,
+  }) async {
+    _validateToken(accessToken);
+    _validateId(groupId, 'groupId');
+    _validateId(appId, 'appId');
+    final http.Response response = await _client.delete(
+      _baseUri.resolve('/hosted/groups/$groupId/apps/$appId'),
+      headers: <String, String>{
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+    );
+    if (response.statusCode == 204) {
+      if (response.bodyBytes.isNotEmpty) {
+        throw const FormatException('Delete response must have an empty body.');
+      }
+      return;
+    }
+    _decodeJsonResponse(response);
+    throw StateError('Unreachable app deletion error path.');
   }
 
   Future<Map<String, Object?>> _jsonRequest({
