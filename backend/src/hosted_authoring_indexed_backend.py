@@ -139,7 +139,7 @@ class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
         accepts: list[str],
         master_data_element_id: str | None,
     ) -> dict[str, Any]:
-        user, _ = self._require_owned_app(
+        user, _ = self._require_app_author_access(
             auth_subject,
             group_id,
             app_id,

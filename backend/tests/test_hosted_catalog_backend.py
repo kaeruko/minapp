@@ -155,7 +155,7 @@ class HostedCatalogBackendTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 409)
         self.assertEqual(caught.exception.error, "builtin_already_installed")
 
-    def test_member_can_list_but_cannot_install(self) -> None:
+    def test_active_member_can_list_and_install_as_app_author(self) -> None:
         alice = self._register("alice")
         bob = self._register("bob")
         group = self.backend.create_group(alice, "創作部屋")
@@ -163,9 +163,15 @@ class HostedCatalogBackendTests(unittest.TestCase):
         self.backend.join_group(bob, invite["code"])
         self.backend.install_builtin(alice, group["group_id"], "shiba-game")
         self.assertEqual(len(self.backend.list_group_apps(bob, group["group_id"])), 1)
-        with self.assertRaises(ApiProblem) as caught:
-            self.backend.install_builtin(bob, group["group_id"], "shiba-goshujin")
-        self.assertEqual(caught.exception.status_code, 403)
+
+        installed = self.backend.install_builtin(
+            bob,
+            group["group_id"],
+            "shiba-goshujin",
+        )
+        bob_user = self.backend._user_by_auth_subject(bob)
+        self.assertEqual(installed["owner_user_id"], bob_user.user_id)
+        self.assertEqual(len(self.backend.list_group_apps(bob, group["group_id"])), 2)
 
     def test_app_count_guard_applies_to_forks(self) -> None:
         alice = self._register("alice")

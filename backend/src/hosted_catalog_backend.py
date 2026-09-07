@@ -180,6 +180,23 @@ class HostedCatalogBackend(HostedPlatformBackend):
             self._require_editable_app(app)
         return user, app
 
+    def _require_app_author_access(
+        self,
+        auth_subject: str,
+        group_id: str,
+        app_id: str,
+        *,
+        editable: bool,
+    ) -> tuple[Any, dict[str, Any]]:
+        user = self._user_by_auth_subject(auth_subject)
+        self._require_active_membership(user.user_id, group_id)
+        app = self._require_app_in_group(app_id, group_id)
+        if _item_string(app, "owner_user_id") != user.user_id:
+            raise ApiProblem(403, "forbidden", "このアプリの作者ではありません。")
+        if editable:
+            self._require_editable_app(app)
+        return user, app
+
     def install_builtin(
         self,
         auth_subject: str,
@@ -608,7 +625,9 @@ class HostedCatalogBackend(HostedPlatformBackend):
         self._require_app_management_access(
             auth_subject, group_id, app_id, editable=False
         )
+        self._delete_hosted_app_authorized(group_id, app_id)
 
+    def _delete_hosted_app_authorized(self, group_id: str, app_id: str) -> None:
         deleting_at = _now_iso()
         try:
             self._dynamodb.transact_write_items(
