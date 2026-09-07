@@ -13,8 +13,6 @@ import 'ugc_safety.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final Uri directoryBaseUri = await loadDirectoryBaseUriFromGoogleDrive();
-
   const String rawJoinBaseUrl = String.fromEnvironment(
     'MINAPP_JOIN_BASE_URL',
   );
@@ -39,7 +37,10 @@ Future<void> main() async {
     MinAppModeGate(
       modeStore: SharedPreferencesMinAppLaunchModeStore(),
       hostedBaseUriLoader: loadHostedBaseUriFromGoogleDrive,
-      directory: MinAppDirectoryClient(baseUri: directoryBaseUri),
+      directoryLoader: () async {
+        final Uri baseUri = await loadDirectoryBaseUriFromGoogleDrive();
+        return MinAppDirectoryClient(baseUri: baseUri);
+      },
       tenantStore: SharedPreferencesTenantStore(),
       apiFactory: (Uri baseUri) => MinAppApiClient(baseUri: baseUri),
       officialJoinBaseUri: joinBaseUri,
