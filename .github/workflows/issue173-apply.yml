@@ -1,0 +1,36 @@
+name: Issue 173 apply managed Preview authorization
+
+on:
+  push:
+    branches:
+      - chatgpt/issue-173-managed-preview-auth
+    paths:
+      - .github/issue173_apply.py
+      - .github/workflows/issue173-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: chatgpt/issue-173-managed-preview-auth
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Apply and validate #173
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/issue173_apply.py
+          python -m compileall -q backend/src backend/tests
+          python -m unittest discover -s backend/tests -v
+          rm .github/issue173_apply.py .github/workflows/issue173-apply.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "#173 unify managed-app and Preview authorization"
+          git push origin HEAD:chatgpt/issue-173-managed-preview-auth
