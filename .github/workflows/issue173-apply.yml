@@ -57,45 +57,24 @@ jobs:
           old_import = 'from hosted_app_management import _owned_editable_app\n'
           if text.count(old_import) != 1:
               raise RuntimeError(f'thumbnail import expected one target, found {text.count(old_import)}')
-          text = text.replace(
-              old_import,
-              'from hosted_app_management import _author_editable_app\n',
-              1,
-          )
-          count = text.count('_owned_editable_app(backend, auth_subject, app_id)')
-          if count != 2:
-              raise RuntimeError(f'thumbnail calls expected two targets, found {count}')
-          text = text.replace(
-              '_owned_editable_app(backend, auth_subject, app_id)',
-              '_author_editable_app(backend, auth_subject, app_id)',
-          )
+          text = text.replace(old_import, 'from hosted_app_management import _author_editable_app\n', 1)
+          old_call = '_owned_editable_app(backend, auth_subject, app_id)'
+          if text.count(old_call) != 2:
+              raise RuntimeError(f'thumbnail calls expected two targets, found {text.count(old_call)}')
+          text = text.replace(old_call, '_author_editable_app(backend, auth_subject, app_id)')
           thumbnail.write_text(text, encoding='utf-8')
 
           regression = Path('backend/tests/test_hosted_managed_preview_authorization.py')
           text = regression.read_text(encoding='utf-8')
-          old = '''        visible = set_group_visibility(
-              self.backend,
-              self.alice,
-              self.group_id,
-              self.bob_app["app_id"],
-              hidden=False,
-          )
-          self.assertEqual(visible["visibility"], "visible")
-          self.assertEqual(visible["owner_user_id"], self.bob_app["owner_user_id"])
-          '''
-          new = '''        admin_hidden = set_group_visibility(
-              self.backend,
-              self.alice,
-              self.group_id,
-              self.bob_app["app_id"],
-              hidden=True,
-          )
-          self.assertEqual(admin_hidden["visibility"], "hidden")
-          self.assertEqual(admin_hidden["owner_user_id"], self.bob_app["owner_user_id"])
-          '''
-          if text.count(old) != 1:
-              raise RuntimeError(f'visibility regression expected one target, found {text.count(old)}')
-          regression.write_text(text.replace(old, new, 1), encoding='utf-8')
+          old_hidden = '            hidden=False,\n'
+          if text.count(old_hidden) != 1:
+              raise RuntimeError(f'visibility hidden=False expected one target, found {text.count(old_hidden)}')
+          text = text.replace(old_hidden, '            hidden=True,\n', 1)
+          old_assert = '        self.assertEqual(visible["visibility"], "visible")\n'
+          if text.count(old_assert) != 1:
+              raise RuntimeError(f'visibility assertion expected one target, found {text.count(old_assert)}')
+          text = text.replace(old_assert, '        self.assertEqual(visible["visibility"], "hidden")\n', 1)
+          regression.write_text(text, encoding='utf-8')
 
           for source in Path('backend/src').glob('*.py'):
               body = source.read_text(encoding='utf-8')
