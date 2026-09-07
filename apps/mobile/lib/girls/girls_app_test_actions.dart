@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../hosted_app_webview.dart';
+import '../hosted_authoring_contract_api.dart';
+import '../hosted_authoring_projects_page.dart';
 import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
 import 'girls_app_preview_api.dart';
-import 'girls_novel_projects_page.dart';
 import 'hosted_girls_api.dart';
 
 const Color _testLavender = Color(0xFF745B9E);
@@ -29,34 +30,99 @@ class GirlsAppTestActions extends StatefulWidget {
 
 class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   late final GirlsAppPreviewApi _previewApi;
+  late final HostedAuthoringContractApi _authoringContractApi;
+  List<String>? _editorFormats;
   bool _busy = false;
   String? _error;
-
-  bool get _isNovelEditor =>
-      widget.detail.summary.app.sourceKind == 'builtin' &&
-      widget.detail.summary.app.builtinId == 'novel-editor';
 
   @override
   void initState() {
     super.initState();
     _previewApi = GirlsAppPreviewApi(baseUri: widget.api.baseUri);
+    _authoringContractApi = HostedAuthoringContractApi(
+      baseUri: widget.api.baseUri,
+    );
+    _loadAuthoringContract();
   }
 
   @override
   void dispose() {
     _previewApi.close();
+    _authoringContractApi.close();
     super.dispose();
   }
 
-  Future<void> _openNovelProjects() async {
-    if (!_isNovelEditor || _busy) return;
-    final HostedGroupApp editorApp = widget.detail.summary.app;
+  Future<void> _loadAuthoringContract() async {
+    try {
+      final HostedGroupApp app = widget.detail.summary.app;
+      final List<HostedAuthoringAppContract> contracts =
+          await _authoringContractApi.listApps(
+        accessToken: widget.session.accessToken,
+        groupId: app.groupId,
+      );
+      final List<HostedAuthoringAppContract> matches = contracts
+          .where((HostedAuthoringAppContract contract) => contract.appId == app.appId)
+          .toList(growable: false);
+      if (matches.length > 1) {
+        throw const FormatException(
+          'Authoring contract list contains duplicate app_id entries.',
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        _editorFormats = matches.isEmpty
+            ? const <String>[]
+            : List<String>.unmodifiable(matches.single.edits);
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = core.girlsMessageFor(error));
+    }
+  }
+
+  Future<String?> _chooseEditorFormat(List<String> formats) async {
+    if (formats.isEmpty) return null;
+    if (formats.length == 1) return formats.single;
+    if (!mounted) return null;
+    return showDialog<String>(
+      context: context,
+      builder: (BuildContext dialogContext) => SimpleDialog(
+        title: const Text('どの作品形式を編集する？'),
+        children: formats
+            .map(
+              (String format) => SimpleDialogOption(
+                key: Key('girls-authoring-format-$format'),
+                onPressed: () => Navigator.of(dialogContext).pop(format),
+                child: Text(format),
+              ),
+            )
+            .toList(growable: false),
+      ),
+    );
+  }
+
+  Future<void> _openAuthoringProjects() async {
+    if (_busy) return;
+    final List<String> formats = _editorFormats ?? const <String>[];
+    final String? contentFormat = await _chooseEditorFormat(formats);
+    if (contentFormat == null || !mounted) return;
+    final HostedGroupApp app = widget.detail.summary.app;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (BuildContext context) => GirlsNovelProjectsPage(
-          api: widget.api,
-          session: widget.session,
-          editorApp: editorApp,
+        builder: (BuildContext context) => HostedAuthoringProjectsPage(
+          baseUri: widget.api.baseUri,
+          accessToken: widget.session.accessToken,
+          groupId: app.groupId,
+          editorAppId: app.appId,
+          runtimeTransport: widget.api.runtimeClient,
+          definition: HostedAuthoringProjectDefinition(
+            contentFormat: contentFormat,
+            pageTitle: '作品編集',
+            collectionTitle: 'つくった作品',
+            emptyTitle: 'まだ作品がありません',
+            emptyBody: '「新しくつくる」からはじめよう。',
+          ),
+          errorMessage: core.girlsMessageFor,
         ),
       ),
     );
@@ -121,15 +187,16 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isNovelEditor) {
+    final List<String>? editorFormats = _editorFormats;
+    if (editorFormats != null && editorFormats.isNotEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           FilledButton.icon(
-            key: const Key('girls-novel-open-projects'),
-            onPressed: _busy ? null : _openNovelProjects,
+            key: const Key('girls-authoring-open-projects'),
+            onPressed: _busy ? null : _openAuthoringProjects,
             icon: const Icon(Icons.edit_note_rounded),
-            label: const Text('ノベル作品を編集'),
+            label: const Text('作品を編集'),
           ),
           if (_error != null) ...<Widget>[
             const SizedBox(height: 7),
