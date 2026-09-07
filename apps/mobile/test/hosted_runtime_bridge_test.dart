@@ -17,6 +17,7 @@ const String _appId = '33333333333333333333333333333333';
 class FakeRuntimeTransport implements HostedRuntimeTransport {
   final List<String> calls = <String>[];
   Object? storedValue;
+  Object? storedUserValue;
   ApiException? failure;
   Completer<Object?>? getCompleter;
 
@@ -44,6 +45,35 @@ class FakeRuntimeTransport implements HostedRuntimeTransport {
     final ApiException? error = failure;
     if (error != null) throw error;
     storedValue = value;
+    return value;
+  }
+
+  @override
+  Future<void> deleteUserState(String runtimeToken, String key) async {
+    calls.add('userDelete:$runtimeToken:$key');
+    final ApiException? error = failure;
+    if (error != null) throw error;
+    storedUserValue = null;
+  }
+
+  @override
+  Future<Object?> getUserState(String runtimeToken, String key) async {
+    calls.add('userGet:$runtimeToken:$key');
+    final ApiException? error = failure;
+    if (error != null) throw error;
+    return storedUserValue;
+  }
+
+  @override
+  Future<Object?> setUserState(
+    String runtimeToken,
+    String key,
+    Object? value,
+  ) async {
+    calls.add('userSet:$runtimeToken:$key');
+    final ApiException? error = failure;
+    if (error != null) throw error;
+    storedUserValue = value;
     return value;
   }
 }
