@@ -3,9 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
-import mimetypes
 import secrets
-import stat
 import time
 import uuid
 import zipfile
@@ -13,33 +11,11 @@ from datetime import datetime, timezone
 from pathlib import PurePosixPath
 from typing import Any
 
+import app_zip
 from aws_backend import AwsBackend, _item_string, _required_env, _string_attr
 from errors import ApiProblem
 
-MAX_ZIP_BYTES = 2 * 1024 * 1024
-MAX_UNCOMPRESSED_BYTES = 8 * 1024 * 1024
-MAX_FILE_BYTES = 4 * 1024 * 1024
-MAX_FILE_COUNT = 100
 PREVIEW_TTL_SECONDS = 15 * 60
-
-_ALLOWED_SUFFIXES = {
-    ".html",
-    ".css",
-    ".js",
-    ".mjs",
-    ".json",
-    ".txt",
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".webp",
-    ".ico",
-    ".mp3",
-    ".m4a",
-    ".ogg",
-    ".wav",
-}
 
 
 def _now_iso() -> str:
@@ -75,93 +51,6 @@ def _optional_item_string(item: dict[str, Any], key: str) -> str | None:
     if not isinstance(value, str) or not value:
         raise RuntimeError(f"DynamoDB optional attribute {key!r} is not a non-empty string")
     return value
-
-
-def _safe_zip_paths(data: bytes) -> list[str]:
-    if not isinstance(data, bytes):
-        raise TypeError("ZIP payload must be bytes")
-    if not data:
-        raise ApiProblem(400, "empty_zip", "ZIPファイルが空です。")
-    if len(data) > MAX_ZIP_BYTES:
-        raise ApiProblem(413, "zip_too_large", "ZIPファイルは2MB以下にしてください。")
-
-    try:
-        archive = zipfile.ZipFile(io.BytesIO(data))
-    except zipfile.BadZipFile as exc:
-        raise ApiProblem(400, "invalid_zip", "正しいZIPファイルではありません。") from exc
-
-    files: list[str] = []
-    seen: set[str] = set()
-    total_uncompressed = 0
-
-    with archive:
-        for info in archive.infolist():
-            raw_name = info.filename
-            if not isinstance(raw_name, str) or not raw_name:
-                raise ApiProblem(400, "invalid_zip_path", "ZIP内に不正なファイル名があります。")
-            if "\\" in raw_name or "\x00" in raw_name or raw_name.startswith("/"):
-                raise ApiProblem(400, "invalid_zip_path", f"ZIP内のパスが不正です: {raw_name}")
-
-            parts = raw_name.rstrip("/").split("/")
-            if any(part in {"", ".", ".."} for part in parts):
-                raise ApiProblem(400, "invalid_zip_path", f"ZIP内のパスが不正です: {raw_name}")
-
-            mode = (info.external_attr >> 16) & 0o170000
-            if mode == stat.S_IFLNK:
-                raise ApiProblem(400, "zip_symlink_forbidden", "ZIP内のシンボリックリンクは使えません。")
-            if info.flag_bits & 0x1:
-                raise ApiProblem(400, "encrypted_zip_forbidden", "暗号化ZIPは使えません。")
-            if info.is_dir():
-                continue
-
-            path = PurePosixPath(raw_name).as_posix()
-            if path in seen:
-                raise ApiProblem(400, "duplicate_zip_path", f"ZIP内に同名ファイルがあります: {path}")
-            seen.add(path)
-
-            suffix = PurePosixPath(path).suffix.lower()
-            if suffix not in _ALLOWED_SUFFIXES:
-                raise ApiProblem(400, "unsupported_file_type", f"MVPではこの種類のファイルは使えません: {path}")
-            if info.file_size > MAX_FILE_BYTES:
-                raise ApiProblem(413, "file_too_large", f"ZIP内のファイルが大きすぎます: {path}")
-
-            total_uncompressed += info.file_size
-            if total_uncompressed > MAX_UNCOMPRESSED_BYTES:
-                raise ApiProblem(413, "zip_expands_too_large", "ZIP展開後の合計サイズは8MB以下にしてください。")
-
-            files.append(path)
-            if len(files) > MAX_FILE_COUNT:
-                raise ApiProblem(413, "too_many_files", "ZIP内のファイル数は100個以下にしてください。")
-
-        if "index.html" not in seen:
-            raise ApiProblem(400, "index_missing", "ZIP直下に index.html が必要です。")
-
-        bad_file = archive.testzip()
-        if bad_file is not None:
-            raise ApiProblem(400, "invalid_zip_crc", f"ZIP内のファイルが破損しています: {bad_file}")
-
-    files.sort()
-    return files
-
-
-def _content_type(path: str) -> str:
-    suffix = PurePosixPath(path).suffix.lower()
-    explicit = {
-        ".html": "text/html; charset=utf-8",
-        ".css": "text/css; charset=utf-8",
-        ".js": "text/javascript; charset=utf-8",
-        ".mjs": "text/javascript; charset=utf-8",
-        ".json": "application/json; charset=utf-8",
-        ".txt": "text/plain; charset=utf-8",
-        ".mp3": "audio/mpeg",
-        ".m4a": "audio/mp4",
-        ".ogg": "audio/ogg",
-        ".wav": "audio/wav",
-    }
-    if suffix in explicit:
-        return explicit[suffix]
-    guessed, _ = mimetypes.guess_type(path)
-    return guessed or "application/octet-stream"
 
 
 class Phase2AwsBackend(AwsBackend):
@@ -221,7 +110,7 @@ class Phase2AwsBackend(AwsBackend):
         student = self._user_by_auth_subject(auth_subject)
         self._require_role(student, "student")
         group_name = self._require_active_membership(student.user_id, group_id, "student")
-        files = _safe_zip_paths(zip_bytes)
+        files = app_zip.safe_zip_paths(zip_bytes)
 
         if description is not None:
             if not isinstance(description, str):
@@ -441,26 +330,26 @@ class Phase2AwsBackend(AwsBackend):
         body = response.get("Body")
         if body is None or not hasattr(body, "read"):
             raise RuntimeError("S3 GetObject response has no readable Body")
-        zip_bytes = body.read(MAX_ZIP_BYTES + 1)
+        zip_bytes = body.read(app_zip.MAX_ZIP_BYTES + 1)
         if not isinstance(zip_bytes, bytes):
             raise RuntimeError("S3 Body.read() did not return bytes")
-        if len(zip_bytes) > MAX_ZIP_BYTES:
+        if len(zip_bytes) > app_zip.MAX_ZIP_BYTES:
             raise RuntimeError("Stored ZIP exceeds configured maximum size")
         if hashlib.sha256(zip_bytes).hexdigest() != _item_string(item, "sha256"):
             raise RuntimeError("Stored ZIP hash does not match app metadata")
 
         try:
             with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
-                names = set(_safe_zip_paths(zip_bytes))
+                names = set(app_zip.safe_zip_paths(zip_bytes))
                 if normalized not in names:
                     raise ApiProblem(404, "preview_file_not_found", "プレビュー内のファイルが見つかりません。")
                 data = archive.read(normalized)
         except zipfile.BadZipFile as exc:
             raise RuntimeError("Stored app ZIP became unreadable") from exc
 
-        if len(data) > MAX_FILE_BYTES:
+        if len(data) > app_zip.MAX_FILE_BYTES:
             raise RuntimeError("Stored preview file exceeds configured maximum size")
-        return data, _content_type(normalized)
+        return data, app_zip.content_type(normalized)
 
     def _require_active_membership(self, user_id: str, group_id: str, role: str) -> str:
         item = self._get_item(pk=f"GROUP#{group_id}", sk=f"MEMBER#{user_id}")
