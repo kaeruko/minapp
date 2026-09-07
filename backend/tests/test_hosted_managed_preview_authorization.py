@@ -106,6 +106,29 @@ class HostedManagedPreviewAuthorizationTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 403)
         self.assertEqual(caught.exception.error, "forbidden")
 
+    def test_authoring_editor_detail_is_readable_without_making_all_builtins_editable(self) -> None:
+        editor = self.backend.install_builtin(
+            self.bob,
+            self.group_id,
+            "novel-editor",
+        )
+        detail = get_managed_app(self.backend, self.bob, editor["app_id"])
+        self.assertEqual(detail["app_id"], editor["app_id"])
+        self.assertEqual(detail["builtin_id"], "novel-editor")
+        self.assertEqual(detail["edits"], ["minapp/novel@1"])
+        self.assertEqual(detail["source_history"], [])
+        self.assertEqual(detail["published_history"], [])
+
+        non_editor = self.backend.install_builtin(
+            self.bob,
+            self.group_id,
+            "shiba-game",
+        )
+        with self.assertRaises(ApiProblem) as caught:
+            get_managed_app(self.backend, self.bob, non_editor["app_id"])
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(caught.exception.error, "app_not_editable")
+
     def test_author_and_group_owner_can_change_visibility_but_other_member_cannot(self) -> None:
         hidden = set_visibility(
             self.backend,
