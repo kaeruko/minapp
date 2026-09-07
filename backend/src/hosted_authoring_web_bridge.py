@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from html.parser import HTMLParser
 import json
 import os
 import re
@@ -11,6 +12,57 @@ HOST_ADAPTER_NATIVE = "native"
 HOST_ADAPTER_WEB = "web"
 _WEB_BRIDGE_NONCE_RE = re.compile(r"^[A-Za-z0-9_-]{32,64}$")
 _PORTAL_ORIGIN_RE = re.compile(r"^https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?$")
+
+
+class _FirstActiveScriptParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=False)
+        self.position: tuple[int, int] | None = None
+        self._inert_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        normalized = tag.lower()
+        if normalized in {"template", "noscript"}:
+            self._inert_depth += 1
+            return
+        if normalized == "script" and self._inert_depth == 0 and self.position is None:
+            self.position = self.getpos()
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.lower() == "script" and self._inert_depth == 0 and self.position is None:
+            self.position = self.getpos()
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() in {"template", "noscript"} and self._inert_depth > 0:
+            self._inert_depth -= 1
+
+
+def _first_active_script_offset(source: str) -> int:
+    parser = _FirstActiveScriptParser()
+    try:
+        parser.feed(source)
+        parser.close()
+    except Exception as exc:
+        raise ApiProblem(
+            409,
+            "authoring_editor_web_incompatible",
+            "Web Authoring Editor index.html could not be parsed safely.",
+        ) from exc
+    if parser.position is None:
+        raise ApiProblem(
+            409,
+            "authoring_editor_web_incompatible",
+            "Web Authoring Editor index.html must contain an active script tag.",
+        )
+
+    line_number, column = parser.position
+    lines = source.splitlines(keepends=True)
+    if line_number < 1 or line_number > len(lines):
+        raise RuntimeError("Web Authoring script position is outside index.html")
+    line = lines[line_number - 1]
+    if column < 0 or column > len(line):
+        raise RuntimeError("Web Authoring script column is outside index.html")
+    return sum(len(value) for value in lines[: line_number - 1]) + column
 
 
 def validate_host_adapter(value: str) -> str:
@@ -62,12 +114,15 @@ def inject_web_bridge(
             "Web Authoring Editor index.html must be valid UTF-8.",
         ) from exc
 
-    # Append after the Editor's own source so listeners registered by the Editor
-    # before DOM completion receive the single minappready event emitted below.
+    # Install the bridge before the Editor's first active script. This makes
+    # window.minapp available even when the Editor initializes synchronously,
+    # while minappready still supports Editors that explicitly wait for it.
     # The bootstrap contains no user-controlled HTML and does not include any
     # Runtime/Authoring token or authenticated credential.
+    offset = _first_active_script_offset(source)
     bootstrap = _bootstrap_javascript(parent_origin, bridge_nonce)
-    return (source + "\n<script>\n" + bootstrap + "\n</script>\n").encode("utf-8")
+    bridge = f'<script data-minapp-web-bridge="1">\n{bootstrap}\n</script>\n'
+    return (source[:offset] + bridge + source[offset:]).encode("utf-8")
 
 
 def _bootstrap_javascript(parent_origin: str, bridge_nonce: str) -> str:
@@ -178,7 +233,7 @@ def _bootstrap_javascript(parent_origin: str, bridge_nonce: str) -> str:
   }};
   const validateAssetPath = (path) => {{
     if (typeof path !== 'string' || path.length === 0 || path.length > 256 ||
-        path.startsWith('/') || path.includes('\\') || path.includes('\0')) {{
+        path.startsWith('/') || path.includes('\\\\') || path.includes('\\0')) {{
       throw new MinAppError(0, 'invalid_authoring_asset_path', 'Authoring asset path is invalid.');
     }}
     const parts = path.split('/');
