@@ -28,6 +28,7 @@ from hosted_authoring_backend import (
 _CONTENT_ID_RE = r"([0-9a-f]{32})"
 _GROUP_ID_RE = r"([0-9a-f]{32})"
 _PROJECTS_RE = re.compile(r"^/hosted/authoring/projects$")
+_GROUP_APPS_RE = re.compile(rf"^/hosted/authoring/groups/{_GROUP_ID_RE}/apps$")
 _GROUP_PROJECTS_RE = re.compile(rf"^/hosted/authoring/groups/{_GROUP_ID_RE}/projects$")
 _PROJECT_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}$")
 _DOCUMENT_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/document$")
@@ -44,6 +45,12 @@ class AuthoringBackend(Protocol):
         content_format: str,
         document: dict[str, Any],
     ) -> dict[str, Any]: ...
+
+    def list_authoring_apps(
+        self,
+        auth_subject: str,
+        group_id: str,
+    ) -> list[dict[str, Any]]: ...
 
     def list_authoring_projects(
         self,
@@ -198,6 +205,16 @@ def _require_no_body(event: dict[str, Any]) -> None:
         raise ApiProblem(400, "invalid_request", "This Authoring request must not contain a body.")
 
 
+def _require_no_query(event: dict[str, Any]) -> None:
+    params = _query_parameters(event)
+    if params:
+        raise ApiProblem(
+            400,
+            "invalid_request",
+            f"Unknown query parameter(s): {', '.join(sorted(params))}.",
+        )
+
+
 def _project_list_content_format(event: dict[str, Any]) -> str | None:
     params = _query_parameters(event)
     unknown = set(params) - {"content_format"}
@@ -238,6 +255,22 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
                 content_format,
                 document,
             ),
+        )
+
+    group_apps_match = _GROUP_APPS_RE.fullmatch(path)
+    if group_apps_match is not None:
+        if method != "GET":
+            return None
+        _require_no_body(event)
+        _require_no_query(event)
+        return _json_response(
+            200,
+            {
+                "apps": _get_backend().list_authoring_apps(
+                    _auth_subject(event),
+                    group_apps_match.group(1),
+                )
+            },
         )
 
     group_projects_match = _GROUP_PROJECTS_RE.fullmatch(path)
