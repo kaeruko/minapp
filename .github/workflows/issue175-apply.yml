@@ -1,0 +1,31 @@
+name: Issue 175 apply patch
+
+on:
+  push:
+    branches:
+      - chatgpt/issue-175-neutral-app-zip
+    paths:
+      - .github/workflows/issue175-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: chatgpt/issue-175-neutral-app-zip
+      - name: Apply checked patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check .github/issue175.patch
+          git apply .github/issue175.patch
+          rm .github/issue175.patch
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "#175 finish neutral ZIP import rewrite"
+          git push origin HEAD:chatgpt/issue-175-neutral-app-zip
