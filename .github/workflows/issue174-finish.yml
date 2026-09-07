@@ -27,11 +27,55 @@ jobs:
           cache: true
       - name: Apply migration
         run: python .github/issue174_finish.py
+      - name: Fix migration compile contracts
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"{path}: expected one match for {old!r}, found {count}")
+              p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          for path in [
+              "apps/mobile/lib/girls/girls_apps_page.dart",
+              "apps/mobile/lib/girls/girls_group_app_management_page.dart",
+          ]:
+              replace_once(path, "FilePicker.platform.saveFile(", "FilePicker.saveFile(")
+              replace_once(path, "final HostedSourceDownload download =", "final GirlsSourceDownload download =")
+
+          replace_once(
+              "apps/mobile/lib/girls/girls_group_app_management_page.dart",
+              "import 'hosted_girls_api.dart';\n",
+              "import 'hosted_girls_api.dart';\nimport 'hosted_girls_upload_api.dart';\n",
+          )
+
+          alias = Path("apps/mobile/lib/girls/girls_app_management_api.dart")
+          text = alias.read_text(encoding="utf-8")
+          marker = "typedef GirlsAppStats = HostedAppStats;\n"
+          if text.count(marker) != 1:
+              raise RuntimeError("girls app management alias marker mismatch")
+          alias.write_text(
+              text.replace(marker, "typedef GirlsSourceDownload = HostedSourceDownload;\n" + marker, 1),
+              encoding="utf-8",
+          )
+
+          replace_once(
+              "apps/mobile/lib/hosted_app_management_api.dart",
+              ".split(';', 1).first.trim().toLowerCase()",
+              ".split(';').first.trim().toLowerCase()",
+          )
+          PY
       - name: Format Dart
         run: |
           dart format \
             apps/mobile/lib/hosted_api.dart \
             apps/mobile/lib/hosted_app_management_api.dart \
+            apps/mobile/lib/girls/girls_app_management_api.dart \
             apps/mobile/lib/girls/girls_app_preview_api.dart \
             apps/mobile/lib/girls/girls_app_core.dart \
             apps/mobile/lib/girls/girls_apps_page.dart \
