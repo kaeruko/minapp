@@ -114,12 +114,32 @@ class HostedLegalBackendTests(unittest.TestCase):
             )
         self.assertEqual(metadata["revision"], 1)
 
-    def test_active_member_can_manage_own_app_but_group_owner_cannot_mutate_it(self) -> None:
+    def test_active_member_can_install_builtin_as_its_author(self) -> None:
+        alice = self._register("install-owner")
+        bob = self._register("install-member")
+        group = self.backend.create_group(alice, "インストール部屋")
+        invite = self.backend.create_invite(alice, group["group_id"])
+        self.backend.join_group(bob, invite["code"])
+
+        installed = self.backend.install_builtin(
+            bob,
+            group["group_id"],
+            "shiba-game",
+        )
+        bob_user = self.backend._user_by_auth_subject(bob)
+        self.assertEqual(installed["owner_user_id"], bob_user.user_id)
+        app_item = self.dynamo.items[(f"APP#{installed['app_id']}", "META")]
+        self.assertEqual(app_item["owner_user_id"]["S"], bob_user.user_id)
+
+    def test_author_and_group_owner_manage_app_but_other_members_cannot(self) -> None:
         alice = self._register("alice-owner")
-        bob = self._register("bob-member")
+        bob = self._register("bob-author")
+        carol = self._register("carol-member")
+        dave = self._register("dave-outsider")
         group = self.backend.create_group(alice, "共同制作部")
         invite = self.backend.create_invite(alice, group["group_id"])
         self.backend.join_group(bob, invite["code"])
+        self.backend.join_group(carol, invite["code"])
         installed = self.backend.install_builtin(
             alice,
             group["group_id"],
@@ -133,17 +153,18 @@ class HostedLegalBackendTests(unittest.TestCase):
             "ぼぶの物語",
         )
         app_id = bob_fork["app_id"]
-        app_item = self.dynamo.items[(f"APP#{app_id}", "META")]
         bob_user = self.backend._user_by_auth_subject(bob)
+        self.assertEqual(bob_fork["owner_user_id"], bob_user.user_id)
+        app_item = self.dynamo.items[(f"APP#{app_id}", "META")]
         self.assertEqual(app_item["owner_user_id"]["S"], bob_user.user_id)
 
-        changed = source_zip("<!doctype html><h1>member-v2</h1>")
+        member_v2 = source_zip("<!doctype html><h1>member-v2</h1>")
         updated = self.backend.update_editable_source(
             bob,
             group["group_id"],
             app_id,
             1,
-            changed,
+            member_v2,
         )
         self.assertEqual(updated["revision"], 2)
         published = self.backend.publish_app(
@@ -154,24 +175,65 @@ class HostedLegalBackendTests(unittest.TestCase):
         )
         self.assertEqual(published["published_version"], 1)
 
+        _, owner_read = self.backend.get_editable_source(
+            alice,
+            group["group_id"],
+            app_id,
+        )
+        self.assertEqual(owner_read["revision"], 2)
+        owner_v3 = source_zip("<!doctype html><h1>owner-v3</h1>")
+        owner_updated = self.backend.update_editable_source(
+            alice,
+            group["group_id"],
+            app_id,
+            2,
+            owner_v3,
+        )
+        self.assertEqual(owner_updated["revision"], 3)
+        owner_published = self.backend.publish_app(
+            alice,
+            group["group_id"],
+            app_id,
+            3,
+        )
+        self.assertEqual(owner_published["published_version"], 2)
+        self.assertEqual(
+            self.dynamo.items[(f"APP#{app_id}", "META")]["owner_user_id"]["S"],
+            bob_user.user_id,
+        )
+
         for operation in (
-            lambda: self.backend.get_editable_source(alice, group["group_id"], app_id),
+            lambda: self.backend.get_editable_source(carol, group["group_id"], app_id),
             lambda: self.backend.update_editable_source(
-                alice,
+                carol,
                 group["group_id"],
                 app_id,
-                2,
-                changed,
+                3,
+                owner_v3,
             ),
-            lambda: self.backend.publish_app(alice, group["group_id"], app_id, 2),
-            lambda: self.backend.delete_hosted_app(alice, group["group_id"], app_id),
+            lambda: self.backend.publish_app(carol, group["group_id"], app_id, 3),
+            lambda: self.backend.delete_hosted_app(carol, group["group_id"], app_id),
+            lambda: self.backend.get_editable_source(dave, group["group_id"], app_id),
+            lambda: self.backend.fork_app(
+                dave,
+                group["group_id"],
+                installed["app_id"],
+                "outsider fork",
+            ),
         ):
             with self.assertRaises(ApiProblem) as caught:
                 operation()
             self.assertEqual(caught.exception.status_code, 403)
             self.assertEqual(caught.exception.error, "forbidden")
 
-        self.backend.delete_hosted_app(bob, group["group_id"], app_id)
+        self.backend.leave_group(bob, group["group_id"])
+        self.assertIn((f"APP#{app_id}", "META"), self.dynamo.items)
+        with self.assertRaises(ApiProblem) as caught:
+            self.backend.get_editable_source(bob, group["group_id"], app_id)
+        self.assertEqual(caught.exception.status_code, 403)
+        self.assertEqual(caught.exception.error, "forbidden")
+
+        self.backend.delete_hosted_app(alice, group["group_id"], app_id)
         self.assertNotIn((f"APP#{app_id}", "META"), self.dynamo.items)
 
     def test_registration_persists_versions_and_server_timestamp(self) -> None:
