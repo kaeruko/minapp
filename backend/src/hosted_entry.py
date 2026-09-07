@@ -22,6 +22,7 @@ from handler import (
 )
 import hosted_app_management
 import hosted_handler
+import hosted_preview_session
 import hosted_thumbnail
 from hosted_upload import create_uploaded_app
 
@@ -219,7 +220,7 @@ def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
         backend = _get_backend()
         return _json_response(
             201,
-            hosted_app_management.create_preview_session(
+            hosted_preview_session.create_preview_session(
                 backend,
                 auth_subject,
                 preview_match.group(1),

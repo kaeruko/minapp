@@ -39,15 +39,63 @@ abstract interface class HostedRuntimeTransport {
   Future<void> deleteState(String runtimeToken, String key);
 }
 
-class HostedApiClient implements HostedRuntimeTransport {
+abstract interface class HostedUserStateTransport {
+  Future<Object?> getUserState(String runtimeToken, String key);
+
+  Future<Object?> setUserState(String runtimeToken, String key, Object? value);
+
+  Future<void> deleteUserState(String runtimeToken, String key);
+}
+
+class HostedRuntimeRefreshException implements Exception {
+  const HostedRuntimeRefreshException({
+    required this.expiredSessionError,
+    required this.refreshError,
+    required this.refreshStackTrace,
+  });
+
+  final ApiException expiredSessionError;
+  final Object refreshError;
+  final StackTrace refreshStackTrace;
+
+  @override
+  String toString() {
+    return 'HostedRuntimeRefreshException('
+        'expiredSessionError: $expiredSessionError, '
+        'refreshError: $refreshError)';
+  }
+}
+
+class HostedApiClient implements HostedRuntimeTransport, HostedUserStateTransport {
   HostedApiClient({required Uri baseUri, http.Client? client})
       : _baseUri = _validateBaseUri(baseUri),
         _client = client ?? http.Client();
 
   final Uri _baseUri;
   final http.Client _client;
+  final Map<String, _RuntimeRefreshScope> _runtimeRefreshScopes =
+      <String, _RuntimeRefreshScope>{};
 
   Future<HostedLaunchGrant> createLaunch({
+    required String accessToken,
+    required String groupId,
+    required String appId,
+  }) async {
+    final HostedLaunchGrant launch = await _createLaunchDirect(
+      accessToken: accessToken,
+      groupId: groupId,
+      appId: appId,
+    );
+    _runtimeRefreshScopes[launch.runtimeToken] = _RuntimeRefreshScope(
+      accessToken: accessToken,
+      groupId: groupId,
+      appId: appId,
+      currentToken: launch.runtimeToken,
+    );
+    return launch;
+  }
+
+  Future<HostedLaunchGrant> _createLaunchDirect({
     required String accessToken,
     required String groupId,
     required String appId,
@@ -98,39 +146,189 @@ class HostedApiClient implements HostedRuntimeTransport {
   }
 
   @override
-  Future<Object?> getState(String runtimeToken, String key) async {
+  Future<Object?> getState(String runtimeToken, String key) {
     _validateRuntimeToken(runtimeToken);
     validateHostedStateKey(key);
-    final Map<String, Object?> payload = await _jsonRequest(
-      method: 'GET',
-      path: '/hosted/runtime/$runtimeToken/state/${Uri.encodeComponent(key)}',
+    return _runWithSingleRuntimeRefresh<Object?>(
+      runtimeToken,
+      (String token) async {
+        final Map<String, Object?> payload = await _jsonRequest(
+          method: 'GET',
+          path: '/hosted/runtime/$token/state/${Uri.encodeComponent(key)}',
+        );
+        _validateRuntimeStateResponse(payload, key, 'Runtime get response');
+        return payload['value'];
+      },
     );
-    _validateRuntimeStateResponse(payload, key, 'Runtime get response');
-    return payload['value'];
   }
 
   @override
-  Future<Object?> setState(String runtimeToken, String key, Object? value) async {
+  Future<Object?> setState(String runtimeToken, String key, Object? value) {
     _validateRuntimeToken(runtimeToken);
     validateHostedStateKey(key);
-    final Map<String, Object?> payload = await _jsonRequest(
-      method: 'POST',
-      path: '/hosted/runtime/$runtimeToken/state/${Uri.encodeComponent(key)}',
-      body: <String, Object?>{'value': value},
+    return _runWithSingleRuntimeRefresh<Object?>(
+      runtimeToken,
+      (String token) async {
+        final Map<String, Object?> payload = await _jsonRequest(
+          method: 'POST',
+          path: '/hosted/runtime/$token/state/${Uri.encodeComponent(key)}',
+          body: <String, Object?>{'value': value},
+        );
+        _validateRuntimeStateResponse(payload, key, 'Runtime set response');
+        return payload['value'];
+      },
     );
-    _validateRuntimeStateResponse(payload, key, 'Runtime set response');
-    return payload['value'];
   }
 
   @override
-  Future<void> deleteState(String runtimeToken, String key) async {
+  Future<void> deleteState(String runtimeToken, String key) {
     _validateRuntimeToken(runtimeToken);
     validateHostedStateKey(key);
-    await _emptyRequest(
-      method: 'DELETE',
-      path: '/hosted/runtime/$runtimeToken/state/${Uri.encodeComponent(key)}',
-      expectedStatus: 204,
+    return _runWithSingleRuntimeRefresh<void>(
+      runtimeToken,
+      (String token) => _emptyRequest(
+        method: 'DELETE',
+        path: '/hosted/runtime/$token/state/${Uri.encodeComponent(key)}',
+        expectedStatus: 204,
+      ),
     );
+  }
+
+  @override
+  Future<Object?> getUserState(String runtimeToken, String key) {
+    _validateRuntimeToken(runtimeToken);
+    validateHostedStateKey(key);
+    return _runWithSingleRuntimeRefresh<Object?>(
+      runtimeToken,
+      (String token) async {
+        final Map<String, Object?> payload = await _jsonRequest(
+          method: 'GET',
+          path: '/hosted/runtime/$token/user-state/${Uri.encodeComponent(key)}',
+        );
+        _validateRuntimeStateResponse(payload, key, 'Runtime user-state get response');
+        return payload['value'];
+      },
+    );
+  }
+
+  @override
+  Future<Object?> setUserState(String runtimeToken, String key, Object? value) {
+    _validateRuntimeToken(runtimeToken);
+    validateHostedStateKey(key);
+    return _runWithSingleRuntimeRefresh<Object?>(
+      runtimeToken,
+      (String token) async {
+        final Map<String, Object?> payload = await _jsonRequest(
+          method: 'POST',
+          path: '/hosted/runtime/$token/user-state/${Uri.encodeComponent(key)}',
+          body: <String, Object?>{'value': value},
+        );
+        _validateRuntimeStateResponse(payload, key, 'Runtime user-state set response');
+        return payload['value'];
+      },
+    );
+  }
+
+  @override
+  Future<void> deleteUserState(String runtimeToken, String key) {
+    _validateRuntimeToken(runtimeToken);
+    validateHostedStateKey(key);
+    return _runWithSingleRuntimeRefresh<void>(
+      runtimeToken,
+      (String token) => _emptyRequest(
+        method: 'DELETE',
+        path: '/hosted/runtime/$token/user-state/${Uri.encodeComponent(key)}',
+        expectedStatus: 204,
+      ),
+    );
+  }
+
+  Future<T> _runWithSingleRuntimeRefresh<T>(
+    String suppliedToken,
+    Future<T> Function(String token) operation,
+  ) async {
+    final _RuntimeRefreshScope? scope = _runtimeRefreshScopes[suppliedToken];
+    if (scope == null) {
+      return operation(suppliedToken);
+    }
+
+    final String attemptedToken = scope.currentToken;
+    try {
+      return await operation(attemptedToken);
+    } on ApiException catch (error) {
+      if (!_isExpiredRuntimeSession(error)) {
+        rethrow;
+      }
+      final String refreshedToken = await _refreshRuntimeSession(
+        scope: scope,
+        expiredToken: attemptedToken,
+        expiredSessionError: error,
+      );
+      return operation(refreshedToken);
+    }
+  }
+
+  Future<String> _refreshRuntimeSession({
+    required _RuntimeRefreshScope scope,
+    required String expiredToken,
+    required ApiException expiredSessionError,
+  }) async {
+    if (scope.currentToken != expiredToken) {
+      return scope.currentToken;
+    }
+
+    final Future<String>? existingRefresh = scope.refreshFuture;
+    if (existingRefresh != null) {
+      return existingRefresh;
+    }
+
+    final Future<String> refresh = _performRuntimeRefresh(
+      scope: scope,
+      expiredToken: expiredToken,
+      expiredSessionError: expiredSessionError,
+    );
+    scope.refreshFuture = refresh;
+    try {
+      return await refresh;
+    } finally {
+      if (identical(scope.refreshFuture, refresh)) {
+        scope.refreshFuture = null;
+      }
+    }
+  }
+
+  Future<String> _performRuntimeRefresh({
+    required _RuntimeRefreshScope scope,
+    required String expiredToken,
+    required ApiException expiredSessionError,
+  }) async {
+    final HostedLaunchGrant refreshedLaunch;
+    try {
+      refreshedLaunch = await _createLaunchDirect(
+        accessToken: scope.accessToken,
+        groupId: scope.groupId,
+        appId: scope.appId,
+      );
+    } catch (refreshError, refreshStackTrace) {
+      final HostedRuntimeRefreshException exception =
+          HostedRuntimeRefreshException(
+        expiredSessionError: expiredSessionError,
+        refreshError: refreshError,
+        refreshStackTrace: refreshStackTrace,
+      );
+      Error.throwWithStackTrace(exception, refreshStackTrace);
+    }
+
+    if (scope.currentToken != expiredToken) {
+      return scope.currentToken;
+    }
+    scope.currentToken = refreshedLaunch.runtimeToken;
+    _runtimeRefreshScopes[refreshedLaunch.runtimeToken] = scope;
+    return refreshedLaunch.runtimeToken;
+  }
+
+  static bool _isExpiredRuntimeSession(ApiException error) {
+    return error.statusCode == 404 && error.code == 'runtime_session_not_found';
   }
 
   Future<Map<String, Object?>> _jsonRequest({
@@ -273,6 +471,21 @@ class HostedApiClient implements HostedRuntimeTransport {
   }
 }
 
+class _RuntimeRefreshScope {
+  _RuntimeRefreshScope({
+    required this.accessToken,
+    required this.groupId,
+    required this.appId,
+    required this.currentToken,
+  });
+
+  final String accessToken;
+  final String groupId;
+  final String appId;
+  String currentToken;
+  Future<String>? refreshFuture;
+}
+
 class HostedContentNavigationPolicy {
   HostedContentNavigationPolicy(Uri contentUri)
       : _contentUri = _validateContentUri(contentUri),
@@ -389,7 +602,14 @@ class HostedBridgeProtocol {
 
     final Object? rawMethod = decoded['method'];
     if (rawMethod is! String ||
-        !const <String>{'state.get', 'state.set', 'state.delete'}.contains(rawMethod)) {
+        !const <String>{
+          'state.get',
+          'state.set',
+          'state.delete',
+          'userState.get',
+          'userState.set',
+          'userState.delete',
+        }.contains(rawMethod)) {
       throw HostedBridgeProtocolException(
         code: 'unsupported_bridge_method',
         message: 'Bridge method is not supported.',
@@ -415,7 +635,7 @@ class HostedBridgeProtocol {
     }
 
     final bool hasValue = decoded.containsKey('value');
-    final Set<String> expectedFields = rawMethod == 'state.set'
+    final Set<String> expectedFields = rawMethod.endsWith('.set')
         ? const <String>{'version', 'id', 'method', 'key', 'value'}
         : const <String>{'version', 'id', 'method', 'key'};
     if (decoded.keys.toSet().difference(expectedFields).isNotEmpty ||
@@ -530,9 +750,14 @@ class HostedBridgeProtocol {
     set: (key, value) => send('state.set', key, true, value),
     delete: (key) => send('state.delete', key, false, undefined),
   });
+  const userState = Object.freeze({
+    get: (key) => send('userState.get', key, false, undefined),
+    set: (key, value) => send('userState.set', key, true, value),
+    delete: (key) => send('userState.delete', key, false, undefined),
+  });
   Object.defineProperty(window, 'minapp', {
     configurable: true,
-    value: Object.freeze({ version: VERSION, state }),
+    value: Object.freeze({ version: VERSION, state, userState }),
   });
   window.dispatchEvent(new Event('minappready'));
 })();
@@ -549,6 +774,16 @@ class HostedBridgeSession {
   final HostedRuntimeTransport _transport;
   final String _runtimeToken;
   final Set<String> _inFlightRequestIds = <String>{};
+
+  HostedUserStateTransport get _userStateTransport {
+    final HostedRuntimeTransport transport = _transport;
+    if (transport is! HostedUserStateTransport) {
+      throw StateError(
+        'Hosted Runtime transport does not implement private user state; shared state fallback is forbidden.',
+      );
+    }
+    return transport as HostedUserStateTransport;
+  }
 
   Future<Map<String, Object?>> handleMessage(String message) async {
     final HostedBridgeRequest request;
@@ -583,6 +818,20 @@ class HostedBridgeSession {
         result = await _transport.setState(_runtimeToken, request.key, request.value);
       } else if (request.method == 'state.delete') {
         await _transport.deleteState(_runtimeToken, request.key);
+        result = null;
+      } else if (request.method == 'userState.get') {
+        result = await _userStateTransport.getUserState(_runtimeToken, request.key);
+      } else if (request.method == 'userState.set') {
+        if (!request.hasValue) {
+          throw StateError('userState.set request lost its required value after validation.');
+        }
+        result = await _userStateTransport.setUserState(
+          _runtimeToken,
+          request.key,
+          request.value,
+        );
+      } else if (request.method == 'userState.delete') {
+        await _userStateTransport.deleteUserState(_runtimeToken, request.key);
         result = null;
       } else {
         throw StateError('Validated bridge request has an unsupported method.');

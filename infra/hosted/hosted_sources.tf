@@ -1,4 +1,12 @@
+variable "minapp_apps_source_root" {
+  description = "Path to the minapp_apps checkout that owns creative Hosted app sources. Defaults to a sibling checkout for local development."
+  type        = string
+  default     = null
+}
+
 locals {
+  minapp_apps_source_root = var.minapp_apps_source_root != null ? abspath(var.minapp_apps_source_root) : abspath("${path.module}/../../../minapp_apps")
+
   hosted_builtin_sources = {
     shiba-game = {
       version    = 1
@@ -9,14 +17,19 @@ locals {
       source_dir = abspath("${path.module}/../../apps/mobile/assets/builtin/shiba_goshujin")
     }
     novel-starter = {
-      version    = 3
-      source_dir = abspath("${path.module}/../../apps/mobile/assets/builtin/novel_starter")
+      version    = 4
+      source_dir = "${local.minapp_apps_source_root}/novel_starter"
+    }
+    novel-editor = {
+      version    = 1
+      source_dir = "${local.minapp_apps_source_root}/novel_editor"
     }
   }
 }
 
-# The mobile built-ins remain the source of truth. Terraform makes the same
-# files available to Hosted BtoC as immutable, versioned fork templates.
+# Core demo apps still come from minapp. Creative Editor/Player sources come
+# from the separate minapp_apps checkout so they are not bundled into the Host
+# binary and are not duplicated as a second source of truth in this repo.
 data "archive_file" "hosted_builtin_source" {
   for_each = local.hosted_builtin_sources
 

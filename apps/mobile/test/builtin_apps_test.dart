@@ -6,7 +6,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('built-in app registry has unique valid entries', () {
-    expect(builtInApps, hasLength(5));
+    expect(builtInApps, hasLength(4));
     expect(
       builtInApps.map((BuiltInApp app) => app.id).toSet(),
       hasLength(builtInApps.length),
@@ -25,9 +25,13 @@ void main() {
       expect(app.searchableText, contains(app.title));
       expect(app.assetPath, matches(validAssetPath));
     }
+    expect(
+      builtInApps.where((BuiltInApp app) => app.id == 'novel-starter'),
+      isEmpty,
+    );
   });
 
-  test('built-in app search filters every registered app', () {
+  test('built-in app search filters every registered local app', () {
     expect(filterBuiltInApps(''), hasLength(builtInApps.length));
     expect(filterBuiltInApps('しばちゃん'), hasLength(2));
     expect(
@@ -52,22 +56,8 @@ void main() {
       filterBuiltInApps('マンション').single.id,
       'ol-home',
     );
-    expect(
-      filterBuiltInApps('ノベルゲーム').single.id,
-      'novel-starter',
-    );
-    expect(
-      filterBuiltInApps('女子向け').single.id,
-      'novel-starter',
-    );
-    expect(
-      filterBuiltInApps('男子').single.id,
-      'novel-starter',
-    );
-    expect(
-      filterBuiltInApps('イラスト').single.id,
-      'novel-starter',
-    );
+    expect(filterBuiltInApps('ノベルゲーム'), isEmpty);
+    expect(filterBuiltInApps('女子向け'), isEmpty);
     expect(filterBuiltInApps('じかんわり'), isEmpty);
   });
 
@@ -90,27 +80,5 @@ void main() {
     expect(html, contains('Game initialization failed: required DOM element is missing.'));
     expect(html, contains('requestAnimationFrame(frame)'));
     expect(html, contains('しょうがいぶつを よけて スーパーへ！'));
-  });
-
-  test('novel starter documents AI edit points and optional Hosted save', () async {
-    final BuiltInApp novel = builtInApps.singleWhere(
-      (BuiltInApp app) => app.id == 'novel-starter',
-    );
-    final String html = await rootBundle.loadString(novel.assetPath);
-
-    expect(html, contains('AIで改造するなら'));
-    expect(html, contains('aria-label="白髪の男子キャラクター"'));
-    expect(html, contains('<img src="face.jpg" alt="レンの顔">'));
-    expect(html, contains("speaker: 'レン'"));
-    expect(html, contains("const SAVE_KEY = 'novel_progress';"));
-    expect(html, contains('window.minapp.state.get(SAVE_KEY)'));
-    expect(html, contains('window.minapp.state.set(SAVE_KEY'));
-    expect(html, contains('window.minapp.state.delete(SAVE_KEY)'));
-    expect(html, contains('この環境はセーブなし'));
-
-    final ByteData portrait = await rootBundle.load(
-      'assets/builtin/novel_starter/face.jpg',
-    );
-    expect(portrait.lengthInBytes, greaterThan(0));
   });
 }

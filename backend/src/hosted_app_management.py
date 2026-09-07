@@ -46,7 +46,7 @@ def _owned_editable_app(
     if _item_string(app, "owner_user_id") != user.user_id:
         raise ApiProblem(403, "forbidden", "このアプリを管理する権限がありません。")
     group_id = _item_string(app, "group_id")
-    backend._require_owner_group(user.user_id, group_id)
+    backend._require_active_membership(user.user_id, group_id)
     if _optional_string(app, "deletion_state") is not None:
         raise ApiProblem(409, "app_deleting", "このアプリは削除処理中です。")
     return user, app
@@ -86,7 +86,7 @@ def list_managed_apps(backend: Any, auth_subject: str) -> list[dict[str, Any]]:
     user = backend._user_by_auth_subject(auth_subject)
     result: list[dict[str, Any]] = []
     for group in backend.list_groups(auth_subject):
-        if group.get("role") != "owner" or group.get("status") != "active":
+        if group.get("status") != "active":
             continue
         group_id = group.get("group_id")
         if not isinstance(group_id, str):
@@ -206,7 +206,6 @@ def create_preview_session(
     group_id = _item_string(app, "group_id")
     source_revision = backend._source_revision(app)
 
-    # Validate the immutable draft object before issuing a capability for it.
     _, files, sha256 = backend._read_current_source(app)
     source_key = _item_string(app, "source_key")
 
@@ -252,7 +251,7 @@ def get_preview_file(
     user_id = _item_string(session, "user_id")
     group_id = _item_string(session, "group_id")
     app_id = _item_string(session, "app_id")
-    backend._require_owner_group(user_id, group_id)
+    backend._require_active_membership(user_id, group_id)
     app = backend._require_app_in_group(app_id, group_id)
     if app.get("editable", {}).get("BOOL") is not True:
         raise ApiProblem(409, "app_not_manageable", "このアプリはプレビューできません。")

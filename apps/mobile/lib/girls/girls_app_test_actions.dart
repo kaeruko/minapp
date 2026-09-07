@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../hosted_app_webview.dart';
+import '../hosted_authoring_contract_api.dart';
+import '../hosted_authoring_editor_action.dart';
 import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
@@ -15,12 +17,14 @@ class GirlsAppTestActions extends StatefulWidget {
     required this.api,
     required this.session,
     required this.detail,
+    this.authoringContractApi,
     super.key,
   });
 
   final HostedGirlsApi api;
   final AuthenticatedSession session;
   final ManagedGirlsAppDetail detail;
+  final HostedAuthoringContractApi? authoringContractApi;
 
   @override
   State<GirlsAppTestActions> createState() => _GirlsAppTestActionsState();
@@ -92,16 +96,13 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
         ),
       );
     } catch (error) {
-      if (mounted) {
-        setState(() => _error = core.girlsMessageFor(error));
-      }
+      if (mounted) setState(() => _error = core.girlsMessageFor(error));
     } finally {
       if (mounted && _busy) setState(() => _busy = false);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _runtimeActions() {
     final ManagedGirlsAppDetail detail = widget.detail;
     final int? sourceRevision = detail.summary.sourceRevision;
     final int? latestPublishedRevision = detail.publishedHistory.isEmpty
@@ -155,6 +156,21 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
           ),
         ],
       ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final HostedGroupApp app = widget.detail.summary.app;
+    return HostedAuthoringEditorAction(
+      baseUri: widget.api.baseUri,
+      accessToken: widget.session.accessToken,
+      groupId: app.groupId,
+      editorAppId: app.appId,
+      runtimeTransport: widget.api.runtimeClient,
+      authoringContractApi: widget.authoringContractApi,
+      errorMessage: core.girlsMessageFor,
+      nonEditorChild: _runtimeActions(),
     );
   }
 }

@@ -11,7 +11,7 @@ if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
 
 from errors import ApiProblem  # noqa: E402
-from phase2_backend import _safe_zip_paths  # noqa: E402
+from phase2_backend import _content_type, _safe_zip_paths  # noqa: E402
 
 
 def _zip(entries: dict[str, bytes]) -> bytes:
@@ -35,6 +35,33 @@ class ZipValidationTests(unittest.TestCase):
             _safe_zip_paths(data),
             ["app.js", "images/icon.png", "index.html"],
         )
+
+    def test_accepts_novel_audio_assets(self) -> None:
+        data = _zip(
+            {
+                "index.html": b"ok",
+                "audio/bgm.mp3": b"mp3",
+                "audio/voice.m4a": b"m4a",
+                "audio/ambient.ogg": b"ogg",
+                "audio/click.wav": b"wav",
+            }
+        )
+        self.assertEqual(
+            _safe_zip_paths(data),
+            [
+                "audio/ambient.ogg",
+                "audio/bgm.mp3",
+                "audio/click.wav",
+                "audio/voice.m4a",
+                "index.html",
+            ],
+        )
+
+    def test_uses_explicit_audio_content_types(self) -> None:
+        self.assertEqual(_content_type("audio/bgm.mp3"), "audio/mpeg")
+        self.assertEqual(_content_type("audio/voice.m4a"), "audio/mp4")
+        self.assertEqual(_content_type("audio/ambient.ogg"), "audio/ogg")
+        self.assertEqual(_content_type("audio/click.wav"), "audio/wav")
 
     def test_requires_root_index_html(self) -> None:
         with self.assertRaisesRegex(ApiProblem, "index.html"):
