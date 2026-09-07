@@ -23,7 +23,7 @@ from hosted_authoring_backend import (
     validate_content_format,
 )
 from hosted_catalog_backend import _content_type, _files_json, _item_files, _optional_number
-from hosted_platform_backend import RUNTIME_SESSION_TTL_SECONDS, _number_attr
+from hosted_platform_backend import RUNTIME_SESSION_TTL_SECONDS, _now_iso, _number_attr
 
 
 _AUTHORING_PREVIEW_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{32,64}$")
@@ -146,7 +146,48 @@ def create_preview(
         "preview_state_id": _string_attr(preview_state_id),
         "preview_state_ttl_epoch": _number_attr(preview_state_ttl_epoch),
     }
-    backend._transact_put_new([content_session, runtime_session])
+    selection = {
+        "pk": _string_attr(f"CONTENT#{content_id}"),
+        "sk": _string_attr("PLAYER"),
+        "entity": _string_attr("authoring_player_selection"),
+        "user_id": _string_attr(user.user_id),
+        "group_id": _string_attr(group_id),
+        "content_id": _string_attr(content_id),
+        "content_format": _string_attr(content_format),
+        "selected_at_revision": _number_attr(expected_revision),
+        "player_app_id": _string_attr(player_app_id),
+        "player_source_bucket": _string_attr(source.bucket),
+        "player_source_key": _string_attr(source.key),
+        "player_source_sha256": _string_attr(source.sha256),
+        "player_source_files_json": _string_attr(_files_json(source_files)),
+        "player_source_version": _number_attr(source.version),
+        "master_data_element_id": _string_attr(master_data_element_id),
+        "selected_at": _string_attr(_now_iso()),
+    }
+    backend._dynamodb.transact_write_items(
+        TransactItems=[
+            {
+                "Put": {
+                    "TableName": backend._table_name,
+                    "Item": content_session,
+                    "ConditionExpression": "attribute_not_exists(pk)",
+                }
+            },
+            {
+                "Put": {
+                    "TableName": backend._table_name,
+                    "Item": runtime_session,
+                    "ConditionExpression": "attribute_not_exists(pk)",
+                }
+            },
+            {
+                "Put": {
+                    "TableName": backend._table_name,
+                    "Item": selection,
+                }
+            },
+        ]
+    )
     return {
         "content_id": content_id,
         "content_format": content_format,
@@ -286,8 +327,6 @@ def _revalidate_scope(backend: Any, item: dict[str, Any]) -> None:
     )
     backend._require_not_deleting(player)
     _require_player_support(player, _item_string(item, "content_format"))
-    # Ensure the app remains a visible, published Authoring Player. Do not
-    # switch this live preview to a newly published source version.
     resolve_authoring_app_source(
         backend,
         player,
