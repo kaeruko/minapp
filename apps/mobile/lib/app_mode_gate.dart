@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'app_mode_store.dart';
 import 'directory.dart';
 import 'hosted_api.dart';
-import 'hosted_app.dart';
+import 'hosted_normal_app.dart';
 import 'session_app.dart';
 import 'tenant_store.dart';
 import 'ugc_safety.dart';
@@ -305,7 +305,7 @@ class _HostedModeLoaderState extends State<_HostedModeLoader> {
     if (baseUri == null) {
       throw StateError('Hosted endpoint loader completed without a base URI.');
     }
-    return HostedApp(
+    return HostedNormalApp(
       api: HostedApi(baseUri: baseUri),
       onChangeMode: widget.onChangeMode,
     );
