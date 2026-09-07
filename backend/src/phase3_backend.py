@@ -7,17 +7,14 @@ import time
 import zipfile
 from typing import Any
 
+from app_zip import MAX_FILE_BYTES, MAX_ZIP_BYTES, content_type, safe_zip_paths
 from aws_backend import _item_string, _string_attr
 from errors import ApiProblem
 from phase2_backend import (
-    MAX_FILE_BYTES,
-    MAX_ZIP_BYTES,
     Phase2AwsBackend,
-    _content_type,
     _item_number,
     _now_iso,
     _number_attr,
-    _safe_zip_paths,
 )
 
 LAUNCH_TTL_SECONDS = 10 * 60
@@ -58,7 +55,6 @@ class Phase3AwsBackend(Phase2AwsBackend):
             for item in self._query_items(response):
                 if _item_string(item, "status") != "approved":
                     continue
-                # An approved version without a published object is inconsistent state.
                 _item_string(item, "published_key")
                 apps.append(self._mobile_public_version(item))
 
@@ -169,7 +165,7 @@ class Phase3AwsBackend(Phase2AwsBackend):
 
         try:
             with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
-                names = set(_safe_zip_paths(zip_bytes))
+                names = set(safe_zip_paths(zip_bytes))
                 if normalized not in names:
                     raise ApiProblem(404, "launch_file_not_found", "作品内のファイルが見つかりません。")
                 data = archive.read(normalized)
@@ -178,7 +174,7 @@ class Phase3AwsBackend(Phase2AwsBackend):
 
         if len(data) > MAX_FILE_BYTES:
             raise RuntimeError("Stored launch file exceeds configured maximum size")
-        return data, _content_type(normalized)
+        return data, content_type(normalized)
 
     @staticmethod
     def _mobile_public_version(item: dict[str, Any]) -> dict[str, Any]:
