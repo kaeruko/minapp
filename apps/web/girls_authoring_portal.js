@@ -64,9 +64,20 @@
   }
 
   const shell = requiredElement("girls-upload-panel");
+  const shellTitle = requiredElement("girls-shell-title");
+  const shellMenu = requiredElement("girls-shell-menu");
   const authoringPanel = requiredElement("girls-view-authoring");
+  const authoringNav = requiredElement("girls-authoring-nav");
   const logoutButton = requiredElement("girls-logout");
   const sourceGroupSelect = requiredElement("girls-upload-group");
+
+  if (!(shell instanceof HTMLElement)) throw new Error("#girls-upload-panel must be an element.");
+  if (!(shellTitle instanceof HTMLElement)) throw new Error("#girls-shell-title must be an element.");
+  if (!(shellMenu instanceof HTMLButtonElement)) throw new Error("#girls-shell-menu must be a button.");
+  if (!(authoringPanel instanceof HTMLElement)) throw new Error("#girls-view-authoring must be an element.");
+  if (!(authoringNav instanceof HTMLButtonElement)) throw new Error("#girls-authoring-nav must be a button.");
+  if (!(logoutButton instanceof HTMLButtonElement)) throw new Error("#girls-logout must be a button.");
+  if (!(sourceGroupSelect instanceof HTMLSelectElement)) throw new Error("#girls-upload-group must be a select.");
 
   const controller = new portalApi.HostedAuthoringPortalController({
     sourceGroupSelect,
@@ -94,36 +105,74 @@
   });
   controller.bind();
 
-  function authoringViewIsVisible() {
-    return !authoringPanel.classList.contains("girls-view-hidden") &&
-      !shell.classList.contains("hidden");
+  function clearAuthoringNavigation() {
+    authoringNav.classList.remove("portal-shell-nav-item-active");
+    authoringNav.removeAttribute("aria-current");
+    authoringPanel.classList.add("girls-view-hidden");
   }
 
-  for (const button of document.querySelectorAll(
-    "[data-girls-view='authoring'], [data-girls-open-view='authoring']",
-  )) {
+  function closeNavigation() {
+    shell.classList.remove("portal-shell-nav-open");
+    shellMenu.setAttribute("aria-expanded", "false");
+  }
+
+  async function openAuthoringView() {
+    if (shell.classList.contains("hidden")) {
+      throw new Error("Girls Authoring view requires an authenticated portal session.");
+    }
+    for (const panel of document.querySelectorAll("[data-girls-panel]")) {
+      if (!(panel instanceof HTMLElement)) throw new Error("Girls view panel must be an element.");
+      panel.classList.add("girls-view-hidden");
+    }
+    for (const button of document.querySelectorAll("[data-girls-view]")) {
+      if (!(button instanceof HTMLButtonElement)) throw new Error("Girls navigation item must be a button.");
+      button.classList.remove("portal-shell-nav-item-active");
+      button.removeAttribute("aria-current");
+    }
+    authoringPanel.classList.remove("girls-view-hidden");
+    authoringNav.classList.add("portal-shell-nav-item-active");
+    authoringNav.setAttribute("aria-current", "page");
+    shellTitle.textContent = "作品を作る";
+    closeNavigation();
+    await controller.activate();
+  }
+
+  for (const button of document.querySelectorAll("[data-girls-authoring-open]")) {
     if (!(button instanceof HTMLButtonElement)) {
       throw new Error("Girls Authoring navigation control must be a button.");
     }
-    button.addEventListener("click", () => { void controller.activate(); });
+    button.addEventListener("click", () => {
+      void openAuthoringView().catch((error) => {
+        console.error(error);
+      });
+    });
+  }
+
+  for (const button of document.querySelectorAll("[data-girls-view]")) {
+    if (!(button instanceof HTMLButtonElement)) throw new Error("Girls navigation item must be a button.");
+    button.addEventListener("click", () => {
+      if (!authoringPanel.classList.contains("girls-view-hidden")) {
+        controller.destroy();
+      }
+      clearAuthoringNavigation();
+    });
   }
 
   new MutationObserver(() => {
-    if (shell.classList.contains("hidden")) controller.destroy();
+    if (shell.classList.contains("hidden")) {
+      controller.destroy();
+      clearAuthoringNavigation();
+    }
   }).observe(shell, {
     attributes: true,
     attributeFilter: ["class"],
   });
 
-  new MutationObserver(() => {
-    if (authoringViewIsVisible()) void controller.activate();
-  }).observe(authoringPanel, {
-    attributes: true,
-    attributeFilter: ["class"],
-  });
-
   globalThis.MinAppGirlsAuthoringPortal = Object.freeze({
-    activate: () => controller.activate(),
-    destroy: () => controller.destroy(),
+    activate: openAuthoringView,
+    destroy() {
+      controller.destroy();
+      clearAuthoringNavigation();
+    },
   });
 })();
