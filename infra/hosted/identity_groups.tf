@@ -8,6 +8,9 @@ locals {
     "GET /hosted/runtime/{token}/state/{key}",
     "POST /hosted/runtime/{token}/state/{key}",
     "DELETE /hosted/runtime/{token}/state/{key}",
+    "GET /hosted/runtime/{token}/user-state/{key}",
+    "POST /hosted/runtime/{token}/user-state/{key}",
+    "DELETE /hosted/runtime/{token}/user-state/{key}",
     "GET /hosted/content/{token}/{proxy+}",
   ])
 
@@ -123,7 +126,10 @@ resource "aws_iam_role_policy" "hosted_identity_api_application" {
           "s3:DeleteObject",
           "s3:DeleteObjectVersion",
         ]
-        Resource = "${aws_s3_bucket.uploads.arn}/hosted/drafts/*"
+        Resource = [
+          "${aws_s3_bucket.uploads.arn}/hosted/drafts/*",
+          "${aws_s3_bucket.uploads.arn}/authoring/*",
+        ]
       },
       {
         Sid    = "HostedPublishedSourceObjects"
@@ -134,7 +140,10 @@ resource "aws_iam_role_policy" "hosted_identity_api_application" {
           "s3:DeleteObject",
           "s3:DeleteObjectVersion",
         ]
-        Resource = "${aws_s3_bucket.published.arn}/hosted/published/*"
+        Resource = [
+          "${aws_s3_bucket.published.arn}/hosted/published/*",
+          "${aws_s3_bucket.published.arn}/published/*",
+        ]
       },
     ]
   })
