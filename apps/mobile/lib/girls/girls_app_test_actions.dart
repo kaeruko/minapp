@@ -17,12 +17,14 @@ class GirlsAppTestActions extends StatefulWidget {
     required this.api,
     required this.session,
     required this.detail,
+    this.authoringContractApi,
     super.key,
   });
 
   final HostedGirlsApi api;
   final AuthenticatedSession session;
   final ManagedGirlsAppDetail detail;
+  final HostedAuthoringContractApi? authoringContractApi;
 
   @override
   State<GirlsAppTestActions> createState() => _GirlsAppTestActionsState();
@@ -31,6 +33,7 @@ class GirlsAppTestActions extends StatefulWidget {
 class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   late final GirlsAppPreviewApi _previewApi;
   late final HostedAuthoringContractApi _authoringContractApi;
+  late final bool _ownsAuthoringContractApi;
   List<String>? _editorFormats;
   bool _busy = false;
   String? _error;
@@ -39,16 +42,19 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   void initState() {
     super.initState();
     _previewApi = GirlsAppPreviewApi(baseUri: widget.api.baseUri);
-    _authoringContractApi = HostedAuthoringContractApi(
-      baseUri: widget.api.baseUri,
-    );
+    final HostedAuthoringContractApi? supplied = widget.authoringContractApi;
+    _ownsAuthoringContractApi = supplied == null;
+    _authoringContractApi = supplied ??
+        HostedAuthoringContractApi(
+          baseUri: widget.api.baseUri,
+        );
     _loadAuthoringContract();
   }
 
   @override
   void dispose() {
     _previewApi.close();
-    _authoringContractApi.close();
+    if (_ownsAuthoringContractApi) _authoringContractApi.close();
     super.dispose();
   }
 
