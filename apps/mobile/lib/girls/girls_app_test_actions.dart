@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../hosted_app_webview.dart';
 import '../hosted_authoring_contract_api.dart';
-import '../hosted_authoring_projects_page.dart';
+import '../hosted_authoring_editor_action.dart';
 import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
@@ -32,9 +32,6 @@ class GirlsAppTestActions extends StatefulWidget {
 
 class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   late final GirlsAppPreviewApi _previewApi;
-  late final HostedAuthoringContractApi _authoringContractApi;
-  late final bool _ownsAuthoringContractApi;
-  List<String>? _editorFormats;
   bool _busy = false;
   String? _error;
 
@@ -42,96 +39,12 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   void initState() {
     super.initState();
     _previewApi = GirlsAppPreviewApi(baseUri: widget.api.baseUri);
-    final HostedAuthoringContractApi? supplied = widget.authoringContractApi;
-    _ownsAuthoringContractApi = supplied == null;
-    _authoringContractApi = supplied ??
-        HostedAuthoringContractApi(
-          baseUri: widget.api.baseUri,
-        );
-    _loadAuthoringContract();
   }
 
   @override
   void dispose() {
     _previewApi.close();
-    if (_ownsAuthoringContractApi) _authoringContractApi.close();
     super.dispose();
-  }
-
-  Future<void> _loadAuthoringContract() async {
-    try {
-      final HostedGroupApp app = widget.detail.summary.app;
-      final List<HostedAuthoringAppContract> contracts =
-          await _authoringContractApi.listApps(
-        accessToken: widget.session.accessToken,
-        groupId: app.groupId,
-      );
-      final List<HostedAuthoringAppContract> matches = contracts
-          .where((HostedAuthoringAppContract contract) => contract.appId == app.appId)
-          .toList(growable: false);
-      if (matches.length > 1) {
-        throw const FormatException(
-          'Authoring contract list contains duplicate app_id entries.',
-        );
-      }
-      if (!mounted) return;
-      setState(() {
-        _editorFormats = matches.isEmpty
-            ? const <String>[]
-            : List<String>.unmodifiable(matches.single.edits);
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _error = core.girlsMessageFor(error));
-    }
-  }
-
-  Future<String?> _chooseEditorFormat(List<String> formats) async {
-    if (formats.isEmpty) return null;
-    if (formats.length == 1) return formats.single;
-    if (!mounted) return null;
-    return showDialog<String>(
-      context: context,
-      builder: (BuildContext dialogContext) => SimpleDialog(
-        title: const Text('どの作品形式を編集する？'),
-        children: formats
-            .map(
-              (String format) => SimpleDialogOption(
-                key: Key('girls-authoring-format-$format'),
-                onPressed: () => Navigator.of(dialogContext).pop(format),
-                child: Text(format),
-              ),
-            )
-            .toList(growable: false),
-      ),
-    );
-  }
-
-  Future<void> _openAuthoringProjects() async {
-    if (_busy) return;
-    final List<String> formats = _editorFormats ?? const <String>[];
-    final String? contentFormat = await _chooseEditorFormat(formats);
-    if (contentFormat == null || !mounted) return;
-    final HostedGroupApp app = widget.detail.summary.app;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (BuildContext context) => HostedAuthoringProjectsPage(
-          baseUri: widget.api.baseUri,
-          accessToken: widget.session.accessToken,
-          groupId: app.groupId,
-          editorAppId: app.appId,
-          runtimeTransport: widget.api.runtimeClient,
-          definition: HostedAuthoringProjectDefinition(
-            contentFormat: contentFormat,
-            pageTitle: '作品編集',
-            collectionTitle: 'つくった作品',
-            emptyTitle: 'まだ作品がありません',
-            emptyBody: '「新しくつくる」からはじめよう。',
-          ),
-          errorMessage: core.girlsMessageFor,
-        ),
-      ),
-    );
   }
 
   Future<void> _tryPublished() async {
@@ -183,43 +96,13 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
         ),
       );
     } catch (error) {
-      if (mounted) {
-        setState(() => _error = core.girlsMessageFor(error));
-      }
+      if (mounted) setState(() => _error = core.girlsMessageFor(error));
     } finally {
       if (mounted && _busy) setState(() => _busy = false);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final List<String>? editorFormats = _editorFormats;
-    if (editorFormats != null && editorFormats.isNotEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          FilledButton.icon(
-            key: const Key('girls-authoring-open-projects'),
-            onPressed: _busy ? null : _openAuthoringProjects,
-            icon: const Icon(Icons.edit_note_rounded),
-            label: const Text('作品を編集'),
-          ),
-          if (_error != null) ...<Widget>[
-            const SizedBox(height: 7),
-            Text(
-              _error!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: _testError,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ],
-      );
-    }
-
+  Widget _runtimeActions() {
     final ManagedGirlsAppDetail detail = widget.detail;
     final int? sourceRevision = detail.summary.sourceRevision;
     final int? latestPublishedRevision = detail.publishedHistory.isEmpty
@@ -273,6 +156,21 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
           ),
         ],
       ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final HostedGroupApp app = widget.detail.summary.app;
+    return HostedAuthoringEditorAction(
+      baseUri: widget.api.baseUri,
+      accessToken: widget.session.accessToken,
+      groupId: app.groupId,
+      editorAppId: app.appId,
+      runtimeTransport: widget.api.runtimeClient,
+      authoringContractApi: widget.authoringContractApi,
+      errorMessage: core.girlsMessageFor,
+      nonEditorChild: _runtimeActions(),
     );
   }
 }
