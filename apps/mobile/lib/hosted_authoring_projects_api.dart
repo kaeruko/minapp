@@ -209,6 +209,25 @@ class HostedAuthoringProjectsApi {
     return project;
   }
 
+  Future<void> deleteProject({
+    required String accessToken,
+    required String contentId,
+  }) async {
+    _validateToken(accessToken);
+    _validateId(contentId, 'contentId');
+    final Uri uri = _baseUri.resolve('/hosted/authoring/projects/$contentId');
+    final http.Response response = await _client.delete(
+      uri,
+      headers: <String, String>{
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+    );
+    if (response.statusCode == 204) return;
+    _decodeJsonResponse(response);
+    throw StateError('Expected HTTP 204 for ${uri.path}.');
+  }
+
   Future<Map<String, Object?>> _jsonRequest({
     required String method,
     required String path,

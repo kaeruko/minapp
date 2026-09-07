@@ -254,7 +254,24 @@ The Flutter path now supports `minapp.authoring.load`, `save`, `preview`, and `p
 
 A Web Portal iframe Authoring Host Adapter is not implemented by this slice. Unsupported hosts must not silently fall back to Flutter-specific assumptions, another backend, or direct credential access. Web Portal support remains tracked by #161.
 
-Project-level Authoring deletion is also outside this slice: asset deletion exists, but idempotent deletion of a whole `content_id` and all Draft/Published artifacts remains tracked by #161.
+## 10. Delete an Authoring Project
+
+The trusted Host may delete a work with:
+
+```http
+DELETE /hosted/authoring/projects/{content_id}
+Authorization: Bearer <trusted-host-user-token>
+```
+
+Only the authenticated work owner may delete the `content_id`. Editor JavaScript does not receive a delete capability or an arbitrary content selector.
+
+Deletion is retryable and fail-closed. The first request atomically marks the work `deleting` and removes its group-list index. Existing Draft-only checks then stop load, save, Preview, and Publish while cleanup runs. If the work has a published normal MinApp, that app is deleted through the normal Hosted app deletion path, including its persistent Runtime state.
+
+Authoring Draft and Authoring publication document/assets are removed only from exact object keys recorded in their immutable manifests. The deletion path does not enumerate an S3 bucket. For each recorded object, the platform checks the stored SHA-256 metadata, reads the exact S3 VersionId, and deletes that version. No `s3:ListBucket` or `s3:ListBucketVersions` fallback is used.
+
+If cleanup fails, the work remains `deleting` and the original failure is returned. Repeating the same DELETE resumes cleanup without choosing another storage path or publication. After cleanup, `REVISION#`, `PUBLISHED#`, and `PLAYER` child metadata is removed and `CONTENT#{content_id}/META` becomes a minimal `deleted` tombstone. Repeating DELETE after completion returns success without recreating anything.
+
+The Flutter project list exposes this operation behind an explicit confirmation dialog and warns that a published app is deleted with the work.
 
 ## Reference test
 
@@ -276,5 +293,7 @@ Alice uploads Editor + Player
 ```
 
 `apps/mobile/test/hosted_authoring_preview_bridge_test.dart` additionally verifies that Editor JavaScript cannot select a different work or Player through Preview and that Preview errors preserve their diagnostics.
+
+`backend/tests/test_hosted_authoring_deletion.py` verifies unpublished cleanup, retry after a partial S3 failure, physical removal of exact versioned Authoring objects, and deletion of the linked normal Hosted app for a published work. `backend/tests/test_hosted_authoring_delete_entry.py` verifies that the deployed Hosted entrypoint accepts only the authenticated bodyless/queryless DELETE route.
 
 The roundtrip test also verifies that Alice's later unpublished Editor draft is not exposed to Bob and that Bob cannot manage Alice's Editor source.
