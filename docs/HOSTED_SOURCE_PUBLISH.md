@@ -1,9 +1,11 @@
 # Hosted fork source and publishing
 
-Hosted BtoC fork apps use validated static ZIP archives. The mobile files under
-`apps/mobile/assets/builtin` remain the built-in source of truth; Terraform
-packages them and stores versioned, read-only templates under
-`hosted/templates/...` in the private uploads bucket.
+Hosted BtoC fork apps use validated static ZIP archives. Core built-in sources under
+`apps/mobile/assets/builtin` remain owned by this repository. Creative Novel sources
+(`novel_starter` / `novel_editor`) are owned by the separate `minapp_apps` checkout;
+`infra/hosted/hosted_sources.tf` receives that checkout through
+`minapp_apps_source_root`. Terraform packages both source sets and stores versioned,
+read-only templates under `hosted/templates/...` in the private uploads bucket.
 
 ## Source and publish model
 
