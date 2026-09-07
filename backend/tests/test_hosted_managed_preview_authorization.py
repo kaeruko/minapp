@@ -115,7 +115,8 @@ class HostedManagedPreviewAuthorizationTests(unittest.TestCase):
         detail = get_managed_app(self.backend, self.bob, editor["app_id"])
         self.assertEqual(detail["app_id"], editor["app_id"])
         self.assertEqual(detail["builtin_id"], "novel-editor")
-        self.assertEqual(detail["edits"], ["minapp/novel@1"])
+        self.assertNotIn("edits", detail)
+        self.assertNotIn("accepts", detail)
         self.assertEqual(detail["source_history"], [])
         self.assertEqual(detail["published_history"], [])
 
