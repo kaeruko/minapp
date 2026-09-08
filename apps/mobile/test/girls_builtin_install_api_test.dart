@@ -39,11 +39,14 @@ Map<String, Object?> _installedApp({
 }
 
 void main() {
-  test('Novel Editor install uses JWT and exact builtin id', () async {
-    late http.Request captured;
+  test('Novel Editor setup installs Player first, then Editor', () async {
+    final List<http.Request> captured = <http.Request>[];
     final MockClient client = MockClient((http.Request request) async {
-      captured = request;
-      return _json(201, _installedApp());
+      captured.add(request);
+      final Map<String, Object?> body =
+          jsonDecode(request.body) as Map<String, Object?>;
+      final String builtinId = body['builtin_id']! as String;
+      return _json(201, _installedApp(builtinId: builtinId));
     });
     final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
       baseUri: Uri.parse('https://hosted.example.test'),
@@ -55,10 +58,14 @@ void main() {
       groupId: _groupId,
     );
 
-    expect(captured.method, 'POST');
-    expect(captured.url.path, '/hosted/groups/$_groupId/apps/install');
-    expect(captured.headers['authorization'], 'Bearer owner-token');
-    expect(jsonDecode(captured.body), const <String, Object?>{
+    expect(captured, hasLength(2));
+    expect(captured[0].method, 'POST');
+    expect(captured[0].url.path, '/hosted/groups/$_groupId/apps/install');
+    expect(captured[0].headers['authorization'], 'Bearer owner-token');
+    expect(jsonDecode(captured[0].body), const <String, Object?>{
+      'builtin_id': novelPlayerBuiltinId,
+    });
+    expect(jsonDecode(captured[1].body), const <String, Object?>{
       'builtin_id': novelEditorBuiltinId,
     });
     expect(app.appId, _appId);
@@ -108,7 +115,7 @@ void main() {
     );
 
     await expectLater(
-      api.installNovelEditor(accessToken: 'owner-token', groupId: _groupId),
+      api.installNovelPlayer(accessToken: 'owner-token', groupId: _groupId),
       throwsA(isA<FormatException>()),
     );
   });
@@ -129,14 +136,16 @@ void main() {
   });
 
   test(
-    'already-installed conflict is preserved instead of treated as success',
+    'player install failure stops setup before editor install',
     () async {
-      final MockClient client = MockClient(
-        (http.Request request) async => _json(409, const <String, Object?>{
+      int requestCount = 0;
+      final MockClient client = MockClient((http.Request request) async {
+        requestCount += 1;
+        return _json(409, const <String, Object?>{
           'error': 'builtin_already_installed',
           'message': 'このビルトインアプリはすでに入っています。',
-        }),
-      );
+        });
+      });
       final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
         baseUri: Uri.parse('https://hosted.example.test'),
         client: client,
@@ -158,6 +167,7 @@ void main() {
               ),
         ),
       );
+      expect(requestCount, 1);
     },
   );
 }
