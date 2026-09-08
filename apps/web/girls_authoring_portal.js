@@ -5,12 +5,16 @@
   if (!portalApi || typeof portalApi.HostedAuthoringPortalController !== "function") {
     throw new Error("Girls Authoring portal requires hosted_authoring_portal.js.");
   }
-  if (!globalThis.MinAppWebAuthoring) {
+  const authoringApi = globalThis.MinAppWebAuthoring;
+  if (!authoringApi) {
     throw new Error("Girls Authoring portal requires authoring_host_adapter.js.");
   }
 
   const ACCESS_TOKEN_KEY = "minapp_girls_portal_access_token";
   const CONFIG_PATH = "/girls-config.json";
+  const NOVEL_CONTENT_FORMAT = "minapp/novel@1";
+  const NOVEL_PLAYER_BUILTIN_ID = "novel-starter";
+  const HOSTED_ID_PATTERN = /^[0-9a-f]{32}$/;
 
   function requiredElement(id) {
     const element = document.getElementById(id);
@@ -25,8 +29,22 @@
     return value;
   }
 
+  function requireNonEmptyString(value, label) {
+    if (typeof value !== "string" || value.length === 0) {
+      throw new Error(`${label} must be a non-empty string.`);
+    }
+    return value;
+  }
+
+  function validateHostedId(value, label) {
+    if (typeof value !== "string" || !HOSTED_ID_PATTERN.test(value)) {
+      throw new Error(`${label} must be a 32-character lowercase hexadecimal id.`);
+    }
+    return value;
+  }
+
   function validateApiOrigin(value) {
-    return globalThis.MinAppWebAuthoring.validateApiOrigin(value);
+    return authoringApi.validateApiOrigin(value);
   }
 
   let hostedApiOrigin = null;
@@ -61,6 +79,86 @@
       throw new Error("ログイン情報がありません。もう一度ログインしてください。");
     }
     return token;
+  }
+
+  async function installNovelPlayer({ apiOrigin, accessToken, groupId }) {
+    const origin = validateApiOrigin(apiOrigin);
+    requireNonEmptyString(accessToken, "Hosted access token");
+    const normalizedGroupId = validateHostedId(groupId, "Novel Player group id");
+    const url = new URL(`/hosted/groups/${normalizedGroupId}/apps/install`, `${origin}/`);
+    if (url.origin !== origin) {
+      throw new Error("Novel Player install path escaped the configured Hosted origin.");
+    }
+
+    let response;
+    try {
+      response = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ builtin_id: NOVEL_PLAYER_BUILTIN_ID }),
+        cache: "no-store",
+        credentials: "omit",
+      });
+    } catch (error) {
+      throw new authoringApi.HostedWebApiError(
+        0,
+        "host_adapter_request_failed",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (contentType === null || !contentType.toLowerCase().startsWith("application/json")) {
+      throw new authoringApi.HostedWebApiError(
+        response.status,
+        "invalid_api_response",
+        `Novel Player install returned a non-JSON response (HTTP ${response.status}).`,
+      );
+    }
+
+    let payload;
+    try {
+      payload = requirePlainObject(await response.json(), "Novel Player install response");
+    } catch (error) {
+      throw new authoringApi.HostedWebApiError(
+        response.status,
+        "invalid_api_response",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+
+    if (!response.ok) {
+      const fields = Object.keys(payload).sort();
+      if (fields.length !== 2 || fields[0] !== "error" || fields[1] !== "message") {
+        throw new authoringApi.HostedWebApiError(
+          response.status,
+          "invalid_api_response",
+          "Novel Player install error response fields are invalid.",
+        );
+      }
+      throw new authoringApi.HostedWebApiError(
+        response.status,
+        requireNonEmptyString(payload.error, "Novel Player install error code"),
+        requireNonEmptyString(payload.message, "Novel Player install error message"),
+      );
+    }
+
+    const appId = validateHostedId(payload.app_id, "Novel Player app_id");
+    const returnedGroupId = validateHostedId(payload.group_id, "Novel Player group_id");
+    if (returnedGroupId !== normalizedGroupId ||
+        payload.source_kind !== "builtin" ||
+        payload.builtin_id !== NOVEL_PLAYER_BUILTIN_ID) {
+      throw new authoringApi.HostedWebApiError(
+        response.status,
+        "invalid_api_response",
+        "Novel Player install response changed the requested app scope.",
+      );
+    }
+    return Object.freeze({ appId, groupId: returnedGroupId });
   }
 
   const shell = requiredElement("girls-upload-panel");
@@ -103,6 +201,29 @@
     getAccessToken,
     onUnauthorized: () => logoutButton.click(),
   });
+
+  const previewFromEditor = controller.previewFromEditor.bind(controller);
+  controller.previewFromEditor = async (request) => {
+    const context = requirePlainObject(request, "Girls Authoring preview request");
+    if (context.contentFormat === NOVEL_CONTENT_FORMAT) {
+      const apps = await authoringApi.listAuthoringApps({
+        apiOrigin: context.apiOrigin,
+        accessToken: context.accessToken,
+        groupId: context.groupId,
+        fetchImpl: fetch,
+      });
+      const players = authoringApi.playersFor(apps, NOVEL_CONTENT_FORMAT);
+      if (players.length === 0) {
+        await installNovelPlayer({
+          apiOrigin: context.apiOrigin,
+          accessToken: context.accessToken,
+          groupId: context.groupId,
+        });
+      }
+    }
+    return await previewFromEditor(request);
+  };
+
   controller.bind();
 
   function clearAuthoringNavigation() {
