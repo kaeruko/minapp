@@ -7,6 +7,7 @@ import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
 import 'girls_app_preview_api.dart';
+import 'girls_builtin_install_api.dart';
 import 'hosted_girls_api.dart';
 
 const Color _testLavender = Color(0xFF745B9E);
@@ -32,19 +33,65 @@ class GirlsAppTestActions extends StatefulWidget {
 
 class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   late final GirlsAppPreviewApi _previewApi;
+  late final GirlsBuiltinInstallApi _builtinInstallApi;
   bool _busy = false;
   String? _error;
+  bool _novelSetupBusy = false;
+  bool _novelSetupReady = false;
+  String? _novelSetupError;
+
+  bool get _isNovelEditor {
+    final HostedGroupApp app = widget.detail.summary.app;
+    return app.sourceKind == 'builtin' && app.builtinId == novelEditorBuiltinId;
+  }
 
   @override
   void initState() {
     super.initState();
     _previewApi = GirlsAppPreviewApi(baseUri: widget.api.baseUri);
+    _builtinInstallApi = GirlsBuiltinInstallApi(baseUri: widget.api.baseUri);
+    if (_isNovelEditor) {
+      _novelSetupBusy = true;
+      _prepareNovelEditor(initial: true);
+    }
   }
 
   @override
   void dispose() {
     _previewApi.close();
+    _builtinInstallApi.close();
     super.dispose();
+  }
+
+  Future<void> _prepareNovelEditor({bool initial = false}) async {
+    if (!_isNovelEditor) return;
+    if (!initial) {
+      setState(() {
+        _novelSetupBusy = true;
+        _novelSetupReady = false;
+        _novelSetupError = null;
+      });
+    }
+    final HostedGroupApp app = widget.detail.summary.app;
+    try {
+      await _builtinInstallApi.ensureNovelPlayer(
+        accessToken: widget.session.accessToken,
+        groupId: app.groupId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _novelSetupReady = true;
+        _novelSetupError = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _novelSetupReady = false;
+        _novelSetupError = core.girlsMessageFor(error);
+      });
+    } finally {
+      if (mounted) setState(() => _novelSetupBusy = false);
+    }
   }
 
   Future<void> _tryPublished() async {
@@ -159,9 +206,54 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
     );
   }
 
+  Widget _novelSetupState() {
+    if (_novelSetupBusy) {
+      return const Column(
+        children: <Widget>[
+          Center(child: CircularProgressIndicator()),
+          SizedBox(height: 8),
+          Text(
+            'Preview用Playerを準備しています…',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _testLavender,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          _novelSetupError ?? 'Preview用Playerを準備できませんでした。',
+          key: const Key('girls-novel-player-setup-error'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: _testError,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          key: const Key('girls-novel-player-setup-retry'),
+          onPressed: _prepareNovelEditor,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('Playerを準備しなおす'),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final HostedGroupApp app = widget.detail.summary.app;
+    if (_isNovelEditor && !_novelSetupReady) {
+      return _novelSetupState();
+    }
     return HostedAuthoringEditorAction(
       baseUri: widget.api.baseUri,
       accessToken: widget.session.accessToken,
