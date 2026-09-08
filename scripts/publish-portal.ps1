@@ -92,6 +92,7 @@ $productionAssets = @(
     "girls_portal.js",
     "girls_portal_shell.js",
     "authoring_host_adapter.js",
+    "authoring_resilience_host.js",
     "hosted_authoring_portal.js",
     "girls_authoring_portal.js",
     "girls_footer.js"
