@@ -240,7 +240,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
         const SizedBox(height: 8),
         OutlinedButton.icon(
           key: const Key('girls-novel-player-setup-retry'),
-          onPressed: _prepareNovelEditor,
+          onPressed: () => _prepareNovelEditor(),
           icon: const Icon(Icons.refresh_rounded),
           label: const Text('Playerを準備しなおす'),
         ),
