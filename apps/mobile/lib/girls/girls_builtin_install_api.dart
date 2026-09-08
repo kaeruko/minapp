@@ -23,12 +23,43 @@ class GirlsBuiltinInstallApi {
   Future<HostedGroupApp> installNovelEditor({
     required String accessToken,
     required String groupId,
-  }) {
+  }) async {
+    await ensureNovelPlayer(
+      accessToken: accessToken,
+      groupId: groupId,
+    );
     return _installBuiltin(
       accessToken: accessToken,
       groupId: groupId,
       builtinId: novelEditorBuiltinId,
       label: 'Novel Editor',
+    );
+  }
+
+  Future<HostedGroupApp> ensureNovelPlayer({
+    required String accessToken,
+    required String groupId,
+  }) async {
+    final List<HostedGroupApp> apps = await _listGroupApps(
+      accessToken: accessToken,
+      groupId: groupId,
+    );
+    final List<HostedGroupApp> players = apps
+        .where(
+          (HostedGroupApp app) =>
+              app.sourceKind == 'builtin' &&
+              app.builtinId == novelPlayerBuiltinId,
+        )
+        .toList(growable: false);
+    if (players.length > 1) {
+      throw const FormatException(
+        'Group app list contains duplicate Novel Player installations.',
+      );
+    }
+    if (players.length == 1) return players.single;
+    return installNovelPlayer(
+      accessToken: accessToken,
+      groupId: groupId,
     );
   }
 
@@ -44,22 +75,59 @@ class GirlsBuiltinInstallApi {
     );
   }
 
+  Future<List<HostedGroupApp>> _listGroupApps({
+    required String accessToken,
+    required String groupId,
+  }) async {
+    _validateRequestScope(accessToken: accessToken, groupId: groupId);
+    final Uri uri = _baseUri.resolve('/hosted/groups/$groupId/apps');
+    final http.Response response = await _client.get(
+      uri,
+      headers: <String, String>{
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+    );
+    final Map<String, Object?> payload = _decodeJsonObject(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw _apiException(response.statusCode, payload);
+    }
+    if (payload.length != 1 || !payload.containsKey('apps')) {
+      throw const FormatException(
+        'Group app list response fields are invalid.',
+      );
+    }
+    final Object? rawApps = payload['apps'];
+    if (rawApps is! List<Object?>) {
+      throw const FormatException(
+        'Group app list response has an invalid apps field.',
+      );
+    }
+    final List<HostedGroupApp> apps = <HostedGroupApp>[];
+    for (final Object? rawApp in rawApps) {
+      if (rawApp is! Map<String, Object?>) {
+        throw const FormatException(
+          'Group app list response contains an invalid app entry.',
+        );
+      }
+      final HostedGroupApp app = HostedGroupApp.fromJson(rawApp);
+      if (app.groupId != groupId) {
+        throw const FormatException(
+          'Group app list response changed the requested group scope.',
+        );
+      }
+      apps.add(app);
+    }
+    return apps;
+  }
+
   Future<HostedGroupApp> _installBuiltin({
     required String accessToken,
     required String groupId,
     required String builtinId,
     required String label,
   }) async {
-    if (accessToken.isEmpty) {
-      throw ArgumentError.value(accessToken, 'accessToken', 'must not be empty');
-    }
-    if (!_hostedIdPattern.hasMatch(groupId)) {
-      throw ArgumentError.value(
-        groupId,
-        'groupId',
-        'must be a 32-character lowercase hexadecimal ID',
-      );
-    }
+    _validateRequestScope(accessToken: accessToken, groupId: groupId);
 
     final Uri uri = _baseUri.resolve('/hosted/groups/$groupId/apps/install');
     final http.Response response = await _client.post(
@@ -90,6 +158,22 @@ class GirlsBuiltinInstallApi {
 
   void close() {
     if (_ownsClient) _client.close();
+  }
+
+  static void _validateRequestScope({
+    required String accessToken,
+    required String groupId,
+  }) {
+    if (accessToken.isEmpty) {
+      throw ArgumentError.value(accessToken, 'accessToken', 'must not be empty');
+    }
+    if (!_hostedIdPattern.hasMatch(groupId)) {
+      throw ArgumentError.value(
+        groupId,
+        'groupId',
+        'must be a 32-character lowercase hexadecimal ID',
+      );
+    }
   }
 
   static Map<String, Object?> _decodeJsonObject(http.Response response) {
