@@ -23,7 +23,11 @@ class GirlsBuiltinInstallApi {
   Future<HostedGroupApp> installNovelEditor({
     required String accessToken,
     required String groupId,
-  }) {
+  }) async {
+    await installNovelPlayer(
+      accessToken: accessToken,
+      groupId: groupId,
+    );
     return _installBuiltin(
       accessToken: accessToken,
       groupId: groupId,
