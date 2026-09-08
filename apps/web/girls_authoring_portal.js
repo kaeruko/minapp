@@ -1,6 +1,8 @@
 "use strict";
 
-(function installGirlsAuthoringPortal() {
+(async function installGirlsAuthoringPortal() {
+  await import("/authoring_resilience_host.js");
+
   const portalApi = globalThis.MinAppHostedAuthoringPortal;
   if (!portalApi || typeof portalApi.HostedAuthoringPortalController !== "function") {
     throw new Error("Girls Authoring portal requires hosted_authoring_portal.js.");
@@ -9,23 +11,18 @@
   if (!authoringApi) {
     throw new Error("Girls Authoring portal requires authoring_host_adapter.js.");
   }
+  const resilienceApi = globalThis.MinAppAuthoringResilienceHost;
+  if (!resilienceApi ||
+      typeof resilienceApi.installSessionRenewal !== "function" ||
+      typeof resilienceApi.NovelRecoveryHost !== "function") {
+    throw new Error("Girls Authoring portal requires authoring_resilience_host.js.");
+  }
 
   const ACCESS_TOKEN_KEY = "minapp_girls_portal_access_token";
   const CONFIG_PATH = "/girls-config.json";
   const NOVEL_CONTENT_FORMAT = "minapp/novel@1";
   const NOVEL_PLAYER_BUILTIN_ID = "novel-starter";
   const HOSTED_ID_PATTERN = /^[0-9a-f]{32}$/;
-  const RECOVERY_CHANNEL = "minapp.novel-editor.recovery";
-  const RECOVERY_VERSION = 1;
-  const RECOVERY_REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
-  const RECOVERY_STORAGE_PREFIX = "minapp_novel_editor_recovery_v1:";
-  const RECOVERY_MAX_CHARS = 1500000;
-  const RENEWABLE_SESSION_ERRORS = new Set([
-    "authoring_session_not_found",
-    "authoring_request_limit_reached",
-    "runtime_session_not_found",
-    "runtime_request_limit_reached",
-  ]);
   let activeRecoveryContentId = null;
 
   function requiredElement(id) {
@@ -57,101 +54,6 @@
 
   function validateApiOrigin(value) {
     return authoringApi.validateApiOrigin(value);
-  }
-
-  function requireExactFields(value, expected, label) {
-    const object = requirePlainObject(value, label);
-    const actual = Object.keys(object).sort();
-    const wanted = [...expected].sort();
-    if (actual.length !== wanted.length || actual.some((name, index) => name !== wanted[index])) {
-      throw new Error(`${label} fields are invalid.`);
-    }
-    return object;
-  }
-
-  function recoveryStorageKey(contentId) {
-    return `${RECOVERY_STORAGE_PREFIX}${validateHostedId(contentId, "Recovery content id")}`;
-  }
-
-  function recoverySuccess(id, result) {
-    return {
-      channel: RECOVERY_CHANNEL,
-      version: RECOVERY_VERSION,
-      type: "response",
-      id,
-      ok: true,
-      result,
-    };
-  }
-
-  function recoveryFailure(id, code, message) {
-    return {
-      channel: RECOVERY_CHANNEL,
-      version: RECOVERY_VERSION,
-      type: "response",
-      id,
-      ok: false,
-      error: { code, message },
-    };
-  }
-
-  function validateStoredRecovery(raw, contentId) {
-    const value = requireExactFields(
-      raw,
-      ["contentId", "expectedRevision", "document", "savedAt"],
-      "Stored recovery backup",
-    );
-    if (validateHostedId(value.contentId, "Stored recovery content id") !== contentId) {
-      throw new Error("Stored recovery backup changed content scope.");
-    }
-    if (!Number.isInteger(value.expectedRevision) || value.expectedRevision < 1) {
-      throw new Error("Stored recovery expectedRevision is invalid.");
-    }
-    requirePlainObject(value.document, "Stored recovery document");
-    requireNonEmptyString(value.savedAt, "Stored recovery savedAt");
-    return value;
-  }
-
-  function installAuthoringSessionRenewal() {
-    const prototype = authoringApi.WebAuthoringHostAdapter.prototype;
-    if (prototype.__girlsSessionRenewalInstalled === true) return;
-    const originalDispatch = prototype.dispatch;
-    if (typeof originalDispatch !== "function") {
-      throw new Error("Web Authoring Host Adapter dispatch is unavailable.");
-    }
-    prototype.dispatch = async function dispatchWithRenewal(request) {
-      try {
-        return await originalDispatch.call(this, request);
-      } catch (error) {
-        if (!(error instanceof authoringApi.HostedWebApiError) ||
-            !RENEWABLE_SESSION_ERRORS.has(error.code)) {
-          throw error;
-        }
-        const renewed = await authoringApi.createWebAuthoringLaunch({
-          apiOrigin: this.apiOrigin,
-          accessToken: getAccessToken(),
-          contentId: this.launch.contentId,
-          editorAppId: this.launch.editorAppId,
-          fetchImpl: this.fetchImpl,
-        });
-        if (renewed.contentFormat !== this.launch.contentFormat) {
-          throw new Error("Renewed Authoring session changed content format.");
-        }
-        this.launch = Object.freeze({
-          ...this.launch,
-          runtimeToken: renewed.runtimeToken,
-          runtimeExpiresIn: renewed.runtimeExpiresIn,
-          authoringToken: renewed.authoringToken,
-          authoringExpiresIn: renewed.authoringExpiresIn,
-        });
-        return await originalDispatch.call(this, request);
-      }
-    };
-    Object.defineProperty(prototype, "__girlsSessionRenewalInstalled", {
-      configurable: false,
-      enumerable: false,
-      value: true,
-    });
   }
 
   let hostedApiOrigin = null;
@@ -286,7 +188,7 @@
   if (!(sourceGroupSelect instanceof HTMLSelectElement)) throw new Error("#girls-upload-group must be a select.");
   if (!(editorFrame instanceof HTMLIFrameElement)) throw new Error("#girls-authoring-editor-frame must be an iframe.");
 
-  installAuthoringSessionRenewal();
+  resilienceApi.installSessionRenewal({ authoringApi, getAccessToken });
 
   const controller = new portalApi.HostedAuthoringPortalController({
     sourceGroupSelect,
@@ -313,6 +215,14 @@
     onUnauthorized: () => logoutButton.click(),
   });
 
+  const recoveryHost = new resilienceApi.NovelRecoveryHost({
+    frame: editorFrame,
+    storage: localStorage,
+    getActiveContentId: () => activeRecoveryContentId,
+    eventTarget: window,
+  });
+  recoveryHost.attach();
+
   const openEditor = controller.openEditor.bind(controller);
   controller.openEditor = async (contentId, options = {}) => {
     const normalizedContentId = validateHostedId(contentId, "Recovery active content id");
@@ -333,67 +243,6 @@
       activeRecoveryContentId = null;
     }
   };
-
-  window.addEventListener("message", (event) => {
-    if (event.source !== editorFrame.contentWindow || event.origin !== "null") return;
-    const raw = event.data;
-    if (typeof raw !== "object" || raw === null || Array.isArray(raw) ||
-        raw.channel !== RECOVERY_CHANNEL || raw.version !== RECOVERY_VERSION ||
-        raw.type !== "request") {
-      return;
-    }
-    const id = typeof raw.id === "string" && RECOVERY_REQUEST_ID_PATTERN.test(raw.id)
-      ? raw.id
-      : null;
-    if (id === null) return;
-    try {
-      const common = ["channel", "version", "type", "id", "method", "contentId"];
-      const expected = raw.method === "save"
-        ? [...common, "expectedRevision", "document"]
-        : common;
-      requireExactFields(raw, expected, "Novel recovery request");
-      if (!new Set(["load", "save", "clear"]).has(raw.method)) {
-        throw new Error("Novel recovery method is unsupported.");
-      }
-      const contentId = validateHostedId(raw.contentId, "Novel recovery content id");
-      if (activeRecoveryContentId === null || contentId !== activeRecoveryContentId) {
-        throw new Error("Novel recovery request does not match the active Editor content.");
-      }
-      const key = recoveryStorageKey(contentId);
-      let result = null;
-      if (raw.method === "load") {
-        const stored = localStorage.getItem(key);
-        result = stored === null ? null : validateStoredRecovery(JSON.parse(stored), contentId);
-      } else if (raw.method === "clear") {
-        localStorage.removeItem(key);
-      } else {
-        if (!Number.isInteger(raw.expectedRevision) || raw.expectedRevision < 1) {
-          throw new Error("Novel recovery expectedRevision is invalid.");
-        }
-        const document = requirePlainObject(raw.document, "Novel recovery document");
-        const stored = JSON.stringify({
-          contentId,
-          expectedRevision: raw.expectedRevision,
-          document,
-          savedAt: new Date().toISOString(),
-        });
-        if (stored.length > RECOVERY_MAX_CHARS) {
-          throw new Error("Novel recovery backup is too large for local storage.");
-        }
-        localStorage.setItem(key, stored);
-      }
-      editorFrame.contentWindow.postMessage(recoverySuccess(id, result), "*");
-    } catch (error) {
-      editorFrame.contentWindow.postMessage(
-        recoveryFailure(
-          id,
-          "recovery_store_error",
-          error instanceof Error ? error.message : String(error),
-        ),
-        "*",
-      );
-    }
-  });
 
   const previewFromEditor = controller.previewFromEditor.bind(controller);
   controller.previewFromEditor = async (request) => {
@@ -485,8 +334,11 @@
   globalThis.MinAppGirlsAuthoringPortal = Object.freeze({
     activate: openAuthoringView,
     destroy() {
+      recoveryHost.destroy();
       controller.destroy();
       clearAuthoringNavigation();
     },
   });
-})();
+})().catch((error) => {
+  console.error("Girls Authoring portal bootstrap failed", error);
+});
