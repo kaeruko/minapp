@@ -39,10 +39,13 @@ Map<String, Object?> _installedApp({
 }
 
 void main() {
-  test('Novel Editor setup installs Player first, then Editor', () async {
+  test('Novel Editor setup installs missing Player first, then Editor', () async {
     final List<http.Request> captured = <http.Request>[];
     final MockClient client = MockClient((http.Request request) async {
       captured.add(request);
+      if (request.method == 'GET') {
+        return _json(200, const <String, Object?>{'apps': <Object?>[]});
+      }
       final Map<String, Object?> body =
           jsonDecode(request.body) as Map<String, Object?>;
       final String builtinId = body['builtin_id']! as String;
@@ -58,14 +61,14 @@ void main() {
       groupId: _groupId,
     );
 
-    expect(captured, hasLength(2));
-    expect(captured[0].method, 'POST');
-    expect(captured[0].url.path, '/hosted/groups/$_groupId/apps/install');
+    expect(captured, hasLength(3));
+    expect(captured[0].method, 'GET');
+    expect(captured[0].url.path, '/hosted/groups/$_groupId/apps');
     expect(captured[0].headers['authorization'], 'Bearer owner-token');
-    expect(jsonDecode(captured[0].body), const <String, Object?>{
+    expect(jsonDecode(captured[1].body), const <String, Object?>{
       'builtin_id': novelPlayerBuiltinId,
     });
-    expect(jsonDecode(captured[1].body), const <String, Object?>{
+    expect(jsonDecode(captured[2].body), const <String, Object?>{
       'builtin_id': novelEditorBuiltinId,
     });
     expect(app.appId, _appId);
@@ -74,100 +77,150 @@ void main() {
     expect(app.builtinId, novelEditorBuiltinId);
   });
 
-  test(
-    'Novel Player install uses the exact novel-starter builtin id',
-    () async {
-      late http.Request captured;
-      final MockClient client = MockClient((http.Request request) async {
-        captured = request;
-        return _json(201, _installedApp(builtinId: novelPlayerBuiltinId));
-      });
-      final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
-        baseUri: Uri.parse('https://hosted.example.test'),
-        client: client,
-      );
-
-      final HostedGroupApp app = await api.installNovelPlayer(
-        accessToken: 'owner-token',
-        groupId: _groupId,
-      );
-
-      expect(captured.method, 'POST');
-      expect(captured.url.path, '/hosted/groups/$_groupId/apps/install');
-      expect(captured.headers['authorization'], 'Bearer owner-token');
-      expect(jsonDecode(captured.body), const <String, Object?>{
-        'builtin_id': novelPlayerBuiltinId,
-      });
-      expect(app.groupId, _groupId);
-      expect(app.sourceKind, 'builtin');
-      expect(app.builtinId, novelPlayerBuiltinId);
-    },
-  );
-
-  test('install response cannot silently change group scope', () async {
-    final MockClient client = MockClient(
-      (http.Request request) async =>
-          _json(201, _installedApp(groupId: '3' * 32)),
+  test('Novel Editor setup reuses an already-installed Player', () async {
+    final List<http.Request> captured = <http.Request>[];
+    final MockClient client = MockClient((http.Request request) async {
+      captured.add(request);
+      if (request.method == 'GET') {
+        return _json(200, <String, Object?>{
+          'apps': <Object?>[
+            _installedApp(builtinId: novelPlayerBuiltinId),
+          ],
+        });
+      }
+      return _json(201, _installedApp());
+    });
+    final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
+      baseUri: Uri.parse('https://hosted.example.test'),
+      client: client,
     );
+
+    final HostedGroupApp app = await api.installNovelEditor(
+      accessToken: 'owner-token',
+      groupId: _groupId,
+    );
+
+    expect(captured, hasLength(2));
+    expect(captured[0].method, 'GET');
+    expect(captured[1].method, 'POST');
+    expect(jsonDecode(captured[1].body), const <String, Object?>{
+      'builtin_id': novelEditorBuiltinId,
+    });
+    expect(app.builtinId, novelEditorBuiltinId);
+  });
+
+  test('ensureNovelPlayer repairs a group that is missing the Player', () async {
+    final List<http.Request> captured = <http.Request>[];
+    final MockClient client = MockClient((http.Request request) async {
+      captured.add(request);
+      if (request.method == 'GET') {
+        return _json(200, <String, Object?>{
+          'apps': <Object?>[_installedApp()],
+        });
+      }
+      return _json(
+        201,
+        _installedApp(builtinId: novelPlayerBuiltinId),
+      );
+    });
+    final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
+      baseUri: Uri.parse('https://hosted.example.test'),
+      client: client,
+    );
+
+    final HostedGroupApp app = await api.ensureNovelPlayer(
+      accessToken: 'owner-token',
+      groupId: _groupId,
+    );
+
+    expect(captured, hasLength(2));
+    expect(captured[0].method, 'GET');
+    expect(captured[1].method, 'POST');
+    expect(jsonDecode(captured[1].body), const <String, Object?>{
+      'builtin_id': novelPlayerBuiltinId,
+    });
+    expect(app.builtinId, novelPlayerBuiltinId);
+  });
+
+  test('group app list cannot silently change group scope', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'GET');
+      return _json(200, <String, Object?>{
+        'apps': <Object?>[
+          _installedApp(
+            groupId: '3' * 32,
+            builtinId: novelPlayerBuiltinId,
+          ),
+        ],
+      });
+    });
     final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
       baseUri: Uri.parse('https://hosted.example.test'),
       client: client,
     );
 
     await expectLater(
-      api.installNovelPlayer(accessToken: 'owner-token', groupId: _groupId),
+      api.ensureNovelPlayer(accessToken: 'owner-token', groupId: _groupId),
       throwsA(isA<FormatException>()),
     );
   });
 
   test('Player install response cannot silently change builtin id', () async {
-    final MockClient client = MockClient(
-      (http.Request request) async => _json(201, _installedApp()),
-    );
+    final MockClient client = MockClient((http.Request request) async {
+      if (request.method == 'GET') {
+        return _json(200, const <String, Object?>{'apps': <Object?>[]});
+      }
+      return _json(201, _installedApp());
+    });
     final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
       baseUri: Uri.parse('https://hosted.example.test'),
       client: client,
     );
 
     await expectLater(
-      api.installNovelPlayer(accessToken: 'owner-token', groupId: _groupId),
+      api.ensureNovelPlayer(accessToken: 'owner-token', groupId: _groupId),
       throwsA(isA<FormatException>()),
     );
   });
 
-  test(
-    'player install failure stops setup before editor install',
-    () async {
-      int requestCount = 0;
-      final MockClient client = MockClient((http.Request request) async {
-        requestCount += 1;
-        return _json(409, const <String, Object?>{
-          'error': 'builtin_already_installed',
-          'message': 'このビルトインアプリはすでに入っています。',
-        });
+  test('Player setup failure stops before Editor installation', () async {
+    final List<http.Request> captured = <http.Request>[];
+    final MockClient client = MockClient((http.Request request) async {
+      captured.add(request);
+      if (request.method == 'GET') {
+        return _json(200, const <String, Object?>{'apps': <Object?>[]});
+      }
+      return _json(500, const <String, Object?>{
+        'error': 'player_setup_failed',
+        'message': 'Player setup failed.',
       });
-      final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
-        baseUri: Uri.parse('https://hosted.example.test'),
-        client: client,
-      );
+    });
+    final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
+      baseUri: Uri.parse('https://hosted.example.test'),
+      client: client,
+    );
 
-      await expectLater(
-        api.installNovelEditor(accessToken: 'owner-token', groupId: _groupId),
-        throwsA(
-          isA<ApiException>()
-              .having(
-                (ApiException error) => error.statusCode,
-                'statusCode',
-                409,
-              )
-              .having(
-                (ApiException error) => error.code,
-                'code',
-                'builtin_already_installed',
-              ),
-        ),
-      );
-      expect(requestCount, 1);
-    },
-  );
+    await expectLater(
+      api.installNovelEditor(accessToken: 'owner-token', groupId: _groupId),
+      throwsA(
+        isA<ApiException>()
+            .having(
+              (ApiException error) => error.statusCode,
+              'statusCode',
+              500,
+            )
+            .having(
+              (ApiException error) => error.code,
+              'code',
+              'player_setup_failed',
+            ),
+      ),
+    );
+    expect(captured, hasLength(2));
+    expect(captured[0].method, 'GET');
+    expect(captured[1].method, 'POST');
+    expect(jsonDecode(captured[1].body), const <String, Object?>{
+      'builtin_id': novelPlayerBuiltinId,
+    });
+  });
 }
