@@ -1,6 +1,8 @@
 "use strict";
 
-(function installGirlsAuthoringPortal() {
+(async function installGirlsAuthoringPortal() {
+  await import("/authoring_resilience_host.js");
+
   const portalApi = globalThis.MinAppHostedAuthoringPortal;
   if (!portalApi || typeof portalApi.HostedAuthoringPortalController !== "function") {
     throw new Error("Girls Authoring portal requires hosted_authoring_portal.js.");
@@ -9,12 +11,19 @@
   if (!authoringApi) {
     throw new Error("Girls Authoring portal requires authoring_host_adapter.js.");
   }
+  const resilienceApi = globalThis.MinAppAuthoringResilienceHost;
+  if (!resilienceApi ||
+      typeof resilienceApi.installSessionRenewal !== "function" ||
+      typeof resilienceApi.NovelRecoveryHost !== "function") {
+    throw new Error("Girls Authoring portal requires authoring_resilience_host.js.");
+  }
 
   const ACCESS_TOKEN_KEY = "minapp_girls_portal_access_token";
   const CONFIG_PATH = "/girls-config.json";
   const NOVEL_CONTENT_FORMAT = "minapp/novel@1";
   const NOVEL_PLAYER_BUILTIN_ID = "novel-starter";
   const HOSTED_ID_PATTERN = /^[0-9a-f]{32}$/;
+  let activeRecoveryContentId = null;
 
   function requiredElement(id) {
     const element = document.getElementById(id);
@@ -168,6 +177,7 @@
   const authoringNav = requiredElement("girls-authoring-nav");
   const logoutButton = requiredElement("girls-logout");
   const sourceGroupSelect = requiredElement("girls-upload-group");
+  const editorFrame = requiredElement("girls-authoring-editor-frame");
 
   if (!(shell instanceof HTMLElement)) throw new Error("#girls-upload-panel must be an element.");
   if (!(shellTitle instanceof HTMLElement)) throw new Error("#girls-shell-title must be an element.");
@@ -176,6 +186,9 @@
   if (!(authoringNav instanceof HTMLButtonElement)) throw new Error("#girls-authoring-nav must be a button.");
   if (!(logoutButton instanceof HTMLButtonElement)) throw new Error("#girls-logout must be a button.");
   if (!(sourceGroupSelect instanceof HTMLSelectElement)) throw new Error("#girls-upload-group must be a select.");
+  if (!(editorFrame instanceof HTMLIFrameElement)) throw new Error("#girls-authoring-editor-frame must be an iframe.");
+
+  resilienceApi.installSessionRenewal({ authoringApi, getAccessToken });
 
   const controller = new portalApi.HostedAuthoringPortalController({
     sourceGroupSelect,
@@ -188,7 +201,7 @@
     projectList: requiredElement("girls-authoring-projects"),
     editorDialog: requiredElement("girls-authoring-editor-dialog"),
     editorTitle: requiredElement("girls-authoring-editor-title"),
-    editorFrame: requiredElement("girls-authoring-editor-frame"),
+    editorFrame,
     editorCloseButton: requiredElement("girls-authoring-editor-close"),
     playerDialog: requiredElement("girls-authoring-player-dialog"),
     playerOptions: requiredElement("girls-authoring-player-options"),
@@ -201,6 +214,35 @@
     getAccessToken,
     onUnauthorized: () => logoutButton.click(),
   });
+
+  const recoveryHost = new resilienceApi.NovelRecoveryHost({
+    frame: editorFrame,
+    storage: localStorage,
+    getActiveContentId: () => activeRecoveryContentId,
+    eventTarget: window,
+  });
+  recoveryHost.attach();
+
+  const openEditor = controller.openEditor.bind(controller);
+  controller.openEditor = async (contentId, options = {}) => {
+    const normalizedContentId = validateHostedId(contentId, "Recovery active content id");
+    activeRecoveryContentId = normalizedContentId;
+    try {
+      return await openEditor(normalizedContentId, options);
+    } catch (error) {
+      if (!controller.editorDialog.open) activeRecoveryContentId = null;
+      throw error;
+    }
+  };
+
+  const closeEditor = controller.closeEditor.bind(controller);
+  controller.closeEditor = async () => {
+    try {
+      return await closeEditor();
+    } finally {
+      activeRecoveryContentId = null;
+    }
+  };
 
   const previewFromEditor = controller.previewFromEditor.bind(controller);
   controller.previewFromEditor = async (request) => {
@@ -292,8 +334,11 @@
   globalThis.MinAppGirlsAuthoringPortal = Object.freeze({
     activate: openAuthoringView,
     destroy() {
+      recoveryHost.destroy();
       controller.destroy();
       clearAuthoringNavigation();
     },
   });
-})();
+})().catch((error) => {
+  console.error("Girls Authoring portal bootstrap failed", error);
+});

@@ -33,6 +33,7 @@ locals {
       excludes = [
         "test_asset_tools.js",
         "test_editor_core.js",
+        "test_editor_resilience.js",
         "test_host_authoring_roundtrip.py",
       ]
     }

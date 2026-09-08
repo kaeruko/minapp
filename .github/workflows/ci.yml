@@ -51,12 +51,14 @@ jobs:
           node --check apps/web/girls_portal_shell.js
           node --check apps/web/authoring_host_adapter.js
           node --check apps/web/authoring_host_adapter.test.js
+          node --check apps/web/authoring_resilience_host.js
+          node --check apps/web/authoring_resilience_host.test.js
           node --check apps/web/hosted_authoring_portal.js
           node --check apps/web/girls_authoring_portal.js
           node --check apps/web/hosted_authoring_portal.test.js
           node --check apps/web/portal_publish_assets.test.js
       - name: Test Web portal behavior
-        run: node --test apps/web/portal_routing.test.js apps/web/phase2_transport.test.js apps/web/portal_shell.test.js apps/web/single_html_zip.test.js apps/web/authoring_host_adapter.test.js apps/web/hosted_authoring_portal.test.js apps/web/portal_publish_assets.test.js
+        run: node --test apps/web/portal_routing.test.js apps/web/phase2_transport.test.js apps/web/portal_shell.test.js apps/web/single_html_zip.test.js apps/web/authoring_host_adapter.test.js apps/web/authoring_resilience_host.test.js apps/web/hosted_authoring_portal.test.js apps/web/portal_publish_assets.test.js
 
   powershell:
     runs-on: ubuntu-latest

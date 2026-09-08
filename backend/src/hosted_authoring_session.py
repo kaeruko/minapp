@@ -13,7 +13,8 @@ from hosted_authoring_backend import validate_content_format
 from hosted_catalog_backend import _optional_number
 from hosted_platform_backend import _number_attr
 
-AUTHORING_SESSION_SECONDS = 10 * 60
+# Keep Authoring sessions alive for the full maximum Cognito access-token lifetime.
+AUTHORING_SESSION_SECONDS = 24 * 60 * 60
 AUTHORING_SESSION_TTL_GRACE_SECONDS = 24 * 60 * 60
 MAX_AUTHORING_REQUESTS_PER_SESSION = 300
 _AUTHORING_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{32,64}$")
