@@ -239,7 +239,7 @@ class _GirlsGroupAppManagementPageState
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (BuildContext context) => HostedAppWebViewPage.session(
-            title: '${app.title}（管理プレビュー）',
+            title: '${app.title}（下書きを開く）',
             contentUri: launch.contentUri,
             runtimeToken: launch.runtimeToken,
             runtimeTransport: widget.api.runtimeClient,
@@ -373,12 +373,17 @@ class _GirlsGroupAppManagementPageState
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
+              const Text(
+                'この作品は、みんアプ内で動くミニアプリとして開きます。',
+                style: TextStyle(fontSize: 12, color: _lavender),
+              ),
+              const SizedBox(height: 10),
               FilledButton.tonalIcon(
                 key: const Key('girls-group-admin-preview'),
                 onPressed: _busy ? null : _previewDraft,
-                icon: const Icon(Icons.preview_rounded),
-                label: const Text('下書きをプレビュー'),
+                icon: const Icon(Icons.play_circle_outline_rounded),
+                label: const Text('下書きを開く'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
