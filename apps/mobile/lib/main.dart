@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
-import 'app_mode_gate.dart';
-import 'app_mode_store.dart';
 import 'directory.dart';
 import 'directory_endpoint_source.dart';
 import 'endpoint_validation.dart';
-import 'hosted_endpoint_source.dart';
+import 'session_app.dart';
 import 'tenant_store.dart';
 import 'ugc_safety.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  final Uri directoryBaseUri = await loadDirectoryBaseUriFromGoogleDrive();
 
   const String rawJoinBaseUrl = String.fromEnvironment(
     'MINAPP_JOIN_BASE_URL',
@@ -34,13 +34,8 @@ Future<void> main() async {
         );
 
   runApp(
-    MinAppModeGate(
-      modeStore: SharedPreferencesMinAppLaunchModeStore(),
-      hostedBaseUriLoader: loadHostedBaseUriFromGoogleDrive,
-      directoryLoader: () async {
-        final Uri baseUri = await loadDirectoryBaseUriFromGoogleDrive();
-        return MinAppDirectoryClient(baseUri: baseUri);
-      },
+    MinApp(
+      directory: MinAppDirectoryClient(baseUri: directoryBaseUri),
       tenantStore: SharedPreferencesTenantStore(),
       apiFactory: (Uri baseUri) => MinAppApiClient(baseUri: baseUri),
       officialJoinBaseUri: joinBaseUri,
