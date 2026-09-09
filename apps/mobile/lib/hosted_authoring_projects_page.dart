@@ -220,7 +220,7 @@ class _HostedAuthoringProjectsPageState
     return showDialog<HostedAuthoringAppContract>(
       context: context,
       builder: (BuildContext dialogContext) => SimpleDialog(
-        title: const Text('どのプレイヤーで確認する？'),
+        title: const Text('どのプレイヤーで再生する？'),
         children: players
             .map(
               (HostedAuthoringAppContract player) => SimpleDialogOption(
@@ -301,7 +301,7 @@ class _HostedAuthoringProjectsPageState
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) => HostedAppWebViewPage.session(
-          title: '${widget.definition.pageTitle}（下書きプレビュー）',
+          title: '${widget.definition.pageTitle}（下書きを再生）',
           contentUri: preview.contentUri,
           runtimeToken: preview.runtimeToken,
           runtimeTransport: widget.runtimeTransport,
@@ -440,7 +440,7 @@ class _HostedAuthoringProjectsPageState
               ),
               const SizedBox(height: 6),
               const Text(
-                '作品をタップすると編集、再生ボタンでは保存済みの下書きを対応プレイヤーで確認できます。',
+                '作品をタップすると編集できます。再生ボタンでは、保存済みの下書きをみんアプ内の対応プレイヤーで開きます。',
               ),
               if (_error != null) ...<Widget>[
                 const SizedBox(height: 12),
@@ -489,7 +489,7 @@ class _HostedAuthoringProjectsPageState
                               key: Key(
                                 'hosted-authoring-preview-${project.contentId}',
                               ),
-                              tooltip: '下書きをプレビュー',
+                              tooltip: '下書きを再生',
                               onPressed:
                                   _busy ? null : () => _previewProject(project),
                               icon: const Icon(Icons.play_circle_outline_rounded),
