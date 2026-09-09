@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'creator_portal_policy.dart';
 import 'directory.dart';
 import 'directory_endpoint_source.dart';
 import 'endpoint_validation.dart';
@@ -26,12 +28,10 @@ Future<void> main() async {
   const String rawCreatorPortalBaseUrl = String.fromEnvironment(
     'MINAPP_CREATOR_PORTAL_BASE_URL',
   );
-  final Uri? creatorPortalBaseUri = rawCreatorPortalBaseUrl.isEmpty
-      ? null
-      : validatePublicHttpsBaseUri(
-          Uri.parse(rawCreatorPortalBaseUrl),
-          argumentName: 'MINAPP_CREATOR_PORTAL_BASE_URL',
-        );
+  final Uri? creatorPortalBaseUri = resolveCreatorPortalBaseUriForPlatform(
+    rawBaseUrl: rawCreatorPortalBaseUrl,
+    targetPlatform: defaultTargetPlatform,
+  );
 
   runApp(
     MinApp(
