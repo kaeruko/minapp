@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:http/http.dart' as http;
 
 import '../api.dart';
 import '../hosted_api.dart';
 import '../hosted_runtime_bridge.dart';
+import '../refreshable_auth_client.dart';
+import 'girls_session_store.dart';
 
 export '../hosted_api.dart';
 
@@ -11,17 +15,81 @@ export '../hosted_api.dart';
 /// Hosted protocol, validation, groups, apps and Runtime behavior live in the
 /// neutral [HostedApi]. Girls must not fork the platform contract.
 class HostedGirlsApi {
-  HostedGirlsApi({required Uri baseUri, http.Client? client})
-      : _delegate = HostedApi(baseUri: baseUri, client: client);
+  factory HostedGirlsApi({
+    required Uri baseUri,
+    http.Client? client,
+    GirlsSessionStore? sessionStore,
+  }) {
+    final http.Client resolvedClient = client ?? http.Client();
+    return HostedGirlsApi._(
+      delegate: HostedApi(baseUri: baseUri, client: resolvedClient),
+      authClient: RefreshableAuthClient(
+        baseUri: baseUri,
+        client: resolvedClient,
+      ),
+      sessionStore: sessionStore ?? SecureGirlsSessionStore(),
+    );
+  }
+
+  HostedGirlsApi._({
+    required HostedApi delegate,
+    required RefreshableAuthClient authClient,
+    required GirlsSessionStore sessionStore,
+  })  : _delegate = delegate,
+        _authClient = authClient,
+        _sessionStore = sessionStore;
 
   final HostedApi _delegate;
+  final RefreshableAuthClient _authClient;
+  final GirlsSessionStore _sessionStore;
+  final StreamController<AuthenticatedSession> _authenticatedSessions =
+      StreamController<AuthenticatedSession>.broadcast(sync: true);
 
   Uri get baseUri => _delegate.baseUri;
   HostedApiClient get runtimeClient => _delegate.runtimeClient;
+  Stream<AuthenticatedSession> get authenticatedSessions =>
+      _authenticatedSessions.stream;
 
-  Future<AuthResult> login(String loginId, String password) {
-    return _delegate.login(loginId, password);
+  Future<AuthResult> login(String loginId, String password) async {
+    final RefreshableAuthResult result = await _authClient.login(
+      loginId,
+      password,
+    );
+    if (result is RefreshablePasswordChallenge) {
+      return result.toChallenge();
+    }
+    if (result is! RefreshableAuthenticatedResult) {
+      throw StateError('Refreshable auth client returned an unknown result.');
+    }
+
+    // Persist before reporting authentication success. If secure storage fails,
+    // the login fails visibly instead of creating a session that cannot resume.
+    await _sessionStore.writeRefreshToken(result.refreshToken);
+    final AuthenticatedSession session = result.toSession();
+    _authenticatedSessions.add(session);
+    return session;
   }
+
+  Future<AuthenticatedSession?> restoreSession() async {
+    final String? refreshToken = await _sessionStore.readRefreshToken();
+    if (refreshToken == null) return null;
+
+    try {
+      final RefreshableAuthenticatedResult result =
+          await _authClient.refresh(refreshToken);
+      return result.toSession();
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 && error.code == 'invalid_refresh_token') {
+        // The server has explicitly declared this credential invalid. This is
+        // the only restore failure that automatically removes the saved token.
+        await _sessionStore.clearRefreshToken();
+        return null;
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> logout() => _sessionStore.clearRefreshToken();
 
   Future<HostedLegalBundle> fetchLegal() => _delegate.fetchLegal();
 
