@@ -86,7 +86,15 @@ void main() {
 
     await tester.tap(find.byKey(const Key('girls-footer-groups')));
     await tester.pumpAndSettle();
-    expect(find.text('どのグループで遊ぶ？'), findsOneWidget);
+    expect(
+      find.byKey(const Key('girls-groups-first-view-group')),
+      findsOneWidget,
+    );
+    expect(find.text('いまのグループ'), findsOneWidget);
+    expect(find.text('あなたがオーナーです ♡'), findsOneWidget);
+    expect(find.text('グループを開く'), findsOneWidget);
+    expect(find.text('どのグループで遊ぶ？'), findsNothing);
+
     await tester.tap(find.byKey(const Key('girls-footer-home')));
     await tester.pumpAndSettle();
     expect(find.text('ビルトインアプリ'), findsOneWidget);
