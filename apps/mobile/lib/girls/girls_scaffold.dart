@@ -90,9 +90,10 @@ class GirlsCommonHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final MediaQueryData media = MediaQuery.of(context);
     final bool compact = media.size.height < 500;
-    final double logoHeight = compact ? 44 : 64;
+    final double logoHeight = compact ? 40 : 50;
+    final double controlsHeight = compact ? 42 : 46;
     final TextStyle titleStyle = TextStyle(
-      fontSize: compact ? 24 : 28,
+      fontSize: compact ? 23 : 27,
       height: 1.15,
       fontWeight: FontWeight.w800,
       letterSpacing: 1,
@@ -114,28 +115,23 @@ class GirlsCommonHeader extends StatelessWidget {
         final double titleHeight = title == null ? 0 : titlePainter.height;
         titlePainter.dispose();
 
-        // Narrow phones crop the sides when a notch or larger text needs room.
-        // On wide windows the art is centred at a bounded size.
+        // Keep the controls in their own visible row instead of floating beside
+        // the logo. The header art can grow when a notch or large text needs it.
         final double naturalHeight =
             math.min(constraints.maxWidth, 480) * 630 / 1200;
-        final double artHeight = compact
-            ? math.min(naturalHeight, media.size.height * .42)
-            : naturalHeight;
-        final double top = math.max(media.padding.top + 6, artHeight * .225);
-        final double bottom = compact ? 24 : 32;
-        final double rowHeight = math.max(48, logoHeight);
-        final double contentHeight =
-            rowHeight + (title == null ? 0 : 4 + titleHeight);
-        final double height = math.max(artHeight, top + contentHeight + bottom);
-        final double sideControls = math
-            .max(
-              leading == null ? 0 : 48,
-              actions.length * 48,
-            )
-            .toDouble();
+        final double top = media.padding.top + (compact ? 2 : 4);
+        final double bottom = compact ? 16 : 20;
+        final double contentHeight = controlsHeight +
+            5 +
+            logoHeight +
+            (title == null ? 0 : 3 + titleHeight);
+        final double height = math.max(
+          naturalHeight,
+          top + contentHeight + bottom,
+        );
         final double logoWidth = math.min(
-          128,
-          math.max(48, contentWidth - sideControls * 2 - 12),
+          132,
+          math.max(72, contentWidth * .42),
         );
 
         return SizedBox(
@@ -167,30 +163,23 @@ class GirlsCommonHeader extends StatelessWidget {
                   bottom,
                 ),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.start,
                   children: <Widget>[
                     SizedBox(
-                      height: rowHeight,
-                      child: Stack(
-                        alignment: Alignment.center,
+                      height: controlsHeight,
+                      child: Row(
                         children: <Widget>[
-                          Center(
-                            child: Image.asset(
-                              _girlsLogo,
-                              width: logoWidth,
-                              height: logoHeight,
-                              fit: BoxFit.contain,
-                              semanticLabel: 'みんアプ Girls',
-                            ),
-                          ),
                           if (leading != null)
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: leading,
-                            ),
+                            _HeaderControlTray(
+                              key: const Key('girls-header-leading-tray'),
+                              child: leading!,
+                            )
+                          else
+                            const SizedBox(width: 1),
+                          const Spacer(),
                           if (actions.isNotEmpty)
-                            Align(
-                              alignment: Alignment.centerRight,
+                            _HeaderControlTray(
+                              key: const Key('girls-header-actions-tray'),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: actions,
@@ -199,8 +188,16 @@ class GirlsCommonHeader extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 5),
+                    Image.asset(
+                      _girlsLogo,
+                      width: logoWidth,
+                      height: logoHeight,
+                      fit: BoxFit.contain,
+                      semanticLabel: 'みんアプ Girls',
+                    ),
                     if (title != null) ...<Widget>[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Semantics(
                         header: true,
                         label: title,
@@ -242,6 +239,31 @@ class GirlsCommonHeader extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _HeaderControlTray extends StatelessWidget {
+  const _HeaderControlTray({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .74),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0x99E8C9D5)),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x16745B9E),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 }
