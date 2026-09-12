@@ -405,7 +405,12 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
-                          const _WelcomeCard(),
+                          OverflowBox(
+                            minWidth: MediaQuery.sizeOf(context).width,
+                            maxWidth: MediaQuery.sizeOf(context).width,
+                            alignment: Alignment.center,
+                            child: const _WelcomeCard(),
+                          ),
                           const SizedBox(height: 16),
                           const _SectionHeading(title: 'ビルトインアプリ'),
                           const SizedBox(height: 8),
