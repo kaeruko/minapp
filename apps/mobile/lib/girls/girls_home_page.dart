@@ -398,71 +398,84 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
               ),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(18, 4, 18, 22),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 430),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: <Widget>[
-                          const _WelcomeCard(),
-                          const SizedBox(height: 16),
-                          const _SectionHeading(title: 'ビルトインアプリ'),
-                          const SizedBox(height: 8),
-                          GridView.count(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 6,
-                            crossAxisSpacing: 6,
-                            childAspectRatio: 1.04,
-                            children: <Widget>[
-                              _HomeMenuCard(
-                                key: const Key('girls-home-mascot-app'),
-                                assetName: _mascotDiaryCardAsset,
-                                label: 'マスコット付き交換日記',
-                                onTap: () => _launchBuiltin(_mascotApp),
-                              ),
-                              _HomeMenuCard(
-                                key: const Key('girls-home-novel-app'),
-                                assetName: _pastelNovelCardAsset,
-                                label: 'パステルノベル',
-                                onTap: () => _launchBuiltin(_novelApp),
-                              ),
-                              _HomeMenuCard(
-                                key: const Key('girls-home-paint-app'),
-                                assetName: _pastelPaintCardAsset,
-                                label: 'パステルお絵かき',
-                                onTap: () => _launchBuiltin(_paintApp),
-                              ),
-                              _HomeMenuCard(
-                                key: const Key('girls-home-groups'),
-                                assetName: _groupCreateCardAsset,
-                                label: 'グループと友達を招待',
-                                onTap: _createGroupFromHome,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 13),
-                          const _SectionHeading(title: '友達の最新情報'),
-                          const SizedBox(height: 8),
-                          if (_loadingGroups && groups == null)
-                            const _LatestLoadingCard()
-                          else if (_groupError != null)
-                            _LatestErrorCard(
-                              message: _groupError!,
-                              onRetry: _loadGroups,
-                            )
-                          else
-                            _LatestGroupCard(
-                              group: groups?.firstOrNull,
-                              onTap: groups == null || groups.isEmpty
-                                  ? _openGroups
-                                  : () => _openGroup(groups.first),
-                            ),
-                        ],
+                  padding: const EdgeInsets.only(top: 4, bottom: 22),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 430),
+                          child: const _WelcomeCard(),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 430),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: <Widget>[
+                                const _SectionHeading(title: 'ビルトインアプリ'),
+                                const SizedBox(height: 8),
+                                GridView.count(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: 6,
+                                  crossAxisSpacing: 6,
+                                  childAspectRatio: 1.04,
+                                  children: <Widget>[
+                                    _HomeMenuCard(
+                                      key: const Key('girls-home-mascot-app'),
+                                      assetName: _mascotDiaryCardAsset,
+                                      label: 'マスコット付き交換日記',
+                                      onTap: () => _launchBuiltin(_mascotApp),
+                                    ),
+                                    _HomeMenuCard(
+                                      key: const Key('girls-home-novel-app'),
+                                      assetName: _pastelNovelCardAsset,
+                                      label: 'パステルノベル',
+                                      onTap: () => _launchBuiltin(_novelApp),
+                                    ),
+                                    _HomeMenuCard(
+                                      key: const Key('girls-home-paint-app'),
+                                      assetName: _pastelPaintCardAsset,
+                                      label: 'パステルお絵かき',
+                                      onTap: () => _launchBuiltin(_paintApp),
+                                    ),
+                                    _HomeMenuCard(
+                                      key: const Key('girls-home-groups'),
+                                      assetName: _groupCreateCardAsset,
+                                      label: 'グループと友達を招待',
+                                      onTap: _createGroupFromHome,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 13),
+                                const _SectionHeading(title: '友達の最新情報'),
+                                const SizedBox(height: 8),
+                                if (_loadingGroups && groups == null)
+                                  const _LatestLoadingCard()
+                                else if (_groupError != null)
+                                  _LatestErrorCard(
+                                    message: _groupError!,
+                                    onRetry: _loadGroups,
+                                  )
+                                else
+                                  _LatestGroupCard(
+                                    group: groups?.firstOrNull,
+                                    onTap: groups == null || groups.isEmpty
+                                        ? _openGroups
+                                        : () => _openGroup(groups.first),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
