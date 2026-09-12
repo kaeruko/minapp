@@ -116,9 +116,13 @@ class GirlsCommonHeader extends StatelessWidget {
         titlePainter.dispose();
 
         // Keep the controls in their own visible row instead of floating beside
-        // the logo. The header art can grow when a notch or large text needs it.
+        // the logo. Compact landscapes cap the decorative art so the body keeps
+        // enough usable height.
         final double naturalHeight =
             math.min(constraints.maxWidth, 480) * 630 / 1200;
+        final double artHeight = compact
+            ? math.min(naturalHeight, media.size.height * .42)
+            : naturalHeight;
         final double top = media.padding.top + (compact ? 2 : 4);
         final double bottom = compact ? 16 : 20;
         final double contentHeight = controlsHeight +
@@ -126,7 +130,7 @@ class GirlsCommonHeader extends StatelessWidget {
             logoHeight +
             (title == null ? 0 : 3 + titleHeight);
         final double height = math.max(
-          naturalHeight,
+          artHeight,
           top + contentHeight + bottom,
         );
         final double logoWidth = math.min(
