@@ -53,7 +53,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('こんにちは、ハニー！\n今日も楽しもうね♪'), findsOneWidget);
+    expect(find.text('こんにちは、ハニー！\n今日も楽しもうね♪'), findsNothing);
+    expect(find.byKey(const Key('girls-header-leading-tray')), findsOneWidget);
+    expect(find.byKey(const Key('girls-header-actions-tray')), findsOneWidget);
     expect(find.text('ビルトインアプリ'), findsOneWidget);
     expect(find.text('友達の最新情報'), findsOneWidget);
     expect(find.byKey(const Key('girls-home-mascot-app')), findsOneWidget);
