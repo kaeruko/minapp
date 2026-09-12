@@ -19,10 +19,6 @@ const String _girlsLaceAsset = 'assets/girls/generated/border_lace_heart.png';
 const String _girlsUploadPortalUrl = 'https://minapp.cloxs.jp/girls.html';
 
 /// Girls group selection page using the reusable five-hill footer.
-///
-/// Only the Groups destination is enabled for now because the other four
-/// destination pages do not exist yet. Their visual slots are present without
-/// inventing fake navigation behavior.
 class GirlsGroupsPage extends StatefulWidget {
   const GirlsGroupsPage({
     required this.api,
@@ -304,6 +300,99 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
     if (mounted) await _loadGroups();
   }
 
+  Widget _buildFirstView(List<HostedGroup>? groups) {
+    if (groups == null) {
+      return const _GirlsLaceFrame(
+        child: _PastelPanel(
+          child: SizedBox(
+            height: 76,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        ),
+      );
+    }
+
+    if (groups.isEmpty) {
+      return _GirlsLaceFrame(
+        child: _PastelPanel(
+          child: Row(
+            children: <Widget>[
+              SvgPicture.asset(
+                _mascotPairAsset,
+                width: 92,
+                height: 76,
+                fit: BoxFit.contain,
+                semanticsLabel: 'みんアプ Girls のふたりのマスコット',
+              ),
+              const SizedBox(width: 15),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'どのグループで遊ぶ？',
+                      style: TextStyle(
+                        color: _lavenderDark,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text('友達のIDで参加するか、自分のグループをつくれるよ。'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (groups.length == 1) {
+      final HostedGroup group = groups.single;
+      return _GirlsLaceFrame(
+        child: _CurrentGroupFirstView(
+          group: group,
+          onOpen: _busy ? null : () => _openGroup(group),
+        ),
+      );
+    }
+
+    return _GirlsLaceFrame(
+      child: _PastelPanel(
+        child: Row(
+          children: <Widget>[
+            SvgPicture.asset(
+              _mascotPairAsset,
+              width: 92,
+              height: 76,
+              fit: BoxFit.contain,
+              semanticsLabel: 'みんアプ Girls のふたりのマスコット',
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    '${groups.length}つのグループに参加中',
+                    style: const TextStyle(
+                      color: _lavenderDark,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text('下の「わたしのグループ」から遊ぶグループを選んでね。'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<HostedGroup>? groups = _groups;
@@ -357,40 +446,7 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
-                        _GirlsLaceFrame(
-                          child: _PastelPanel(
-                            child: Row(
-                              children: <Widget>[
-                                SvgPicture.asset(
-                                  _mascotPairAsset,
-                                  width: 92,
-                                  height: 76,
-                                  fit: BoxFit.contain,
-                                  semanticsLabel: 'みんアプ Girls のふたりのマスコット',
-                                ),
-                                const SizedBox(width: 15),
-                                const Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: <Widget>[
-                                      Text(
-                                        'どのグループで遊ぶ？',
-                                        style: TextStyle(
-                                          color: _lavenderDark,
-                                          fontSize: 21,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                      SizedBox(height: 4),
-                                      Text('友達のIDで参加するか、自分のグループをつくれるよ。'),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        _buildFirstView(groups),
                         const SizedBox(height: 16),
                         Row(
                           children: <Widget>[
@@ -474,6 +530,98 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
           onSelected: (GirlsFooterTab tab) {
             if (tab == GirlsFooterTab.home) widget.onHome?.call();
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _CurrentGroupFirstView extends StatelessWidget {
+  const _CurrentGroupFirstView({required this.group, required this.onOpen});
+
+  final HostedGroup group;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: const Key('girls-groups-first-view-group'),
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: <Color>[Color(0xFFFFD7E5), Color(0xFFE7DCFF)],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          child: Row(
+            children: <Widget>[
+              SvgPicture.asset(
+                _mascotPairAsset,
+                width: 86,
+                height: 74,
+                fit: BoxFit.contain,
+                semanticsLabel: 'みんアプ Girls のふたりのマスコット',
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const Text(
+                      'いまのグループ',
+                      style: TextStyle(
+                        color: Color(0xFF8C7893),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      group.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _lavenderDark,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      group.isOwner ? 'あなたがオーナーです ♡' : 'メンバーとして参加中',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 7),
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          'グループを開く',
+                          style: TextStyle(
+                            color: _lavenderDark,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: _lavenderDark,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
