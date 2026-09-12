@@ -15,11 +15,9 @@ import 'hosted_girls_api.dart';
 const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF8B6BB2);
 const Color _pink = Color(0xFFE79AAF);
-const String _laceAsset = 'assets/girls/generated/border_lace_heart.png';
 const String _mascotAsset = 'assets/girls/cutouts/mascot_white.png';
 const String _profileAsset = 'assets/girls/cutouts/profile.png';
 const String _settingsAsset = 'assets/girls/cutouts/settings.png';
-const String _flowerAsset = 'assets/girls/cutouts/flower_pink.png';
 const String _sparkleAsset = 'assets/girls/cutouts/sparkle.png';
 const String _mascotDiaryCardAsset =
     'assets/girls/cutouts/mascot_diary_card.png';
@@ -29,9 +27,6 @@ const String _pastelPaintCardAsset =
     'assets/girls/cutouts/pastel_paint_card.png';
 const String _groupCreateCardAsset =
     'assets/girls/cutouts/group_create_card.png';
-
-const double _laceSourceWidth = 1386;
-const double _laceSourceHeight = 102;
 
 enum _AccountAction { email, refresh, logout }
 
@@ -294,7 +289,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
 
   void _showNotices() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('新しいお知らせはまだないよ♡')),
+      const SnackBar(content: Text('新しいお知らせはまだないよ')),
     );
   }
 
@@ -390,84 +385,72 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         ),
       ],
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(top: 4, bottom: 22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 430),
-                child: const _WelcomeCard(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 430),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+        padding: const EdgeInsets.fromLTRB(0, 10, 0, 22),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const _SectionHeading(title: 'ビルトインアプリ'),
+                  const SizedBox(height: 8),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 6,
+                    crossAxisSpacing: 6,
+                    childAspectRatio: 1.04,
                     children: <Widget>[
-                      const _SectionHeading(title: 'ビルトインアプリ'),
-                      const SizedBox(height: 8),
-                      GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 6,
-                        crossAxisSpacing: 6,
-                        childAspectRatio: 1.04,
-                        children: <Widget>[
-                          _HomeMenuCard(
-                            key: const Key('girls-home-mascot-app'),
-                            assetName: _mascotDiaryCardAsset,
-                            label: 'マスコット付き交換日記',
-                            onTap: () => _launchBuiltin(_mascotApp),
-                          ),
-                          _HomeMenuCard(
-                            key: const Key('girls-home-novel-app'),
-                            assetName: _pastelNovelCardAsset,
-                            label: 'パステルノベル',
-                            onTap: () => _launchBuiltin(_novelApp),
-                          ),
-                          _HomeMenuCard(
-                            key: const Key('girls-home-paint-app'),
-                            assetName: _pastelPaintCardAsset,
-                            label: 'パステルお絵かき',
-                            onTap: () => _launchBuiltin(_paintApp),
-                          ),
-                          _HomeMenuCard(
-                            key: const Key('girls-home-groups'),
-                            assetName: _groupCreateCardAsset,
-                            label: 'グループと友達を招待',
-                            onTap: _createGroupFromHome,
-                          ),
-                        ],
+                      _HomeMenuCard(
+                        key: const Key('girls-home-mascot-app'),
+                        assetName: _mascotDiaryCardAsset,
+                        label: 'マスコット付き交換日記',
+                        onTap: () => _launchBuiltin(_mascotApp),
                       ),
-                      const SizedBox(height: 13),
-                      const _SectionHeading(title: '友達の最新情報'),
-                      const SizedBox(height: 8),
-                      if (_loadingGroups && groups == null)
-                        const _LatestLoadingCard()
-                      else if (_groupError != null)
-                        _LatestErrorCard(
-                          message: _groupError!,
-                          onRetry: _loadGroups,
-                        )
-                      else
-                        _LatestGroupCard(
-                          group: groups?.firstOrNull,
-                          onTap: groups == null || groups.isEmpty
-                              ? _openGroups
-                              : () => _openGroup(groups.first),
-                        ),
+                      _HomeMenuCard(
+                        key: const Key('girls-home-novel-app'),
+                        assetName: _pastelNovelCardAsset,
+                        label: 'パステルノベル',
+                        onTap: () => _launchBuiltin(_novelApp),
+                      ),
+                      _HomeMenuCard(
+                        key: const Key('girls-home-paint-app'),
+                        assetName: _pastelPaintCardAsset,
+                        label: 'パステルお絵かき',
+                        onTap: () => _launchBuiltin(_paintApp),
+                      ),
+                      _HomeMenuCard(
+                        key: const Key('girls-home-groups'),
+                        assetName: _groupCreateCardAsset,
+                        label: 'グループと友達を招待',
+                        onTap: _createGroupFromHome,
+                      ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 13),
+                  const _SectionHeading(title: '友達の最新情報'),
+                  const SizedBox(height: 8),
+                  if (_loadingGroups && groups == null)
+                    const _LatestLoadingCard()
+                  else if (_groupError != null)
+                    _LatestErrorCard(
+                      message: _groupError!,
+                      onRetry: _loadGroups,
+                    )
+                  else
+                    _LatestGroupCard(
+                      group: groups?.firstOrNull,
+                      onTap: groups == null || groups.isEmpty
+                          ? _openGroups
+                          : () => _openGroup(groups.first),
+                    ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
       bottomNavigationBar: GirlsFooterNav(
@@ -502,21 +485,12 @@ class _BellButton extends StatelessWidget {
     return IconButton(
       tooltip: 'お知らせ',
       onPressed: onTap,
-      constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+      constraints: const BoxConstraints.tightFor(width: 44, height: 44),
       padding: EdgeInsets.zero,
-      icon: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .82),
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFFF2C8D6)),
-        ),
-        child: const Icon(
-          Icons.notifications_rounded,
-          color: Color(0xFFC57B98),
-          size: 21,
-        ),
+      icon: const Icon(
+        Icons.notifications_rounded,
+        color: Color(0xFFC57B98),
+        size: 22,
       ),
     );
   }
@@ -541,170 +515,20 @@ class _RoundArtButton extends StatelessWidget {
       label: label,
       child: InkResponse(
         onTap: onTap,
-        radius: 24,
+        radius: 22,
         child: SizedBox.square(
-          dimension: 48,
+          dimension: 44,
           child: Center(
             child: Image.asset(
               assetName,
-              width: 35,
-              height: 35,
+              width: 30,
+              height: 30,
               fit: BoxFit.contain,
               excludeFromSemantics: true,
             ),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _WelcomeCard extends StatelessWidget {
-  const _WelcomeCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRect(
-      child: SizedBox(
-        height: 148,
-        child: Stack(
-          fit: StackFit.expand,
-          children: <Widget>[
-            const ColoredBox(color: Color(0xFFFFE9F1)),
-            Positioned(
-              left: 5,
-              bottom: -2,
-              child: Image.asset(
-                _mascotAsset,
-                width: 112,
-                height: 126,
-                fit: BoxFit.contain,
-                semanticLabel: '白い猫のハニー',
-              ),
-            ),
-            Positioned(
-              top: 9,
-              left: 10,
-              child: Image.asset(_flowerAsset, width: 27, height: 27),
-            ),
-            Positioned(
-              right: 10,
-              top: 31,
-              child: _SpeechBubble(
-                width: MediaQuery.sizeOf(context).width < 355 ? 180 : 208,
-              ),
-            ),
-            const Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: _WelcomeLaceStrip(),
-            ),
-            const Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: _FlippedWelcomeLaceStrip(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _WelcomeLaceStrip extends StatelessWidget {
-  const _WelcomeLaceStrip();
-
-  @override
-  Widget build(BuildContext context) {
-    final double screenWidth = MediaQuery.sizeOf(context).width;
-    final double renderedLaceHeight =
-        screenWidth * _laceSourceHeight / _laceSourceWidth;
-    return SizedBox(
-      width: double.infinity,
-      height: renderedLaceHeight,
-      child: ClipRect(
-        child: OverflowBox(
-          alignment: Alignment.topCenter,
-          minWidth: screenWidth,
-          maxWidth: screenWidth,
-          minHeight: renderedLaceHeight,
-          maxHeight: renderedLaceHeight,
-          child: Image.asset(
-            _laceAsset,
-            width: screenWidth,
-            height: renderedLaceHeight,
-            fit: BoxFit.fill,
-            alignment: Alignment.topCenter,
-            excludeFromSemantics: true,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FlippedWelcomeLaceStrip extends StatelessWidget {
-  const _FlippedWelcomeLaceStrip();
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.flip(
-      flipY: true,
-      child: const _WelcomeLaceStrip(),
-    );
-  }
-}
-
-class _SpeechBubble extends StatelessWidget {
-  const _SpeechBubble({required this.width});
-
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: <Widget>[
-        Positioned(
-          left: -5,
-          bottom: 20,
-          child: Transform.rotate(
-            angle: .78,
-            child: Container(
-              width: 15,
-              height: 15,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(
-                  left: BorderSide(color: Color(0xFFD9B3A8)),
-                  bottom: BorderSide(color: Color(0xFFD9B3A8)),
-                ),
-              ),
-            ),
-          ),
-        ),
-        Container(
-          width: width,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(23),
-            border: Border.all(color: const Color(0xFFD9B3A8), width: 1.4),
-          ),
-          child: const Text(
-            'こんにちは、ハニー！\n今日も楽しもうね♪',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: _ink,
-              fontSize: 13,
-              height: 1.45,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
