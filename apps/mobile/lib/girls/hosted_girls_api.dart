@@ -6,6 +6,7 @@ import '../api.dart';
 import '../hosted_api.dart';
 import '../hosted_runtime_bridge.dart';
 import '../refreshable_auth_client.dart';
+import 'girls_registration_onboarding.dart';
 import 'girls_session_store.dart';
 
 export '../hosted_api.dart';
@@ -21,12 +22,17 @@ class HostedGirlsApi {
     GirlsSessionStore? sessionStore,
   }) {
     final http.Client resolvedClient = client ?? http.Client();
+    final HostedApi delegate = HostedApi(
+      baseUri: baseUri,
+      client: resolvedClient,
+    );
     return HostedGirlsApi._(
-      delegate: HostedApi(baseUri: baseUri, client: resolvedClient),
+      delegate: delegate,
       authClient: RefreshableAuthClient(
         baseUri: baseUri,
         client: resolvedClient,
       ),
+      registrationOnboarding: GirlsRegistrationOnboarding(delegate),
       sessionStore: sessionStore ?? SecureGirlsSessionStore(),
     );
   }
@@ -34,13 +40,16 @@ class HostedGirlsApi {
   HostedGirlsApi._({
     required HostedApi delegate,
     required RefreshableAuthClient authClient,
+    required GirlsRegistrationOnboarding registrationOnboarding,
     required GirlsSessionStore sessionStore,
   })  : _delegate = delegate,
         _authClient = authClient,
+        _registrationOnboarding = registrationOnboarding,
         _sessionStore = sessionStore;
 
   final HostedApi _delegate;
   final RefreshableAuthClient _authClient;
+  final GirlsRegistrationOnboarding _registrationOnboarding;
   final GirlsSessionStore _sessionStore;
   final StreamController<AuthenticatedSession> _authenticatedSessions =
       StreamController<AuthenticatedSession>.broadcast(sync: true);
@@ -62,10 +71,16 @@ class HostedGirlsApi {
       throw StateError('Refreshable auth client returned an unknown result.');
     }
 
-    // Persist before reporting authentication success. If secure storage fails,
-    // the login fails visibly instead of creating a session that cannot resume.
-    await _sessionStore.writeRefreshToken(result.refreshToken);
     final AuthenticatedSession session = result.toSession();
+
+    // Girls accounts always need at least one group so app creation has a
+    // destination immediately after registration. Existing memberships are
+    // preserved; an empty account receives one ordinary starter group.
+    await _registrationOnboarding.ensureInitialGroup(session);
+
+    // Persist only after onboarding succeeds. A group/network failure remains
+    // visible to the user and does not silently commit a half-finished login.
+    await _sessionStore.writeRefreshToken(result.refreshToken);
     _authenticatedSessions.add(session);
     return session;
   }
@@ -77,7 +92,9 @@ class HostedGirlsApi {
     try {
       final RefreshableAuthenticatedResult result =
           await _authClient.refresh(refreshToken);
-      return result.toSession();
+      final AuthenticatedSession session = result.toSession();
+      await _registrationOnboarding.ensureInitialGroup(session);
+      return session;
     } on ApiException catch (error) {
       if (error.statusCode == 401 && error.code == 'invalid_refresh_token') {
         // The server has explicitly declared this credential invalid. This is
