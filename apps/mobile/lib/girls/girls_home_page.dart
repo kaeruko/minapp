@@ -613,63 +613,50 @@ class _WelcomeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 148,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[Color(0xFFFFF1E6), Color(0xFFFFE4EC)],
+    return ClipRect(
+      child: SizedBox(
+        height: 148,
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            const ColoredBox(color: Color(0xFFFFE9F1)),
+            Positioned(
+              left: 5,
+              bottom: -2,
+              child: Image.asset(
+                _mascotAsset,
+                width: 112,
+                height: 126,
+                fit: BoxFit.contain,
+                semanticLabel: '白い猫のハニー',
+              ),
+            ),
+            Positioned(
+              top: 9,
+              left: 10,
+              child: Image.asset(_flowerAsset, width: 27, height: 27),
+            ),
+            Positioned(
+              right: 10,
+              top: 31,
+              child: _SpeechBubble(
+                width: MediaQuery.sizeOf(context).width < 355 ? 180 : 208,
+              ),
+            ),
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _WelcomeLaceStrip(),
+            ),
+            const Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _FlippedWelcomeLaceStrip(),
+            ),
+          ],
         ),
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: Colors.white, width: 2),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x1FC7829B),
-            blurRadius: 14,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: <Widget>[
-          Positioned(
-            left: 5,
-            bottom: -2,
-            child: Image.asset(
-              _mascotAsset,
-              width: 112,
-              height: 126,
-              fit: BoxFit.contain,
-              semanticLabel: '白い猫のハニー',
-            ),
-          ),
-          Positioned(
-            top: 9,
-            left: 10,
-            child: Image.asset(_flowerAsset, width: 27, height: 27),
-          ),
-          Positioned(
-            right: 10,
-            top: 31,
-            child: _SpeechBubble(
-              width: MediaQuery.sizeOf(context).width < 355 ? 180 : 208,
-            ),
-          ),
-          const Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: _WelcomeLaceStrip(),
-          ),
-          const Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: _FlippedWelcomeLaceStrip(),
-          ),
-        ],
       ),
     );
   }
