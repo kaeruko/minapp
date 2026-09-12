@@ -18,8 +18,7 @@ const Color _cream = Color(0xFFFFFAF0);
 
 const String _logoAsset = 'assets/girls/generated/minapp_girls_logo.png';
 const String _patternAsset = 'assets/girls/cutouts/home_pattern.png';
-const String _laceTopAsset = 'assets/girls/cutouts/lace_top.png';
-const String _laceBottomAsset = 'assets/girls/cutouts/lace_bottom.png';
+const String _laceAsset = 'assets/girls/generated/border_lace_heart.png';
 const String _mascotAsset = 'assets/girls/cutouts/mascot_white.png';
 const String _profileAsset = 'assets/girls/cutouts/profile.png';
 const String _settingsAsset = 'assets/girls/cutouts/settings.png';
@@ -655,30 +654,59 @@ class _WelcomeCard extends StatelessWidget {
               width: MediaQuery.sizeOf(context).width < 355 ? 180 : 208,
             ),
           ),
-          Positioned(
+          const Positioned(
             top: 0,
             left: 0,
             right: 0,
-            child: Image.asset(
-              _laceTopAsset,
-              height: 18,
-              fit: BoxFit.fill,
-              excludeFromSemantics: true,
-            ),
+            child: _WelcomeLaceStrip(),
           ),
-          Positioned(
+          const Positioned(
             bottom: 0,
             left: 0,
             right: 0,
-            child: Image.asset(
-              _laceBottomAsset,
-              height: 19,
-              fit: BoxFit.fill,
-              excludeFromSemantics: true,
-            ),
+            child: _FlippedWelcomeLaceStrip(),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _WelcomeLaceStrip extends StatelessWidget {
+  const _WelcomeLaceStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    final double screenWidth = MediaQuery.sizeOf(context).width;
+    return SizedBox(
+      width: double.infinity,
+      height: 34,
+      child: ClipRect(
+        child: OverflowBox(
+          alignment: Alignment.topCenter,
+          minWidth: screenWidth,
+          maxWidth: screenWidth,
+          child: Image.asset(
+            _laceAsset,
+            width: screenWidth,
+            fit: BoxFit.fitWidth,
+            alignment: Alignment.topCenter,
+            excludeFromSemantics: true,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FlippedWelcomeLaceStrip extends StatelessWidget {
+  const _FlippedWelcomeLaceStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.flip(
+      flipY: true,
+      child: const _WelcomeLaceStrip(),
     );
   }
 }
