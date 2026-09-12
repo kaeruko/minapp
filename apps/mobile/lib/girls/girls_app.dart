@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import 'api.dart';
 import 'girls_app_core.dart' as core;
@@ -13,7 +12,7 @@ const Color _lavender = Color(0xFFB39DDB);
 const Color _lavenderDark = Color(0xFF745B9E);
 const Color _text = Color(0xFF5D4037);
 
-const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
+const String _loginCharacterAsset = 'assets/girls/character.png';
 const String _girlsLoginHeroPatternAsset =
     'assets/girls/generated/bg_pastel_pattern.png';
 const String _girlsLoginHeroLaceAsset =
@@ -151,7 +150,7 @@ class _GirlsPngHero extends StatelessWidget {
             bottom: 38,
             child: Align(
               alignment: Alignment.bottomCenter,
-              child: _GirlsMascotPair(),
+              child: _GirlsLoginCharacter(),
             ),
           ),
           Positioned(
@@ -224,17 +223,17 @@ class _GirlsLaceStrip extends StatelessWidget {
   }
 }
 
-class _GirlsMascotPair extends StatelessWidget {
-  const _GirlsMascotPair();
+class _GirlsLoginCharacter extends StatelessWidget {
+  const _GirlsLoginCharacter();
 
   @override
   Widget build(BuildContext context) {
-    return SvgPicture.asset(
-      _mascotPairAsset,
+    return Image.asset(
+      _loginCharacterAsset,
       width: 215,
       height: 118,
       fit: BoxFit.contain,
-      semanticsLabel: 'みんアプ Girls のふたりのマスコット',
+      semanticLabel: 'みんアプ Girls のキャラクター',
     );
   }
 }
