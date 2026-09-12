@@ -33,6 +33,9 @@ const String _pastelPaintCardAsset =
 const String _groupCreateCardAsset =
     'assets/girls/cutouts/group_create_card.png';
 
+const double _laceSourceWidth = 1386;
+const double _laceSourceHeight = 102;
+
 enum _AccountAction { email, refresh, logout }
 
 /// The Girls landing screen. It keeps the playful visual hierarchy from the
@@ -678,18 +681,23 @@ class _WelcomeLaceStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.sizeOf(context).width;
+    final double renderedLaceHeight =
+        screenWidth * _laceSourceHeight / _laceSourceWidth;
     return SizedBox(
       width: double.infinity,
-      height: 34,
+      height: renderedLaceHeight,
       child: ClipRect(
         child: OverflowBox(
           alignment: Alignment.topCenter,
           minWidth: screenWidth,
           maxWidth: screenWidth,
+          minHeight: renderedLaceHeight,
+          maxHeight: renderedLaceHeight,
           child: Image.asset(
             _laceAsset,
             width: screenWidth,
-            fit: BoxFit.fitWidth,
+            height: renderedLaceHeight,
+            fit: BoxFit.fill,
             alignment: Alignment.topCenter,
             excludeFromSemantics: true,
           ),
