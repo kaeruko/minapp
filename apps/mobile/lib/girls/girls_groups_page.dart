@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_footer_nav.dart';
+import 'girls_scaffold.dart';
 import 'hosted_girls_api.dart';
 
 const Color _lavender = Color(0xFFB39DDB);
@@ -14,7 +15,6 @@ const Color _pink = Color(0xFFFFC4D6);
 const Color _mint = Color(0xFFC8F3D0);
 const Color _blue = Color(0xFFC9E5FF);
 const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
-const String _girlsLogoAsset = 'assets/girls/generated/minapp_girls_logo.png';
 const String _girlsLaceAsset = 'assets/girls/generated/border_lace_heart.png';
 const String _girlsUploadPortalUrl = 'https://minapp.cloxs.jp/girls.html';
 
@@ -396,141 +396,104 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
   @override
   Widget build(BuildContext context) {
     final List<HostedGroup>? groups = _groups;
-    return Scaffold(
-      backgroundColor: const Color(0xFFFDF9EE),
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 12, 10, 8),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Image.asset(
-                        _girlsLogoAsset,
-                        width: 112,
-                        height: 52,
-                        fit: BoxFit.contain,
-                        semanticLabel: 'みんアプ Girls',
+    return GirlsScaffold(
+      title: 'グループ',
+      actions: <Widget>[
+        IconButton(
+          tooltip: '更新',
+          onPressed: _busy ? null : _loadGroups,
+          icon: const Icon(Icons.refresh_rounded, color: _lavenderDark),
+        ),
+        IconButton(
+          tooltip: 'ログアウト',
+          onPressed: _busy ? null : widget.onLogout,
+          icon: const Icon(Icons.logout_rounded, color: _lavenderDark),
+        ),
+      ],
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                _buildFirstView(groups),
+                const SizedBox(height: 16),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: _GroupActionCard(
+                        color: _blue,
+                        icon: Icons.vpn_key_rounded,
+                        title: 'グループIDで参加',
+                        onTap: _busy ? null : _joinGroup,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _GroupActionCard(
+                        color: _mint,
+                        icon: Icons.add_circle_outline_rounded,
+                        title: '新しくつくる',
+                        onTap: _busy ? null : _createGroup,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _GroupActionCard(
+                  color: const Color(0xFFE8D8FF),
+                  icon: Icons.open_in_new_rounded,
+                  title: 'アプリを追加♡',
+                  onTap: _busy || groups == null ? null : _openUploadPortal,
+                ),
+                if (_error != null) ...<Widget>[
+                  const SizedBox(height: 14),
+                  _GirlsError(message: _error!),
+                ],
+                const SizedBox(height: 24),
+                const Text(
+                  'わたしのグループ',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if (groups == null)
+                  const Padding(
+                    padding: EdgeInsets.all(30),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (groups.isEmpty)
+                  const _EmptyGroups()
+                else
+                  ...groups.map(
+                    (HostedGroup group) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _GroupTile(
+                        group: group,
+                        onTap: _busy ? null : () => _openGroup(group),
                       ),
                     ),
                   ),
-                  IconButton(
-                    tooltip: '更新',
-                    onPressed: _busy ? null : _loadGroups,
-                    icon: const Icon(
-                      Icons.refresh_rounded,
-                      color: _lavenderDark,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'ログアウト',
-                    onPressed: _busy ? null : widget.onLogout,
-                    icon: const Icon(
-                      Icons.logout_rounded,
-                      color: _lavenderDark,
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 620),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        _buildFirstView(groups),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: <Widget>[
-                            Expanded(
-                              child: _GroupActionCard(
-                                color: _blue,
-                                icon: Icons.vpn_key_rounded,
-                                title: 'グループIDで参加',
-                                onTap: _busy ? null : _joinGroup,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _GroupActionCard(
-                                color: _mint,
-                                icon: Icons.add_circle_outline_rounded,
-                                title: '新しくつくる',
-                                onTap: _busy ? null : _createGroup,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _GroupActionCard(
-                          color: const Color(0xFFE8D8FF),
-                          icon: Icons.open_in_new_rounded,
-                          title: 'アプリを追加♡',
-                          onTap:
-                              _busy || groups == null ? null : _openUploadPortal,
-                        ),
-                        if (_error != null) ...<Widget>[
-                          const SizedBox(height: 14),
-                          _GirlsError(message: _error!),
-                        ],
-                        const SizedBox(height: 24),
-                        const Text(
-                          'わたしのグループ',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        if (groups == null)
-                          const Padding(
-                            padding: EdgeInsets.all(30),
-                            child: Center(child: CircularProgressIndicator()),
-                          )
-                        else if (groups.isEmpty)
-                          const _EmptyGroups()
-                        else
-                          ...groups.map(
-                            (HostedGroup group) => Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: _GroupTile(
-                                group: group,
-                                onTap: _busy ? null : () => _openGroup(group),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        minimum: EdgeInsets.zero,
-        child: GirlsFooterNav(
-          selectedTab: GirlsFooterTab.groups,
-          enabledTabs: widget.onHome == null
-              ? const <GirlsFooterTab>{GirlsFooterTab.groups}
-              : const <GirlsFooterTab>{
-                  GirlsFooterTab.home,
-                  GirlsFooterTab.groups,
-                },
-          onSelected: (GirlsFooterTab tab) {
-            if (tab == GirlsFooterTab.home) widget.onHome?.call();
-          },
-        ),
+      bottomNavigationBar: GirlsFooterNav(
+        selectedTab: GirlsFooterTab.groups,
+        enabledTabs: widget.onHome == null
+            ? const <GirlsFooterTab>{GirlsFooterTab.groups}
+            : const <GirlsFooterTab>{
+                GirlsFooterTab.home,
+                GirlsFooterTab.groups,
+              },
+        onSelected: (GirlsFooterTab tab) {
+          if (tab == GirlsFooterTab.home) widget.onHome?.call();
+        },
       ),
     );
   }

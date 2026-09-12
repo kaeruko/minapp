@@ -11,6 +11,7 @@ import 'girls_app_management_api.dart';
 import 'girls_app_test_actions.dart';
 import 'girls_builtin_install_api.dart';
 import 'girls_footer_nav.dart';
+import 'girls_scaffold.dart';
 import 'hosted_girls_api.dart';
 import 'hosted_girls_upload_api.dart';
 
@@ -217,111 +218,95 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
   @override
   Widget build(BuildContext context) {
     final List<ManagedGirlsApp>? apps = _apps;
-    return Scaffold(
-      backgroundColor: _cream,
-      appBar: AppBar(
-        backgroundColor: _cream,
-        foregroundColor: _ink,
-        automaticallyImplyLeading: false,
-        title: const Text(
-          'マイアプリ',
-          style: TextStyle(fontWeight: FontWeight.w900),
+    return GirlsScaffold(
+      title: 'アプリ',
+      actions: <Widget>[
+        IconButton(
+          tooltip: '更新',
+          onPressed: _busy ? null : _load,
+          icon: const Icon(Icons.refresh_rounded),
         ),
-        actions: <Widget>[
-          IconButton(
-            tooltip: '更新',
-            onPressed: _busy ? null : _load,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          onRefresh: _load,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
-            children: <Widget>[
-              FilledButton.icon(
-                key: const Key('girls-my-apps-upload'),
-                onPressed: _busy ? null : _openUploadPortal,
-                style: FilledButton.styleFrom(
-                  backgroundColor: _lavender,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                ),
-                icon: const Icon(Icons.open_in_new_rounded),
-                label: const Text('アプリを追加♡'),
+      ],
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+          children: <Widget>[
+            FilledButton.icon(
+              key: const Key('girls-my-apps-upload'),
+              onPressed: _busy ? null : _openUploadPortal,
+              style: FilledButton.styleFrom(
+                backgroundColor: _lavender,
+                padding: const EdgeInsets.symmetric(vertical: 15),
               ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                key: const Key('girls-my-apps-novel-maker'),
-                onPressed: _busy ? null : _openNovelMaker,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                icon: const Icon(Icons.edit_note_rounded),
-                label: const Text('ノベルゲームを作る'),
+              icon: const Icon(Icons.open_in_new_rounded),
+              label: const Text('アプリを追加♡'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              key: const Key('girls-my-apps-novel-maker'),
+              onPressed: _busy ? null : _openNovelMaker,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
               ),
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: 12),
-                _ErrorCard(message: _error!),
-              ],
-              const SizedBox(height: 22),
-              const Text(
-                'あなたのアプリ',
-                style: TextStyle(
-                  color: _ink,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w900,
-                ),
+              icon: const Icon(Icons.edit_note_rounded),
+              label: const Text('ノベルゲームを作る'),
+            ),
+            if (_error != null) ...<Widget>[
+              const SizedBox(height: 12),
+              _ErrorCard(message: _error!),
+            ],
+            const SizedBox(height: 22),
+            const Text(
+              'あなたのアプリ',
+              style: TextStyle(
+                color: _ink,
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
               ),
-              const SizedBox(height: 10),
-              if (apps == null)
-                const Padding(
-                  padding: EdgeInsets.all(36),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (apps.isEmpty)
-                const _EmptyApps()
-              else
-                ...apps.map(
-                  (ManagedGirlsApp app) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _ManagedAppCard(
-                      app: app,
-                      onTap: _busy ? null : () => _openDetail(app),
-                    ),
+            ),
+            const SizedBox(height: 10),
+            if (apps == null)
+              const Padding(
+                padding: EdgeInsets.all(36),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (apps.isEmpty)
+              const _EmptyApps()
+            else
+              ...apps.map(
+                (ManagedGirlsApp app) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _ManagedAppCard(
+                    app: app,
+                    onTap: _busy ? null : () => _openDetail(app),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        minimum: EdgeInsets.zero,
-        child: GirlsFooterNav(
-          selectedTab: GirlsFooterTab.apps,
-          enabledTabs: <GirlsFooterTab>{
-            if (widget.onHome != null) GirlsFooterTab.home,
-            if (widget.onGroups != null) GirlsFooterTab.groups,
-            GirlsFooterTab.apps,
-            GirlsFooterTab.more,
-          },
-          onSelected: (GirlsFooterTab tab) {
-            if (tab == GirlsFooterTab.home) {
-              widget.onHome?.call();
-              return;
-            }
-            if (tab == GirlsFooterTab.groups) {
-              widget.onGroups?.call();
-              return;
-            }
-            if (tab == GirlsFooterTab.more) {
-              _showMoreMenu(context);
-            }
-          },
-        ),
+      bottomNavigationBar: GirlsFooterNav(
+        selectedTab: GirlsFooterTab.apps,
+        enabledTabs: <GirlsFooterTab>{
+          if (widget.onHome != null) GirlsFooterTab.home,
+          if (widget.onGroups != null) GirlsFooterTab.groups,
+          GirlsFooterTab.apps,
+          GirlsFooterTab.more,
+        },
+        onSelected: (GirlsFooterTab tab) {
+          if (tab == GirlsFooterTab.home) {
+            widget.onHome?.call();
+            return;
+          }
+          if (tab == GirlsFooterTab.groups) {
+            widget.onGroups?.call();
+            return;
+          }
+          if (tab == GirlsFooterTab.more) {
+            _showMoreMenu(context);
+          }
+        },
       ),
     );
   }

@@ -70,6 +70,8 @@ void main() {
     await tester.tapAt(const Offset(10, 100));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.byKey(const Key('girls-home-groups')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('girls-home-groups')));
     await tester.pumpAndSettle();
 

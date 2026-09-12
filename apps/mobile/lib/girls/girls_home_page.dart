@@ -9,15 +9,12 @@ import 'girls_apps_page.dart';
 import 'girls_footer_nav.dart';
 import 'girls_email_settings_page.dart';
 import 'girls_groups_page.dart';
+import 'girls_scaffold.dart';
 import 'hosted_girls_api.dart';
 
 const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF8B6BB2);
 const Color _pink = Color(0xFFE79AAF);
-const Color _cream = Color(0xFFFFFAF0);
-
-const String _logoAsset = 'assets/girls/generated/minapp_girls_logo.png';
-const String _patternAsset = 'assets/girls/cutouts/home_pattern.png';
 const String _laceAsset = 'assets/girls/generated/border_lace_heart.png';
 const String _mascotAsset = 'assets/girls/cutouts/mascot_white.png';
 const String _profileAsset = 'assets/girls/cutouts/profile.png';
@@ -376,186 +373,120 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   @override
   Widget build(BuildContext context) {
     final List<HostedGroup>? groups = _groups;
-    return Scaffold(
-      backgroundColor: _cream,
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: _cream,
-          image: DecorationImage(
-            image: AssetImage(_patternAsset),
-            fit: BoxFit.cover,
-            opacity: .12,
-          ),
+    return GirlsScaffold(
+      title: 'ホーム',
+      leading: _BellButton(onTap: _showNotices),
+      actions: <Widget>[
+        _RoundArtButton(
+          key: const Key('girls-home-settings'),
+          assetName: _settingsAsset,
+          label: '設定',
+          onTap: _showAccountMenu,
         ),
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: <Widget>[
-              _GirlsHomeHeader(
-                onNotices: _showNotices,
-                onSettings: _showAccountMenu,
-                onProfile: _showAccountMenu,
+        _RoundArtButton(
+          assetName: _profileAsset,
+          label: 'マイページ',
+          onTap: _showAccountMenu,
+        ),
+      ],
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.only(top: 4, bottom: 22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 430),
+                child: const _WelcomeCard(),
               ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(top: 4, bottom: 22),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 430),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 430),
-                          child: const _WelcomeCard(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 430),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: <Widget>[
-                                const _SectionHeading(title: 'ビルトインアプリ'),
-                                const SizedBox(height: 8),
-                                GridView.count(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  crossAxisCount: 2,
-                                  mainAxisSpacing: 6,
-                                  crossAxisSpacing: 6,
-                                  childAspectRatio: 1.04,
-                                  children: <Widget>[
-                                    _HomeMenuCard(
-                                      key: const Key('girls-home-mascot-app'),
-                                      assetName: _mascotDiaryCardAsset,
-                                      label: 'マスコット付き交換日記',
-                                      onTap: () => _launchBuiltin(_mascotApp),
-                                    ),
-                                    _HomeMenuCard(
-                                      key: const Key('girls-home-novel-app'),
-                                      assetName: _pastelNovelCardAsset,
-                                      label: 'パステルノベル',
-                                      onTap: () => _launchBuiltin(_novelApp),
-                                    ),
-                                    _HomeMenuCard(
-                                      key: const Key('girls-home-paint-app'),
-                                      assetName: _pastelPaintCardAsset,
-                                      label: 'パステルお絵かき',
-                                      onTap: () => _launchBuiltin(_paintApp),
-                                    ),
-                                    _HomeMenuCard(
-                                      key: const Key('girls-home-groups'),
-                                      assetName: _groupCreateCardAsset,
-                                      label: 'グループと友達を招待',
-                                      onTap: _createGroupFromHome,
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 13),
-                                const _SectionHeading(title: '友達の最新情報'),
-                                const SizedBox(height: 8),
-                                if (_loadingGroups && groups == null)
-                                  const _LatestLoadingCard()
-                                else if (_groupError != null)
-                                  _LatestErrorCard(
-                                    message: _groupError!,
-                                    onRetry: _loadGroups,
-                                  )
-                                else
-                                  _LatestGroupCard(
-                                    group: groups?.firstOrNull,
-                                    onTap: groups == null || groups.isEmpty
-                                        ? _openGroups
-                                        : () => _openGroup(groups.first),
-                                  ),
-                              ],
-                            ),
+                      const _SectionHeading(title: 'ビルトインアプリ'),
+                      const SizedBox(height: 8),
+                      GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 6,
+                        crossAxisSpacing: 6,
+                        childAspectRatio: 1.04,
+                        children: <Widget>[
+                          _HomeMenuCard(
+                            key: const Key('girls-home-mascot-app'),
+                            assetName: _mascotDiaryCardAsset,
+                            label: 'マスコット付き交換日記',
+                            onTap: () => _launchBuiltin(_mascotApp),
                           ),
-                        ),
+                          _HomeMenuCard(
+                            key: const Key('girls-home-novel-app'),
+                            assetName: _pastelNovelCardAsset,
+                            label: 'パステルノベル',
+                            onTap: () => _launchBuiltin(_novelApp),
+                          ),
+                          _HomeMenuCard(
+                            key: const Key('girls-home-paint-app'),
+                            assetName: _pastelPaintCardAsset,
+                            label: 'パステルお絵かき',
+                            onTap: () => _launchBuiltin(_paintApp),
+                          ),
+                          _HomeMenuCard(
+                            key: const Key('girls-home-groups'),
+                            assetName: _groupCreateCardAsset,
+                            label: 'グループと友達を招待',
+                            onTap: _createGroupFromHome,
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 13),
+                      const _SectionHeading(title: '友達の最新情報'),
+                      const SizedBox(height: 8),
+                      if (_loadingGroups && groups == null)
+                        const _LatestLoadingCard()
+                      else if (_groupError != null)
+                        _LatestErrorCard(
+                          message: _groupError!,
+                          onRetry: _loadGroups,
+                        )
+                      else
+                        _LatestGroupCard(
+                          group: groups?.firstOrNull,
+                          onTap: groups == null || groups.isEmpty
+                              ? _openGroups
+                              : () => _openGroup(groups.first),
+                        ),
                     ],
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        minimum: EdgeInsets.zero,
-        child: GirlsFooterNav(
-          selectedTab: GirlsFooterTab.home,
-          enabledTabs: const <GirlsFooterTab>{
-            GirlsFooterTab.home,
-            GirlsFooterTab.groups,
-            GirlsFooterTab.apps,
-            GirlsFooterTab.more,
-          },
-          onSelected: (GirlsFooterTab tab) {
-            if (tab == GirlsFooterTab.groups) {
-              _openGroups();
-              return;
-            }
-            if (tab == GirlsFooterTab.apps || tab == GirlsFooterTab.more) {
-              _openApps();
-            }
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _GirlsHomeHeader extends StatelessWidget {
-  const _GirlsHomeHeader({
-    required this.onNotices,
-    required this.onSettings,
-    required this.onProfile,
-  });
-
-  final VoidCallback onNotices;
-  final VoidCallback onSettings;
-  final VoidCallback onProfile;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0xFFFFF8EF),
-      child: SizedBox(
-        height: 64,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 5, 8, 5),
-          child: Row(
-            children: <Widget>[
-              _BellButton(onTap: onNotices),
-              Expanded(
-                child: Center(
-                  child: Image.asset(
-                    _logoAsset,
-                    width: 88,
-                    height: 46,
-                    fit: BoxFit.contain,
-                    semanticLabel: 'みんアプ Girls',
-                  ),
-                ),
-              ),
-              _RoundArtButton(
-                key: const Key('girls-home-settings'),
-                assetName: _settingsAsset,
-                label: '設定',
-                onTap: onSettings,
-              ),
-              _RoundArtButton(
-                assetName: _profileAsset,
-                label: 'マイページ',
-                onTap: onProfile,
-              ),
-            ],
-          ),
-        ),
+      bottomNavigationBar: GirlsFooterNav(
+        selectedTab: GirlsFooterTab.home,
+        enabledTabs: const <GirlsFooterTab>{
+          GirlsFooterTab.home,
+          GirlsFooterTab.groups,
+          GirlsFooterTab.apps,
+          GirlsFooterTab.more,
+        },
+        onSelected: (GirlsFooterTab tab) {
+          if (tab == GirlsFooterTab.groups) {
+            _openGroups();
+            return;
+          }
+          if (tab == GirlsFooterTab.apps || tab == GirlsFooterTab.more) {
+            _openApps();
+          }
+        },
       ),
     );
   }
@@ -571,16 +502,21 @@ class _BellButton extends StatelessWidget {
     return IconButton(
       tooltip: 'お知らせ',
       onPressed: onTap,
-      constraints: const BoxConstraints.tightFor(width: 38, height: 38),
+      constraints: const BoxConstraints.tightFor(width: 48, height: 48),
       padding: EdgeInsets.zero,
-      style: IconButton.styleFrom(
-        backgroundColor: Colors.white.withValues(alpha: .82),
-        side: const BorderSide(color: Color(0xFFF2C8D6)),
-      ),
-      icon: const Icon(
-        Icons.notifications_rounded,
-        color: Color(0xFFC57B98),
-        size: 21,
+      icon: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: .82),
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFF2C8D6)),
+        ),
+        child: const Icon(
+          Icons.notifications_rounded,
+          color: Color(0xFFC57B98),
+          size: 21,
+        ),
       ),
     );
   }
@@ -605,15 +541,17 @@ class _RoundArtButton extends StatelessWidget {
       label: label,
       child: InkResponse(
         onTap: onTap,
-        radius: 21,
-        child: Padding(
-          padding: const EdgeInsets.all(1),
-          child: Image.asset(
-            assetName,
-            width: 35,
-            height: 35,
-            fit: BoxFit.contain,
-            excludeFromSemantics: true,
+        radius: 24,
+        child: SizedBox.square(
+          dimension: 48,
+          child: Center(
+            child: Image.asset(
+              assetName,
+              width: 35,
+              height: 35,
+              fit: BoxFit.contain,
+              excludeFromSemantics: true,
+            ),
           ),
         ),
       ),
