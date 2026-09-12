@@ -67,7 +67,10 @@ void main() {
         tester.getRect(find.byKey(const Key('girls-body-background')));
     final Rect headerBefore =
         tester.getRect(find.byKey(const Key('girls-common-header')));
-    final double firstBefore = tester.getTopLeft(find.text('Item 0')).dy;
+    final double trackedBefore = tester.getTopLeft(find.text('Item 2')).dy;
+
+    expect(find.byKey(const Key('girls-header-leading-tray')), findsOneWidget);
+    expect(find.byKey(const Key('girls-header-actions-tray')), findsOneWidget);
 
     await tester.drag(
       find.byKey(const Key('scrolling-content')),
@@ -83,7 +86,7 @@ void main() {
       tester.getRect(find.byKey(const Key('girls-common-header'))),
       headerBefore,
     );
-    expect(tester.getTopLeft(find.text('Item 0')).dy, lessThan(firstBefore));
+    expect(tester.getTopLeft(find.text('Item 2')).dy, lessThan(trackedBefore));
     await tester.tap(find.byKey(const Key('header-action')));
     expect(taps, 1);
     expect(tester.takeException(), isNull);
