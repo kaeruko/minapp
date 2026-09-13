@@ -69,7 +69,7 @@ jobs:
               'recommendation card',
           )
           text = sub_once(
-              r"'まだグループのアプリはないよ。\\\nGirlsおすすめアプリは上からすぐ遊べるよ ♡'",
+              r"'まだグループのアプリはないよ。.*?Girlsおすすめアプリは上からすぐ遊べるよ ♡'",
               "'まだグループのアプリはないよ。'",
               text,
               'empty-state copy',
