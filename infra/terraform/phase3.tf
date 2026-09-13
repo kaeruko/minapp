@@ -3,6 +3,11 @@ locals {
     "GET /mobile/apps",
     "POST /mobile/apps/{app_id}/versions/{version_id}/launch",
     "POST /mobile/apps/{app_id}/versions/{version_id}/reports",
+    "GET /shop/apps",
+    "POST /shop/apps/{app_id}/versions/{version_id}/launch",
+    "POST /shop/apps/{app_id}/versions/{version_id}/download",
+    "POST /shop/apps/{app_id}/versions/{version_id}/reports",
+    "PUT /apps/{app_id}/shop-visibility",
   ])
 }
 
