@@ -7,7 +7,7 @@ from typing import Any
 from aws_backend import _item_string, _string_attr
 from display_name_backend import DisplayNameAwsBackend
 from errors import ApiProblem
-from phase2_backend import _now_iso, _optional_item_string
+from phase2_backend import _now_iso
 from phase3_backend import LAUNCH_TTL_SECONDS, REPORT_REASONS
 
 SHOP_DOWNLOAD_TTL_SECONDS = 10 * 60
@@ -61,8 +61,6 @@ class ShopAwsBackend(DisplayNameAwsBackend):
         }
 
     def list_shop_apps(self, auth_subject: str) -> list[dict[str, Any]]:
-        # Authentication is required even though shop listing does not require
-        # membership in the source group.
         self._user_by_auth_subject(auth_subject)
         response = self._dynamodb.query(
             TableName=self._table_name,
@@ -123,11 +121,13 @@ class ShopAwsBackend(DisplayNameAwsBackend):
                                 "sk": _string_attr("META"),
                             },
                             "UpdateExpression": "SET shop_visibility = :listed, shop_listed_at = :listed_at, shop_listed_by = :user_id",
-                            "ConditionExpression": "owner_user_id = :user_id",
+                            "ConditionExpression": "owner_user_id = :user_id AND (attribute_not_exists(#app_status) OR #app_status = :active)",
+                            "ExpressionAttributeNames": {"#app_status": "status"},
                             "ExpressionAttributeValues": {
                                 ":listed": _string_attr("listed"),
                                 ":listed_at": _string_attr(listed_at),
                                 ":user_id": _string_attr(user.user_id),
+                                ":active": _string_attr("active"),
                             },
                         }
                     },
@@ -150,10 +150,12 @@ class ShopAwsBackend(DisplayNameAwsBackend):
                                 "sk": _string_attr("META"),
                             },
                             "UpdateExpression": "SET shop_visibility = :unlisted REMOVE shop_listed_at, shop_listed_by",
-                            "ConditionExpression": "owner_user_id = :user_id",
+                            "ConditionExpression": "owner_user_id = :user_id AND (attribute_not_exists(#app_status) OR #app_status = :active)",
+                            "ExpressionAttributeNames": {"#app_status": "status"},
                             "ExpressionAttributeValues": {
                                 ":unlisted": _string_attr("unlisted"),
                                 ":user_id": _string_attr(user.user_id),
+                                ":active": _string_attr("active"),
                             },
                         }
                     },
@@ -287,18 +289,105 @@ class ShopAwsBackend(DisplayNameAwsBackend):
         app_id: str,
         version_id: str,
     ) -> dict[str, Any]:
-        result = super().unpublish_app(auth_subject, app_id, version_id)
-        self._force_unlist(app_id)
-        return result
+        self._require_active_app(app_id)
+        teacher = self._user_by_auth_subject(auth_subject)
+        version = self._version_item(app_id, version_id)
+        group_id = _item_string(version, "group_id")
+        self._require_teacher_membership(teacher.user_id, group_id)
+        if _item_string(version, "status") != "approved":
+            raise ApiProblem(409, "app_not_published", "現在公開中の作品だけ公開を停止できます。")
+
+        latest = self._latest_publication_decision(self._version_items(app_id))
+        if latest is None:
+            raise RuntimeError("Approved app has no publication decision")
+        latest_status = _item_string(latest, "status")
+        if latest_status != "approved":
+            if latest_status == "unpublished":
+                raise ApiProblem(409, "app_not_published", "この作品はすでに公開停止中です。")
+            raise RuntimeError(f"Unsupported publication decision: {latest_status!r}")
+        if _item_string(latest, "version_id") != version_id:
+            raise ApiProblem(
+                409,
+                "old_version_not_published",
+                "この作品には新しい公開版があります。一覧を更新してください。",
+            )
+
+        owner_user_id = _item_string(version, "owner_user_id")
+        unpublished_at = _now_iso()
+        version_keys = [
+            (f"APP#{app_id}", f"VERSION#{version_id}"),
+            (f"GROUP#{group_id}", f"APP#{app_id}#VERSION#{version_id}"),
+            (f"USER#{owner_user_id}", f"APP#{app_id}#VERSION#{version_id}"),
+        ]
+        self._dynamodb.transact_write_items(
+            TransactItems=[
+                *[
+                    {
+                        "Update": {
+                            "TableName": self._table_name,
+                            "Key": {"pk": _string_attr(pk), "sk": _string_attr(sk)},
+                            "UpdateExpression": "SET #status = :unpublished, unpublished_at = :at, unpublished_by = :by",
+                            "ConditionExpression": "#status = :approved",
+                            "ExpressionAttributeNames": {"#status": "status"},
+                            "ExpressionAttributeValues": {
+                                ":approved": _string_attr("approved"),
+                                ":unpublished": _string_attr("unpublished"),
+                                ":at": _string_attr(unpublished_at),
+                                ":by": _string_attr(teacher.user_id),
+                            },
+                        }
+                    }
+                    for pk, sk in version_keys
+                ],
+                {
+                    "Update": {
+                        "TableName": self._table_name,
+                        "Key": {
+                            "pk": _string_attr(f"APP#{app_id}"),
+                            "sk": _string_attr("META"),
+                        },
+                        "UpdateExpression": "SET shop_visibility = :unlisted REMOVE shop_listed_at, shop_listed_by",
+                        "ConditionExpression": "attribute_exists(pk) AND (attribute_not_exists(#app_status) OR #app_status = :active)",
+                        "ExpressionAttributeNames": {"#app_status": "status"},
+                        "ExpressionAttributeValues": {
+                            ":unlisted": _string_attr("unlisted"),
+                            ":active": _string_attr("active"),
+                        },
+                    }
+                },
+                {
+                    "Delete": {
+                        "TableName": self._table_name,
+                        "Key": {
+                            "pk": _string_attr("SHOP"),
+                            "sk": _string_attr(f"APP#{app_id}"),
+                        },
+                    }
+                },
+            ]
+        )
+        version["status"] = _string_attr("unpublished")
+        version["unpublished_at"] = _string_attr(unpublished_at)
+        version["unpublished_by"] = _string_attr(teacher.user_id)
+        return self._public_version(version)
 
     def archive_app(self, auth_subject: str, app_id: str) -> None:
-        super().archive_app(auth_subject, app_id)
-        self._force_unlist(app_id)
+        student = self._user_by_auth_subject(auth_subject)
+        self._require_role(student, "student")
+        meta = self._require_active_app(app_id)
+        if _item_string(meta, "owner_user_id") != student.user_id:
+            raise ApiProblem(403, "forbidden", "この作品を削除する権限がありません。")
+        group_id = _item_string(meta, "group_id")
+        self._require_active_membership(student.user_id, group_id, "student")
+        versions = self._version_items(app_id)
+        if any(_item_string(item, "status") == "pending_review" for item in versions):
+            raise ApiProblem(
+                409,
+                "review_in_progress",
+                "先生の確認待ちの版があるため削除できません。確認が終わってから削除してください。",
+            )
 
-    def _force_unlist(self, app_id: str) -> None:
-        meta = self._app_meta_item(app_id)
-        if self._shop_visibility(meta) == "unlisted":
-            return
+        archived_at = _now_iso()
         self._dynamodb.transact_write_items(
             TransactItems=[
                 {
@@ -308,8 +397,16 @@ class ShopAwsBackend(DisplayNameAwsBackend):
                             "pk": _string_attr(f"APP#{app_id}"),
                             "sk": _string_attr("META"),
                         },
-                        "UpdateExpression": "SET shop_visibility = :unlisted REMOVE shop_listed_at, shop_listed_by",
-                        "ExpressionAttributeValues": {":unlisted": _string_attr("unlisted")},
+                        "UpdateExpression": "SET #status = :archived, archived_at = :archived_at, shop_visibility = :unlisted REMOVE shop_listed_at, shop_listed_by",
+                        "ConditionExpression": "owner_user_id = :owner AND (attribute_not_exists(#status) OR #status = :active)",
+                        "ExpressionAttributeNames": {"#status": "status"},
+                        "ExpressionAttributeValues": {
+                            ":owner": _string_attr(student.user_id),
+                            ":active": _string_attr("active"),
+                            ":archived": _string_attr("archived"),
+                            ":archived_at": _string_attr(archived_at),
+                            ":unlisted": _string_attr("unlisted"),
+                        },
                     }
                 },
                 {
