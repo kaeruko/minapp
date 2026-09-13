@@ -17,6 +17,7 @@ from handler import (
     _required_string,
 )
 from hosted_girls_shop_backend import HostedGirlsShopBackend
+from hosted_user_state_backend import HostedUserStateBackend
 
 _LOGGER = logging.getLogger(__name__)
 _BACKEND: HostedGirlsShopBackend | None = None
@@ -29,18 +30,26 @@ _SHOP_CONTENT_RE = re.compile(r"^/shop/content/([A-Za-z0-9_-]{32,128})/(.+)$")
 def _shared_backend() -> HostedGirlsShopBackend:
     global _BACKEND
     backend = hosted_handler._BACKEND
-    if backend is None:
-        resolved = HostedGirlsShopBackend.from_environment()
-        hosted_handler._BACKEND = resolved
-        _BACKEND = resolved
-        return resolved
-    if not isinstance(backend, HostedGirlsShopBackend):
+
+    if isinstance(backend, HostedGirlsShopBackend):
+        if _BACKEND is None:
+            _BACKEND = backend
+        elif _BACKEND is not backend:
+            raise RuntimeError("Hosted and shop handlers must share the same backend instance")
+        return backend
+
+    if backend is not None and not isinstance(backend, HostedUserStateBackend):
         raise RuntimeError("Hosted API backend was initialized with an incompatible backend type")
-    if _BACKEND is None:
-        _BACKEND = backend
-    elif _BACKEND is not backend:
-        raise RuntimeError("Hosted and shop handlers must share the same backend instance")
-    return backend
+    if _BACKEND is not None:
+        raise RuntimeError("Shop backend is initialized but Hosted API points at a different backend instance")
+
+    # Existing Hosted routes can initialize HostedUserStateBackend before the
+    # first Shop request. Promote that process to the final Girls backend here
+    # so both handlers share one backend type and one instance from this point on.
+    resolved = HostedGirlsShopBackend.from_environment()
+    hosted_handler._BACKEND = resolved
+    _BACKEND = resolved
+    return resolved
 
 
 def _absolute_url(event: dict[str, Any], content_path: str) -> str:
