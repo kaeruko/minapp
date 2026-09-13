@@ -16,25 +16,25 @@ from handler import (
     _require_fields,
     _required_string,
 )
-from hosted_shop_backend import HostedShopBackend
+from hosted_shop_runtime_backend import HostedShopRuntimeBackend
 
 _LOGGER = logging.getLogger(__name__)
-_BACKEND: HostedShopBackend | None = None
+_BACKEND: HostedShopRuntimeBackend | None = None
 _ID_RE = r"([0-9a-f]{32})"
 _SHOP_ACTION_RE = re.compile(rf"^/shop/apps/{_ID_RE}/(launch|download|reports)$")
 _SHOP_VISIBILITY_RE = re.compile(rf"^/apps/{_ID_RE}/shop-visibility$")
 _SHOP_CONTENT_RE = re.compile(r"^/shop/content/([A-Za-z0-9_-]{32,128})/(.+)$")
 
 
-def _shared_backend() -> HostedShopBackend:
+def _shared_backend() -> HostedShopRuntimeBackend:
     global _BACKEND
     backend = hosted_handler._BACKEND
     if backend is None:
-        resolved = HostedShopBackend.from_environment()
+        resolved = HostedShopRuntimeBackend.from_environment()
         hosted_handler._BACKEND = resolved
         _BACKEND = resolved
         return resolved
-    if not isinstance(backend, HostedShopBackend):
+    if not isinstance(backend, HostedShopRuntimeBackend):
         raise RuntimeError("Hosted API backend was initialized with an incompatible backend type")
     if _BACKEND is None:
         _BACKEND = backend
@@ -111,14 +111,21 @@ def _handle_shop_request(event: dict[str, Any]) -> dict[str, Any] | None:
             if action == "launch":
                 launch = backend.create_shop_launch(_auth_subject(event), app_id, version)
                 content_path = launch.get("content_path")
+                runtime_token = launch.get("runtime_token")
                 expires_in = launch.get("expires_in")
                 if not isinstance(content_path, str):
                     raise RuntimeError("Shop launch backend response has no content_path")
+                if not isinstance(runtime_token, str) or not runtime_token:
+                    raise RuntimeError("Shop launch backend response has no runtime_token")
                 if not isinstance(expires_in, int) or expires_in <= 0:
                     raise RuntimeError("Shop launch backend response has invalid expires_in")
                 return _json_response(
                     200,
-                    {"url": _absolute_url(event, content_path), "expires_in": expires_in},
+                    {
+                        "url": _absolute_url(event, content_path),
+                        "runtime_token": runtime_token,
+                        "expires_in": expires_in,
+                    },
                 )
             return _json_response(
                 200,
