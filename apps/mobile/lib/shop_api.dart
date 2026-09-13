@@ -84,6 +84,8 @@ class ShopApiClient {
   final Uri _baseUri;
   final http.Client _client;
 
+  void close() => _client.close();
+
   Future<List<ShopApp>> listApps(String accessToken) async {
     final Map<String, Object?> payload = await _jsonRequest(
       method: 'GET',
@@ -205,21 +207,20 @@ class ShopApiClient {
     if (body != null) headers['Content-Type'] = 'application/json';
 
     late final http.Response response;
-    switch (method) {
-      case 'GET':
-        if (body != null) throw ArgumentError('GET must not contain a body.');
-        response = await _client.get(uri, headers: headers);
-      case 'POST':
-        response = await _client.post(
-          uri,
-          headers: headers,
-          body: body == null ? null : jsonEncode(body),
-        );
-      case 'PUT':
-        if (body == null) throw ArgumentError('PUT requires a JSON body.');
-        response = await _client.put(uri, headers: headers, body: jsonEncode(body));
-      default:
-        throw ArgumentError.value(method, 'method', 'unsupported HTTP method');
+    if (method == 'GET') {
+      if (body != null) throw ArgumentError('GET must not contain a body.');
+      response = await _client.get(uri, headers: headers);
+    } else if (method == 'POST') {
+      response = await _client.post(
+        uri,
+        headers: headers,
+        body: body == null ? null : jsonEncode(body),
+      );
+    } else if (method == 'PUT') {
+      if (body == null) throw ArgumentError('PUT requires a JSON body.');
+      response = await _client.put(uri, headers: headers, body: jsonEncode(body));
+    } else {
+      throw ArgumentError.value(method, 'method', 'unsupported HTTP method');
     }
 
     final String? contentType = response.headers['content-type'];
