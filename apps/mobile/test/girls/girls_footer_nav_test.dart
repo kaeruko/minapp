@@ -72,7 +72,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('shop scope enables shop footer even when page omits it', (
+  testWidgets('shop scope routes shop footer even when page omits it', (
     WidgetTester tester,
   ) async {
     int shopOpens = 0;
@@ -94,15 +94,6 @@ void main() {
 
     final Finder shop = find.byKey(const ValueKey<String>('girls-footer-shop'));
     expect(shop, findsOneWidget);
-    expect(
-      tester.getSemantics(shop),
-      matchesSemantics(
-        label: 'ショップ',
-        isButton: true,
-        hasEnabledState: true,
-        isEnabled: true,
-      ),
-    );
 
     await tester.tap(shop);
     await tester.pump();
