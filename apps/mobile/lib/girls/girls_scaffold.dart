@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 const Color _girlsCream = Color(0xFFFCF4E9);
-const String _headerBackground = 'assets/girls/backgrounds/girls_header_bg.jpg';
+const Color _headerCream = Color(0xFFFBF3E8);
+const String _headerBackground =
+    'assets/girls/backgrounds/girls_header_bg_top.png';
 const String _bodyBackground = 'assets/girls/backgrounds/girls_body_bg.jpg';
 const String _girlsLogo = 'assets/girls/generated/minapp_girls_logo.png';
 
@@ -37,209 +39,227 @@ class GirlsScaffold extends StatelessWidget {
       ),
       child: Scaffold(
         backgroundColor: _girlsCream,
-        body: Column(
-          children: <Widget>[
-            GirlsCommonHeader(
-              title: title,
-              leading: leading,
-              actions: actions,
-            ),
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: <Widget>[
-                  const Positioned.fill(child: _GirlsBodyBackground()),
-                  Column(
-                    children: <Widget>[
-                      Expanded(
-                        child: ClipRect(
-                          child: SafeArea(
-                            top: false,
-                            bottom: false,
-                            child: body,
+        extendBody: true,
+        bottomNavigationBar: SafeArea(top: false, child: bottomNavigationBar),
+        body: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final _HeaderLayout header = _HeaderLayout.forWidth(
+              MediaQuery.of(context),
+              constraints.maxWidth,
+              hasLeading: leading != null,
+              actionCount: actions.length,
+            );
+            return Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                // Start behind the transparent scallops, so the body artwork
+                // shows through the lace instead of a rectangular header fill.
+                Positioned(
+                  top: header.height - header.laceHeight,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: const _GirlsBodyBackground(),
+                ),
+                Column(
+                  children: <Widget>[
+                    GirlsCommonHeader(leading: leading, actions: actions),
+                    Expanded(
+                      child: Column(
+                        children: <Widget>[
+                          if (title != null)
+                            SafeArea(
+                              top: false,
+                              bottom: false,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Semantics(
+                                    header: true,
+                                    child: Text(
+                                      title!,
+                                      key: const Key('girls-page-title'),
+                                      style: const TextStyle(
+                                        color: Color(0xFF745B9E),
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          Expanded(
+                            child: ClipRect(
+                              child: SafeArea(
+                                top: false,
+                                child: body,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                      SafeArea(top: false, child: bottomNavigationBar),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
-/// The lace, logo, page name and actions share one header, including the inset.
+/// The PNG is 1200 x 450; its bottom 100 pixels contain the scalloped lace.
+class _HeaderLayout {
+  const _HeaderLayout({
+    required this.artHeight,
+    required this.height,
+    required this.laceHeight,
+    required this.rowTop,
+    required this.rowHeight,
+    required this.logoWidth,
+  });
+
+  factory _HeaderLayout.forWidth(
+    MediaQueryData media,
+    double width, {
+    required bool hasLeading,
+    required int actionCount,
+  }) {
+    final double contentWidth =
+        math.max(0, width - media.padding.horizontal - 24);
+    final double sideWidth =
+        math.max(hasLeading ? 48 : 0, actionCount * 48).toDouble();
+    final double logoWidth =
+        math.min(128, math.max(48, contentWidth - sideWidth * 2 - 16));
+    final double rowHeight =
+        math.max(48, math.min(64, logoWidth * 1504 / 2808));
+    final double artHeight = width * 450 / 1200;
+    final double laceHeight = width * 100 / 1200;
+    final double safeTop = media.padding.top + 4;
+    final double minimumHeight = safeTop + rowHeight + 4 + laceHeight;
+    // Wide screens crop only the empty upper cream area. The lace always spans
+    // the real screen width and keeps the PNG's proportions.
+    final double preferredHeight =
+        math.min(artHeight, media.size.height < 500 ? 144 : 180);
+    final double height = math.max(preferredHeight, minimumHeight);
+    final double rowTop =
+        safeTop + (height - laceHeight - 4 - safeTop - rowHeight) / 2;
+    return _HeaderLayout(
+      artHeight: artHeight,
+      height: height,
+      laceHeight: laceHeight,
+      rowTop: rowTop,
+      rowHeight: rowHeight,
+      logoWidth: logoWidth,
+    );
+  }
+
+  final double artHeight;
+  final double height;
+  final double laceHeight;
+  final double rowTop;
+  final double rowHeight;
+  final double logoWidth;
+}
+
+/// Places the logo and live controls in one row above the transparent lace.
 class GirlsCommonHeader extends StatelessWidget {
   const GirlsCommonHeader({
-    this.title,
     this.leading,
     this.actions = const <Widget>[],
     super.key,
   });
 
-  final String? title;
   final Widget? leading;
   final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
     final MediaQueryData media = MediaQuery.of(context);
-    final bool compact = media.size.height < 500;
-    final double logoHeight = compact ? 40 : 50;
-    final double controlsHeight = compact ? 42 : 46;
-    final TextStyle titleStyle = TextStyle(
-      fontSize: compact ? 23 : 27,
-      height: 1.15,
-      fontWeight: FontWeight.w800,
-      letterSpacing: 1,
-    );
-
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        final double contentWidth = math.max(
-          1,
-          constraints.maxWidth - media.padding.horizontal - 24,
+        final _HeaderLayout layout = _HeaderLayout.forWidth(
+          media,
+          constraints.maxWidth,
+          hasLeading: leading != null,
+          actionCount: actions.length,
         );
-        final TextPainter titlePainter = TextPainter(
-          text: TextSpan(text: title ?? '', style: titleStyle),
-          textDirection: Directionality.of(context),
-          textScaler: media.textScaler,
-          maxLines: 2,
-          ellipsis: '…',
-        )..layout(maxWidth: contentWidth);
-        final double titleHeight = title == null ? 0 : titlePainter.height;
-        titlePainter.dispose();
-
-        // Keep the controls in their own visible row instead of floating beside
-        // the logo. Compact landscapes cap the decorative art so the body keeps
-        // enough usable height.
-        final double naturalHeight =
-            math.min(constraints.maxWidth, 480) * 630 / 1200;
-        final double artHeight = compact
-            ? math.min(naturalHeight, media.size.height * .42)
-            : naturalHeight;
-        final double top = media.padding.top + (compact ? 2 : 4);
-        final double bottom = compact ? 16 : 20;
-        final double contentHeight = controlsHeight +
-            5 +
-            logoHeight +
-            (title == null ? 0 : 3 + titleHeight);
-        final double height = math.max(
-          artHeight,
-          top + contentHeight + bottom,
-        );
-        final double logoWidth = math.min(
-          132,
-          math.max(72, contentWidth * .42),
-        );
-
         return SizedBox(
           key: const Key('girls-common-header'),
-          height: height,
+          height: layout.height,
           width: double.infinity,
-          child: Stack(
-            fit: StackFit.expand,
-            children: <Widget>[
-              ClipRect(
-                child: OverflowBox(
-                  alignment: Alignment.center,
-                  minWidth: height * 1200 / 630,
-                  maxWidth: height * 1200 / 630,
+          child: ClipRect(
+            child: Stack(
+              children: <Widget>[
+                // Extra notch clearance is plain cream, not a scaled-up image.
+                if (layout.height > layout.artHeight)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: layout.height - layout.artHeight + 1,
+                    child: const ColoredBox(color: _headerCream),
+                  ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
                   child: Image.asset(
                     _headerBackground,
-                    height: height,
-                    width: height * 1200 / 630,
-                    fit: BoxFit.contain,
+                    key: const Key('girls-header-background'),
+                    width: constraints.maxWidth,
+                    height: layout.artHeight,
+                    fit: BoxFit.fitWidth,
                     excludeFromSemantics: true,
                   ),
                 ),
-              ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  media.padding.left + 12,
-                  top,
-                  media.padding.right + 12,
-                  bottom,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: <Widget>[
-                    SizedBox(
-                      height: controlsHeight,
-                      child: Row(
-                        children: <Widget>[
-                          if (leading != null)
-                            _HeaderControlTray(
-                              key: const Key('girls-header-leading-tray'),
-                              child: leading!,
-                            )
-                          else
-                            const SizedBox(width: 1),
-                          const Spacer(),
-                          if (actions.isNotEmpty)
-                            _HeaderControlTray(
-                              key: const Key('girls-header-actions-tray'),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: actions,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Image.asset(
-                      _girlsLogo,
-                      width: logoWidth,
-                      height: logoHeight,
-                      fit: BoxFit.contain,
-                      semanticLabel: 'みんアプ Girls',
-                    ),
-                    if (title != null) ...<Widget>[
-                      const SizedBox(height: 3),
-                      Semantics(
-                        header: true,
-                        label: title,
-                        child: ExcludeSemantics(
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: <Widget>[
-                              Text(
-                                title!,
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: titleStyle.copyWith(
-                                  foreground: Paint()
-                                    ..style = PaintingStyle.stroke
-                                    ..strokeWidth = 5
-                                    ..color =
-                                        Colors.white.withValues(alpha: .96),
-                                ),
-                              ),
-                              Text(
-                                title!,
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: titleStyle.copyWith(
-                                  color: const Color(0xFFB4A0BB),
-                                ),
-                              ),
-                            ],
-                          ),
+                Positioned(
+                  top: layout.rowTop,
+                  left: media.padding.left + 12,
+                  right: media.padding.right + 12,
+                  height: layout.rowHeight,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: <Widget>[
+                      Center(
+                        child: Image.asset(
+                          _girlsLogo,
+                          key: const Key('girls-header-logo'),
+                          width: layout.logoWidth,
+                          height: layout.rowHeight,
+                          fit: BoxFit.contain,
+                          semanticLabel: 'みんアプ Girls',
                         ),
                       ),
+                      if (leading != null)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: _HeaderControlTray(
+                            key: const Key('girls-header-leading-tray'),
+                            child: leading!,
+                          ),
+                        ),
+                      if (actions.isNotEmpty)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: _HeaderControlTray(
+                            key: const Key('girls-header-actions-tray'),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: actions,
+                            ),
+                          ),
+                        ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },

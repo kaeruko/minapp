@@ -20,8 +20,7 @@ const String _profileAsset = 'assets/girls/cutouts/profile.png';
 const String _settingsAsset = 'assets/girls/cutouts/settings.png';
 const String _sparkleAsset = 'assets/girls/cutouts/sparkle.png';
 const String _memoCardAsset = 'assets/girls/home/cards/memo_card.png';
-const String _minappchiCardAsset =
-    'assets/girls/home/cards/minappchi_card.png';
+const String _minappchiCardAsset = 'assets/girls/home/cards/minappchi_card.png';
 const String _novelCardAsset = 'assets/girls/home/cards/novel_card.png';
 const String _groupCreateCardAsset =
     'assets/girls/home/cards/group_create_card.png';
@@ -343,7 +342,6 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   Widget build(BuildContext context) {
     final List<HostedGroup>? groups = _groups;
     return GirlsScaffold(
-      title: 'ホーム',
       leading: _BellButton(onTap: _showNotices),
       actions: <Widget>[
         _RoundArtButton(
