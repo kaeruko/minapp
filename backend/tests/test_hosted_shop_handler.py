@@ -5,6 +5,7 @@ import sys
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 BACKEND_SRC = Path(__file__).resolve().parents[1] / "src"
 if str(BACKEND_SRC) not in sys.path:
@@ -13,6 +14,7 @@ if str(BACKEND_SRC) not in sys.path:
 import hosted_handler  # noqa: E402
 import hosted_shop_handler  # noqa: E402
 from hosted_girls_shop_backend import HostedGirlsShopBackend  # noqa: E402
+from hosted_user_state_backend import HostedUserStateBackend  # noqa: E402
 
 APP_ID = "a" * 32
 USER_ID = "c" * 32
@@ -123,6 +125,27 @@ class HostedShopHandlerTests(unittest.TestCase):
         payload = json.loads(response["body"])
         self.assertEqual(payload["apps"][0]["app_id"], APP_ID)
         self.assertEqual(self.backend.calls, [("list", "girls-user-subject")])
+
+    def test_legacy_hosted_backend_is_promoted_before_first_shop_request(self) -> None:
+        legacy_backend = object.__new__(HostedUserStateBackend)
+        replacement = FakeBackend()
+        hosted_handler._BACKEND = legacy_backend
+        hosted_shop_handler._BACKEND = None
+
+        with patch.object(
+            HostedGirlsShopBackend,
+            "from_environment",
+            return_value=replacement,
+        ) as factory:
+            response = hosted_shop_handler.lambda_handler(
+                _event("GET", "/shop/apps"), None
+            )
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertIs(hosted_handler._BACKEND, replacement)
+        self.assertIs(hosted_shop_handler._BACKEND, replacement)
+        self.assertEqual(replacement.calls, [("list", "girls-user-subject")])
+        factory.assert_called_once_with()
 
     def test_launch_returns_content_and_isolated_runtime_token(self) -> None:
         response = hosted_shop_handler.lambda_handler(
