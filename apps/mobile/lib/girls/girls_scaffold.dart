@@ -10,6 +10,28 @@ const String _headerBackground =
 const String _bodyBackground = 'assets/girls/backgrounds/girls_body_bg.jpg';
 const String _girlsLogo = 'assets/girls/generated/minapp_girls_logo.png';
 
+/// Marks pages that are already hosted inside the authenticated Girls chrome.
+///
+/// Root and detail pages may keep using [GirlsScaffold] directly. When they are
+/// pushed inside the authenticated shell, [GirlsScaffold] renders only their
+/// page title and body so the shared header/footer are never duplicated.
+class GirlsScaffoldChromeScope extends InheritedWidget {
+  const GirlsScaffoldChromeScope({
+    required super.child,
+    super.key,
+  });
+
+  static bool isEmbedded(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<
+          GirlsScaffoldChromeScope
+        >() !=
+        null;
+  }
+
+  @override
+  bool updateShouldNotify(GirlsScaffoldChromeScope oldWidget) => false;
+}
+
 /// Keeps the supplied artwork stationary while each page scrolls its content.
 class GirlsScaffold extends StatelessWidget {
   const GirlsScaffold({
@@ -29,6 +51,10 @@ class GirlsScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (GirlsScaffoldChromeScope.isEmbedded(context)) {
+      return _GirlsEmbeddedPage(title: title, body: body);
+    }
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -65,42 +91,7 @@ class GirlsScaffold extends StatelessWidget {
                   children: <Widget>[
                     GirlsCommonHeader(leading: leading, actions: actions),
                     Expanded(
-                      child: Column(
-                        children: <Widget>[
-                          if (title != null)
-                            SafeArea(
-                              top: false,
-                              bottom: false,
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(20, 8, 20, 4),
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Semantics(
-                                    header: true,
-                                    child: Text(
-                                      title!,
-                                      key: const Key('girls-page-title'),
-                                      style: const TextStyle(
-                                        color: Color(0xFF745B9E),
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          Expanded(
-                            child: ClipRect(
-                              child: SafeArea(
-                                top: false,
-                                child: body,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                      child: _GirlsPageContent(title: title, body: body),
                     ),
                   ],
                 ),
@@ -109,6 +100,67 @@ class GirlsScaffold extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+class _GirlsEmbeddedPage extends StatelessWidget {
+  const _GirlsEmbeddedPage({required this.title, required this.body});
+
+  final String? title;
+  final Widget body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: _GirlsPageContent(title: title, body: body),
+    );
+  }
+}
+
+class _GirlsPageContent extends StatelessWidget {
+  const _GirlsPageContent({required this.title, required this.body});
+
+  final String? title;
+  final Widget body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        if (title != null)
+          SafeArea(
+            top: false,
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Semantics(
+                  header: true,
+                  child: Text(
+                    title!,
+                    key: const Key('girls-page-title'),
+                    style: const TextStyle(
+                      color: Color(0xFF745B9E),
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        Expanded(
+          child: ClipRect(
+            child: SafeArea(
+              top: false,
+              child: body,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
