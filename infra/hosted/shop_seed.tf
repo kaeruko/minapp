@@ -1,20 +1,75 @@
 locals {
-  # Stable synthetic identities keep official shop works on the same canonical
+  # Girls built-ins are intentionally limited to memo (planned), karaoke,
+  # novel and minappchi. Existing sample apps outside that set live in Shop.
+  # Stable synthetic identities keep official Shop works on the same canonical
   # app/listing path as user-published works without creating a login-capable
   # Cognito account or attaching the work to a user's group.
   official_shop_owner_user_id = "4fdc521e5f2642e1afe420ec9f5a931e"
   official_shop_group_id      = "218dbe54f5276416a7634ab10ef33bd4"
 
-  official_shop_apps = {
-    drawing = {
-      app_id       = "ecb3cb6a08e05305668a952cbdae435b"
-      title        = "おえかき"
-      version      = 1
-      source       = "${local.minapp_apps_source_root}/minapp_drawing.zip"
-      files        = ["index.html"]
-      published_at = "2026-09-13T00:00:00Z"
+  official_shop_directory_sources = {
+    shiba-game = {
+      app_id     = "bc54fcb0fdca499ebcab0c4de81776a3"
+      title      = "しば犬どんぐりキャッチ"
+      version    = 1
+      source_dir = "${local.minapp_apps_source_root}/shiba_donguri"
+      files      = ["index.html"]
+    }
+    shiba-goshujin = {
+      app_id     = "478cbf2dbf804d65b433468e632f0a17"
+      title      = "ごしゅじんどこわん"
+      version    = 1
+      source_dir = "${local.minapp_apps_source_root}/shiba_goshujin"
+      files      = ["index.html"]
+    }
+    shopping-town = {
+      app_id     = "29f96117bb7148289e07e759226cfd1a"
+      title      = "おかいもの いくわよ"
+      version    = 1
+      source_dir = "${local.minapp_apps_source_root}/shopping_town"
+      files      = ["index.html", "rules.js"]
+    }
+    ol-home = {
+      app_id     = "9b3cd1527777483d8177b6792e7783be"
+      title      = "OLさん おうちにかえる"
+      version    = 1
+      source_dir = "${local.minapp_apps_source_root}/ol_home"
+      files      = ["effects.js", "index.html"]
     }
   }
+}
+
+data "archive_file" "official_shop_directory_source" {
+  for_each = local.official_shop_directory_sources
+
+  type        = "zip"
+  source_dir  = each.value.source_dir
+  output_path = "${path.module}/minapp-hosted-shop-${each.key}-v${each.value.version}.zip"
+}
+
+locals {
+  official_shop_apps = merge(
+    {
+      drawing = {
+        app_id       = "ecb3cb6a08e05305668a952cbdae435b"
+        title        = "おえかき"
+        version      = 1
+        source       = "${local.minapp_apps_source_root}/minapp_drawing.zip"
+        files        = ["index.html"]
+        published_at = "2026-09-13T00:00:00Z"
+      }
+    },
+    {
+      for key, app in local.official_shop_directory_sources : key => {
+        app_id       = app.app_id
+        title        = app.title
+        version      = app.version
+        source       = data.archive_file.official_shop_directory_source[key].output_path
+        files        = app.files
+        published_at = "2026-09-13T00:00:00Z"
+      }
+    }
+  )
 }
 
 # Official shop works are ordinary immutable published ZIPs. Keeping them under
@@ -106,5 +161,10 @@ resource "aws_dynamodb_table_item" "official_shop_listing" {
   depends_on = [aws_dynamodb_table_item.official_shop_app]
 }
 
-# novel_editor is intentionally not seeded here. It requires minapp.authoring
-# and is an Editor, not a normal Runtime app that can be launched from Shop.
+# Girls built-ins are not duplicated into Shop:
+# - memo: planned, not implemented yet
+# - sing-along: karaoke
+# - novel-starter: novel
+# - minappchi: minappchi
+# novel_editor is an authoring tool that requires minapp.authoring and is not a
+# standalone Runtime work, so it is not a Shop listing either.
