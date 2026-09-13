@@ -4,17 +4,17 @@ from typing import Any
 
 import phase3_handler
 import shop_handler
-from shop_backend import ShopAwsBackend
+from shop_guarded_backend import ShopGuardedAwsBackend
 
 
-def _shared_backend() -> ShopAwsBackend:
+def _shared_backend() -> ShopGuardedAwsBackend:
     backend = phase3_handler._BACKEND
     if backend is None:
-        resolved = ShopAwsBackend.from_environment()
+        resolved = ShopGuardedAwsBackend.from_environment()
         phase3_handler._BACKEND = resolved
         shop_handler._BACKEND = resolved
         return resolved
-    if not isinstance(backend, ShopAwsBackend):
+    if not isinstance(backend, ShopGuardedAwsBackend):
         raise RuntimeError("Mobile API backend was initialized with an incompatible backend type")
     if shop_handler._BACKEND is None:
         shop_handler._BACKEND = backend
