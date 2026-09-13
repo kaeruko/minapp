@@ -3,8 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import 'api.dart';
-import 'builtin_apps.dart';
-import 'builtin_webview.dart';
 import 'hosted_app_webview.dart';
 import 'girls_group_app_management_page.dart';
 import 'hosted_girls_api.dart';
@@ -20,11 +18,6 @@ const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
 const String _girlsLoginHeroBackgroundAsset =
     'assets/girls/generated/login_hero_bg.svg';
 
-const Set<String> _girlsBuiltinIds = <String>{
-  'ol-home',
-  'novel-starter',
-  'shiba-goshujin',
-};
 
 class GirlsApp extends StatelessWidget {
   const GirlsApp({required this.api, super.key});
@@ -1266,9 +1259,6 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
   String? _error;
   String? _launchingAppId;
 
-  List<BuiltInApp> get _girlsBuiltins => builtInApps
-      .where((BuiltInApp app) => _girlsBuiltinIds.contains(app.id))
-      .toList(growable: false);
 
   @override
   void initState() {
@@ -1292,15 +1282,6 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  Future<void> _launchBuiltin(BuiltInApp app) async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (BuildContext context) =>
-            BuiltInWebViewPage(title: app.title, assetPath: app.assetPath),
-      ),
-    );
   }
 
   Future<void> _launchHostedApp(HostedGroupApp app) async {
@@ -1471,25 +1452,6 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
                             _GirlsError(message: _error!),
                           ],
                           const SizedBox(height: 22),
-                          const _SectionTitle('Girls おすすめアプリ'),
-                          const SizedBox(height: 10),
-                          GridView.count(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 12,
-                            crossAxisSpacing: 12,
-                            childAspectRatio: .98,
-                            children: _girlsBuiltins
-                                .map(
-                                  (BuiltInApp app) => _GirlsBuiltinCard(
-                                    app: app,
-                                    onTap: () => _launchBuiltin(app),
-                                  ),
-                                )
-                                .toList(growable: false),
-                          ),
-                          const SizedBox(height: 26),
                           const _SectionTitle('このグループのアプリ'),
                           const SizedBox(height: 10),
                           if (apps == null)
@@ -1741,60 +1703,6 @@ class _GroupHeader extends StatelessWidget {
   }
 }
 
-class _GirlsBuiltinCard extends StatelessWidget {
-  const _GirlsBuiltinCard({required this.app, required this.onTap});
-
-  final BuiltInApp app;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color pastel = switch (app.id) {
-      'ol-home' => _blue,
-      'novel-starter' => const Color(0xFFE8D8FF),
-      'shiba-goshujin' => const Color(0xFFFFD8C2),
-      _ => _pink,
-    };
-    return Material(
-      color: pastel.withValues(alpha: .82),
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Container(
-                width: 58,
-                height: 58,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Icon(app.icon, color: _lavenderDark, size: 31),
-              ),
-              const SizedBox(height: 11),
-              Text(
-                app.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _HostedAppTile extends StatelessWidget {
   const _HostedAppTile({
     required this.app,
@@ -1945,7 +1853,7 @@ class _EmptyGroupApps extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
       ),
       child: const Text(
-        'まだグループのアプリはないよ。\nGirlsおすすめアプリは上からすぐ遊べるよ ♡',
+        'まだグループのアプリはないよ。',
         textAlign: TextAlign.center,
       ),
     );
