@@ -19,14 +19,12 @@ const String _mascotAsset = 'assets/girls/cutouts/mascot_white.png';
 const String _profileAsset = 'assets/girls/cutouts/profile.png';
 const String _settingsAsset = 'assets/girls/cutouts/settings.png';
 const String _sparkleAsset = 'assets/girls/cutouts/sparkle.png';
-const String _memoCardAsset =
-    'assets/girls/cutouts/minapp_cards_480/08_マイメモ帳.png';
+const String _memoCardAsset = 'assets/girls/home/cards/memo_card.png';
 const String _minappchiCardAsset =
-    'assets/girls/cutouts/minapp_cards_480/06_みんアプっち.png';
-const String _novelCardAsset =
-    'assets/girls/cutouts/minapp_cards_480/02_パステルノベル.png';
+    'assets/girls/home/cards/minappchi_card.png';
+const String _novelCardAsset = 'assets/girls/home/cards/novel_card.png';
 const String _groupCreateCardAsset =
-    'assets/girls/cutouts/minapp_cards_480/04_新規グループ作成.png';
+    'assets/girls/home/cards/group_create_card.png';
 
 enum _AccountAction { email, refresh, logout }
 
@@ -375,9 +373,10 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
                   GridView.count(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     crossAxisCount: 2,
-                    mainAxisSpacing: 6,
-                    crossAxisSpacing: 6,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
                     childAspectRatio: 1,
                     children: <Widget>[
                       _HomeMenuCard(
@@ -543,20 +542,25 @@ class _HomeMenuCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: label,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(25),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(1),
-            child: Image.asset(
-              assetName,
-              fit: BoxFit.contain,
-              excludeFromSemantics: true,
+    return Center(
+      child: FractionallySizedBox(
+        widthFactor: .92,
+        child: Semantics(
+          button: true,
+          label: label,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(25),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.all(1),
+                child: Image.asset(
+                  assetName,
+                  fit: BoxFit.contain,
+                  excludeFromSemantics: true,
+                ),
+              ),
             ),
           ),
         ),
