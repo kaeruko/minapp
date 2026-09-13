@@ -41,6 +41,11 @@ HostedGirlsApi _fakeApi() {
   );
 }
 
+Future<void> _finishRouteTransition(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 600));
+}
+
 void main() {
   testWidgets('authenticated Girls routes keep one common header and footer', (
     WidgetTester tester,
@@ -60,7 +65,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _finishRouteTransition(tester);
 
     expect(find.byKey(const Key('girls-common-header')), findsOneWidget);
     expect(find.byKey(const Key('girls-header-logo')), findsOneWidget);
@@ -71,7 +76,7 @@ void main() {
     expect(find.text('ビルトインアプリ'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('girls-footer-shop')));
-    await tester.pumpAndSettle();
+    await _finishRouteTransition(tester);
 
     expect(find.byKey(const Key('girls-common-header')), findsOneWidget);
     expect(find.byKey(const Key('girls-header-logo')), findsOneWidget);
@@ -80,7 +85,7 @@ void main() {
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byKey(const Key('girls-footer-home')));
-    await tester.pumpAndSettle();
+    await _finishRouteTransition(tester);
 
     expect(find.byKey(const Key('girls-common-header')), findsOneWidget);
     expect(find.byKey(const Key('girls-footer-home')), findsOneWidget);
