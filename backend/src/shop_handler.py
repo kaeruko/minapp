@@ -20,9 +20,10 @@ from shop_backend import ShopAwsBackend
 _LOGGER = logging.getLogger(__name__)
 _BACKEND: ShopAwsBackend | None = None
 _ID_RE = r"([0-9a-f]{32})"
-_SHOP_ACTION_RE = re.compile(
+_SHOP_VERSIONED_ACTION_RE = re.compile(
     rf"^/shop/apps/{_ID_RE}/versions/{_ID_RE}/(launch|download|reports)$"
 )
+_SHOP_ACTION_RE = re.compile(rf"^/shop/apps/{_ID_RE}/(launch|download|reports)$")
 _SHOP_VISIBILITY_RE = re.compile(rf"^/apps/{_ID_RE}/shop-visibility$")
 
 
@@ -51,6 +52,74 @@ def _visibility(event: dict[str, Any]) -> str:
     return value
 
 
+def _common_action_body(event: dict[str, Any], *, report: bool) -> tuple[str, str | None]:
+    payload = _json_object_body(event)
+    expected = {"version", "reason"} if report else {"version"}
+    if set(payload) != expected:
+        raise ApiProblem(
+            400,
+            "invalid_request",
+            f"The JSON request body must contain exactly {', '.join(sorted(expected))}.",
+        )
+    version = payload.get("version")
+    if not isinstance(version, str) or re.fullmatch(r"[0-9a-f]{32}", version) is None:
+        raise ApiProblem(
+            400,
+            "invalid_shop_version",
+            "version must be a 32-character lowercase hexadecimal id.",
+        )
+    if not report:
+        return version, None
+    reason = payload.get("reason")
+    if not isinstance(reason, str):
+        raise ApiProblem(400, "invalid_request", "reason must be a string.")
+    if len(reason) < 1 or len(reason) > 80 or reason != reason.strip():
+        raise ApiProblem(400, "invalid_request", "reason must be 1-80 trimmed characters.")
+    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in reason):
+        raise ApiProblem(400, "invalid_request", "reason must not contain control characters.")
+    return version, reason
+
+
+def _action_response(
+    event: dict[str, Any],
+    app_id: str,
+    version_id: str,
+    action: str,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    backend = _get_backend()
+    if action == "launch":
+        launch = backend.create_shop_launch(_auth_subject(event), app_id, version_id)
+        content_path = launch.get("content_path")
+        expires_in = launch.get("expires_in")
+        if not isinstance(content_path, str):
+            raise RuntimeError("Shop launch backend response has no content_path")
+        if not isinstance(expires_in, int) or expires_in <= 0:
+            raise RuntimeError("Shop launch backend response has invalid expires_in")
+        return _json_response(
+            200,
+            {
+                "url": _absolute_url(event, content_path),
+                "expires_in": expires_in,
+            },
+        )
+    if action == "download":
+        return _json_response(
+            200,
+            backend.create_shop_download(_auth_subject(event), app_id, version_id),
+        )
+    if action == "reports":
+        if reason is None:
+            raise RuntimeError("Shop report action requires a reason")
+        return _json_response(
+            201,
+            backend.create_shop_report(
+                _auth_subject(event), app_id, version_id, reason
+            ),
+        )
+    raise RuntimeError(f"Unsupported shop action: {action!r}")
+
+
 def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
     method = _request_method(event)
     path = _raw_path(event)
@@ -72,46 +141,28 @@ def _handle_request(event: dict[str, Any]) -> dict[str, Any]:
             ),
         )
 
+    versioned_match = _SHOP_VERSIONED_ACTION_RE.fullmatch(path)
+    if versioned_match is not None and method == "POST":
+        app_id, version_id, action = versioned_match.groups()
+        if action in {"launch", "download"}:
+            _empty_json_body(event)
+            return _action_response(event, app_id, version_id, action)
+        return _action_response(
+            event,
+            app_id,
+            version_id,
+            action,
+            reason=_report_reason(event),
+        )
+
     action_match = _SHOP_ACTION_RE.fullmatch(path)
     if action_match is not None and method == "POST":
-        app_id, version_id, action = action_match.groups()
-        if action == "launch":
-            _empty_json_body(event)
-            launch = _get_backend().create_shop_launch(
-                _auth_subject(event), app_id, version_id
-            )
-            content_path = launch.get("content_path")
-            expires_in = launch.get("expires_in")
-            if not isinstance(content_path, str):
-                raise RuntimeError("Shop launch backend response has no content_path")
-            if not isinstance(expires_in, int) or expires_in <= 0:
-                raise RuntimeError("Shop launch backend response has invalid expires_in")
-            return _json_response(
-                200,
-                {
-                    "url": _absolute_url(event, content_path),
-                    "expires_in": expires_in,
-                },
-            )
-        if action == "download":
-            _empty_json_body(event)
-            return _json_response(
-                200,
-                _get_backend().create_shop_download(
-                    _auth_subject(event), app_id, version_id
-                ),
-            )
-        if action == "reports":
-            return _json_response(
-                201,
-                _get_backend().create_shop_report(
-                    _auth_subject(event),
-                    app_id,
-                    version_id,
-                    _report_reason(event),
-                ),
-            )
-        raise RuntimeError(f"Unsupported shop action: {action!r}")
+        app_id, action = action_match.groups()
+        version_id, reason = _common_action_body(
+            event,
+            report=action == "reports",
+        )
+        return _action_response(event, app_id, version_id, action, reason=reason)
 
     return _json_response(
         404,
