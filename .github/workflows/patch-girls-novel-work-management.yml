@@ -1,0 +1,152 @@
+name: Patch Girls Novel Work Management
+
+on:
+  push:
+    branches:
+      - fix/girls-novel-work-management
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Patch Girls novel flow
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if old not in text:
+                  raise RuntimeError(f'expected block not found in {path}: {old[:120]!r}')
+              text = text.replace(old, new, 1)
+              p.write_text(text, encoding='utf-8')
+
+          # 1) Reuse the installed official Novel Editor instead of trying to reinstall it.
+          path = 'apps/mobile/lib/girls/girls_builtin_install_api.dart'
+          anchor = '''  Future<HostedGroupApp> ensureNovelPlayer({\n'''
+          addition = '''  Future<HostedGroupApp> ensureNovelEditor({\n    required String accessToken,\n    required String groupId,\n  }) async {\n    await ensureNovelPlayer(\n      accessToken: accessToken,\n      groupId: groupId,\n    );\n    final List<HostedGroupApp> apps = await _listGroupApps(\n      accessToken: accessToken,\n      groupId: groupId,\n    );\n    final List<HostedGroupApp> editors = apps\n        .where(\n          (HostedGroupApp app) =>\n              app.sourceKind == 'builtin' &&\n              app.builtinId == novelEditorBuiltinId,\n        )\n        .toList(growable: false);\n    if (editors.length > 1) {\n      throw const FormatException(\n        'Group app list contains duplicate Novel Editor installations.',\n      );\n    }\n    if (editors.length == 1) return editors.single;\n    return _installBuiltin(\n      accessToken: accessToken,\n      groupId: groupId,\n      builtinId: novelEditorBuiltinId,\n      label: 'Novel Editor',\n    );\n  }\n\n  Future<HostedGroupApp> ensureNovelPlayer({\n'''
+          replace_once(path, anchor, addition)
+
+          # 2) Let a format-specific caller provide a display title without teaching the generic Host a schema.
+          path = 'apps/mobile/lib/hosted_authoring_projects_page.dart'
+          replace_once(
+              path,
+              '''typedef HostedAuthoringErrorMessage = String Function(Object error);\ntypedef HostedAuthoringInstallPlayer = Future<String?> Function(\n''',
+              '''typedef HostedAuthoringErrorMessage = String Function(Object error);\ntypedef HostedAuthoringProjectTitle = String Function(\n  HostedAuthoringProject project,\n);\ntypedef HostedAuthoringInstallPlayer = Future<String?> Function(\n''',
+          )
+          replace_once(
+              path,
+              '''    this.projectIcon = Icons.edit_note_rounded,\n    this.installCompatiblePlayer,\n  });\n''',
+              '''    this.projectIcon = Icons.edit_note_rounded,\n    this.installCompatiblePlayer,\n    this.projectTitle,\n  });\n''',
+          )
+          replace_once(
+              path,
+              '''  final IconData projectIcon;\n  final HostedAuthoringInstallPlayer? installCompatiblePlayer;\n}\n''',
+              '''  final IconData projectIcon;\n  final HostedAuthoringInstallPlayer? installCompatiblePlayer;\n  final HostedAuthoringProjectTitle? projectTitle;\n}\n''',
+          )
+          replace_once(
+              path,
+              '''  List<HostedAuthoringProjectSummary>? _projects;\n  bool _busy = false;\n''',
+              '''  List<HostedAuthoringProjectSummary>? _projects;\n  Map<String, String> _projectTitles = const <String, String>{};\n  bool _busy = false;\n''',
+          )
+          old_load = '''      final List<HostedAuthoringProjectSummary> projects =\n          await _projectsApi.listProjects(\n        accessToken: widget.accessToken,\n        groupId: widget.groupId,\n        contentFormat: widget.definition.contentFormat,\n      );\n      if (mounted) setState(() => _projects = projects);\n'''
+          new_load = '''      final List<HostedAuthoringProjectSummary> projects =\n          await _projectsApi.listProjects(\n        accessToken: widget.accessToken,\n        groupId: widget.groupId,\n        contentFormat: widget.definition.contentFormat,\n      );\n      final Map<String, String> titles = <String, String>{};\n      final HostedAuthoringProjectTitle? projectTitle =\n          widget.definition.projectTitle;\n      if (projectTitle != null) {\n        for (final HostedAuthoringProjectSummary summary in projects) {\n          final HostedAuthoringProject project = await _projectsApi.loadProject(\n            accessToken: widget.accessToken,\n            contentId: summary.contentId,\n          );\n          if (project.summary.contentId != summary.contentId ||\n              project.summary.groupId != widget.groupId ||\n              project.summary.contentFormat != widget.definition.contentFormat) {\n            throw const FormatException(\n              'Authoring project title lookup changed the requested scope.',\n            );\n          }\n          final String title = projectTitle(project);\n          if (title.isEmpty || title != title.trim() || title.length > 80) {\n            throw const FormatException(\n              'Authoring project title must be a trimmed non-empty string up to 80 characters.',\n            );\n          }\n          titles[summary.contentId] = title;\n        }\n      }\n      if (mounted) {\n        setState(() {\n          _projects = projects;\n          _projectTitles = Map<String, String>.unmodifiable(titles);\n        });\n      }\n'''
+          replace_once(path, old_load, new_load)
+          replace_once(
+              path,
+              '''                        title: const Text(\n                          '作品',\n                          style: TextStyle(fontWeight: FontWeight.w800),\n                        ),\n''',
+              '''                        title: Text(\n                          _projectTitles[project.contentId] ?? '作品',\n                          style: const TextStyle(fontWeight: FontWeight.w800),\n                        ),\n''',
+          )
+
+          # 3) Thread the optional title resolver through the generic Editor action helper.
+          path = 'apps/mobile/lib/hosted_authoring_editor_action.dart'
+          replace_once(
+              path,
+              '''  required String emptyTitle,\n  required String emptyBody,\n}) async {\n''',
+              '''  required String emptyTitle,\n  required String emptyBody,\n  HostedAuthoringProjectTitle? projectTitle,\n}) async {\n''',
+          )
+          replace_once(
+              path,
+              '''          emptyTitle: emptyTitle,\n          emptyBody: emptyBody,\n        ),\n''',
+              '''          emptyTitle: emptyTitle,\n          emptyBody: emptyBody,\n          projectTitle: projectTitle,\n        ),\n''',
+          )
+          replace_once(
+              path,
+              '''    this.emptyBody = '「新しくつくる」からはじめよう。',\n    super.key,\n''',
+              '''    this.emptyBody = '「新しくつくる」からはじめよう。',\n    this.projectTitle,\n    super.key,\n''',
+          )
+          replace_once(
+              path,
+              '''  final String emptyTitle;\n  final String emptyBody;\n\n  @override\n''',
+              '''  final String emptyTitle;\n  final String emptyBody;\n  final HostedAuthoringProjectTitle? projectTitle;\n\n  @override\n''',
+          )
+          replace_once(
+              path,
+              '''        emptyTitle: widget.emptyTitle,\n        emptyBody: widget.emptyBody,\n      );\n''',
+              '''        emptyTitle: widget.emptyTitle,\n        emptyBody: widget.emptyBody,\n        projectTitle: widget.projectTitle,\n      );\n''',
+          )
+
+          # 4) Girls: the Novel button goes straight to works, not the Editor ZIP management screen.
+          path = 'apps/mobile/lib/girls/girls_apps_page.dart'
+          replace_once(
+              path,
+              '''import 'api.dart';\nimport 'girls_app_core.dart' as core;\n''',
+              '''import '../hosted_authoring_editor_action.dart';\nimport '../hosted_authoring_projects_api.dart';\nimport 'api.dart';\nimport 'girls_app_core.dart' as core;\n''',
+          )
+          replace_once(
+              path,
+              '''const String _girlsUploadPortalUrl = 'https://minapp.cloxs.jp/girls.html';\n\nclass GirlsAppsPage extends StatefulWidget {\n''',
+              '''const String _girlsUploadPortalUrl = 'https://minapp.cloxs.jp/girls.html';\nconst String _novelContentFormat = 'minapp/novel@1';\n\nString _novelProjectTitle(HostedAuthoringProject project) {\n  if (project.summary.contentFormat != _novelContentFormat) {\n    throw const FormatException('Novel project has an unexpected content format.');\n  }\n  final Object? rawTitle = project.document['title'];\n  if (rawTitle is! String ||\n      rawTitle.isEmpty ||\n      rawTitle != rawTitle.trim() ||\n      rawTitle.length > 80) {\n    throw const FormatException(\n      'Novel project document has an invalid title.',\n    );\n  }\n  return rawTitle;\n}\n\nbool _isNovelInfrastructureApp(ManagedGirlsApp app) {\n  final String? builtinId = app.app.builtinId;\n  return builtinId == novelEditorBuiltinId || builtinId == novelPlayerBuiltinId;\n}\n\nclass GirlsAppsPage extends StatefulWidget {\n''',
+          )
+          replace_once(
+              path,
+              '''      setState(() {\n        _activeGroups = groups;\n        _apps = apps;\n      });\n''',
+              '''      setState(() {\n        _activeGroups = groups;\n        _apps = apps\n            .where((ManagedGirlsApp app) => !_isNovelInfrastructureApp(app))\n            .toList(growable: false);\n      });\n''',
+          )
+          old_choose = '''  Future<ManagedGirlsApp?> _chooseInstalledNovelEditor(\n    List<ManagedGirlsApp> editors,\n  ) async {\n    if (editors.length == 1) return editors.single;\n    return showDialog<ManagedGirlsApp>(\n      context: context,\n      builder: (BuildContext dialogContext) => SimpleDialog(\n        title: const Text('どのグループのノベルゲームメーカーを使う？'),\n        children: editors\n            .map(\n              (ManagedGirlsApp editor) => SimpleDialogOption(\n                onPressed: () => Navigator.of(dialogContext).pop(editor),\n                child: Text(editor.groupName ?? editor.app.groupId),\n              ),\n            )\n            .toList(growable: false),\n      ),\n    );\n  }\n\n'''
+          replace_once(path, old_choose, '')
+          old_open = '''  Future<void> _openNovelMaker() async {\n    final List<ManagedGirlsApp>? apps = _apps;\n    final List<HostedGroup>? activeGroups = _activeGroups;\n    if (apps == null || activeGroups == null) return;\n\n    final List<ManagedGirlsApp> installedEditors = apps\n        .where(\n          (ManagedGirlsApp app) =>\n              app.app.sourceKind == 'builtin' &&\n              app.app.builtinId == novelEditorBuiltinId,\n        )\n        .toList(growable: false);\n    if (installedEditors.isNotEmpty) {\n      final ManagedGirlsApp? editor = await _chooseInstalledNovelEditor(\n        installedEditors,\n      );\n      if (editor != null && mounted) await _openDetail(editor);\n      return;\n    }\n\n    if (activeGroups.isEmpty) {\n      setState(() => _error = 'ノベルゲームメーカーを追加するには、参加中のグループが必要です。');\n      return;\n    }\n    final HostedGroup? group = await _chooseActiveGroup(activeGroups);\n    if (group == null || !mounted) return;\n\n    setState(() {\n      _busy = true;\n      _error = null;\n    });\n    String? installedAppId;\n    try {\n      final HostedGroupApp installed = await _builtinInstallApi\n          .installNovelEditor(\n            accessToken: widget.session.accessToken,\n            groupId: group.groupId,\n          );\n      installedAppId = installed.appId;\n    } catch (error) {\n      if (mounted) setState(() => _error = core.girlsMessageFor(error));\n    } finally {\n      if (mounted) setState(() => _busy = false);\n    }\n    if (installedAppId != null && mounted) {\n      await _openDetailById(installedAppId);\n    }\n  }\n'''
+          new_open = '''  Future<void> _openNovelMaker() async {\n    final List<HostedGroup>? activeGroups = _activeGroups;\n    if (activeGroups == null) return;\n    if (activeGroups.isEmpty) {\n      setState(() => _error = 'ノベルゲームを作るには、参加中のグループが必要です。');\n      return;\n    }\n    final HostedGroup? group = await _chooseActiveGroup(activeGroups);\n    if (group == null || !mounted) return;\n\n    setState(() {\n      _busy = true;\n      _error = null;\n    });\n    try {\n      final HostedGroupApp editor = await _builtinInstallApi.ensureNovelEditor(\n        accessToken: widget.session.accessToken,\n        groupId: group.groupId,\n      );\n      if (!mounted) return;\n      setState(() => _busy = false);\n      await openHostedAuthoringProjects(\n        context: context,\n        baseUri: widget.api.baseUri,\n        accessToken: widget.session.accessToken,\n        groupId: group.groupId,\n        editorAppId: editor.appId,\n        runtimeTransport: widget.api.runtimeClient,\n        editorFormats: const <String>[_novelContentFormat],\n        errorMessage: core.girlsMessageFor,\n        pageTitle: 'ノベルゲームを作る',\n        collectionTitle: 'あなたのノベル作品',\n        emptyTitle: 'まだノベル作品がありません',\n        emptyBody: '「新しくつくる」から物語を作ってみよう。',\n        projectTitle: _novelProjectTitle,\n      );\n      if (mounted) await _load();\n    } catch (error) {\n      if (mounted) setState(() => _error = core.girlsMessageFor(error));\n    } finally {\n      if (mounted && _busy) setState(() => _busy = false);\n    }\n  }\n'''
+          replace_once(path, old_open, new_open)
+          replace_once(path, "label: const Text('アプリを追加♡'),", "label: const Text('ZIPからアプリを追加♡'),")
+
+          # Hide ZIP source controls when the detail is a platform-managed builtin.
+          old_controls = '''              OutlinedButton.icon(\n                key: const Key('girls-app-download-source'),\n                onPressed: _busy ? null : _downloadZip,\n                icon: const Icon(Icons.download_rounded),\n                label: const Text('現在のZIPを保存'),\n              ),\n              const SizedBox(height: 8),\n              Row(\n                children: <Widget>[\n                  Expanded(\n                    child: OutlinedButton.icon(\n                      onPressed: _busy ? null : _updateZip,\n                      icon: const Icon(Icons.folder_zip_rounded),\n                      label: const Text('新しいZIPで更新'),\n                    ),\n                  ),\n                ],\n              ),\n              const SizedBox(height: 8),\n              FilledButton.icon(\n                onPressed: _busy || detail.summary.sourceRevision == null\n                    ? null\n                    : _publish,\n                icon: const Icon(Icons.cloud_upload_rounded),\n                label: const Text('最新版を公開'),\n              ),\n              const SizedBox(height: 8),\n'''
+          new_controls = '''              if (detail.summary.app.editable) ...<Widget>[\n                OutlinedButton.icon(\n                  key: const Key('girls-app-download-source'),\n                  onPressed: _busy ? null : _downloadZip,\n                  icon: const Icon(Icons.download_rounded),\n                  label: const Text('現在のZIPを保存'),\n                ),\n                const SizedBox(height: 8),\n                OutlinedButton.icon(\n                  onPressed: _busy ? null : _updateZip,\n                  icon: const Icon(Icons.folder_zip_rounded),\n                  label: const Text('新しいZIPで更新'),\n                ),\n                const SizedBox(height: 8),\n                FilledButton.icon(\n                  onPressed: _busy || detail.summary.sourceRevision == null\n                      ? null\n                      : _publish,\n                  icon: const Icon(Icons.cloud_upload_rounded),\n                  label: const Text('最新版を公開'),\n                ),\n                const SizedBox(height: 8),\n              ] else if (detail.summary.app.sourceKind == 'builtin') ...<Widget>[\n                const _BuiltinManagedNotice(),\n                const SizedBox(height: 8),\n              ],\n'''
+          replace_once(path, old_controls, new_controls)
+          marker = '''class _Stat extends StatelessWidget {\n'''
+          notice = '''class _BuiltinManagedNotice extends StatelessWidget {\n  const _BuiltinManagedNotice();\n\n  @override\n  Widget build(BuildContext context) {\n    return Container(\n      padding: const EdgeInsets.all(14),\n      decoration: BoxDecoration(\n        color: _mint.withValues(alpha: .58),\n        borderRadius: BorderRadius.circular(16),\n      ),\n      child: const Row(\n        crossAxisAlignment: CrossAxisAlignment.start,\n        children: <Widget>[\n          Icon(Icons.auto_awesome_rounded, color: _lavender),\n          SizedBox(width: 10),\n          Expanded(\n            child: Text(\n              'この公式ツール本体はみんアプ側で更新します。作品の内容は「ノベルゲームを作る」から編集してください。',\n              style: TextStyle(color: _ink, fontWeight: FontWeight.w700),\n            ),\n          ),\n        ],\n      ),\n    );\n  }\n}\n\nclass _Stat extends StatelessWidget {\n'''
+          replace_once(path, marker, notice)
+
+          # 5) Add API coverage for reusing an existing Editor.
+          path = 'apps/mobile/test/girls_builtin_install_api_test.dart'
+          anchor = '''  test('ensureNovelPlayer repairs a group that is missing the Player', () async {\n'''
+          test = '''  test('ensureNovelEditor reuses an already-installed Editor and Player', () async {\n    final List<http.Request> captured = <http.Request>[];\n    var getCount = 0;\n    final MockClient client = MockClient((http.Request request) async {\n      captured.add(request);\n      expect(request.method, 'GET');\n      getCount += 1;\n      if (getCount == 1) {\n        return _json(200, <String, Object?>{\n          'apps': <Object?>[\n            _installedApp(builtinId: novelPlayerBuiltinId),\n          ],\n        });\n      }\n      return _json(200, <String, Object?>{\n        'apps': <Object?>[\n          _installedApp(builtinId: novelPlayerBuiltinId),\n          _installedApp(),\n        ],\n      });\n    });\n    final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(\n      baseUri: Uri.parse('https://hosted.example.test'),\n      client: client,\n    );\n\n    final HostedGroupApp app = await api.ensureNovelEditor(\n      accessToken: 'owner-token',\n      groupId: _groupId,\n    );\n\n    expect(captured, hasLength(2));\n    expect(captured.every((http.Request request) => request.method == 'GET'), isTrue);\n    expect(app.builtinId, novelEditorBuiltinId);\n  });\n\n  test('ensureNovelPlayer repairs a group that is missing the Player', () async {\n'''
+          replace_once(path, anchor, test)
+          PY
+
+          dart format \
+            apps/mobile/lib/girls/girls_apps_page.dart \
+            apps/mobile/lib/girls/girls_builtin_install_api.dart \
+            apps/mobile/lib/hosted_authoring_editor_action.dart \
+            apps/mobile/lib/hosted_authoring_projects_page.dart \
+            apps/mobile/test/girls_builtin_install_api_test.dart
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/mobile/lib/girls/girls_apps_page.dart \
+            apps/mobile/lib/girls/girls_builtin_install_api.dart \
+            apps/mobile/lib/hosted_authoring_editor_action.dart \
+            apps/mobile/lib/hosted_authoring_projects_page.dart \
+            apps/mobile/test/girls_builtin_install_api_test.dart
+          git commit -m "Separate Novel works from Editor management"
+          git push origin HEAD:fix/girls-novel-work-management
