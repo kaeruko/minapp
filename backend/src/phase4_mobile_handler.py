@@ -3,10 +3,31 @@ from __future__ import annotations
 from typing import Any
 
 import phase3_handler
-from display_name_backend import DisplayNameAwsBackend
+import shop_handler
+from shop_backend import ShopAwsBackend
+
+
+def _shared_backend() -> ShopAwsBackend:
+    backend = phase3_handler._BACKEND
+    if backend is None:
+        resolved = ShopAwsBackend.from_environment()
+        phase3_handler._BACKEND = resolved
+        shop_handler._BACKEND = resolved
+        return resolved
+    if not isinstance(backend, ShopAwsBackend):
+        raise RuntimeError("Mobile API backend was initialized with an incompatible backend type")
+    if shop_handler._BACKEND is None:
+        shop_handler._BACKEND = backend
+    elif shop_handler._BACKEND is not backend:
+        raise RuntimeError("Mobile and shop handlers must share the same backend instance")
+    return backend
 
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
-    if phase3_handler._BACKEND is None:
-        phase3_handler._BACKEND = DisplayNameAwsBackend.from_environment()
+    _shared_backend()
+    raw_path = event.get("rawPath") if isinstance(event, dict) else None
+    if isinstance(raw_path, str) and (
+        raw_path.startswith("/shop/") or raw_path.endswith("/shop-visibility")
+    ):
+        return shop_handler.lambda_handler(event, context)
     return phase3_handler.lambda_handler(event, context)
