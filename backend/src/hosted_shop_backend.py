@@ -6,6 +6,7 @@ import secrets
 import time
 import zipfile
 from typing import Any
+from urllib.parse import quote
 
 from aws_backend import _item_string, _string_attr
 from errors import ApiProblem
@@ -26,6 +27,30 @@ SHOP_REPORT_REASONS = frozenset(
     }
 )
 SHOP_VISIBILITIES = frozenset({"listed", "unlisted"})
+
+
+def _shop_download_filename(title: str, app_id: str) -> str:
+    if not isinstance(title, str) or not title:
+        raise ValueError("shop download title must be a non-empty string")
+    if not isinstance(app_id, str) or not app_id:
+        raise ValueError("shop download app_id must be a non-empty string")
+    forbidden = '<>:"/\\|?*'
+    sanitized = "".join(
+        "_" if char in forbidden or ord(char) < 32 else char
+        for char in title
+    ).strip().rstrip(". ")
+    if not sanitized:
+        sanitized = f"minapp-{app_id[:8]}"
+    return f"{sanitized}.zip"
+
+
+def _shop_download_content_disposition(filename: str, app_id: str) -> str:
+    ascii_fallback = f"minapp-{app_id}.zip"
+    encoded = quote(filename, safe="")
+    return (
+        f'attachment; filename="{ascii_fallback}"; '
+        f"filename*=UTF-8''{encoded}"
+    )
 
 
 class HostedShopBackend(HostedUserStateBackend):
@@ -298,13 +323,15 @@ class HostedShopBackend(HostedUserStateBackend):
         self._assert_version(app, version)
         key = _item_string(app, "published_key")
         sha256 = _item_string(app, "published_sha256")
+        filename = _shop_download_filename(_item_string(app, "title"), app_id)
+        content_disposition = _shop_download_content_disposition(filename, app_id)
         url = self._s3.generate_presigned_url(
             "get_object",
             Params={
                 "Bucket": self._published_bucket,
                 "Key": key,
                 "ResponseContentType": "application/zip",
-                "ResponseContentDisposition": f'attachment; filename="{app_id}.zip"',
+                "ResponseContentDisposition": content_disposition,
             },
             ExpiresIn=SHOP_DOWNLOAD_TTL_SECONDS,
         )
@@ -312,7 +339,7 @@ class HostedShopBackend(HostedUserStateBackend):
             raise RuntimeError("S3 did not return an HTTPS presigned URL")
         return {
             "url": url,
-            "filename": f"{app_id}.zip",
+            "filename": filename,
             "sha256": sha256,
             "expires_in": SHOP_DOWNLOAD_TTL_SECONDS,
         }
