@@ -66,6 +66,20 @@ void main() {
     }
   });
 
+  test('novel starter bundles required runtime files', () async {
+    expect(
+      await rootBundle.loadString('assets/builtin/novel_starter/player.js'),
+      contains('MinAppNovelFormat'),
+    );
+    expect(
+      await rootBundle.loadString('assets/builtin/novel_starter/story-validator.js'),
+      contains("const FORMAT = 'minapp/novel@1'"),
+    );
+    final ByteData face =
+        await rootBundle.load('assets/builtin/novel_starter/face.jpg');
+    expect(face.lengthInBytes, greaterThan(0));
+  });
+
   test('shopping town exposes touch controls and fail-fast initialization', () async {
     final BuiltInApp shoppingTown = builtInApps.singleWhere(
       (BuiltInApp app) => app.id == 'shopping-town',
