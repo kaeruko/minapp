@@ -1,0 +1,46 @@
+name: Apply Girls Novel Work Management
+
+on:
+  push:
+    branches:
+      - fix/girls-novel-work-management
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message != 'Separate Novel works from Editor management'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Reuse patch script and commit changes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/patch-girls-novel-work-management.yml').read_text(encoding='utf-8')
+          start_marker = "          python - <<'PY'\n"
+          end_marker = "          PY\n\n          dart format"
+          start = workflow.index(start_marker) + len(start_marker)
+          end = workflow.index(end_marker, start)
+          code = '\n'.join(
+              line[10:] if line.startswith('          ') else line
+              for line in workflow[start:end].splitlines()
+          )
+          exec(compile(code, '<girls-novel-patch>', 'exec'))
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/mobile/lib/girls/girls_apps_page.dart \
+            apps/mobile/lib/girls/girls_builtin_install_api.dart \
+            apps/mobile/lib/hosted_authoring_editor_action.dart \
+            apps/mobile/lib/hosted_authoring_projects_page.dart \
+            apps/mobile/test/girls_builtin_install_api_test.dart
+          git commit -m "Separate Novel works from Editor management"
+          git push origin HEAD:fix/girls-novel-work-management
