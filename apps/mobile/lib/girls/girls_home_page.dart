@@ -6,8 +6,8 @@ import 'builtin_apps.dart';
 import 'builtin_webview.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_apps_page.dart';
-import 'girls_footer_nav.dart';
 import 'girls_email_settings_page.dart';
+import 'girls_footer_nav.dart';
 import 'girls_groups_page.dart';
 import 'girls_scaffold.dart';
 import 'hosted_girls_api.dart';
@@ -19,20 +19,17 @@ const String _mascotAsset = 'assets/girls/cutouts/mascot_white.png';
 const String _profileAsset = 'assets/girls/cutouts/profile.png';
 const String _settingsAsset = 'assets/girls/cutouts/settings.png';
 const String _sparkleAsset = 'assets/girls/cutouts/sparkle.png';
-const String _mascotDiaryCardAsset =
-    'assets/girls/cutouts/mascot_diary_card.png';
-const String _pastelNovelCardAsset =
-    'assets/girls/cutouts/pastel_novel_card.png';
-const String _pastelPaintCardAsset =
-    'assets/girls/cutouts/pastel_paint_card.png';
+const String _memoCardAsset =
+    'assets/girls/cutouts/minapp_cards_480/08_マイメモ帳.png';
+const String _minappchiCardAsset =
+    'assets/girls/cutouts/minapp_cards_480/06_みんアプっち.png';
+const String _novelCardAsset =
+    'assets/girls/cutouts/minapp_cards_480/02_パステルノベル.png';
 const String _groupCreateCardAsset =
-    'assets/girls/cutouts/group_create_card.png';
+    'assets/girls/cutouts/minapp_cards_480/04_新規グループ作成.png';
 
 enum _AccountAction { email, refresh, logout }
 
-/// The Girls landing screen. It keeps the playful visual hierarchy from the
-/// supplied concept art while routing every live destination to the existing
-/// app and group flows.
 class GirlsHomePage extends StatefulWidget {
   const GirlsHomePage({
     required this.api,
@@ -55,9 +52,8 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   bool _creatingGroup = false;
   String? _groupError;
 
-  BuiltInApp get _mascotApp => _findBuiltin('shiba-goshujin');
+  BuiltInApp get _minappchiApp => _findBuiltin('minappchi');
   BuiltInApp get _novelApp => _findBuiltin('novel-starter');
-  BuiltInApp get _paintApp => _findBuiltin('ol-home');
 
   BuiltInApp _findBuiltin(String id) =>
       builtInApps.firstWhere((BuiltInApp app) => app.id == id);
@@ -93,6 +89,12 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
           assetPath: app.assetPath,
         ),
       ),
+    );
+  }
+
+  void _showMemoComingSoon() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('マイメモ帳は準備中だよ')),
     );
   }
 
@@ -155,9 +157,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
             labelText: 'グループ名',
             hintText: '例：放課後イラスト部',
           ),
-          onChanged: (String nextValue) {
-            value = nextValue;
-          },
+          onChanged: (String nextValue) => value = nextValue,
         ),
         actions: <Widget>[
           TextButton(
@@ -263,21 +263,6 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       await _openGroup(createdGroup);
     } catch (error) {
       if (!mounted) return;
-      try {
-        final List<HostedGroup> groups = await widget.api.listGroups(
-          widget.session.accessToken,
-        );
-        if (!mounted) return;
-        setState(() => _groups = groups);
-      } catch (reloadError) {
-        if (!mounted) return;
-        setState(() {
-          _groupError =
-              'グループ「${createdGroup.name}」は作成できたけれど、グループIDの発行に失敗し、その後の一覧更新にも失敗しました。${core.girlsMessageFor(error)} / ${core.girlsMessageFor(reloadError)}';
-        });
-        return;
-      }
-      if (!mounted) return;
       setState(() {
         _groupError =
             'グループ「${createdGroup.name}」は作成できたけれど、グループIDの発行に失敗しました。${core.girlsMessageFor(error)}';
@@ -319,25 +304,16 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
                     const Icon(Icons.alternate_email_rounded, color: _pink),
                 title: const Text('メールアドレス'),
                 subtitle: const Text('確認コードで紐づける'),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
                 onTap: () => Navigator.of(context).pop(_AccountAction.email),
               ),
               ListTile(
                 leading: const Icon(Icons.refresh_rounded, color: _lavender),
                 title: const Text('最新の情報に更新'),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
                 onTap: () => Navigator.of(context).pop(_AccountAction.refresh),
               ),
               ListTile(
                 leading: const Icon(Icons.logout_rounded, color: _pink),
                 title: const Text('ログアウト'),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
                 onTap: () => Navigator.of(context).pop(_AccountAction.logout),
               ),
             ],
@@ -402,25 +378,25 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
                     crossAxisCount: 2,
                     mainAxisSpacing: 6,
                     crossAxisSpacing: 6,
-                    childAspectRatio: 1.04,
+                    childAspectRatio: 1,
                     children: <Widget>[
                       _HomeMenuCard(
-                        key: const Key('girls-home-mascot-app'),
-                        assetName: _mascotDiaryCardAsset,
-                        label: 'マスコット付き交換日記',
-                        onTap: () => _launchBuiltin(_mascotApp),
+                        key: const Key('girls-home-memo-app'),
+                        assetName: _memoCardAsset,
+                        label: 'マイメモ帳（準備中）',
+                        onTap: _showMemoComingSoon,
+                      ),
+                      _HomeMenuCard(
+                        key: const Key('girls-home-minappchi-app'),
+                        assetName: _minappchiCardAsset,
+                        label: 'みんアプっち',
+                        onTap: () => _launchBuiltin(_minappchiApp),
                       ),
                       _HomeMenuCard(
                         key: const Key('girls-home-novel-app'),
-                        assetName: _pastelNovelCardAsset,
+                        assetName: _novelCardAsset,
                         label: 'パステルノベル',
                         onTap: () => _launchBuiltin(_novelApp),
-                      ),
-                      _HomeMenuCard(
-                        key: const Key('girls-home-paint-app'),
-                        assetName: _pastelPaintCardAsset,
-                        label: 'パステルお絵かき',
-                        onTap: () => _launchBuiltin(_paintApp),
                       ),
                       _HomeMenuCard(
                         key: const Key('girls-home-groups'),
@@ -477,7 +453,6 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
 
 class _BellButton extends StatelessWidget {
   const _BellButton({required this.onTap});
-
   final VoidCallback onTap;
 
   @override
@@ -503,7 +478,6 @@ class _RoundArtButton extends StatelessWidget {
     required this.onTap,
     super.key,
   });
-
   final String assetName;
   final String label;
   final VoidCallback onTap;
@@ -535,7 +509,6 @@ class _RoundArtButton extends StatelessWidget {
 
 class _SectionHeading extends StatelessWidget {
   const _SectionHeading({required this.title});
-
   final String title;
 
   @override
@@ -564,7 +537,6 @@ class _HomeMenuCard extends StatelessWidget {
     required this.onTap,
     super.key,
   });
-
   final String assetName;
   final String label;
   final VoidCallback onTap;
@@ -595,7 +567,6 @@ class _HomeMenuCard extends StatelessWidget {
 
 class _LatestGroupCard extends StatelessWidget {
   const _LatestGroupCard({required this.group, required this.onTap});
-
   final HostedGroup? group;
   final VoidCallback onTap;
 
@@ -674,7 +645,6 @@ class _LatestLoadingCard extends StatelessWidget {
 
 class _LatestErrorCard extends StatelessWidget {
   const _LatestErrorCard({required this.message, required this.onRetry});
-
   final String message;
   final VoidCallback onRetry;
 

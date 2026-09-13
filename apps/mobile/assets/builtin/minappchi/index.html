@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>みんあぷっち</title>
+  <style>
+    :root {
+      font-family: "Hiragino Maru Gothic ProN", "Yu Gothic", system-ui, sans-serif;
+      color: #5b4a58;
+      background: #fff7fb;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; }
+    button { font: inherit; }
+
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      background:
+        radial-gradient(circle at 16% 10%, #ffffff 0 5%, transparent 6%),
+        radial-gradient(circle at 86% 18%, #ffffff 0 4%, transparent 5%),
+        linear-gradient(180deg, #ffe8f2 0%, #f4edff 48%, #fff5dc 100%);
+    }
+
+    .app {
+      width: min(100%, 480px);
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: 0 auto;
+      padding: max(18px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    header { text-align: center; }
+    h1 {
+      margin: 0;
+      color: #8a6597;
+      font-size: 30px;
+      font-weight: 900;
+      letter-spacing: .06em;
+    }
+    .subtitle {
+      margin: 5px 0 0;
+      color: #9b839f;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .room {
+      position: relative;
+      min-height: 310px;
+      overflow: hidden;
+      border: 4px solid #fff;
+      border-radius: 30px;
+      background:
+        linear-gradient(180deg, #dff4ff 0 58%, #f4e4c9 58% 61%, #fff7e6 61% 100%);
+      box-shadow: 0 12px 28px #71577724;
+    }
+
+    .room::before {
+      content: "☁️";
+      position: absolute;
+      left: 18px;
+      top: 18px;
+      font-size: 32px;
+      opacity: .75;
+    }
+
+    .room::after {
+      content: "🌷";
+      position: absolute;
+      right: 18px;
+      bottom: 15px;
+      font-size: 29px;
+    }
+
+    .pet-stage {
+      position: absolute;
+      inset: 42px 20px 54px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    .egg {
+      width: 112px;
+      height: 140px;
+      border: 5px solid #fff;
+      border-radius: 50% 50% 46% 46% / 58% 58% 42% 42%;
+      background: linear-gradient(145deg, #fff 0 42%, #ffe1ef 43% 68%, #dcd2ff 69% 100%);
+      box-shadow: 0 13px 0 #d2bdd2, 0 20px 25px #6f5d7330;
+      animation: wobble 1.8s ease-in-out infinite;
+    }
+
+    @keyframes wobble {
+      0%, 100% { transform: rotate(-3deg); }
+      50% { transform: rotate(3deg); }
+    }
+
+    .creature {
+      position: relative;
+      width: 154px;
+      height: 132px;
+      border: 5px solid #fff;
+      border-radius: 50% 50% 44% 44% / 58% 58% 42% 42%;
+      background: #fffdfb;
+      box-shadow: 0 12px 0 #decfd6, 0 20px 28px #6f5d7328;
+      animation: breathe 2.2s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-5px) scale(1.015); }
+    }
+
+    .ear {
+      position: absolute;
+      top: -24px;
+      width: 47px;
+      height: 55px;
+      border: 5px solid #fff;
+      background: #fffdfb;
+      z-index: -1;
+    }
+    .ear.left { left: 17px; border-radius: 65% 35% 45% 55%; transform: rotate(-23deg); }
+    .ear.right { right: 17px; border-radius: 35% 65% 55% 45%; transform: rotate(23deg); }
+
+    .eye {
+      position: absolute;
+      top: 48px;
+      width: 13px;
+      height: 17px;
+      border-radius: 50%;
+      background: #5a4d58;
+    }
+    .eye.left { left: 43px; }
+    .eye.right { right: 43px; }
+
+    .mouth {
+      position: absolute;
+      left: 50%;
+      top: 76px;
+      width: 24px;
+      height: 13px;
+      border-bottom: 4px solid #d68097;
+      border-radius: 0 0 50% 50%;
+      transform: translateX(-50%);
+    }
+
+    .creature.tired .eye { height: 5px; top: 56px; border-radius: 999px; }
+    .creature.tired .mouth {
+      top: 86px;
+      border-bottom: 0;
+      border-top: 4px solid #9c7f8b;
+      border-radius: 50% 50% 0 0;
+    }
+
+    .speech {
+      min-height: 24px;
+      margin-top: 19px;
+      color: #725f74;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .star {
+      font-size: 96px;
+      filter: drop-shadow(0 10px 8px #7a63802b);
+      animation: float 2.2s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .poops {
+      position: absolute;
+      left: 20px;
+      right: 20px;
+      bottom: 18px;
+      min-height: 34px;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      font-size: 28px;
+      pointer-events: none;
+    }
+
+    .card {
+      border: 3px solid #fff;
+      border-radius: 23px;
+      background: #ffffffd9;
+      box-shadow: 0 8px 22px #7157771c;
+      padding: 14px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 12px;
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .stat {
+      padding: 9px 10px;
+      border-radius: 14px;
+      background: #faf6fc;
+    }
+
+    .stat.full { grid-column: 1 / -1; }
+    .value { display: block; margin-top: 3px; color: #7a617e; letter-spacing: .08em; }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    button {
+      min-height: 54px;
+      border: 0;
+      border-radius: 17px;
+      color: #614d61;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #c9b7cc;
+    }
+    button:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #c9b7cc; }
+    button:disabled { opacity: .4; cursor: default; }
+
+    #snack { background: #ffd1df; box-shadow: 0 4px 0 #e5adbe; }
+    #flush { background: #d7ecff; box-shadow: 0 4px 0 #adcde8; }
+    #next-egg {
+      grid-column: 1 / -1;
+      background: #ddd3ff;
+      box-shadow: 0 4px 0 #bdb0e6;
+    }
+
+    .message {
+      min-height: 48px;
+      margin-top: 11px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: #fff7d7;
+      color: #776b45;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.55;
+    }
+
+    .save-status {
+      margin-top: 8px;
+      color: #9a879b;
+      font-size: 10px;
+      text-align: center;
+    }
+
+    .error {
+      background: #fff0f3;
+      color: #a14c60;
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>みんあぷっち</h1>
+      <p class="subtitle">ちいさないきものを、ちょっとだけおせわ。</p>
+    </header>
+
+    <section class="room" aria-label="みんあぷっちのおへや">
+      <div id="pet-stage" class="pet-stage"></div>
+      <div id="poops" class="poops" aria-label="うんち"></div>
+    </section>
+
+    <section class="card">
+      <div class="stats">
+        <div class="stat">🍪 おなか<span id="fullness" class="value">-----</span></div>
+        <div class="stat">💗 げんき<span id="health" class="value">---</span></div>
+        <div class="stat full">🎂 いっしょにいる時間<span id="age" class="value">--</span></div>
+      </div>
+
+      <div class="buttons">
+        <button id="snack" disabled>🍪 おやつ</button>
+        <button id="flush" disabled>🚽 ながす</button>
+        <button id="next-egg" hidden>🥚 つぎのたまご</button>
+      </div>
+
+      <div id="message" class="message" role="status" aria-live="polite">たまごをじゅんびしています…</div>
+      <div id="save-status" class="save-status">セーブ確認中</div>
+    </section>
+  </main>
+
+  <script>
+    'use strict';
+
+    const SAVE_KEY = 'minappchi_pet_v1';
+    const STATE_VERSION = 1;
+    const EGG_MS = 15 * 1000;
+    const HUNGER_MS = 2 * 60 * 60 * 1000;
+    const POOP_MS = 4 * 60 * 60 * 1000;
+    const LIFESPAN_MS = 7 * 24 * 60 * 60 * 1000;
+    const MAX_FULLNESS = 5;
+    const MAX_HEALTH = 3;
+    const MAX_POOP = 3;
+
+    const stage = document.getElementById('pet-stage');
+    const poops = document.getElementById('poops');
+    const fullnessText = document.getElementById('fullness');
+    const healthText = document.getElementById('health');
+    const ageText = document.getElementById('age');
+    const snackButton = document.getElementById('snack');
+    const flushButton = document.getElementById('flush');
+    const nextEggButton = document.getElementById('next-egg');
+    const message = document.getElementById('message');
+    const saveStatus = document.getElementById('save-status');
+
+    let state = null;
+    let persistentMode = false;
+    let started = false;
+    let busy = false;
+
+    function hasMinAppState() {
+      return Boolean(
+        window.minapp &&
+        window.minapp.version === 1 &&
+        window.minapp.state &&
+        typeof window.minapp.state.get === 'function' &&
+        typeof window.minapp.state.set === 'function'
+      );
+    }
+
+    function newEgg(generation, now = Date.now()) {
+      return {
+        version: STATE_VERSION,
+        generation,
+        phase: 'egg',
+        eggAt: now,
+        hatchAt: now + EGG_MS,
+        bornAt: null,
+        diedAt: null,
+        deathCause: null,
+        fullness: 3,
+        health: MAX_HEALTH,
+        poop: 0,
+        nextHungerAt: null,
+        nextPoopAt: null,
+      };
+    }
+
+    function requireNumber(value, name) {
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new Error(`Invalid saved state: ${name}`);
+      }
+    }
+
+    function validateState(value) {
+      if (!value || typeof value !== 'object') throw new Error('Invalid saved state: root');
+      if (value.version !== STATE_VERSION) throw new Error(`Unsupported saved state version: ${value.version}`);
+      if (!Number.isInteger(value.generation) || value.generation < 1) throw new Error('Invalid saved state: generation');
+      if (!['egg', 'alive', 'dead'].includes(value.phase)) throw new Error(`Invalid saved state phase: ${value.phase}`);
+      requireNumber(value.eggAt, 'eggAt');
+      requireNumber(value.hatchAt, 'hatchAt');
+      if (!Number.isInteger(value.fullness) || value.fullness < 0 || value.fullness > MAX_FULLNESS) throw new Error('Invalid saved state: fullness');
+      if (!Number.isInteger(value.health) || value.health < 0 || value.health > MAX_HEALTH) throw new Error('Invalid saved state: health');
+      if (!Number.isInteger(value.poop) || value.poop < 0 || value.poop > MAX_POOP) throw new Error('Invalid saved state: poop');
+
+      if (value.phase !== 'egg') requireNumber(value.bornAt, 'bornAt');
+      if (value.phase === 'alive') {
+        requireNumber(value.nextHungerAt, 'nextHungerAt');
+        requireNumber(value.nextPoopAt, 'nextPoopAt');
+      }
+      if (value.phase === 'dead') {
+        requireNumber(value.diedAt, 'diedAt');
+        if (typeof value.deathCause !== 'string' || value.deathCause.length === 0) {
+          throw new Error('Invalid saved state: deathCause');
+        }
+      }
+      return value;
+    }
+
+    function setMessage(text, isError = false) {
+      message.textContent = text;
+      message.classList.toggle('error', isError);
+    }
+
+    function setSaveStatus(text) {
+      saveStatus.textContent = text;
+    }
+
+    function die(cause, at) {
+      state.phase = 'dead';
+      state.health = 0;
+      state.diedAt = at;
+      state.deathCause = cause;
+      state.nextHungerAt = null;
+      state.nextPoopAt = null;
+    }
+
+    function hatch(at) {
+      state.phase = 'alive';
+      state.bornAt = at;
+      state.fullness = 3;
+      state.health = MAX_HEALTH;
+      state.poop = 0;
+      state.nextHungerAt = at + HUNGER_MS;
+      state.nextPoopAt = at + POOP_MS;
+      setMessage('ぽこん！ みんあぷっちが うまれた！');
+    }
+
+    function advanceTo(now) {
+      let changed = false;
+      if (state.phase === 'egg' && now >= state.hatchAt) {
+        hatch(state.hatchAt);
+        changed = true;
+      }
+      if (state.phase !== 'alive') return changed;
+
+      const naturalDeathAt = state.bornAt + LIFESPAN_MS;
+      while (state.phase === 'alive') {
+        const nextEventAt = Math.min(state.nextHungerAt, state.nextPoopAt, naturalDeathAt);
+        if (nextEventAt > now) break;
+        if (nextEventAt === naturalDeathAt) {
+          die('いっぱい いっしょにいて、おほしさまになりました。', naturalDeathAt);
+          changed = true;
+          break;
+        }
+        if (state.nextHungerAt <= state.nextPoopAt) {
+          if (state.fullness > 0) state.fullness -= 1;
+          else state.health -= 1;
+          state.nextHungerAt += HUNGER_MS;
+          changed = true;
+          if (state.health <= 0) {
+            die('おなかが ぺこぺこで、おほしさまになりました。', nextEventAt);
+            break;
+          }
+        } else {
+          state.poop = Math.min(MAX_POOP, state.poop + 1);
+          state.nextPoopAt += POOP_MS;
+          changed = true;
+          if (state.poop >= MAX_POOP) {
+            state.health -= 1;
+            if (state.health <= 0) {
+              die('おへやが くちゃくちゃで、おほしさまになりました。', nextEventAt);
+              break;
+            }
+          }
+        }
+      }
+      return changed;
+    }
+
+    async function persist() {
+      if (!persistentMode) {
+        setSaveStatus('この環境ではセーブなし');
+        return;
+      }
+      if (!hasMinAppState()) throw new Error('MinApp state bridge disappeared while saving.');
+      await window.minapp.state.set(SAVE_KEY, state);
+      setSaveStatus('セーブしました');
+    }
+
+    function dots(value, max, filled, empty) {
+      return filled.repeat(value) + empty.repeat(max - value);
+    }
+
+    function formatAge(now) {
+      if (state.phase === 'egg') {
+        const seconds = Math.max(0, Math.ceil((state.hatchAt - now) / 1000));
+        return `あと ${seconds}びょうで うまれる`;
+      }
+      const endAt = state.phase === 'dead' ? state.diedAt : now;
+      const elapsed = Math.max(0, endAt - state.bornAt);
+      const hours = Math.floor(elapsed / (60 * 60 * 1000));
+      const days = Math.floor(hours / 24);
+      const restHours = hours % 24;
+      return `${days}にち ${restHours}じかん`;
+    }
+
+    function creatureSpeech() {
+      if (state.poop > 0) return 'くちゃい…';
+      if (state.health <= 1) return 'ちょっと げんきない…';
+      if (state.fullness === 0) return 'おなか ぺこぺこ…';
+      if (state.fullness >= MAX_FULLNESS) return 'おなかいっぱい！';
+      return 'きょうも いっしょだよ';
+    }
+
+    function render() {
+      if (!state) return;
+      const now = Date.now();
+      stage.replaceChildren();
+      poops.replaceChildren();
+      fullnessText.textContent = dots(state.fullness, MAX_FULLNESS, '●', '○');
+      healthText.textContent = dots(state.health, MAX_HEALTH, '♥', '♡');
+      ageText.textContent = `第${state.generation}代 ・ ${formatAge(now)}`;
+      snackButton.disabled = state.phase !== 'alive' || busy;
+      flushButton.disabled = state.phase !== 'alive' || busy;
+      nextEggButton.hidden = state.phase !== 'dead';
+      nextEggButton.disabled = busy;
+
+      if (state.phase === 'egg') {
+        const egg = document.createElement('div');
+        egg.className = 'egg';
+        stage.appendChild(egg);
+        const speech = document.createElement('div');
+        speech.className = 'speech';
+        speech.textContent = '……なかで もぞもぞしてる';
+        stage.appendChild(speech);
+        return;
+      }
+      if (state.phase === 'dead') {
+        const star = document.createElement('div');
+        star.className = 'star';
+        star.textContent = '⭐';
+        stage.appendChild(star);
+        const speech = document.createElement('div');
+        speech.className = 'speech';
+        speech.textContent = 'ありがとう。またね。';
+        stage.appendChild(speech);
+        setMessage(state.deathCause);
+        return;
+      }
+
+      const creature = document.createElement('div');
+      creature.className = `creature${state.health <= 1 || state.fullness === 0 ? ' tired' : ''}`;
+      creature.innerHTML = `
+        <div class="ear left"></div>
+        <div class="ear right"></div>
+        <div class="eye left"></div>
+        <div class="eye right"></div>
+        <div class="mouth"></div>
+      `;
+      stage.appendChild(creature);
+      const speech = document.createElement('div');
+      speech.className = 'speech';
+      speech.textContent = creatureSpeech();
+      stage.appendChild(speech);
+      for (let i = 0; i < state.poop; i += 1) {
+        const item = document.createElement('span');
+        item.textContent = '💩';
+        poops.appendChild(item);
+      }
+    }
+
+    async function withAction(action) {
+      if (busy || !state) return;
+      busy = true;
+      render();
+      try {
+        const changedByTime = advanceTo(Date.now());
+        await action();
+        await persist();
+        if (changedByTime && state.phase === 'dead') setMessage(state.deathCause);
+      } catch (error) {
+        setMessage(`エラー: ${error instanceof Error ? error.message : String(error)}`, true);
+      } finally {
+        busy = false;
+        render();
+      }
+    }
+
+    snackButton.addEventListener('click', () => withAction(async () => {
+      if (state.phase !== 'alive') return;
+      if (state.fullness >= MAX_FULLNESS) {
+        setMessage('もう おなかいっぱいだよ。');
+        return;
+      }
+      state.fullness += 1;
+      setMessage('もぐもぐ。おいしい！');
+    }));
+
+    flushButton.addEventListener('click', () => withAction(async () => {
+      if (state.phase !== 'alive') return;
+      if (state.poop === 0) {
+        setMessage('まだ ながすものはないよ。');
+        return;
+      }
+      state.poop = 0;
+      setMessage('じゃーっ！ すっきり！');
+    }));
+
+    nextEggButton.addEventListener('click', () => withAction(async () => {
+      if (state.phase !== 'dead') return;
+      state = newEgg(state.generation + 1);
+      setMessage('あたらしい たまごが やってきた。');
+    }));
+
+    async function bootPersistent() {
+      if (!hasMinAppState()) throw new Error('MinApp state bridge is unavailable.');
+      persistentMode = true;
+      try {
+        const saved = await window.minapp.state.get(SAVE_KEY);
+        state = validateState(saved);
+        setSaveStatus('セーブを読み込みました');
+      } catch (error) {
+        if (error && error.code === 'state_not_found') {
+          state = newEgg(1);
+          await persist();
+          setMessage('たまごが やってきた！');
+        } else {
+          throw error;
+        }
+      }
+      const changed = advanceTo(Date.now());
+      if (changed) await persist();
+      started = true;
+      render();
+    }
+
+    function bootSession() {
+      if (persistentMode) return;
+      state = newEgg(1);
+      started = true;
+      setSaveStatus('この環境ではセーブなし');
+      setMessage('おためしモード。みんアプで開くとセーブできるよ。');
+      render();
+    }
+
+    async function handleMinAppReady() {
+      try {
+        await bootPersistent();
+      } catch (error) {
+        setMessage(`セーブを開始できません: ${error instanceof Error ? error.message : String(error)}`, true);
+        setSaveStatus('セーブ失敗');
+        snackButton.disabled = true;
+        flushButton.disabled = true;
+        nextEggButton.disabled = true;
+      }
+    }
+
+    window.addEventListener('minappready', handleMinAppReady);
+    if (hasMinAppState()) handleMinAppReady();
+    else {
+      window.setTimeout(() => {
+        if (!persistentMode && !started) bootSession();
+      }, 1200);
+    }
+
+    window.setInterval(async () => {
+      if (!state || busy) {
+        render();
+        return;
+      }
+      try {
+        const changed = advanceTo(Date.now());
+        if (changed) await persist();
+        render();
+      } catch (error) {
+        setMessage(`時間更新エラー: ${error instanceof Error ? error.message : String(error)}`, true);
+      }
+    }, 1000);
+  </script>
+</body>
+</html>

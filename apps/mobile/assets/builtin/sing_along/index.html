@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>うたってみよう</title>
+  <style>
+    :root {
+      font-family: "Hiragino Maru Gothic ProN", "Yu Gothic", system-ui, sans-serif;
+      color: #5f4b66;
+      background: #fff6fb;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    button, select { font: inherit; }
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      background: linear-gradient(180deg, #ffe7f2 0%, #f2eaff 48%, #fff4dc 100%);
+    }
+    .app {
+      width: min(100%, 560px);
+      margin: 0 auto;
+      padding: max(18px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+    }
+    header { text-align: center; margin-bottom: 14px; }
+    h1 { margin: 0; font-size: 29px; color: #7d5d9b; }
+    .subtitle { margin: 7px 0 0; font-size: 13px; color: #8d7894; }
+    .stage {
+      min-height: 130px;
+      display: grid;
+      place-items: center;
+      border: 4px solid #fff;
+      border-radius: 28px;
+      background: linear-gradient(135deg, #ffd5e7, #dcd1ff 58%, #d8f5e5);
+      box-shadow: 0 10px 28px #8d73a52b;
+      text-align: center;
+    }
+    .mic { font-size: 54px; }
+    .friends { font-size: 25px; letter-spacing: 7px; }
+    .stage-note { margin-top: 4px; font-size: 12px; font-weight: 800; color: #725b7a; }
+    .card {
+      margin-top: 14px;
+      padding: 16px;
+      border: 3px solid #fff;
+      border-radius: 24px;
+      background: #ffffffd9;
+      box-shadow: 0 8px 22px #8d73a520;
+    }
+    .label { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 900; color: #765b82; }
+    select {
+      width: 100%;
+      min-height: 48px;
+      padding: 0 13px;
+      border: 2px solid #e3d8ef;
+      border-radius: 15px;
+      background: white;
+      color: #5f4b66;
+      font-weight: 800;
+    }
+    .track-info { min-height: 38px; margin: 9px 2px 0; font-size: 12px; line-height: 1.55; color: #816f88; }
+    .time-row { display: flex; justify-content: space-between; align-items: center; margin: 13px 2px 8px; font-weight: 900; }
+    .timer { font-size: 23px; color: #7b5d97; font-variant-numeric: tabular-nums; }
+    .limit { font-size: 13px; color: #9d879e; }
+    .buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button {
+      min-height: 52px;
+      border: 0;
+      border-radius: 17px;
+      padding: 9px 10px;
+      font-weight: 900;
+      color: #5d4964;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .42; cursor: default; }
+    .preview { background: #d9efff; }
+    .record { background: #ffc9d9; }
+    .stop { background: #ffe3b6; }
+    .play { background: #d5f2de; }
+    .delete { grid-column: 1 / -1; background: #f0e9f7; }
+    .status { min-height: 44px; margin-top: 13px; padding: 10px 12px; border-radius: 14px; background: #f8f3fb; font-size: 12px; line-height: 1.5; }
+    .status.error { background: #fff0f2; color: #a14358; }
+    .tip { margin: 12px 0 0; padding: 11px 13px; border-radius: 16px; background: #fff8ce; color: #776c3e; font-size: 12px; font-weight: 800; line-height: 1.5; }
+    .privacy { margin: 10px 2px 0; font-size: 11px; color: #95879a; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>🎤 うたってみよう</h1>
+      <p class="subtitle">すきな伴奏にあわせて、じぶんの声をろくおんしよう</p>
+    </header>
+
+    <section class="stage" aria-label="うたのステージ">
+      <div>
+        <div class="mic">🎙️</div>
+        <div class="friends">🐶 🐻 🐰</div>
+        <div class="stage-note">みんながおうえんしてるよ！</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <label class="label" for="track">🎵 BGMをえらぶ</label>
+      <select id="track">
+        <option value="sparkle">きらきらポップ</option>
+        <option value="after-school">放課後バラード</option>
+        <option value="idol-step">アイドルステップ</option>
+      </select>
+      <p id="track-info" class="track-info"></p>
+
+      <div class="time-row">
+        <span id="timer" class="timer">00:00</span>
+        <span class="limit">最大 01:00</span>
+      </div>
+
+      <div class="buttons">
+        <button id="preview" class="preview">▶ BGMをきく</button>
+        <button id="record" class="record">🔴 ろくおん</button>
+        <button id="stop" class="stop" disabled>■ とめる</button>
+        <button id="play" class="play" disabled>▶ BGM＋うた</button>
+        <button id="delete" class="delete" disabled>🗑 とりなおす</button>
+      </div>
+
+      <div id="status" class="status" role="status" aria-live="polite">マイクは「ろくおん」を押したときだけ使います。</div>
+      <p class="tip">🎧 イヤホンがおすすめだよ。スピーカーのBGMをマイクが拾いにくくなるよ。</p>
+      <p class="privacy">録音した声はこの画面の中だけで使い、サーバーには送信しません。画面を閉じると録音は消えます。</p>
+      <p class="privacy">🎵 自分で作った曲や、利用が許可されている音楽を使ってね。市販の曲など、他の人が権利を持つ音楽をアップロード・共有するときは、必要な許可を確認してください。</p>
+    </section>
+  </main>
+
+  <script>
+    'use strict';
+
+    const MAX_SECONDS = 60;
+    const TRACKS = Object.freeze({
+      sparkle: Object.freeze({
+        bpm: 124,
+        description: '明るくて軽いポップ。自由にメロディをのせてみよう。',
+        root: 60,
+        chords: [[0, 4, 7], [9, 12, 16], [5, 9, 12], [7, 11, 14]],
+        wave: 'triangle',
+      }),
+      'after-school': Object.freeze({
+        bpm: 82,
+        description: 'ゆっくり歌える、やさしい放課後の伴奏。',
+        root: 53,
+        chords: [[0, 4, 7], [7, 11, 14], [9, 12, 16], [5, 9, 12]],
+        wave: 'sine',
+      }),
+      'idol-step': Object.freeze({
+        bpm: 148,
+        description: '元気に歌いたいときの、はずむアイドル風伴奏。',
+        root: 55,
+        chords: [[0, 4, 7], [5, 9, 12], [9, 12, 16], [7, 11, 14]],
+        wave: 'square',
+      }),
+    });
+
+    const trackSelect = document.getElementById('track');
+    const trackInfo = document.getElementById('track-info');
+    const timer = document.getElementById('timer');
+    const statusBox = document.getElementById('status');
+    const previewButton = document.getElementById('preview');
+    const recordButton = document.getElementById('record');
+    const stopButton = document.getElementById('stop');
+    const playButton = document.getElementById('play');
+    const deleteButton = document.getElementById('delete');
+
+    let audioContext = null;
+    let bgmNodes = [];
+    let mediaStream = null;
+    let recorder = null;
+    let recordedBlob = null;
+    let recordedUrl = null;
+    let recordedAudio = null;
+    let timerId = null;
+    let startedAt = 0;
+    let mode = 'idle';
+
+    function fail(error) {
+      stopEverything();
+      statusBox.className = 'status error';
+      statusBox.textContent = `エラー: ${error instanceof Error ? error.message : String(error)}`;
+      setMode('error');
+    }
+
+    function setStatus(message) {
+      statusBox.className = 'status';
+      statusBox.textContent = message;
+    }
+
+    function requireCapabilities() {
+      if (!window.AudioContext && !window.webkitAudioContext) throw new Error('この端末ではBGM再生機能を使えません。');
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') throw new Error('この端末ではマイク録音機能を使えません。');
+      if (typeof window.MediaRecorder !== 'function') throw new Error('この端末では録音形式に対応していません。');
+    }
+
+    function currentTrack() {
+      const track = TRACKS[trackSelect.value];
+      if (!track) throw new Error(`Unknown track: ${trackSelect.value}`);
+      return track;
+    }
+
+    function setMode(next) {
+      mode = next;
+      const busy = next === 'preview' || next === 'recording' || next === 'playback';
+      trackSelect.disabled = busy || next === 'error';
+      previewButton.disabled = busy || next === 'error';
+      recordButton.disabled = busy || next === 'error';
+      stopButton.disabled = !busy;
+      playButton.disabled = busy || !recordedBlob || next === 'error';
+      deleteButton.disabled = busy || !recordedBlob || next === 'error';
+    }
+
+    function formatTime(seconds) {
+      const value = Math.max(0, Math.floor(seconds));
+      return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
+    }
+
+    function beginTimer(onLimit) {
+      clearInterval(timerId);
+      startedAt = performance.now();
+      timerId = setInterval(() => {
+        const elapsed = (performance.now() - startedAt) / 1000;
+        timer.textContent = formatTime(elapsed);
+        if (elapsed >= MAX_SECONDS) {
+          clearInterval(timerId);
+          timerId = null;
+          onLimit();
+        }
+      }, 200);
+    }
+
+    function stopTimer() {
+      if (timerId !== null) clearInterval(timerId);
+      timerId = null;
+    }
+
+    function midiToHz(note) {
+      return 440 * Math.pow(2, (note - 69) / 12);
+    }
+
+    async function ensureAudioContext() {
+      if (!audioContext) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioContextClass();
+      }
+      if (audioContext.state === 'suspended') await audioContext.resume();
+      if (audioContext.state !== 'running') throw new Error(`AudioContext is ${audioContext.state}`);
+      return audioContext;
+    }
+
+    function scheduleTone(context, destination, frequency, start, duration, gainValue, wave) {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = wave;
+      oscillator.frequency.setValueAtTime(frequency, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(gainValue, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      oscillator.connect(gain).connect(destination);
+      oscillator.start(start);
+      oscillator.stop(start + duration + 0.03);
+      bgmNodes.push(oscillator, gain);
+    }
+
+    async function startBgm() {
+      const context = await ensureAudioContext();
+      const track = currentTrack();
+      const beat = 60 / track.bpm;
+      const start = context.currentTime + 0.05;
+      const totalBeats = Math.ceil(MAX_SECONDS / beat) + 4;
+
+      stopBgm();
+      for (let beatIndex = 0; beatIndex < totalBeats; beatIndex += 1) {
+        const chord = track.chords[Math.floor(beatIndex / 4) % track.chords.length];
+        const when = start + beatIndex * beat;
+        if (beatIndex % 4 === 0) {
+          for (const offset of chord) {
+            scheduleTone(context, context.destination, midiToHz(track.root + offset), when, beat * 3.8, 0.035, track.wave);
+          }
+        }
+        scheduleTone(context, context.destination, midiToHz(track.root - 12 + chord[0]), when, beat * 0.8, 0.045, 'sine');
+        if (beatIndex % 2 === 0) {
+          scheduleTone(context, context.destination, midiToHz(84), when, 0.035, 0.018, 'square');
+        }
+      }
+    }
+
+    function stopBgm() {
+      for (const node of bgmNodes) {
+        try { if (typeof node.stop === 'function') node.stop(); } catch (_) {}
+        try { node.disconnect(); } catch (_) {}
+      }
+      bgmNodes = [];
+    }
+
+    function stopStream() {
+      if (!mediaStream) return;
+      for (const track of mediaStream.getTracks()) track.stop();
+      mediaStream = null;
+    }
+
+    function stopEverything() {
+      stopTimer();
+      stopBgm();
+      if (recordedAudio) {
+        recordedAudio.pause();
+        recordedAudio.currentTime = 0;
+      }
+      if (recorder && recorder.state === 'recording') recorder.stop();
+      stopStream();
+    }
+
+    async function previewBgm() {
+      try {
+        requireCapabilities();
+        setMode('preview');
+        timer.textContent = '00:00';
+        await startBgm();
+        beginTimer(stopByUser);
+        setStatus('BGMを再生中です。');
+      } catch (error) { fail(error); }
+    }
+
+    async function startRecording() {
+      try {
+        requireCapabilities();
+        if (recordedBlob) throw new Error('録音済みです。「とりなおす」を押してから録音してください。');
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        const chunks = [];
+        recorder = new MediaRecorder(mediaStream);
+        recorder.addEventListener('dataavailable', (event) => {
+          if (event.data && event.data.size > 0) chunks.push(event.data);
+        });
+        recorder.addEventListener('stop', () => {
+          if (chunks.length === 0) {
+            fail(new Error('録音データが空でした。'));
+            return;
+          }
+          recordedBlob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+          if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+          recordedUrl = URL.createObjectURL(recordedBlob);
+          recordedAudio = new Audio(recordedUrl);
+          stopStream();
+          setMode('idle');
+          setStatus('録音できたよ！「BGM＋うた」で聞いてみよう。');
+        }, { once: true });
+        recorder.start();
+        setMode('recording');
+        timer.textContent = '00:00';
+        await startBgm();
+        beginTimer(stopByUser);
+        setStatus('🔴 ろくおん中… うたってね！');
+      } catch (error) { fail(error); }
+    }
+
+    async function playRecording() {
+      try {
+        if (!recordedAudio || !recordedBlob) throw new Error('録音データがありません。');
+        recordedAudio.currentTime = 0;
+        setMode('playback');
+        timer.textContent = '00:00';
+        await startBgm();
+        await recordedAudio.play();
+        beginTimer(stopByUser);
+        recordedAudio.addEventListener('ended', stopByUser, { once: true });
+        setStatus('BGMといっしょに再生中です。');
+      } catch (error) { fail(error); }
+    }
+
+    function stopByUser() {
+      const wasRecording = recorder && recorder.state === 'recording';
+      stopTimer();
+      stopBgm();
+      if (recordedAudio) {
+        recordedAudio.pause();
+        recordedAudio.currentTime = 0;
+      }
+      if (wasRecording) {
+        recorder.stop();
+        setStatus('録音を保存しています…');
+        return;
+      }
+      stopStream();
+      setMode('idle');
+      setStatus(recordedBlob ? 'もう一度聞くか、とりなおせるよ。' : '準備できたよ。');
+    }
+
+    function deleteRecording() {
+      if (!recordedBlob) throw new Error('削除する録音がありません。');
+      stopEverything();
+      if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+      recordedBlob = null;
+      recordedUrl = null;
+      recordedAudio = null;
+      recorder = null;
+      timer.textContent = '00:00';
+      setMode('idle');
+      setStatus('録音を消しました。もう一度うたえるよ。');
+    }
+
+    trackSelect.addEventListener('change', () => {
+      const track = currentTrack();
+      trackInfo.textContent = `${track.description}  ${track.bpm} BPM`;
+    });
+    previewButton.addEventListener('click', previewBgm);
+    recordButton.addEventListener('click', startRecording);
+    stopButton.addEventListener('click', stopByUser);
+    playButton.addEventListener('click', playRecording);
+    deleteButton.addEventListener('click', () => {
+      try { deleteRecording(); } catch (error) { fail(error); }
+    });
+    window.addEventListener('pagehide', stopEverything);
+
+    try {
+      requireCapabilities();
+      const track = currentTrack();
+      trackInfo.textContent = `${track.description}  ${track.bpm} BPM`;
+      setMode('idle');
+    } catch (error) {
+      fail(error);
+    }
+  </script>
+</body>
+</html>

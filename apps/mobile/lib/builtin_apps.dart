@@ -82,6 +82,42 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     iconBorderColor: Color(0xFF818CF8),
     iconColor: Color(0xFF4338CA),
   ),
+  BuiltInApp(
+    id: 'novel-starter',
+    title: 'ひみつの放課後',
+    assetPath: 'assets/builtin/novel_starter/index.html',
+    searchableText:
+        'ひみつの放課後 パステルノベル ノベルゲーム 物語 選択肢 恋愛 Girls 女子向け みんアプ公式 サンプル',
+    icon: Icons.auto_stories_rounded,
+    cardColor: Color(0xFFF5EEFF),
+    iconBackgroundColor: Color(0xFFE9D5FF),
+    iconBorderColor: Color(0xFFC4B5FD),
+    iconColor: Color(0xFF6D4AA5),
+  ),
+  BuiltInApp(
+    id: 'sing-along',
+    title: 'うたってみよう',
+    assetPath: 'assets/builtin/sing_along/index.html',
+    searchableText:
+        'うたってみよう カラオケ 歌 うた 録音 BGM マイク 音楽 Girls 女子向け みんアプ公式 サンプル',
+    icon: Icons.mic_rounded,
+    cardColor: Color(0xFFFFF1E8),
+    iconBackgroundColor: Color(0xFFFFD9C2),
+    iconBorderColor: Color(0xFFFFA66B),
+    iconColor: Color(0xFFB45309),
+  ),
+  BuiltInApp(
+    id: 'minappchi',
+    title: 'みんあぷっち',
+    assetPath: 'assets/builtin/minappchi/index.html',
+    searchableText:
+        'みんあぷっち みんアプっち 育成 ペット たまご お世話 おやつ Girls 女子向け みんアプ公式 サンプル',
+    icon: Icons.pets_rounded,
+    cardColor: Color(0xFFFFEEF0),
+    iconBackgroundColor: Color(0xFFFFCDD2),
+    iconBorderColor: Color(0xFFFF8A94),
+    iconColor: Color(0xFFA73548),
+  ),
 ];
 
 List<BuiltInApp> filterBuiltInApps(String query) {

@@ -6,7 +6,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('built-in app registry has unique valid entries', () {
-    expect(builtInApps, hasLength(4));
+    expect(builtInApps, hasLength(7));
     expect(
       builtInApps.map((BuiltInApp app) => app.id).toSet(),
       hasLength(builtInApps.length),
@@ -25,40 +25,37 @@ void main() {
       expect(app.searchableText, contains(app.title));
       expect(app.assetPath, matches(validAssetPath));
     }
+
     expect(
-      builtInApps.where((BuiltInApp app) => app.id == 'novel-starter'),
-      isEmpty,
+      builtInApps.singleWhere((BuiltInApp app) => app.id == 'novel-starter').title,
+      'ひみつの放課後',
+    );
+    expect(
+      builtInApps.singleWhere((BuiltInApp app) => app.id == 'sing-along').title,
+      'うたってみよう',
+    );
+    expect(
+      builtInApps.singleWhere((BuiltInApp app) => app.id == 'minappchi').title,
+      'みんあぷっち',
     );
   });
 
   test('built-in app search filters every registered local app', () {
     expect(filterBuiltInApps(''), hasLength(builtInApps.length));
     expect(filterBuiltInApps('しばちゃん'), hasLength(2));
-    expect(
-      filterBuiltInApps('どんぐり').single.id,
-      'shiba-game',
-    );
-    expect(
-      filterBuiltInApps('なでなで').single.id,
-      'shiba-goshujin',
-    );
+    expect(filterBuiltInApps('どんぐり').single.id, 'shiba-game');
+    expect(filterBuiltInApps('なでなで').single.id, 'shiba-goshujin');
 
     final Set<String> sideScrollerIds = filterBuiltInApps('横スクロール')
         .map((BuiltInApp app) => app.id)
         .toSet();
     expect(sideScrollerIds, <String>{'shopping-town', 'ol-home'});
 
-    expect(
-      filterBuiltInApps('奥さん').single.id,
-      'shopping-town',
-    );
-    expect(
-      filterBuiltInApps('マンション').single.id,
-      'ol-home',
-    );
-    expect(filterBuiltInApps('ノベルゲーム'), isEmpty);
-    expect(filterBuiltInApps('女子向け'), isEmpty);
-    expect(filterBuiltInApps('じかんわり'), isEmpty);
+    expect(filterBuiltInApps('奥さん').single.id, 'shopping-town');
+    expect(filterBuiltInApps('マンション').single.id, 'ol-home');
+    expect(filterBuiltInApps('ノベルゲーム').single.id, 'novel-starter');
+    expect(filterBuiltInApps('カラオケ').single.id, 'sing-along');
+    expect(filterBuiltInApps('みんアプっち').single.id, 'minappchi');
   });
 
   test('every registered built-in app asset is bundled', () async {

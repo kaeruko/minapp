@@ -33,7 +33,7 @@ HostedGirlsApi _fakeApi() {
 }
 
 void main() {
-  testWidgets('Girls home opens group creation dialog from the create card', (
+  testWidgets('Girls home shows the intended four cards and opens group creation', (
     WidgetTester tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(360, 720));
@@ -53,17 +53,21 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('こんにちは、ハニー！\n今日も楽しもうね♪'), findsNothing);
     expect(find.byKey(const Key('girls-header-leading-tray')), findsOneWidget);
     expect(find.byKey(const Key('girls-header-actions-tray')), findsOneWidget);
     expect(find.text('ビルトインアプリ'), findsOneWidget);
     expect(find.text('友達の最新情報'), findsOneWidget);
-    expect(find.byKey(const Key('girls-home-mascot-app')), findsOneWidget);
+    expect(find.byKey(const Key('girls-home-memo-app')), findsOneWidget);
+    expect(find.byKey(const Key('girls-home-minappchi-app')), findsOneWidget);
     expect(find.byKey(const Key('girls-home-novel-app')), findsOneWidget);
-    expect(find.byKey(const Key('girls-home-paint-app')), findsOneWidget);
     expect(find.byKey(const Key('girls-home-groups')), findsOneWidget);
     expect(find.text('放課後イラスト部'), findsOneWidget);
     expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const Key('girls-home-memo-app')));
+    await tester.pump();
+    expect(find.text('マイメモ帳は準備中だよ'), findsOneWidget);
+    await tester.pumpAndSettle(const Duration(seconds: 4));
 
     await tester.tap(find.byKey(const Key('girls-home-settings')));
     await tester.pumpAndSettle();
@@ -82,7 +86,6 @@ void main() {
     expect(find.text('グループ名'), findsOneWidget);
     expect(find.text('やめる'), findsOneWidget);
     expect(find.text('つくる'), findsOneWidget);
-    expect(find.text('ビルトインアプリ'), findsOneWidget);
 
     await tester.tap(find.text('やめる'));
     await tester.pumpAndSettle();
@@ -97,7 +100,6 @@ void main() {
     expect(find.text('いまのグループ'), findsOneWidget);
     expect(find.text('あなたがオーナーです ♡'), findsOneWidget);
     expect(find.text('グループを開く'), findsOneWidget);
-    expect(find.text('どのグループで遊ぶ？'), findsNothing);
 
     await tester.tap(find.byKey(const Key('girls-footer-home')));
     await tester.pumpAndSettle();

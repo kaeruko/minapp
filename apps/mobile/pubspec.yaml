@@ -30,6 +30,9 @@ flutter:
     - assets/builtin/shopping_town/rules.js
     - assets/builtin/ol_home/index.html
     - assets/builtin/ol_home/effects.js
+    - assets/builtin/novel_starter/index.html
+    - assets/builtin/sing_along/index.html
+    - assets/builtin/minappchi/index.html
     - assets/girls/character.png
     - assets/girls/mascot_pair.svg
     - assets/girls/mascot_white.svg
