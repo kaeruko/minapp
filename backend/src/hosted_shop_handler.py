@@ -16,25 +16,25 @@ from handler import (
     _require_fields,
     _required_string,
 )
-from hosted_shop_runtime_backend import HostedShopRuntimeBackend
+from hosted_girls_shop_backend import HostedGirlsShopBackend
 
 _LOGGER = logging.getLogger(__name__)
-_BACKEND: HostedShopRuntimeBackend | None = None
+_BACKEND: HostedGirlsShopBackend | None = None
 _ID_RE = r"([0-9a-f]{32})"
 _SHOP_ACTION_RE = re.compile(rf"^/shop/apps/{_ID_RE}/(launch|download|reports)$")
 _SHOP_VISIBILITY_RE = re.compile(rf"^/apps/{_ID_RE}/shop-visibility$")
 _SHOP_CONTENT_RE = re.compile(r"^/shop/content/([A-Za-z0-9_-]{32,128})/(.+)$")
 
 
-def _shared_backend() -> HostedShopRuntimeBackend:
+def _shared_backend() -> HostedGirlsShopBackend:
     global _BACKEND
     backend = hosted_handler._BACKEND
     if backend is None:
-        resolved = HostedShopRuntimeBackend.from_environment()
+        resolved = HostedGirlsShopBackend.from_environment()
         hosted_handler._BACKEND = resolved
         _BACKEND = resolved
         return resolved
-    if not isinstance(backend, HostedShopRuntimeBackend):
+    if not isinstance(backend, HostedGirlsShopBackend):
         raise RuntimeError("Hosted API backend was initialized with an incompatible backend type")
     if _BACKEND is None:
         _BACKEND = backend
