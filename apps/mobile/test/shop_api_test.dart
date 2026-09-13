@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:minapp_mobile/shop_api.dart';
 
+String _repeat(String value, int count) => List<String>.filled(count, value).join();
+
 void main() {
   test('listApps parses classic classroom shop payload', () async {
     final MockClient client = MockClient((http.Request request) async {
@@ -15,13 +17,13 @@ void main() {
         jsonEncode(<String, Object?>{
           'apps': <Object?>[
             <String, Object?>{
-              'app_id': 'a' * 32,
-              'version_id': 'b' * 32,
-              'owner_user_id': 'c' * 32,
+              'app_id': _repeat('a', 32),
+              'version_id': _repeat('b', 32),
+              'owner_user_id': _repeat('c', 32),
               'owner_display_name': '作者',
               'title': '作品A',
               'reviewed_at': '2026-09-13T01:00:00Z',
-              'sha256': 'd' * 64,
+              'sha256': _repeat('d', 64),
             },
           ],
         }),
@@ -37,7 +39,7 @@ void main() {
 
     final List<ShopApp> apps = await api.listApps('token');
     expect(apps, hasLength(1));
-    expect(apps.single.version, 'b' * 32);
+    expect(apps.single.version, _repeat('b', 32));
     expect(apps.single.ownerDisplayName, '作者');
   });
 
@@ -47,13 +49,13 @@ void main() {
         jsonEncode(<String, Object?>{
           'apps': <Object?>[
             <String, Object?>{
-              'app_id': 'a' * 32,
+              'app_id': _repeat('a', 32),
               'version': '3',
-              'owner_user_id': 'c' * 32,
+              'owner_user_id': _repeat('c', 32),
               'owner_display_name': 'girls-author',
               'title': '作品B',
               'published_at': '2026-09-13T02:00:00Z',
-              'sha256': 'd' * 64,
+              'sha256': _repeat('d', 64),
             },
           ],
         }),
@@ -73,11 +75,12 @@ void main() {
   });
 
   test('createLaunch posts exact selected version token', () async {
+    final String appId = _repeat('a', 32);
     final MockClient client = MockClient((http.Request request) async {
       expect(request.method, 'POST');
       expect(
         request.url,
-        Uri.parse('https://api.example.com/shop/apps/${'a' * 32}/launch'),
+        Uri.parse('https://api.example.com/shop/apps/$appId/launch'),
       );
       expect(jsonDecode(request.body), <String, Object?>{'version': '7'});
       return http.Response(
@@ -95,13 +98,13 @@ void main() {
     );
     addTearDown(api.close);
     final ShopApp app = ShopApp(
-      appId: 'a' * 32,
+      appId: appId,
       version: '7',
       title: '作品',
-      ownerUserId: 'c' * 32,
+      ownerUserId: _repeat('c', 32),
       ownerDisplayName: '作者',
       publishedAt: DateTime.utc(2026, 9, 13),
-      sha256: 'd' * 64,
+      sha256: _repeat('d', 64),
     );
 
     final ShopLaunchGrant grant = await api.createLaunch(
@@ -117,7 +120,7 @@ void main() {
         jsonEncode(<String, Object?>{
           'url': 'https://download.example.com/app.zip?sig=x',
           'filename': 'app.zip',
-          'sha256': 'e' * 64,
+          'sha256': _repeat('e', 64),
           'expires_in': 600,
         }),
         200,
@@ -130,13 +133,13 @@ void main() {
     );
     addTearDown(api.close);
     final ShopApp app = ShopApp(
-      appId: 'a' * 32,
-      version: 'b' * 32,
+      appId: _repeat('a', 32),
+      version: _repeat('b', 32),
       title: '作品',
-      ownerUserId: 'c' * 32,
+      ownerUserId: _repeat('c', 32),
       ownerDisplayName: '作者',
       publishedAt: DateTime.utc(2026, 9, 13),
-      sha256: 'd' * 64,
+      sha256: _repeat('d', 64),
     );
 
     expect(
@@ -151,14 +154,14 @@ void main() {
         jsonEncode(<String, Object?>{
           'apps': <Object?>[
             <String, Object?>{
-              'app_id': 'a' * 32,
+              'app_id': _repeat('a', 32),
               'version': '3',
-              'version_id': 'b' * 32,
-              'owner_user_id': 'c' * 32,
+              'version_id': _repeat('b', 32),
+              'owner_user_id': _repeat('c', 32),
               'owner_display_name': '作者',
               'title': '壊れた作品',
               'published_at': '2026-09-13T02:00:00Z',
-              'sha256': 'd' * 64,
+              'sha256': _repeat('d', 64),
             },
           ],
         }),
