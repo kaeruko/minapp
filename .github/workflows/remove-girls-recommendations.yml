@@ -68,12 +68,12 @@ jobs:
               text,
               'recommendation card',
           )
-
-          old_empty = r"""'まだグループのアプリはないよ。\
-Girlsおすすめアプリは上からすぐ遊べるよ ♡'"""
-          if old_empty not in text:
-              raise RuntimeError('empty-state recommendation copy was not found')
-          text = text.replace(old_empty, "'まだグループのアプリはないよ。'", 1)
+          text = sub_once(
+              r"'まだグループのアプリはないよ。\\\nGirlsおすすめアプリは上からすぐ遊べるよ ♡'",
+              "'まだグループのアプリはないよ。'",
+              text,
+              'empty-state copy',
+          )
 
           forbidden = [
               'Girls おすすめアプリ',
