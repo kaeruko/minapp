@@ -9,6 +9,9 @@ function phase4ValidateLifecycleApp(app) {
   if (!Number.isInteger(app.version_number) || app.version_number < 1 || !Number.isInteger(app.version_count) || app.version_count < app.version_number || typeof app.is_latest_version !== "boolean" || typeof app.is_published !== "boolean" || app.app_status !== "active") {
     throw new Error("作品管理APIのレスポンス形式が不正です。");
   }
+  if (app.shop_visibility !== "listed" && app.shop_visibility !== "unlisted") {
+    throw new Error("作品管理APIのshop_visibilityが不正です。");
+  }
 }
 
 async function phase4UploadVersion(app, file, button) {
@@ -42,6 +45,46 @@ async function phase4ArchiveApp(app, button) {
   }
 }
 
+async function phase4SetShopVisibility(app, checkbox) {
+  if (!(checkbox instanceof HTMLInputElement) || checkbox.type !== "checkbox") {
+    throw new TypeError("shop visibility control must be a checkbox input.");
+  }
+  const previous = app.shop_visibility;
+  const requested = checkbox.checked ? "listed" : "unlisted";
+  if (requested === previous) return;
+
+  checkbox.disabled = true;
+  try {
+    const payload = await apiRequest(`/apps/${app.app_id}/shop-visibility`, {
+      method: "PUT",
+      authenticated: true,
+      body: { visibility: requested },
+    });
+    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+      throw new Error("ショップ掲載APIのレスポンス形式が不正です。");
+    }
+    const fields = Object.keys(payload).sort();
+    if (fields.length !== 2 || fields[0] !== "app_id" || fields[1] !== "shop_visibility") {
+      throw new Error("ショップ掲載APIのレスポンス項目が不正です。");
+    }
+    if (payload.app_id !== app.app_id || payload.shop_visibility !== requested) {
+      throw new Error("ショップ掲載APIのレスポンスが要求内容と一致しません。");
+    }
+    phase2SetMessage(
+      uploadResult,
+      requested === "listed"
+        ? `${app.title} をみんアプショップに公開しました。`
+        : `${app.title} をみんアプショップから取り下げました。`,
+    );
+    await phase2LoadMyApps();
+  } catch (error) {
+    checkbox.checked = previous === "listed";
+    throw error;
+  } finally {
+    checkbox.disabled = false;
+  }
+}
+
 const phase4OriginalAppCard = phase2AppCard;
 phase2AppCard = function phase4AppCard(app, teacherReview) {
   const card = phase4OriginalAppCard(app, teacherReview);
@@ -69,6 +112,27 @@ phase2AppCard = function phase4AppCard(app, teacherReview) {
   if (!app.is_latest_version) return card;
   const actions = card.querySelector(".phase2-actions");
   if (!(actions instanceof HTMLElement)) throw new Error("作品カードの操作欄が見つかりません。");
+
+  if (app.is_published) {
+    const shopLabel = document.createElement("label");
+    shopLabel.className = "phase4-shop-toggle";
+    const shopCheckbox = document.createElement("input");
+    shopCheckbox.type = "checkbox";
+    shopCheckbox.checked = app.shop_visibility === "listed";
+    shopCheckbox.setAttribute("aria-label", `${app.title} をみんアプショップに公開`);
+    const shopText = document.createElement("span");
+    shopText.textContent = "みんアプショップにも公開";
+    shopLabel.append(shopCheckbox, shopText);
+    shopCheckbox.addEventListener("change", async () => {
+      phase2SetMessage(myAppError, null);
+      try {
+        await phase4SetShopVisibility(app, shopCheckbox);
+      } catch (error) {
+        phase2SetMessage(myAppError, apiErrorMessage(error));
+      }
+    });
+    actions.append(shopLabel);
+  }
 
   if (app.status === "approved") {
     const fileInput = document.createElement("input");
