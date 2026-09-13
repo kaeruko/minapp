@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../hosted_authoring_editor_action.dart';
+import '../hosted_authoring_projects_api.dart';
 import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
@@ -21,6 +23,28 @@ const Color _lavender = Color(0xFF745B9E);
 const Color _pink = Color(0xFFF9DDE8);
 const Color _mint = Color(0xFFDDF4E4);
 const String _girlsUploadPortalUrl = 'https://minapp.cloxs.jp/girls.html';
+const String _novelContentFormat = 'minapp/novel@1';
+
+String _novelProjectTitle(HostedAuthoringProject project) {
+  if (project.summary.contentFormat != _novelContentFormat) {
+    throw const FormatException('Novel project has an unexpected content format.');
+  }
+  final Object? rawTitle = project.document['title'];
+  if (rawTitle is! String ||
+      rawTitle.isEmpty ||
+      rawTitle != rawTitle.trim() ||
+      rawTitle.length > 80) {
+    throw const FormatException(
+      'Novel project document has an invalid title.',
+    );
+  }
+  return rawTitle;
+}
+
+bool _isNovelInfrastructureApp(ManagedGirlsApp app) {
+  final String? builtinId = app.app.builtinId;
+  return builtinId == novelEditorBuiltinId || builtinId == novelPlayerBuiltinId;
+}
 
 class GirlsAppsPage extends StatefulWidget {
   const GirlsAppsPage({
@@ -78,7 +102,9 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       if (!mounted) return;
       setState(() {
         _activeGroups = groups;
-        _apps = apps;
+        _apps = apps
+            .where((ManagedGirlsApp app) => !_isNovelInfrastructureApp(app))
+            .toList(growable: false);
       });
     } catch (error) {
       if (mounted) setState(() => _error = core.girlsMessageFor(error));
@@ -128,26 +154,6 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
     return _openDetailById(app.app.appId);
   }
 
-  Future<ManagedGirlsApp?> _chooseInstalledNovelEditor(
-    List<ManagedGirlsApp> editors,
-  ) async {
-    if (editors.length == 1) return editors.single;
-    return showDialog<ManagedGirlsApp>(
-      context: context,
-      builder: (BuildContext dialogContext) => SimpleDialog(
-        title: const Text('どのグループのノベルゲームメーカーを使う？'),
-        children: editors
-            .map(
-              (ManagedGirlsApp editor) => SimpleDialogOption(
-                onPressed: () => Navigator.of(dialogContext).pop(editor),
-                child: Text(editor.groupName ?? editor.app.groupId),
-              ),
-            )
-            .toList(growable: false),
-      ),
-    );
-  }
-
   Future<HostedGroup?> _chooseActiveGroup(List<HostedGroup> groups) async {
     if (groups.length == 1) return groups.single;
     return showDialog<HostedGroup>(
@@ -167,27 +173,10 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
   }
 
   Future<void> _openNovelMaker() async {
-    final List<ManagedGirlsApp>? apps = _apps;
     final List<HostedGroup>? activeGroups = _activeGroups;
-    if (apps == null || activeGroups == null) return;
-
-    final List<ManagedGirlsApp> installedEditors = apps
-        .where(
-          (ManagedGirlsApp app) =>
-              app.app.sourceKind == 'builtin' &&
-              app.app.builtinId == novelEditorBuiltinId,
-        )
-        .toList(growable: false);
-    if (installedEditors.isNotEmpty) {
-      final ManagedGirlsApp? editor = await _chooseInstalledNovelEditor(
-        installedEditors,
-      );
-      if (editor != null && mounted) await _openDetail(editor);
-      return;
-    }
-
+    if (activeGroups == null) return;
     if (activeGroups.isEmpty) {
-      setState(() => _error = 'ノベルゲームメーカーを追加するには、参加中のグループが必要です。');
+      setState(() => _error = 'ノベルゲームを作るには、参加中のグループが必要です。');
       return;
     }
     final HostedGroup? group = await _chooseActiveGroup(activeGroups);
@@ -197,21 +186,33 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       _busy = true;
       _error = null;
     });
-    String? installedAppId;
     try {
-      final HostedGroupApp installed = await _builtinInstallApi
-          .installNovelEditor(
-            accessToken: widget.session.accessToken,
-            groupId: group.groupId,
-          );
-      installedAppId = installed.appId;
+      final HostedGroupApp editor = await _builtinInstallApi.ensureNovelEditor(
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
+      );
+      if (!mounted) return;
+      setState(() => _busy = false);
+      await openHostedAuthoringProjects(
+        context: context,
+        baseUri: widget.api.baseUri,
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
+        editorAppId: editor.appId,
+        runtimeTransport: widget.api.runtimeClient,
+        editorFormats: const <String>[_novelContentFormat],
+        errorMessage: core.girlsMessageFor,
+        pageTitle: 'ノベルゲームを作る',
+        collectionTitle: 'あなたのノベル作品',
+        emptyTitle: 'まだノベル作品がありません',
+        emptyBody: '「新しくつくる」から物語を作ってみよう。',
+        projectTitle: _novelProjectTitle,
+      );
+      if (mounted) await _load();
     } catch (error) {
       if (mounted) setState(() => _error = core.girlsMessageFor(error));
     } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-    if (installedAppId != null && mounted) {
-      await _openDetailById(installedAppId);
+      if (mounted && _busy) setState(() => _busy = false);
     }
   }
 
@@ -240,7 +241,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
                 padding: const EdgeInsets.symmetric(vertical: 15),
               ),
               icon: const Icon(Icons.open_in_new_rounded),
-              label: const Text('アプリを追加♡'),
+              label: const Text('ZIPからアプリを追加♡'),
             ),
             const SizedBox(height: 10),
             OutlinedButton.icon(
@@ -587,33 +588,32 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
                 detail: detail,
               ),
               const SizedBox(height: 14),
-              OutlinedButton.icon(
-                key: const Key('girls-app-download-source'),
-                onPressed: _busy ? null : _downloadZip,
-                icon: const Icon(Icons.download_rounded),
-                label: const Text('現在のZIPを保存'),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _busy ? null : _updateZip,
-                      icon: const Icon(Icons.folder_zip_rounded),
-                      label: const Text('新しいZIPで更新'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              FilledButton.icon(
-                onPressed: _busy || detail.summary.sourceRevision == null
-                    ? null
-                    : _publish,
-                icon: const Icon(Icons.cloud_upload_rounded),
-                label: const Text('最新版を公開'),
-              ),
-              const SizedBox(height: 8),
+              if (detail.summary.app.editable) ...<Widget>[
+                OutlinedButton.icon(
+                  key: const Key('girls-app-download-source'),
+                  onPressed: _busy ? null : _downloadZip,
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('現在のZIPを保存'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _updateZip,
+                  icon: const Icon(Icons.folder_zip_rounded),
+                  label: const Text('新しいZIPで更新'),
+                ),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  onPressed: _busy || detail.summary.sourceRevision == null
+                      ? null
+                      : _publish,
+                  icon: const Icon(Icons.cloud_upload_rounded),
+                  label: const Text('最新版を公開'),
+                ),
+                const SizedBox(height: 8),
+              ] else if (detail.summary.app.sourceKind == 'builtin') ...<Widget>[
+                const _BuiltinManagedNotice(),
+                const SizedBox(height: 8),
+              ],
               OutlinedButton.icon(
                 onPressed: _busy ? null : _toggleHidden,
                 icon: Icon(
@@ -744,6 +744,34 @@ class _AppSummary extends StatelessWidget {
           Text('最新revision: ${app.sourceRevision ?? '-'}'),
           Text(
             '最終更新: ${app.sourceUpdatedAt == null ? '-' : _formatDate(app.sourceUpdatedAt!)}',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BuiltinManagedNotice extends StatelessWidget {
+  const _BuiltinManagedNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _mint.withValues(alpha: .58),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(Icons.auto_awesome_rounded, color: _lavender),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'この公式ツール本体はみんアプ側で更新します。作品の内容は「ノベルゲームを作る」から編集してください。',
+              style: TextStyle(color: _ink, fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),

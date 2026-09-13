@@ -17,6 +17,7 @@ Future<void> openHostedAuthoringProjects({
   required String collectionTitle,
   required String emptyTitle,
   required String emptyBody,
+  HostedAuthoringProjectTitle? projectTitle,
 }) async {
   if (editorFormats.isEmpty) {
     throw StateError('Selected app is not an Authoring Editor.');
@@ -58,6 +59,7 @@ Future<void> openHostedAuthoringProjects({
           collectionTitle: collectionTitle,
           emptyTitle: emptyTitle,
           emptyBody: emptyBody,
+          projectTitle: projectTitle,
         ),
         errorMessage: errorMessage,
       ),
@@ -80,6 +82,7 @@ class HostedAuthoringEditorAction extends StatefulWidget {
     this.collectionTitle = 'つくった作品',
     this.emptyTitle = 'まだ作品がありません',
     this.emptyBody = '「新しくつくる」からはじめよう。',
+    this.projectTitle,
     super.key,
   });
 
@@ -96,6 +99,7 @@ class HostedAuthoringEditorAction extends StatefulWidget {
   final String collectionTitle;
   final String emptyTitle;
   final String emptyBody;
+  final HostedAuthoringProjectTitle? projectTitle;
 
   @override
   State<HostedAuthoringEditorAction> createState() =>
@@ -180,6 +184,7 @@ class _HostedAuthoringEditorActionState
         collectionTitle: widget.collectionTitle,
         emptyTitle: widget.emptyTitle,
         emptyBody: widget.emptyBody,
+        projectTitle: widget.projectTitle,
       );
     } catch (error) {
       if (mounted) setState(() => _error = widget.errorMessage(error));
