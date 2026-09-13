@@ -95,6 +95,12 @@ class _GirlsShopPageState extends State<GirlsShopPage> {
     final List<ShopApp> apps = _visibleApps();
     return GirlsScaffold(
       title: 'ショップ ♡',
+      leading: IconButton(
+        key: const Key('girls-shop-back'),
+        tooltip: '戻る',
+        onPressed: () => Navigator.of(context).pop(),
+        icon: const Icon(Icons.chevron_left_rounded, color: _lavender),
+      ),
       actions: <Widget>[
         IconButton(
           tooltip: '更新',
@@ -102,6 +108,7 @@ class _GirlsShopPageState extends State<GirlsShopPage> {
           icon: const Icon(Icons.refresh_rounded),
         ),
       ],
+      bottomNavigationBar: const SizedBox.shrink(),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
