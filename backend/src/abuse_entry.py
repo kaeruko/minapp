@@ -11,6 +11,7 @@ import hosted_authoring_publish_entry
 import hosted_entry
 import hosted_handler
 import hosted_preview_state_entry
+import hosted_shop_handler
 import hosted_user_state_entry
 from abuse_guard import get_abuse_guard, source_ip_from_event
 from auth_refresh import refresh_access_token
@@ -140,14 +141,26 @@ def hosted_lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]
 
         method = _request_method(event)
         path = _raw_path(event)
+
+        # abuse_handlers_override.tf makes this function the deployed Hosted
+        # Lambda entrypoint. Shop routes therefore have to be composed here;
+        # otherwise they fall through hosted_entry -> hosted_handler and return
+        # the generic Hosted 404 without ever reaching hosted_shop_handler.
+        if (
+            path == "/shop/apps"
+            or path.startswith("/shop/apps/")
+            or path.startswith("/shop/content/")
+            or (path.startswith("/apps/") and path.endswith("/shop-visibility"))
+        ):
+            return hosted_shop_handler.lambda_handler(event, context)
+
         if method == "POST" and path == "/hosted/register":
             _guard_register(event)
         elif method == "POST" and path == "/hosted/recover":
             _guard_recover(event)
-        # Terraform's abuse_handlers_override.tf makes this function the real
-        # Hosted Lambda entrypoint. Delegate through hosted_entry so the new
-        # launch-session interception is reachable without bypassing the
-        # existing register/recover abuse guards.
+        # Delegate non-Shop Hosted requests through hosted_entry so the newer
+        # launch-session and app-management interceptors remain reachable
+        # without bypassing the existing register/recover abuse guards.
         return hosted_entry.lambda_handler(event, context)
     except ApiProblem as exc:
         _LOGGER.info(

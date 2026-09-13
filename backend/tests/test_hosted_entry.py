@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import patch
 
 BACKEND_SRC = Path(__file__).resolve().parents[1] / "src"
 if str(BACKEND_SRC) not in sys.path:
@@ -13,6 +14,7 @@ if str(BACKEND_SRC) not in sys.path:
 
 import abuse_entry  # noqa: E402
 import hosted_entry  # noqa: E402
+import hosted_shop_handler  # noqa: E402
 
 
 class FakeDynamoDb:
@@ -126,6 +128,25 @@ class HostedEntryTests(unittest.TestCase):
             [("sub-member", group_id, app_id)],
         )
         self.assertEqual(len(self.backend._dynamodb.transactions), 1)
+
+    def test_deployed_abuse_entry_reaches_shop_handler(self) -> None:
+        expected = {
+            "statusCode": 200,
+            "headers": {"content-type": "application/json; charset=utf-8"},
+            "body": '{"apps":[]}',
+        }
+        with patch.object(
+            hosted_shop_handler,
+            "lambda_handler",
+            return_value=expected,
+        ) as shop_handler:
+            response = abuse_entry.hosted_lambda_handler(
+                event("GET", "/shop/apps", auth=True),
+                None,
+            )
+
+        self.assertIs(response, expected)
+        shop_handler.assert_called_once()
 
     def test_launch_session_rejects_unknown_body_fields(self) -> None:
         group_id = "2" * 32
