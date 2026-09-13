@@ -1,0 +1,100 @@
+name: Remove Girls Recommendations
+
+on:
+  push:
+    branches:
+      - cleanup/remove-girls-recommendations
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Remove obsolete Girls recommendations section
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('apps/mobile/lib/girls/girls_app_core.dart')
+          text = path.read_text(encoding='utf-8')
+
+          if "Girls おすすめアプリ" not in text:
+              print('Recommendations section already removed; nothing to do.')
+              raise SystemExit(0)
+
+          def sub_once(pattern: str, replacement: str, source: str, label: str) -> str:
+              updated, count = re.subn(pattern, replacement, source, count=1, flags=re.S)
+              if count != 1:
+                  raise RuntimeError(f'{label}: expected exactly one match, got {count}')
+              return updated
+
+          text = text.replace("import 'builtin_apps.dart';\n", '', 1)
+          text = text.replace("import 'builtin_webview.dart';\n", '', 1)
+
+          text = sub_once(
+              r"\nconst Set<String> _girlsBuiltinIds = <String>\{.*?\n\};\n",
+              "\n",
+              text,
+              'builtin id set',
+          )
+          text = sub_once(
+              r"\n  List<BuiltInApp> get _girlsBuiltins => builtInApps\n      \.where\(\(BuiltInApp app\) => _girlsBuiltinIds\.contains\(app\.id\)\)\n      \.toList\(growable: false\);\n",
+              "\n",
+              text,
+              'girls builtins getter',
+          )
+          text = sub_once(
+              r"\n  Future<void> _launchBuiltin\(BuiltInApp app\) async \{.*?\n  \}\n\n  Future<void> _launchHostedApp",
+              "\n  Future<void> _launchHostedApp",
+              text,
+              'builtin launcher',
+          )
+          text = sub_once(
+              r"                          const SizedBox\(height: 22\),\n                          const _SectionTitle\('Girls おすすめアプリ'\),.*?                          const SizedBox\(height: 26\),\n                          const _SectionTitle\('このグループのアプリ'\),",
+              "                          const SizedBox(height: 22),\n                          const _SectionTitle('このグループのアプリ'),",
+              text,
+              'recommendations UI',
+          )
+          text = sub_once(
+              r"\nclass _GirlsBuiltinCard extends StatelessWidget \{.*?\n\}\n\nclass _HostedAppTile",
+              "\nclass _HostedAppTile",
+              text,
+              'recommendation card',
+          )
+
+          old_empty = r"""'まだグループのアプリはないよ。\
+Girlsおすすめアプリは上からすぐ遊べるよ ♡'"""
+          if old_empty not in text:
+              raise RuntimeError('empty-state recommendation copy was not found')
+          text = text.replace(old_empty, "'まだグループのアプリはないよ。'", 1)
+
+          forbidden = [
+              'Girls おすすめアプリ',
+              '_girlsBuiltinIds',
+              '_girlsBuiltins',
+              '_GirlsBuiltinCard',
+              '_launchBuiltin',
+          ]
+          remaining = [value for value in forbidden if value in text]
+          if remaining:
+              raise RuntimeError(f'obsolete recommendation symbols remain: {remaining}')
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/mobile/lib/girls/girls_app_core.dart
+          if git diff --cached --quiet; then
+            echo "No code changes to commit."
+            exit 0
+          fi
+          git commit -m "Remove obsolete Girls recommendations section"
+          git push origin HEAD:cleanup/remove-girls-recommendations
