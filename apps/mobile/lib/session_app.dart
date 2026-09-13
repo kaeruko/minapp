@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'app_webview.dart';
-import 'catalog_page.dart';
 import 'classroom_setup_page.dart';
 import 'directory.dart';
 import 'login_page.dart';
+import 'standard_catalog_shell.dart';
 import 'tenant_store.dart';
 import 'terms_gate_page.dart';
 import 'ugc_safety.dart';
@@ -235,8 +235,9 @@ class _SessionRootState extends State<_SessionRoot> {
         ),
       );
     }
-    return CatalogPage(
+    return StandardCatalogShell(
       api: api,
+      apiBaseUri: tenant.apiBaseUrl,
       session: session,
       classroomName: tenant.displayName,
       creatorPortalBaseUri: widget.creatorPortalBaseUri,
