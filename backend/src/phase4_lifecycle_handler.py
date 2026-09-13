@@ -16,10 +16,10 @@ from handler import (
     _require_fields,
     _zip_body,
 )
-from shop_backend import ShopAwsBackend
+from shop_lifecycle_backend import ShopLifecycleBackend
 
 _LOGGER = logging.getLogger(__name__)
-_BACKEND: ShopAwsBackend | None = None
+_BACKEND: ShopLifecycleBackend | None = None
 _ID_RE = r"([0-9a-f]{32})"
 _VERSION_UPLOAD_RE = re.compile(rf"^/apps/{_ID_RE}/versions$")
 _APP_RE = re.compile(rf"^/apps/{_ID_RE}$")
@@ -27,10 +27,10 @@ _APPROVE_RE = re.compile(rf"^/apps/{_ID_RE}/versions/{_ID_RE}/approve$")
 _MODERATION_RE = re.compile(rf"^/apps/{_ID_RE}/versions/{_ID_RE}/(reject|unpublish)$")
 
 
-def _get_backend() -> ShopAwsBackend:
+def _get_backend() -> ShopLifecycleBackend:
     global _BACKEND
     if _BACKEND is None:
-        _BACKEND = ShopAwsBackend.from_environment()
+        _BACKEND = ShopLifecycleBackend.from_environment()
     return _BACKEND
 
 
