@@ -29,7 +29,7 @@ class HostedShopDownloadFilenameTests(unittest.TestCase):
 
     def test_replaces_filesystem_unsafe_title_characters(self) -> None:
         filename = _shop_download_filename('猫/犬:ゲーム?*"<>|', "abcdef0123456789")
-        self.assertEqual(filename, "猫_犬_ゲーム_______.zip")
+        self.assertEqual(filename, "猫_犬_ゲーム______.zip")
 
     def test_uses_safe_fallback_when_title_becomes_empty(self) -> None:
         filename = _shop_download_filename('... ', "abcdef0123456789")
