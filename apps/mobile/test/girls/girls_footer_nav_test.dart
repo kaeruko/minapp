@@ -71,4 +71,32 @@ void main() {
     }
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('shop scope routes shop footer even when page omits it', (
+    WidgetTester tester,
+  ) async {
+    int shopOpens = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GirlsFooterNavigationScope(
+          onOpenShop: () => shopOpens += 1,
+          child: const Scaffold(
+            bottomNavigationBar: GirlsFooterNav(
+              selectedTab: GirlsFooterTab.home,
+              enabledTabs: <GirlsFooterTab>{GirlsFooterTab.home},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final Finder shop = find.byKey(const ValueKey<String>('girls-footer-shop'));
+    expect(shop, findsOneWidget);
+
+    await tester.tap(shop);
+    await tester.pump();
+    expect(shopOpens, 1);
+  });
 }

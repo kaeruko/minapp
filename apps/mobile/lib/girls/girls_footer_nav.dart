@@ -22,6 +22,33 @@ enum GirlsFooterTab {
   final String assetName;
 }
 
+/// Supplies top-level destinations that are owned outside the current page.
+///
+/// The home page predates the shared Girls shop and intentionally does not need
+/// to know about the shop implementation. The authenticated root can provide
+/// the shop action here, while [GirlsFooterNav] keeps rendering the existing
+/// footer and exposes the shop tab as a normal destination.
+class GirlsFooterNavigationScope extends InheritedWidget {
+  const GirlsFooterNavigationScope({
+    required this.onOpenShop,
+    required super.child,
+    super.key,
+  });
+
+  final VoidCallback onOpenShop;
+
+  static GirlsFooterNavigationScope? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<
+      GirlsFooterNavigationScope
+    >();
+  }
+
+  @override
+  bool updateShouldNotify(GirlsFooterNavigationScope oldWidget) {
+    return oldWidget.onOpenShop != onOpenShop;
+  }
+}
+
 /// Maps the five marker fills in girls_footer_base.svg to live Flutter colors.
 ///
 /// The SVG owns the exact five-hill silhouette and outline. Flutter owns which
@@ -75,6 +102,9 @@ class GirlsFooterNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final VoidCallback? scopedShopAction =
+        GirlsFooterNavigationScope.maybeOf(context)?.onOpenShop;
+
     return Material(
       color: Colors.transparent,
       child: SizedBox(
@@ -95,20 +125,26 @@ class GirlsFooterNav extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(4, 5, 4, 1),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
-                children: GirlsFooterTab.values
-                    .map(
-                      (GirlsFooterTab tab) => Expanded(
-                        child: _GirlsFooterItem(
-                          tab: tab,
-                          selected: tab == selectedTab,
-                          enabled: enabledTabs.contains(tab),
-                          onTap: onSelected == null
-                              ? null
-                              : () => onSelected!(tab),
-                        ),
-                      ),
-                    )
-                    .toList(growable: false),
+                children: GirlsFooterTab.values.map((GirlsFooterTab tab) {
+                  final bool hasScopedShopAction =
+                      tab == GirlsFooterTab.shop && scopedShopAction != null;
+                  final bool enabled =
+                      enabledTabs.contains(tab) || hasScopedShopAction;
+                  final VoidCallback? onTap = hasScopedShopAction
+                      ? scopedShopAction
+                      : onSelected == null
+                      ? null
+                      : () => onSelected!(tab);
+
+                  return Expanded(
+                    child: _GirlsFooterItem(
+                      tab: tab,
+                      selected: tab == selectedTab,
+                      enabled: enabled,
+                      onTap: onTap,
+                    ),
+                  );
+                }).toList(growable: false),
               ),
             ),
           ],
