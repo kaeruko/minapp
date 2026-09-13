@@ -12,7 +12,7 @@ HostedGirlsApi _fakeApi() {
   return HostedGirlsApi(
     baseUri: Uri.parse('https://example.com'),
     client: MockClient((http.Request request) async {
-      if (request.url.path == '/hosted/shop/apps') {
+      if (request.url.path == '/shop/apps') {
         return http.Response(
           jsonEncode(<String, Object?>{'apps': <Object?>[]}),
           200,
