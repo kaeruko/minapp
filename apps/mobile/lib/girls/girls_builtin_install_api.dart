@@ -36,6 +36,39 @@ class GirlsBuiltinInstallApi {
     );
   }
 
+  Future<HostedGroupApp> ensureNovelEditor({
+    required String accessToken,
+    required String groupId,
+  }) async {
+    await ensureNovelPlayer(
+      accessToken: accessToken,
+      groupId: groupId,
+    );
+    final List<HostedGroupApp> apps = await _listGroupApps(
+      accessToken: accessToken,
+      groupId: groupId,
+    );
+    final List<HostedGroupApp> editors = apps
+        .where(
+          (HostedGroupApp app) =>
+              app.sourceKind == 'builtin' &&
+              app.builtinId == novelEditorBuiltinId,
+        )
+        .toList(growable: false);
+    if (editors.length > 1) {
+      throw const FormatException(
+        'Group app list contains duplicate Novel Editor installations.',
+      );
+    }
+    if (editors.length == 1) return editors.single;
+    return _installBuiltin(
+      accessToken: accessToken,
+      groupId: groupId,
+      builtinId: novelEditorBuiltinId,
+      label: 'Novel Editor',
+    );
+  }
+
   Future<HostedGroupApp> ensureNovelPlayer({
     required String accessToken,
     required String groupId,

@@ -12,6 +12,9 @@ import 'hosted_authoring_resolver.dart';
 import 'hosted_runtime_bridge.dart';
 
 typedef HostedAuthoringErrorMessage = String Function(Object error);
+typedef HostedAuthoringProjectTitle = String Function(
+  HostedAuthoringProject project,
+);
 typedef HostedAuthoringInstallPlayer = Future<String?> Function(
   BuildContext context,
 );
@@ -25,6 +28,7 @@ class HostedAuthoringProjectDefinition {
     required this.emptyBody,
     this.projectIcon = Icons.edit_note_rounded,
     this.installCompatiblePlayer,
+    this.projectTitle,
   });
 
   final String contentFormat;
@@ -34,6 +38,7 @@ class HostedAuthoringProjectDefinition {
   final String emptyBody;
   final IconData projectIcon;
   final HostedAuthoringInstallPlayer? installCompatiblePlayer;
+  final HostedAuthoringProjectTitle? projectTitle;
 }
 
 class HostedAuthoringProjectsPage extends StatefulWidget {
@@ -71,6 +76,7 @@ class _HostedAuthoringProjectsPageState
   late final HostedAuthoringApiClient _authoringTransport;
 
   List<HostedAuthoringProjectSummary>? _projects;
+  Map<String, String> _projectTitles = const <String, String>{};
   bool _busy = false;
   String? _error;
 
@@ -135,7 +141,37 @@ class _HostedAuthoringProjectsPageState
         groupId: widget.groupId,
         contentFormat: widget.definition.contentFormat,
       );
-      if (mounted) setState(() => _projects = projects);
+      final Map<String, String> titles = <String, String>{};
+      final HostedAuthoringProjectTitle? projectTitle =
+          widget.definition.projectTitle;
+      if (projectTitle != null) {
+        for (final HostedAuthoringProjectSummary summary in projects) {
+          final HostedAuthoringProject project = await _projectsApi.loadProject(
+            accessToken: widget.accessToken,
+            contentId: summary.contentId,
+          );
+          if (project.summary.contentId != summary.contentId ||
+              project.summary.groupId != widget.groupId ||
+              project.summary.contentFormat != widget.definition.contentFormat) {
+            throw const FormatException(
+              'Authoring project title lookup changed the requested scope.',
+            );
+          }
+          final String title = projectTitle(project);
+          if (title.isEmpty || title != title.trim() || title.length > 80) {
+            throw const FormatException(
+              'Authoring project title must be a trimmed non-empty string up to 80 characters.',
+            );
+          }
+          titles[summary.contentId] = title;
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _projects = projects;
+          _projectTitles = Map<String, String>.unmodifiable(titles);
+        });
+      }
     } catch (error) {
       if (mounted) setState(() => _error = widget.errorMessage(error));
     } finally {
@@ -475,9 +511,9 @@ class _HostedAuthoringProjectsPageState
                         leading: CircleAvatar(
                           child: Icon(widget.definition.projectIcon),
                         ),
-                        title: const Text(
-                          '作品',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                        title: Text(
+                          _projectTitles[project.contentId] ?? '作品',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                         subtitle: Text(
                           '下書き revision ${project.draftRevision}',

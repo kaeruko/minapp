@@ -109,6 +109,42 @@ void main() {
     expect(app.builtinId, novelEditorBuiltinId);
   });
 
+  test('ensureNovelEditor reuses an already-installed Editor and Player', () async {
+    final List<http.Request> captured = <http.Request>[];
+    var getCount = 0;
+    final MockClient client = MockClient((http.Request request) async {
+      captured.add(request);
+      expect(request.method, 'GET');
+      getCount += 1;
+      if (getCount == 1) {
+        return _json(200, <String, Object?>{
+          'apps': <Object?>[
+            _installedApp(builtinId: novelPlayerBuiltinId),
+          ],
+        });
+      }
+      return _json(200, <String, Object?>{
+        'apps': <Object?>[
+          _installedApp(builtinId: novelPlayerBuiltinId),
+          _installedApp(),
+        ],
+      });
+    });
+    final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
+      baseUri: Uri.parse('https://hosted.example.test'),
+      client: client,
+    );
+
+    final HostedGroupApp app = await api.ensureNovelEditor(
+      accessToken: 'owner-token',
+      groupId: _groupId,
+    );
+
+    expect(captured, hasLength(2));
+    expect(captured.every((http.Request request) => request.method == 'GET'), isTrue);
+    expect(app.builtinId, novelEditorBuiltinId);
+  });
+
   test('ensureNovelPlayer repairs a group that is missing the Player', () async {
     final List<http.Request> captured = <http.Request>[];
     final MockClient client = MockClient((http.Request request) async {
