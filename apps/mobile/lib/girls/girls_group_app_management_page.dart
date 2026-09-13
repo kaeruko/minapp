@@ -8,6 +8,7 @@ import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
 import 'girls_app_preview_api.dart';
+import 'girls_shop_api.dart';
 import 'hosted_girls_api.dart';
 import 'hosted_girls_upload_api.dart';
 
@@ -38,10 +39,14 @@ class _GirlsGroupAppManagementPageState
     extends State<GirlsGroupAppManagementPage> {
   late final GirlsAppManagementApi _managementApi;
   late final GirlsAppPreviewApi _previewApi;
+  late final GirlsShopApi _shopApi;
   HostedGroupApp? _app;
   String? _authorLabel;
+  bool? _shopListed;
   bool _busy = false;
+  bool _shopBusy = false;
   String? _error;
+  String? _shopError;
 
   @override
   void initState() {
@@ -53,6 +58,7 @@ class _GirlsGroupAppManagementPageState
     }
     _managementApi = GirlsAppManagementApi(baseUri: widget.api.baseUri);
     _previewApi = GirlsAppPreviewApi(baseUri: widget.api.baseUri);
+    _shopApi = GirlsShopApi(baseUri: widget.api.baseUri);
     _load();
   }
 
@@ -60,6 +66,7 @@ class _GirlsGroupAppManagementPageState
   void dispose() {
     _managementApi.close();
     _previewApi.close();
+    _shopApi.close();
     super.dispose();
   }
 
@@ -67,6 +74,7 @@ class _GirlsGroupAppManagementPageState
     setState(() {
       _busy = true;
       _error = null;
+      _shopError = null;
     });
     try {
       final List<HostedGroupApp> apps = await widget.api.listGroupApps(
@@ -99,10 +107,28 @@ class _GirlsGroupAppManagementPageState
       final String authorLabel = authors.isEmpty
           ? '退出済みユーザー (${app.ownerUserId.substring(0, 8)}…)'
           : authors.single.loginId;
+
+      bool? shopListed;
+      String? shopError;
+      try {
+        final List<GirlsShopApp> shopApps =
+            await _shopApi.listApps(widget.session.accessToken);
+        final int matchesInShop =
+            shopApps.where((GirlsShopApp item) => item.appId == app.appId).length;
+        if (matchesInShop > 1) {
+          throw StateError('Girls shop returned duplicate app_id entries.');
+        }
+        shopListed = matchesInShop == 1;
+      } catch (error) {
+        shopError = core.girlsMessageFor(error);
+      }
+
       if (!mounted) return;
       setState(() {
         _app = app;
         _authorLabel = authorLabel;
+        _shopListed = shopListed;
+        _shopError = shopError;
       });
     } catch (error) {
       if (mounted) setState(() => _error = core.girlsMessageFor(error));
@@ -117,6 +143,38 @@ class _GirlsGroupAppManagementPageState
       throw StateError('Editable group app metadata is not loaded.');
     }
     return app;
+  }
+
+  Future<void> _setShopListed(bool listed) async {
+    final HostedGroupApp app = _requireEditableApp();
+    if (!app.isPublished) {
+      throw StateError('Unpublished app cannot be listed in the Girls shop.');
+    }
+    if (_shopBusy) return;
+    setState(() {
+      _shopBusy = true;
+      _shopError = null;
+    });
+    try {
+      await _shopApi.setVisibility(
+        accessToken: widget.session.accessToken,
+        appId: app.appId,
+        listed: listed,
+      );
+      if (!mounted) return;
+      setState(() => _shopListed = listed);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            listed ? 'Girlsショップに公開しました。' : 'Girlsショップから取り下げました。',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _shopError = core.girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _shopBusy = false);
+    }
   }
 
   Future<void> _downloadZip() async {
@@ -406,6 +464,45 @@ class _GirlsGroupAppManagementPageState
                 icon: const Icon(Icons.cloud_upload_rounded),
                 label: const Text('最新版を公開'),
               ),
+              const SizedBox(height: 22),
+              const Text(
+                'みんアプGirls ショップ',
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              if (!app.isPublished)
+                const Text(
+                  '最新版を公開すると、ほかのグループのみんなが見られるショップへ出せるようになります。',
+                  style: TextStyle(fontSize: 12, color: _lavender),
+                )
+              else ...<Widget>[
+                const Text(
+                  'ONにすると、このグループの外からも作品を見つけて遊んだりZIPを受け取ったりできます。',
+                  style: TextStyle(fontSize: 12, color: _lavender),
+                ),
+                if (_shopError != null) ...<Widget>[
+                  const SizedBox(height: 8),
+                  _AdminError(message: 'ショップ状態を確認できませんでした。$_shopError'),
+                ],
+                const SizedBox(height: 4),
+                if (_shopListed == null && _shopError == null)
+                  const LinearProgressIndicator()
+                else if (_shopListed != null)
+                  SwitchListTile(
+                    key: const Key('girls-group-admin-shop-listing'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Girlsショップに公開'),
+                    subtitle: Text(
+                      _shopListed! ? 'ショップ掲載中' : 'このグループだけで公開中',
+                    ),
+                    value: _shopListed!,
+                    onChanged: _busy || _shopBusy ? null : _setShopListed,
+                  ),
+              ],
               const SizedBox(height: 18),
               const Text(
                 'グループでの表示',
