@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'girls_app.dart';
 import 'girls_app_core.dart' as core;
-import 'girls_home_page.dart';
+import 'girls_home_shop_shell.dart';
 import 'hosted_girls_api.dart';
 
 const Color _lavender = Color(0xFFB39DDB);
@@ -151,7 +151,7 @@ class _GirlsPersistentAppState extends State<GirlsPersistentApp> {
     }
 
     return _authenticatedMaterialApp(
-      home: GirlsHomePage(
+      home: GirlsHomeShopShell(
         api: widget.api,
         session: session,
         onLogout: () {
