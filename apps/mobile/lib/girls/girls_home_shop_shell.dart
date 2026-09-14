@@ -5,7 +5,7 @@ import 'girls_apps_page.dart';
 import 'girls_current_group_store.dart';
 import 'girls_email_settings_page.dart';
 import 'girls_footer_nav.dart';
-import 'girls_groups_page.dart';
+import 'girls_groups_dashboard_page.dart';
 import 'girls_home_page.dart';
 import 'girls_registration_onboarding.dart';
 import 'girls_scaffold.dart';
@@ -127,13 +127,11 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               currentGroup: _currentGroup,
               onCurrentGroupChanged: _setCurrentGroup,
             ),
-          GirlsFooterTab.groups => GirlsGroupsPage(
+          GirlsFooterTab.groups => GirlsGroupsDashboardPage(
               api: widget.api,
               session: widget.session,
-              onLogout: widget.onLogout,
-              onHome: () => _selectTab(GirlsFooterTab.home),
-              selectedGroupId: _currentGroup?.groupId,
-              onGroupSelected: _setCurrentGroup,
+              currentGroup: _currentGroup,
+              onCurrentGroupChanged: _setCurrentGroup,
               currentGroupStore: widget.currentGroupStore,
             ),
           GirlsFooterTab.shop => GirlsShopPage(
