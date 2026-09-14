@@ -5,8 +5,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:minapp_mobile/girls/api.dart';
+import 'package:minapp_mobile/girls/girls_current_group_store.dart';
 import 'package:minapp_mobile/girls/girls_home_shop_shell.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
+
+class _MemoryCurrentGroupStore implements GirlsCurrentGroupStore {
+  String? value;
+
+  @override
+  Future<String?> load() async => value;
+
+  @override
+  Future<void> save(String groupId) async {
+    value = groupId;
+  }
+
+  @override
+  Future<void> clear() async {
+    value = null;
+  }
+}
 
 HostedGirlsApi _fakeApi() {
   return HostedGirlsApi(
@@ -62,6 +80,7 @@ void main() {
             expiresIn: 3600,
           ),
           onLogout: () {},
+          currentGroupStore: _MemoryCurrentGroupStore(),
         ),
       ),
     );
