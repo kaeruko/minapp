@@ -13,6 +13,36 @@ import 'hosted_runtime_bridge.dart';
 
 final RegExp _previewTokenPattern = RegExp(r'^[A-Za-z0-9_-]{32,128}$');
 final RegExp _authoringEditorTokenPattern = RegExp(r'^[A-Za-z0-9_-]{32,64}$');
+const String _novelContentFormat = 'minapp/novel@1';
+const String _novelTransparentBackgroundScript = r'''
+(() => {
+  const styleId = 'minapp-girls-novel-background';
+  let style = document.getElementById(styleId);
+  if (!(style instanceof HTMLStyleElement)) {
+    style = document.createElement('style');
+    style.id = styleId;
+    document.head.appendChild(style);
+  }
+  style.textContent = `
+    html,
+    body,
+    .app,
+    .workspace,
+    .pane {
+      background: transparent !important;
+    }
+
+    @media (max-width: 900px) {
+      header {
+        background: rgba(255, 255, 255, .78) !important;
+      }
+      .editor-footer {
+        background: rgba(255, 250, 252, .88) !important;
+      }
+    }
+  `;
+})();
+''';
 
 bool isHostedMicrophoneOnlyPermissionRequest(
   Set<WebViewPermissionResourceType> types,
@@ -114,6 +144,9 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
   final HostedAuthoringPreviewBridgeDocumentInjector _authoringPreviewInjector =
       HostedAuthoringPreviewBridgeDocumentInjector();
 
+  bool get _usesGirlsNovelBackground =>
+      widget.authoringLaunch?.contentFormat == _novelContentFormat;
+
   @override
   void initState() {
     super.initState();
@@ -192,6 +225,9 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
             },
           ),
         );
+      if (_usesGirlsNovelBackground) {
+        await controller.setBackgroundColor(Colors.transparent);
+      }
       if (_authoringBridgeSession != null) {
         await controller.addJavaScriptChannel(
           'MinAppAuthoringBridge',
@@ -349,6 +385,9 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
           _authoringPreviewInjector.scriptForFinishedDocument(),
         );
       }
+      if (_usesGirlsNovelBackground) {
+        await controller.runJavaScript(_novelTransparentBackgroundScript);
+      }
     } catch (error, stackTrace) {
       _failBridgeOrPage(
         context: 'Hosted bridge injection failed.',
@@ -493,6 +532,7 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _usesGirlsNovelBackground ? Colors.transparent : null,
       appBar: AppBar(title: Text(widget.title)),
       body: SafeArea(
         child: _error != null
