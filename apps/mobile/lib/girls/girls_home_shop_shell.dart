@@ -23,8 +23,9 @@ enum _AccountAction { email, refresh, logout }
 /// One authenticated Girls chrome around the nested in-app navigator.
 ///
 /// Every route pushed from Home / Groups / Shop / Apps stays inside this
-/// navigator, so the branded header and five-tab footer never jump, disappear,
-/// or get redrawn with page-specific variants.
+/// navigator, so the branded header remains stable. The shared footer normally
+/// stays stable too; a creative editor may explicitly hide it while its own
+/// editor footer is active, then restore it when the flow closes.
 class GirlsHomeShopShell extends StatefulWidget {
   const GirlsHomeShopShell({
     required this.api,
@@ -48,6 +49,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
   GirlsFooterTab _selectedTab = GirlsFooterTab.home;
   HostedGroup? _currentGroup;
   bool _loadingCurrentGroup = true;
+  bool _footerHidden = false;
   String? _currentGroupError;
 
   @override
@@ -115,6 +117,11 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
     setState(() => _currentGroup = group);
   }
 
+  void _setFooterHidden(bool hidden) {
+    if (!mounted || _footerHidden == hidden) return;
+    setState(() => _footerHidden = hidden);
+  }
+
   Route<void> _rootRoute(GirlsFooterTab tab) {
     return MaterialPageRoute<void>(
       settings: RouteSettings(name: '/girls/${tab.name}'),
@@ -145,6 +152,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               onGroups: () => _selectTab(GirlsFooterTab.groups),
               currentGroup: _currentGroup,
               onCurrentGroupChanged: _setCurrentGroup,
+              onFooterVisibilityChanged: _setFooterHidden,
             ),
           // 「その他」の専用画面ができるまでは従来どおりアプリ画面を使う。
           GirlsFooterTab.more => GirlsAppsPage(
@@ -154,6 +162,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               onGroups: () => _selectTab(GirlsFooterTab.groups),
               currentGroup: _currentGroup,
               onCurrentGroupChanged: _setCurrentGroup,
+              onFooterVisibilityChanged: _setFooterHidden,
             ),
         };
       },
@@ -164,7 +173,10 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
     final NavigatorState? navigator = _navigatorKey.currentState;
     if (navigator == null) return;
 
-    setState(() => _selectedTab = tab);
+    setState(() {
+      _selectedTab = tab;
+      _footerHidden = false;
+    });
     navigator.pushAndRemoveUntil(_rootRoute(tab), (Route<dynamic> route) => false);
   }
 
@@ -315,10 +327,12 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               _rootRoute(GirlsFooterTab.home),
         ),
       ),
-      bottomNavigationBar: GirlsFooterNav(
-        selectedTab: _selectedTab,
-        onSelected: _selectTab,
-      ),
+      bottomNavigationBar: _footerHidden
+          ? const SizedBox.shrink()
+          : GirlsFooterNav(
+              selectedTab: _selectedTab,
+              onSelected: _selectTab,
+            ),
     );
   }
 }
