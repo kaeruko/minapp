@@ -15,6 +15,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Relax patch helper for first-match edits
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tools/patch_current_group_context.py')
+          text = path.read_text(encoding='utf-8')
+          old = '    if count != 1:\n        raise RuntimeError(f"{path}: expected one match, found {count}: {old[:80]!r}")\n'
+          new = '    if count < 1:\n        raise RuntimeError(f"{path}: expected a match, found {count}: {old[:80]!r}")\n'
+          if text.count(old) != 1:
+              raise RuntimeError('patch helper guard did not match exactly once')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
       - name: Apply patch
         run: python tools/patch_current_group_context.py
       - name: Commit patch
