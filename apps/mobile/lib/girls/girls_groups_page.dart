@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
 import 'girls_app_core.dart' as core;
+import 'girls_current_group_store.dart';
 import 'girls_footer_nav.dart';
 import 'girls_scaffold.dart';
 import 'hosted_girls_api.dart';
@@ -27,6 +28,7 @@ class GirlsGroupsPage extends StatefulWidget {
     this.onHome,
     this.selectedGroupId,
     this.onGroupSelected,
+    this.currentGroupStore = const SharedPreferencesGirlsCurrentGroupStore(),
     super.key,
   });
 
@@ -36,6 +38,7 @@ class GirlsGroupsPage extends StatefulWidget {
   final VoidCallback? onHome;
   final String? selectedGroupId;
   final ValueChanged<HostedGroup?>? onGroupSelected;
+  final GirlsCurrentGroupStore currentGroupStore;
 
   @override
   State<GirlsGroupsPage> createState() => _GirlsGroupsPageState();
@@ -62,11 +65,25 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
     }
   }
 
-  void _selectGroup(HostedGroup? group) {
-    final String? nextId = group?.groupId;
-    if (_selectedGroupId == nextId) return;
-    setState(() => _selectedGroupId = nextId);
-    widget.onGroupSelected?.call(group);
+  Future<void> _switchCurrentGroup(HostedGroup group) async {
+    if (_selectedGroupId == group.groupId) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.currentGroupStore.save(group.groupId);
+      if (!mounted) return;
+      setState(() => _selectedGroupId = group.groupId);
+      widget.onGroupSelected?.call(group);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('「${group.name}」をいまのグループにしたよ。')),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _loadGroups() async {
@@ -79,23 +96,20 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
         widget.session.accessToken,
       );
       if (!mounted) return;
-      final String? previousId = _selectedGroupId;
-      HostedGroup? selectedGroup;
-      if (previousId != null) {
-        for (final HostedGroup group in groups) {
-          if (group.groupId == previousId) {
-            selectedGroup = group;
-            break;
-          }
-        }
-      }
-      selectedGroup ??= groups.length == 1 ? groups.single : null;
-      setState(() {
-        _groups = groups;
-        _selectedGroupId = selectedGroup?.groupId;
-      });
-      if (previousId != selectedGroup?.groupId) {
-        widget.onGroupSelected?.call(selectedGroup);
+      final String? selectedId = _selectedGroupId;
+      final bool selectedStillAvailable = selectedId == null ||
+          groups.any((HostedGroup group) => group.groupId == selectedId);
+      if (!selectedStillAvailable) {
+        await widget.currentGroupStore.clear();
+        if (!mounted) return;
+        setState(() {
+          _groups = groups;
+          _selectedGroupId = null;
+          _error = 'いままで使っていたグループには参加していません。別のグループへ明示的に切り替えてね。';
+        });
+        widget.onGroupSelected?.call(null);
+      } else {
+        setState(() => _groups = groups);
       }
     } catch (error) {
       if (mounted) setState(() => _error = core.girlsMessageFor(error));
@@ -274,11 +288,11 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
 
     final String? selectedGroupId = _selectedGroupId;
     if (selectedGroupId == null) {
-      setState(() => _error = '先に、いま使うグループを選んでね。');
+      setState(() => _error = '先に、いま使うグループへ「切り替える」を押してね。');
       return;
     }
     if (!groups.any((HostedGroup group) => group.groupId == selectedGroupId)) {
-      setState(() => _error = '選んでいたグループに参加していません。別のグループを選んでね。');
+      setState(() => _error = '選んでいたグループに参加していません。別のグループへ切り替えてね。');
       return;
     }
 
@@ -339,7 +353,6 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
   }
 
   Future<void> _openGroup(HostedGroup group) async {
-    _selectGroup(group);
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) => core.GirlsGroupHomePage(
@@ -410,7 +423,6 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
         }
       }
     }
-    selectedGroup ??= groups.length == 1 ? groups.single : null;
     if (selectedGroup != null) {
       final HostedGroup group = selectedGroup;
       return _GirlsLaceFrame(
@@ -446,7 +458,7 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text('下の「わたしのグループ」から遊ぶグループを選んでね。'),
+                  const Text('下の「切り替える」で、いま使うグループを選んでね。'),
                 ],
               ),
             ),
@@ -539,6 +551,9 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
                         group: group,
                         isSelected: group.groupId == _selectedGroupId,
                         onTap: _busy ? null : () => _openGroup(group),
+                        onSwitch: _busy || group.groupId == _selectedGroupId
+                            ? null
+                            : () => _switchCurrentGroup(group),
                       ),
                     ),
                   ),
@@ -800,11 +815,13 @@ class _GroupTile extends StatelessWidget {
     required this.group,
     required this.isSelected,
     required this.onTap,
+    required this.onSwitch,
   });
 
   final HostedGroup group;
   final bool isSelected;
   final VoidCallback? onTap;
+  final VoidCallback? onSwitch;
 
   @override
   Widget build(BuildContext context) {
@@ -850,10 +867,14 @@ class _GroupTile extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
-                isSelected ? Icons.check_circle_rounded : Icons.chevron_right_rounded,
-                color: _lavender,
-              ),
+              if (isSelected)
+                const Icon(Icons.check_circle_rounded, color: _lavender)
+              else
+                TextButton(
+                  key: Key('girls-group-switch-${group.groupId}'),
+                  onPressed: onSwitch,
+                  child: const Text('切り替える'),
+                ),
             ],
           ),
         ),
