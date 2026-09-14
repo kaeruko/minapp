@@ -325,6 +325,19 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
       );
     }
 
+    final ThemeData shellTheme = Theme.of(context);
+    final ThemeData nestedTheme = _novelFlowActive
+        ? shellTheme.copyWith(
+            scaffoldBackgroundColor: Colors.transparent,
+            appBarTheme: shellTheme.appBarTheme.copyWith(
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+            ),
+          )
+        : shellTheme;
+
     return GirlsScaffold(
       leading: _BellButton(onTap: _showNotices),
       actions: <Widget>[
@@ -342,16 +355,19 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
         ),
       ],
       body: GirlsScaffoldChromeScope(
-        child: Navigator(
-          key: _navigatorKey,
-          observers: <NavigatorObserver>[_navigatorObserver],
-          initialRoute: '/girls/home',
-          onGenerateInitialRoutes: (
-            NavigatorState navigator,
-            String initialRoute,
-          ) => <Route<void>>[_rootRoute(GirlsFooterTab.home)],
-          onGenerateRoute: (RouteSettings settings) =>
-              _rootRoute(GirlsFooterTab.home),
+        child: Theme(
+          data: nestedTheme,
+          child: Navigator(
+            key: _navigatorKey,
+            observers: <NavigatorObserver>[_navigatorObserver],
+            initialRoute: '/girls/home',
+            onGenerateInitialRoutes: (
+              NavigatorState navigator,
+              String initialRoute,
+            ) => <Route<void>>[_rootRoute(GirlsFooterTab.home)],
+            onGenerateRoute: (RouteSettings settings) =>
+                _rootRoute(GirlsFooterTab.home),
+          ),
         ),
       ),
       bottomNavigationBar: _footerHidden
