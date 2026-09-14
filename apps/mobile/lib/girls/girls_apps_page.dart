@@ -246,7 +246,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
                 padding: const EdgeInsets.symmetric(vertical: 15),
               ),
               icon: const Icon(Icons.open_in_new_rounded),
-              label: const Text('ZIPからアプリを追加♡'),
+              label: const Text('ZIPからアプリを追加'),
             ),
             const SizedBox(height: 10),
             OutlinedButton.icon(
@@ -1060,7 +1060,7 @@ class _EmptyApps extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         const Text(
-          'アイデアカードをタップすると、その内容を入れた文章をコピーできるよ。\nAIがHTMLを作ってくれたら、上の「アプリを追加♡」からポータルを開いて貼り付けてね♡',
+          'アイデアカードをタップすると、その内容を入れた文章をコピーできるよ。\nAIがHTMLを作ってくれたら、上の「アプリを追加」からポータルを開いて貼り付けてね♡',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Color(0xFF8F756D),

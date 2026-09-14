@@ -445,7 +445,7 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
                 _GroupActionCard(
                   color: const Color(0xFFE8D8FF),
                   icon: Icons.open_in_new_rounded,
-                  title: 'アプリを追加♡',
+                  title: 'アプリを追加',
                   onTap: _busy || groups == null ? null : _openUploadPortal,
                 ),
                 if (_error != null) ...<Widget>[
