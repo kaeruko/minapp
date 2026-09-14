@@ -269,6 +269,10 @@
   const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
   const ID_PATTERN = /^[0-9a-f]{32}$/;
   const LOGIN_ID_PATTERN = /^[a-z0-9][a-z0-9-]{2,31}$/;
+  const requestedGroupId = new URL(globalThis.location.href).searchParams.get("group_id");
+  if (requestedGroupId !== null && !ID_PATTERN.test(requestedGroupId)) {
+    throw new Error("Girls portal group_id query parameter is invalid.");
+  }
 
   class GirlsApiError extends Error {
     constructor(status, code, message) {
@@ -597,6 +601,16 @@
     uploadSubmit.disabled = groups.length === 0;
     if (groups.length === 0) {
       setMessage(uploadError, "アプリを追加するには、参加中のグループが必要です。Girlsアプリでグループを作るか参加してください。");
+    } else if (requestedGroupId !== null) {
+      const requestedGroup = groups.find((group) => group.group_id === requestedGroupId);
+      if (requestedGroup === undefined) {
+        uploadGroup.value = "";
+        uploadSubmit.disabled = true;
+        setMessage(uploadError, "Girlsアプリで選んだグループに参加していません。アプリに戻ってグループを選び直してください。");
+      } else {
+        uploadGroup.value = requestedGroupId;
+        setMessage(uploadError, null);
+      }
     } else {
       setMessage(uploadError, null);
     }

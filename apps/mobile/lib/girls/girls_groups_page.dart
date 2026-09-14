@@ -25,6 +25,8 @@ class GirlsGroupsPage extends StatefulWidget {
     required this.session,
     required this.onLogout,
     this.onHome,
+    this.selectedGroupId,
+    this.onGroupSelected,
     super.key,
   });
 
@@ -32,6 +34,8 @@ class GirlsGroupsPage extends StatefulWidget {
   final AuthenticatedSession session;
   final VoidCallback onLogout;
   final VoidCallback? onHome;
+  final String? selectedGroupId;
+  final ValueChanged<HostedGroup?>? onGroupSelected;
 
   @override
   State<GirlsGroupsPage> createState() => _GirlsGroupsPageState();
@@ -39,13 +43,30 @@ class GirlsGroupsPage extends StatefulWidget {
 
 class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
   List<HostedGroup>? _groups;
+  String? _selectedGroupId;
   bool _busy = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _selectedGroupId = widget.selectedGroupId;
     _loadGroups();
+  }
+
+  @override
+  void didUpdateWidget(covariant GirlsGroupsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selectedGroupId != oldWidget.selectedGroupId) {
+      _selectedGroupId = widget.selectedGroupId;
+    }
+  }
+
+  void _selectGroup(HostedGroup? group) {
+    final String? nextId = group?.groupId;
+    if (_selectedGroupId == nextId) return;
+    setState(() => _selectedGroupId = nextId);
+    widget.onGroupSelected?.call(group);
   }
 
   Future<void> _loadGroups() async {
@@ -57,7 +78,25 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
       final List<HostedGroup> groups = await widget.api.listGroups(
         widget.session.accessToken,
       );
-      if (mounted) setState(() => _groups = groups);
+      if (!mounted) return;
+      final String? previousId = _selectedGroupId;
+      HostedGroup? selectedGroup;
+      if (previousId != null) {
+        for (final HostedGroup group in groups) {
+          if (group.groupId == previousId) {
+            selectedGroup = group;
+            break;
+          }
+        }
+      }
+      selectedGroup ??= groups.length == 1 ? groups.single : null;
+      setState(() {
+        _groups = groups;
+        _selectedGroupId = selectedGroup?.groupId;
+      });
+      if (previousId != selectedGroup?.groupId) {
+        widget.onGroupSelected?.call(selectedGroup);
+      }
     } catch (error) {
       if (mounted) setState(() => _error = core.girlsMessageFor(error));
     } finally {
@@ -288,6 +327,7 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
   }
 
   Future<void> _openGroup(HostedGroup group) async {
+    _selectGroup(group);
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) => core.GirlsGroupHomePage(
@@ -348,8 +388,19 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
       );
     }
 
-    if (groups.length == 1) {
-      final HostedGroup group = groups.single;
+    HostedGroup? selectedGroup;
+    final String? selectedId = _selectedGroupId;
+    if (selectedId != null) {
+      for (final HostedGroup group in groups) {
+        if (group.groupId == selectedId) {
+          selectedGroup = group;
+          break;
+        }
+      }
+    }
+    selectedGroup ??= groups.length == 1 ? groups.single : null;
+    if (selectedGroup != null) {
+      final HostedGroup group = selectedGroup;
       return _GirlsLaceFrame(
         child: _CurrentGroupFirstView(
           group: group,
@@ -474,6 +525,7 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _GroupTile(
                         group: group,
+                        isSelected: group.groupId == _selectedGroupId,
                         onTap: _busy ? null : () => _openGroup(group),
                       ),
                     ),
@@ -732,15 +784,22 @@ class _GroupActionCard extends StatelessWidget {
 }
 
 class _GroupTile extends StatelessWidget {
-  const _GroupTile({required this.group, required this.onTap});
+  const _GroupTile({
+    required this.group,
+    required this.isSelected,
+    required this.onTap,
+  });
 
   final HostedGroup group;
+  final bool isSelected;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withValues(alpha: .76),
+      color: isSelected
+          ? const Color(0xFFF1E8FA).withValues(alpha: .92)
+          : Colors.white.withValues(alpha: .76),
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
@@ -770,7 +829,7 @@ class _GroupTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      group.isOwner ? 'オーナー' : 'メンバー',
+                      '${group.isOwner ? 'オーナー' : 'メンバー'}${isSelected ? ' ・ いまのグループ' : ''}',
                       style: const TextStyle(
                         color: Color(0xFF8C7893),
                         fontSize: 12,
@@ -779,7 +838,10 @@ class _GroupTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: _lavender),
+              Icon(
+                isSelected ? Icons.check_circle_rounded : Icons.chevron_right_rounded,
+                color: _lavender,
+              ),
             ],
           ),
         ),

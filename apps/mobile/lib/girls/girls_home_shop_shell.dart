@@ -42,6 +42,12 @@ class GirlsHomeShopShell extends StatefulWidget {
 class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   GirlsFooterTab _selectedTab = GirlsFooterTab.home;
+  HostedGroup? _currentGroup;
+
+  void _setCurrentGroup(HostedGroup? group) {
+    if (_currentGroup?.groupId == group?.groupId) return;
+    setState(() => _currentGroup = group);
+  }
 
   Route<void> _rootRoute(GirlsFooterTab tab) {
     return MaterialPageRoute<void>(
@@ -52,12 +58,16 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               api: widget.api,
               session: widget.session,
               onLogout: widget.onLogout,
+              currentGroup: _currentGroup,
+              onCurrentGroupChanged: _setCurrentGroup,
             ),
           GirlsFooterTab.groups => GirlsGroupsPage(
               api: widget.api,
               session: widget.session,
               onLogout: widget.onLogout,
               onHome: () => _selectTab(GirlsFooterTab.home),
+              selectedGroupId: _currentGroup?.groupId,
+              onGroupSelected: _setCurrentGroup,
             ),
           GirlsFooterTab.shop => GirlsShopPage(
               api: widget.api,
@@ -68,6 +78,8 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               session: widget.session,
               onHome: () => _selectTab(GirlsFooterTab.home),
               onGroups: () => _selectTab(GirlsFooterTab.groups),
+              currentGroup: _currentGroup,
+              onCurrentGroupChanged: _setCurrentGroup,
             ),
           // 「その他」の専用画面ができるまでは従来どおりアプリ画面を使う。
           GirlsFooterTab.more => GirlsAppsPage(
@@ -75,6 +87,8 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               session: widget.session,
               onHome: () => _selectTab(GirlsFooterTab.home),
               onGroups: () => _selectTab(GirlsFooterTab.groups),
+              currentGroup: _currentGroup,
+              onCurrentGroupChanged: _setCurrentGroup,
             ),
         };
       },

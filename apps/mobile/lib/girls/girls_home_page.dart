@@ -32,12 +32,16 @@ class GirlsHomePage extends StatefulWidget {
     required this.api,
     required this.session,
     required this.onLogout,
+    this.currentGroup,
+    this.onCurrentGroupChanged,
     super.key,
   });
 
   final HostedGirlsApi api;
   final AuthenticatedSession session;
   final VoidCallback onLogout;
+  final HostedGroup? currentGroup;
+  final ValueChanged<HostedGroup?>? onCurrentGroupChanged;
 
   @override
   State<GirlsHomePage> createState() => _GirlsHomePageState();
@@ -45,6 +49,7 @@ class GirlsHomePage extends StatefulWidget {
 
 class _GirlsHomePageState extends State<GirlsHomePage> {
   List<HostedGroup>? _groups;
+  HostedGroup? _currentGroup;
   bool _loadingGroups = false;
   bool _creatingGroup = false;
   String? _groupError;
@@ -58,7 +63,22 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   @override
   void initState() {
     super.initState();
+    _currentGroup = widget.currentGroup;
     _loadGroups();
+  }
+
+  @override
+  void didUpdateWidget(covariant GirlsHomePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.currentGroup?.groupId != oldWidget.currentGroup?.groupId) {
+      _currentGroup = widget.currentGroup;
+    }
+  }
+
+  void _setCurrentGroup(HostedGroup? group) {
+    if (_currentGroup?.groupId == group?.groupId) return;
+    setState(() => _currentGroup = group);
+    widget.onCurrentGroupChanged?.call(group);
   }
 
   Future<void> _loadGroups() async {
@@ -70,7 +90,25 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       final List<HostedGroup> groups = await widget.api.listGroups(
         widget.session.accessToken,
       );
-      if (mounted) setState(() => _groups = groups);
+      if (!mounted) return;
+      final String? previousId = _currentGroup?.groupId;
+      HostedGroup? currentGroup;
+      if (previousId != null) {
+        for (final HostedGroup group in groups) {
+          if (group.groupId == previousId) {
+            currentGroup = group;
+            break;
+          }
+        }
+      }
+      currentGroup ??= groups.length == 1 ? groups.single : null;
+      setState(() {
+        _groups = groups;
+        _currentGroup = currentGroup;
+      });
+      if (previousId != currentGroup?.groupId) {
+        widget.onCurrentGroupChanged?.call(currentGroup);
+      }
     } catch (error) {
       if (mounted) setState(() => _groupError = core.girlsMessageFor(error));
     } finally {
@@ -102,6 +140,8 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
           api: widget.api,
           session: widget.session,
           onHome: () => Navigator.of(routeContext).pop(),
+          selectedGroupId: _currentGroup?.groupId,
+          onGroupSelected: _setCurrentGroup,
           onLogout: () {
             Navigator.of(routeContext).pop();
             widget.onLogout();
@@ -119,6 +159,9 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
           api: widget.api,
           session: widget.session,
           onHome: () => Navigator.of(routeContext).pop(),
+          onGroups: _openGroups,
+          currentGroup: _currentGroup,
+          onCurrentGroupChanged: _setCurrentGroup,
         ),
       ),
     );
@@ -126,6 +169,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   }
 
   Future<void> _openGroup(HostedGroup group) async {
+    _setCurrentGroup(group);
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) => core.GirlsGroupHomePage(

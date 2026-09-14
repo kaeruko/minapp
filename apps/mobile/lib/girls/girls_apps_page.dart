@@ -57,6 +57,8 @@ class GirlsAppsPage extends StatefulWidget {
     required this.session,
     this.onHome,
     this.onGroups,
+    this.currentGroup,
+    this.onCurrentGroupChanged,
     super.key,
   });
 
@@ -64,6 +66,8 @@ class GirlsAppsPage extends StatefulWidget {
   final AuthenticatedSession session;
   final VoidCallback? onHome;
   final VoidCallback? onGroups;
+  final HostedGroup? currentGroup;
+  final ValueChanged<HostedGroup?>? onCurrentGroupChanged;
 
   @override
   State<GirlsAppsPage> createState() => _GirlsAppsPageState();
@@ -74,15 +78,25 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
   late final GirlsBuiltinInstallApi _builtinInstallApi;
   List<ManagedGirlsApp>? _apps;
   List<HostedGroup>? _activeGroups;
+  HostedGroup? _currentGroup;
   bool _busy = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _currentGroup = widget.currentGroup;
     _managementApi = GirlsAppManagementApi(baseUri: widget.api.baseUri);
     _builtinInstallApi = GirlsBuiltinInstallApi(baseUri: widget.api.baseUri);
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant GirlsAppsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.currentGroup?.groupId != oldWidget.currentGroup?.groupId) {
+      _currentGroup = widget.currentGroup;
+    }
   }
 
   @override
@@ -105,12 +119,33 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
         widget.session.accessToken,
       );
       if (!mounted) return;
+      final String? previousId = _currentGroup?.groupId;
+      HostedGroup? currentGroup;
+      if (previousId != null) {
+        for (final HostedGroup group in groups) {
+          if (group.groupId == previousId) {
+            currentGroup = group;
+            break;
+          }
+        }
+      }
+      currentGroup ??= groups.length == 1 ? groups.single : null;
       setState(() {
         _activeGroups = groups;
-        _apps = apps
-            .where((ManagedGirlsApp app) => !_isNovelInfrastructureApp(app))
-            .toList(growable: false);
+        _currentGroup = currentGroup;
+        _apps = currentGroup == null
+            ? <ManagedGirlsApp>[]
+            : apps
+                .where(
+                  (ManagedGirlsApp app) =>
+                      app.app.groupId == currentGroup!.groupId &&
+                      !_isNovelInfrastructureApp(app),
+                )
+                .toList(growable: false);
       });
+      if (previousId != currentGroup?.groupId) {
+        widget.onCurrentGroupChanged?.call(currentGroup);
+      }
     } catch (error) {
       if (mounted) setState(() => _error = core.girlsMessageFor(error));
     } finally {
@@ -125,9 +160,16 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       setState(() => _error = 'アプリを追加するには、参加中のグループが必要です。');
       return;
     }
+    final HostedGroup? group = _currentGroup;
+    if (group == null) {
+      setState(() => _error = '先に「グループ」から、いま使うグループを選んでね。');
+      return;
+    }
 
     setState(() => _error = null);
-    final Uri portalUri = Uri.parse(_girlsUploadPortalUrl);
+    final Uri portalUri = Uri.parse(_girlsUploadPortalUrl).replace(
+      queryParameters: <String, String>{'group_id': group.groupId},
+    );
     try {
       final bool opened = await launchUrl(
         portalUri,
@@ -159,24 +201,6 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
     return _openDetailById(app.app.appId);
   }
 
-  Future<HostedGroup?> _chooseActiveGroup(List<HostedGroup> groups) async {
-    if (groups.length == 1) return groups.single;
-    return showDialog<HostedGroup>(
-      context: context,
-      builder: (BuildContext dialogContext) => SimpleDialog(
-        title: const Text('どのグループに追加する？'),
-        children: groups
-            .map(
-              (HostedGroup group) => SimpleDialogOption(
-                onPressed: () => Navigator.of(dialogContext).pop(group),
-                child: Text(group.name),
-              ),
-            )
-            .toList(growable: false),
-      ),
-    );
-  }
-
   Future<void> _openNovelMaker() async {
     final List<HostedGroup>? activeGroups = _activeGroups;
     if (activeGroups == null) return;
@@ -184,8 +208,11 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       setState(() => _error = 'ノベルゲームを作るには、参加中のグループが必要です。');
       return;
     }
-    final HostedGroup? group = await _chooseActiveGroup(activeGroups);
-    if (group == null || !mounted) return;
+    final HostedGroup? group = _currentGroup;
+    if (group == null) {
+      setState(() => _error = '先に「グループ」から、いま使うグループを選んでね。');
+      return;
+    }
 
     setState(() {
       _busy = true;
@@ -238,6 +265,11 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
           children: <Widget>[
+            _CurrentGroupBanner(
+              group: _currentGroup,
+              onChange: widget.onGroups,
+            ),
+            const SizedBox(height: 12),
             FilledButton.icon(
               key: const Key('girls-my-apps-upload'),
               onPressed: _busy ? null : _openUploadPortal,
@@ -277,6 +309,8 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
                 padding: EdgeInsets.all(36),
                 child: Center(child: CircularProgressIndicator()),
               )
+            else if (_currentGroup == null)
+              _NoCurrentGroup(onSelect: widget.onGroups)
             else if (apps.isEmpty)
               const _EmptyApps()
             else
@@ -808,6 +842,89 @@ class _Stat extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
       ],
+    );
+  }
+}
+
+class _CurrentGroupBanner extends StatelessWidget {
+  const _CurrentGroupBanner({required this.group, required this.onChange});
+
+  final HostedGroup? group;
+  final VoidCallback? onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('girls-apps-current-group'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1E8FA).withValues(alpha: .78),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: <Widget>[
+          const Icon(Icons.groups_rounded, color: _lavender),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  'いまのグループ',
+                  style: TextStyle(
+                    color: Color(0xFF8F7A74),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  group?.name ?? 'まだ選んでいません',
+                  style: const TextStyle(
+                    color: _ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onChange,
+            child: Text(group == null ? '選ぶ' : '変更'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoCurrentGroup extends StatelessWidget {
+  const _NoCurrentGroup({required this.onSelect});
+
+  final VoidCallback? onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .72),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: <Widget>[
+          const Text(
+            'グループを選ぶと、そのグループのアプリだけがここに並ぶよ。',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: _ink, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: onSelect,
+            icon: const Icon(Icons.groups_rounded),
+            label: const Text('グループを選ぶ'),
+          ),
+        ],
+      ),
     );
   }
 }
