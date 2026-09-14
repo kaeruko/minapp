@@ -91,23 +91,22 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         widget.session.accessToken,
       );
       if (!mounted) return;
-      final String? previousId = _currentGroup?.groupId;
+      final String? currentId = _currentGroup?.groupId;
       HostedGroup? currentGroup;
-      if (previousId != null) {
+      if (currentId != null) {
         for (final HostedGroup group in groups) {
-          if (group.groupId == previousId) {
+          if (group.groupId == currentId) {
             currentGroup = group;
             break;
           }
         }
       }
-      currentGroup ??= groups.length == 1 ? groups.single : null;
       setState(() {
         _groups = groups;
         _currentGroup = currentGroup;
       });
-      if (previousId != currentGroup?.groupId) {
-        widget.onCurrentGroupChanged?.call(currentGroup);
+      if (currentId != null && currentGroup == null) {
+        widget.onCurrentGroupChanged?.call(null);
       }
     } catch (error) {
       if (mounted) setState(() => _groupError = core.girlsMessageFor(error));
@@ -169,7 +168,6 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   }
 
   Future<void> _openGroup(HostedGroup group) async {
-    _setCurrentGroup(group);
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) => core.GirlsGroupHomePage(
