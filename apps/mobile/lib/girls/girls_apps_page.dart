@@ -29,6 +29,11 @@ String _novelProjectTitle(HostedAuthoringProject project) {
   if (project.summary.contentFormat != _novelContentFormat) {
     throw const FormatException('Novel project has an unexpected content format.');
   }
+  // An empty document is the Authoring contract's intentional
+  // uninitialized draft state. The Novel Editor fills it on first open.
+  if (project.document.isEmpty) {
+    return '新しいノベル';
+  }
   final Object? rawTitle = project.document['title'];
   if (rawTitle is! String ||
       rawTitle.isEmpty ||
