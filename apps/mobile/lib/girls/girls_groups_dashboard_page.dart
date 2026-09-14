@@ -11,7 +11,6 @@ import 'hosted_girls_api.dart';
 
 const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF8B6BB2);
-const Color _pink = Color(0xFFE9A8BA);
 const Color _panelPink = Color(0xFFF8DCDD);
 const Color _softCream = Color(0xFFFFFBF6);
 const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
