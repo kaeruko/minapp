@@ -8,6 +8,13 @@ import 'package:minapp_mobile/girls/api.dart';
 import 'package:minapp_mobile/girls/girls_home_page.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
+const HostedGroup _currentGroup = HostedGroup(
+  groupId: '0123456789abcdef0123456789abcdef',
+  name: '放課後イラスト部',
+  role: 'owner',
+  status: 'active',
+);
+
 HostedGirlsApi _fakeApi() {
   return HostedGirlsApi(
     baseUri: Uri.parse('https://example.com'),
@@ -16,10 +23,10 @@ HostedGirlsApi _fakeApi() {
         jsonEncode(<String, Object?>{
           'groups': <Object?>[
             <String, Object?>{
-              'group_id': '0123456789abcdef0123456789abcdef',
-              'name': '放課後イラスト部',
-              'role': 'owner',
-              'status': 'active',
+              'group_id': _currentGroup.groupId,
+              'name': _currentGroup.name,
+              'role': _currentGroup.role,
+              'status': _currentGroup.status,
             },
           ],
         }),
@@ -48,6 +55,7 @@ void main() {
             expiresIn: 3600,
           ),
           onLogout: () {},
+          currentGroup: _currentGroup,
         ),
       ),
     );
