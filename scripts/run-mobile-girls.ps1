@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$DeviceId
+    [string]$DeviceId,
+    [switch]$SyncNovelEditor
 )
 
 $ErrorActionPreference = "Stop"
@@ -9,6 +10,7 @@ Set-StrictMode -Version Latest
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $mobileDir = Join-Path $repoRoot "apps\mobile"
 $configureAndroidScript = Join-Path $PSScriptRoot "configure-mobile-android.ps1"
+$syncNovelEditorScript = Join-Path $PSScriptRoot "sync-novel-editor-dev.ps1"
 $girlsEntrypoint = Join-Path $mobileDir "lib\main_girls.dart"
 
 if (-not (Test-Path -LiteralPath $mobileDir -PathType Container)) {
@@ -20,8 +22,16 @@ if (-not (Test-Path -LiteralPath $configureAndroidScript -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $girlsEntrypoint -PathType Leaf)) {
     throw "MinApp Girls entrypoint not found: $girlsEntrypoint"
 }
+if ($SyncNovelEditor -and -not (Test-Path -LiteralPath $syncNovelEditorScript -PathType Leaf)) {
+    throw "Novel Editor sync script not found: $syncNovelEditorScript"
+}
 if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) {
     throw "flutter was not found in PATH."
+}
+
+if ($SyncNovelEditor) {
+    Write-Host "Syncing the sibling minapp_apps Novel Editor before Flutter launch..."
+    & $syncNovelEditorScript
 }
 
 & $configureAndroidScript
