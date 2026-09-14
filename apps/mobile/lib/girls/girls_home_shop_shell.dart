@@ -23,9 +23,10 @@ enum _AccountAction { email, refresh, logout }
 /// One authenticated Girls chrome around the nested in-app navigator.
 ///
 /// Every route pushed from Home / Groups / Shop / Apps stays inside this
-/// navigator, so the branded header remains stable. The shared footer normally
-/// stays stable too; a creative editor may explicitly hide it while its own
-/// editor footer is active, then restore it when the flow closes.
+/// navigator, so the branded header remains stable. The shared footer also
+/// stays visible on a maker's project list. While a creative editor or its
+/// nested preview is open, the shared footer is hidden so the editor can use
+/// that area for its own controls.
 class GirlsHomeShopShell extends StatefulWidget {
   const GirlsHomeShopShell({
     required this.api,
@@ -46,15 +47,19 @@ class GirlsHomeShopShell extends StatefulWidget {
 
 class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  late final _GirlsShellNavigatorObserver _navigatorObserver;
   GirlsFooterTab _selectedTab = GirlsFooterTab.home;
   HostedGroup? _currentGroup;
   bool _loadingCurrentGroup = true;
   bool _footerHidden = false;
+  bool _novelFlowActive = false;
+  int? _novelFlowBaseDepth;
   String? _currentGroupError;
 
   @override
   void initState() {
     super.initState();
+    _navigatorObserver = _GirlsShellNavigatorObserver(_syncFooterForRouteDepth);
     _loadCurrentGroup();
   }
 
@@ -117,8 +122,27 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
     setState(() => _currentGroup = group);
   }
 
-  void _setFooterHidden(bool hidden) {
-    if (!mounted || _footerHidden == hidden) return;
+  void _setNovelFlowActive(bool active) {
+    if (!mounted) return;
+    if (active) {
+      if (!_novelFlowActive) {
+        _novelFlowActive = true;
+        _novelFlowBaseDepth = _navigatorObserver.depth;
+      }
+    } else {
+      _novelFlowActive = false;
+      _novelFlowBaseDepth = null;
+    }
+    _syncFooterForRouteDepth();
+  }
+
+  void _syncFooterForRouteDepth() {
+    if (!mounted) return;
+    final int? baseDepth = _novelFlowBaseDepth;
+    final bool hidden = _novelFlowActive &&
+        baseDepth != null &&
+        _navigatorObserver.depth > baseDepth + 1;
+    if (_footerHidden == hidden) return;
     setState(() => _footerHidden = hidden);
   }
 
@@ -152,7 +176,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               onGroups: () => _selectTab(GirlsFooterTab.groups),
               currentGroup: _currentGroup,
               onCurrentGroupChanged: _setCurrentGroup,
-              onFooterVisibilityChanged: _setFooterHidden,
+              onFooterVisibilityChanged: _setNovelFlowActive,
             ),
           // 「その他」の専用画面ができるまでは従来どおりアプリ画面を使う。
           GirlsFooterTab.more => GirlsAppsPage(
@@ -162,7 +186,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               onGroups: () => _selectTab(GirlsFooterTab.groups),
               currentGroup: _currentGroup,
               onCurrentGroupChanged: _setCurrentGroup,
-              onFooterVisibilityChanged: _setFooterHidden,
+              onFooterVisibilityChanged: _setNovelFlowActive,
             ),
         };
       },
@@ -175,6 +199,8 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
 
     setState(() {
       _selectedTab = tab;
+      _novelFlowActive = false;
+      _novelFlowBaseDepth = null;
       _footerHidden = false;
     });
     navigator.pushAndRemoveUntil(_rootRoute(tab), (Route<dynamic> route) => false);
@@ -318,6 +344,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
       body: GirlsScaffoldChromeScope(
         child: Navigator(
           key: _navigatorKey,
+          observers: <NavigatorObserver>[_navigatorObserver],
           initialRoute: '/girls/home',
           onGenerateInitialRoutes: (
             NavigatorState navigator,
@@ -334,6 +361,42 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               onSelected: _selectTab,
             ),
     );
+  }
+}
+
+class _GirlsShellNavigatorObserver extends NavigatorObserver {
+  _GirlsShellNavigatorObserver(this.onStackChanged);
+
+  final VoidCallback onStackChanged;
+  int _depth = 0;
+
+  int get depth => _depth;
+
+  void _notify() {
+    onStackChanged();
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _depth += 1;
+    _notify();
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (_depth > 0) _depth -= 1;
+    _notify();
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (_depth > 0) _depth -= 1;
+    _notify();
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    _notify();
   }
 }
 
