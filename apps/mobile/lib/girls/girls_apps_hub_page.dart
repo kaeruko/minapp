@@ -47,6 +47,7 @@ class GirlsAppsPage extends StatefulWidget {
     this.onGroups,
     this.currentGroup,
     this.onCurrentGroupChanged,
+    this.onFooterVisibilityChanged,
     super.key,
   });
 
@@ -56,6 +57,7 @@ class GirlsAppsPage extends StatefulWidget {
   final VoidCallback? onGroups;
   final HostedGroup? currentGroup;
   final ValueChanged<HostedGroup?>? onCurrentGroupChanged;
+  final ValueChanged<bool>? onFooterVisibilityChanged;
 
   @override
   State<GirlsAppsPage> createState() => _GirlsAppsPageState();
@@ -225,6 +227,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
     final bool isNovel = maker.appId == _novelEditorAppId &&
         maker.edits.length == 1 &&
         maker.edits.single == _novelContentFormat;
+    if (isNovel) widget.onFooterVisibilityChanged?.call(true);
     try {
       await openHostedAuthoringProjects(
         context: context,
@@ -246,6 +249,8 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       if (mounted) await _load();
     } catch (error) {
       if (mounted) setState(() => _error = core.girlsMessageFor(error));
+    } finally {
+      if (isNovel) widget.onFooterVisibilityChanged?.call(false);
     }
   }
 
