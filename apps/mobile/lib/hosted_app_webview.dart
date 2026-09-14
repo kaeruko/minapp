@@ -485,7 +485,7 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
     final WebViewController? controller = _controller;
     if (controller == null) {
       _failBridgeOrPage(
-        context: 'Authoring bridge received a message before WebView initialization completed.',
+        context: 'Authoring Preview bridge received a message before WebView initialization completed.',
         error: StateError('WebView controller is not ready.'),
         stackTrace: StackTrace.current,
       );
