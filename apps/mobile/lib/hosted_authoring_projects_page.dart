@@ -80,6 +80,8 @@ class _HostedAuthoringProjectsPageState
   bool _busy = false;
   String? _error;
 
+  bool get _isNovel => widget.definition.contentFormat == 'minapp/novel@1';
+
   @override
   void initState() {
     super.initState();
@@ -230,7 +232,9 @@ class _HostedAuthoringProjectsPageState
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (BuildContext context) => HostedAppWebViewPage.authoring(
-            title: '${widget.definition.pageTitle}（編集）',
+            title: _isNovel
+                ? widget.definition.pageTitle
+                : '${widget.definition.pageTitle}（編集）',
             launch: launch,
             runtimeTransport: widget.runtimeTransport,
             authoringTransport: _authoringTransport,
@@ -468,16 +472,20 @@ class _HostedAuthoringProjectsPageState
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
             children: <Widget>[
-              Text(
-                widget.definition.collectionTitle,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                '作品をタップすると編集できます。再生ボタンでは、保存済みの下書きをみんアプ内の対応プレイヤーで開きます。',
-              ),
+              if (_isNovel)
+                _NovelProjectsIntro(title: widget.definition.collectionTitle)
+              else ...<Widget>[
+                Text(
+                  widget.definition.collectionTitle,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  '作品をタップすると編集できます。再生ボタンでは、保存済みの下書きをみんアプ内の対応プレイヤーで開きます。',
+                ),
+              ],
               if (_error != null) ...<Widget>[
                 const SizedBox(height: 12),
                 Text(
@@ -551,6 +559,80 @@ class _HostedAuthoringProjectsPageState
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _NovelProjectsIntro extends StatelessWidget {
+  const _NovelProjectsIntro({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: <Color>[Color(0xFFFFFBFD), Color(0xFFF8F0FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFEBCFDC)),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x12745B9E),
+            blurRadius: 18,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF4E9FB),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const Icon(
+              Icons.auto_stories_rounded,
+              color: Color(0xFF745B9E),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF604943),
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                const Text(
+                  '作品をタップして編集できます',
+                  style: TextStyle(
+                    color: Color(0xFF8C7893),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Text(
+            '✦',
+            style: TextStyle(color: Color(0xFFEFA5C0), fontSize: 18),
+          ),
+        ],
       ),
     );
   }
