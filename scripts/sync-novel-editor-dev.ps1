@@ -42,6 +42,57 @@ function Invoke-ExternalCapture {
     return $text.Trim()
 }
 
+function Invoke-ExternalCaptureSeparated {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $FilePath
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    foreach ($argument in $Arguments) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) {
+            throw "$Context could not start '$FilePath'."
+        }
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+        $exitCode = $process.ExitCode
+    }
+    finally {
+        $process.Dispose()
+    }
+
+    if ($exitCode -ne 0) {
+        $diagnostic = if ([string]::IsNullOrWhiteSpace($stderr)) { '<empty stderr>' } else { $stderr.Trim() }
+        throw "$Context failed with exit code $exitCode`: $diagnostic"
+    }
+    if ([string]::IsNullOrWhiteSpace($stdout)) {
+        $diagnostic = if ([string]::IsNullOrWhiteSpace($stderr)) { '<empty stderr>' } else { $stderr.Trim() }
+        throw "$Context returned empty stdout. stderr: $diagnostic"
+    }
+
+    return [pscustomobject]@{
+        Stdout = $stdout.Trim()
+        Stderr = $stderr.Trim()
+    }
+}
+
 $null = Get-Command terraform -ErrorAction Stop
 $null = Get-Command git -ErrorAction Stop
 
@@ -135,18 +186,19 @@ try {
         ) `
         -Context 'Novel Editor Terraform plan'
 
-    $planJson = Invoke-ExternalCapture `
+    $planCapture = Invoke-ExternalCaptureSeparated `
         -FilePath 'terraform' `
         -Arguments @("-chdir=$hostedDir", 'show', '-json', $planPath) `
         -Context 'Novel Editor saved plan JSON'
-    if ([string]::IsNullOrWhiteSpace($planJson)) {
-        throw 'Novel Editor saved plan JSON was empty.'
+    if (-not [string]::IsNullOrWhiteSpace($planCapture.Stderr)) {
+        Write-Warning "terraform show emitted stderr while producing valid stdout: $($planCapture.Stderr)"
     }
     try {
-        $plan = $planJson | ConvertFrom-Json -Depth 100
+        $plan = $planCapture.Stdout | ConvertFrom-Json -Depth 100
     }
     catch {
-        throw "Novel Editor saved plan JSON could not be decoded: $($_.Exception.Message)"
+        $stderrDiagnostic = if ([string]::IsNullOrWhiteSpace($planCapture.Stderr)) { '<empty stderr>' } else { $planCapture.Stderr }
+        throw "Novel Editor saved plan JSON could not be decoded: $($_.Exception.Message) stderr: $stderrDiagnostic"
     }
 
     Write-Host '[5/6] Reject changes outside the Novel Editor S3 object'
