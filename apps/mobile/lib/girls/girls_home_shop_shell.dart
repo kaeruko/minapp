@@ -75,11 +75,8 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
             break;
           }
         }
-        if (currentGroup == null) {
-          // The previously selected group is no longer usable. Do not silently
-          // switch to another membership; the user must choose explicitly.
-          await widget.currentGroupStore.clear();
-        }
+        // Keep an unavailable stored id intact. It must never turn into an
+        // implicit switch to another membership on a later app restart.
       } else {
         if (groups.length == 1) {
           currentGroup = groups.single;
@@ -137,6 +134,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               onHome: () => _selectTab(GirlsFooterTab.home),
               selectedGroupId: _currentGroup?.groupId,
               onGroupSelected: _setCurrentGroup,
+              currentGroupStore: widget.currentGroupStore,
             ),
           GirlsFooterTab.shop => GirlsShopPage(
               api: widget.api,
@@ -252,6 +250,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
     if (_loadingCurrentGroup) {
       return const GirlsScaffold(
         body: Center(child: CircularProgressIndicator()),
+        bottomNavigationBar: SizedBox.shrink(),
       );
     }
 
@@ -264,7 +263,11 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                const Icon(Icons.error_outline_rounded, color: _lavender, size: 42),
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: _lavender,
+                  size: 42,
+                ),
                 const SizedBox(height: 12),
                 const Text(
                   'いまのグループを確認できませんでした',
@@ -282,6 +285,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
             ),
           ),
         ),
+        bottomNavigationBar: const SizedBox.shrink(),
       );
     }
 
