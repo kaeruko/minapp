@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import 'girls_apps_page.dart';
+import 'girls_current_group_store.dart';
 import 'girls_email_settings_page.dart';
 import 'girls_footer_nav.dart';
 import 'girls_groups_page.dart';
 import 'girls_home_page.dart';
+import 'girls_registration_onboarding.dart';
 import 'girls_scaffold.dart';
 import 'girls_shop_page.dart';
 import 'hosted_girls_api.dart';
@@ -28,12 +30,14 @@ class GirlsHomeShopShell extends StatefulWidget {
     required this.api,
     required this.session,
     required this.onLogout,
+    this.currentGroupStore = const SharedPreferencesGirlsCurrentGroupStore(),
     super.key,
   });
 
   final HostedGirlsApi api;
   final AuthenticatedSession session;
   final VoidCallback onLogout;
+  final GirlsCurrentGroupStore currentGroupStore;
 
   @override
   State<GirlsHomeShopShell> createState() => _GirlsHomeShopShellState();
@@ -43,6 +47,71 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   GirlsFooterTab _selectedTab = GirlsFooterTab.home;
   HostedGroup? _currentGroup;
+  bool _loadingCurrentGroup = true;
+  String? _currentGroupError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentGroup();
+  }
+
+  Future<void> _loadCurrentGroup() async {
+    setState(() {
+      _loadingCurrentGroup = true;
+      _currentGroupError = null;
+    });
+    try {
+      final List<HostedGroup> groups = await widget.api.listGroups(
+        widget.session.accessToken,
+      );
+      final String? storedGroupId = await widget.currentGroupStore.load();
+      HostedGroup? currentGroup;
+
+      if (storedGroupId != null) {
+        for (final HostedGroup group in groups) {
+          if (group.groupId == storedGroupId) {
+            currentGroup = group;
+            break;
+          }
+        }
+        if (currentGroup == null) {
+          // The previously selected group is no longer usable. Do not silently
+          // switch to another membership; the user must choose explicitly.
+          await widget.currentGroupStore.clear();
+        }
+      } else {
+        if (groups.length == 1) {
+          currentGroup = groups.single;
+        } else {
+          final List<HostedGroup> starterGroups = groups
+              .where(
+                (HostedGroup group) =>
+                    group.isOwner && group.name == girlsInitialGroupName,
+              )
+              .toList(growable: false);
+          if (starterGroups.length == 1) {
+            currentGroup = starterGroups.single;
+          }
+        }
+        if (currentGroup != null) {
+          await widget.currentGroupStore.save(currentGroup.groupId);
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _currentGroup = currentGroup;
+        _loadingCurrentGroup = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _currentGroupError = error.toString();
+        _loadingCurrentGroup = false;
+      });
+    }
+  }
 
   void _setCurrentGroup(HostedGroup? group) {
     if (_currentGroup?.groupId == group?.groupId) return;
@@ -169,7 +238,8 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
           ),
         );
       case _AccountAction.refresh:
-        _selectTab(_selectedTab);
+        await _loadCurrentGroup();
+        if (mounted) _selectTab(_selectedTab);
       case _AccountAction.logout:
         widget.onLogout();
       case null:
@@ -179,6 +249,42 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loadingCurrentGroup) {
+      return const GirlsScaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final String? currentGroupError = _currentGroupError;
+    if (currentGroupError != null) {
+      return GirlsScaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const Icon(Icons.error_outline_rounded, color: _lavender, size: 42),
+                const SizedBox(height: 12),
+                const Text(
+                  'いまのグループを確認できませんでした',
+                  style: TextStyle(color: _ink, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 8),
+                Text(currentGroupError, textAlign: TextAlign.center),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  onPressed: _loadCurrentGroup,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('もう一度確認'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return GirlsScaffold(
       leading: _BellButton(onTap: _showNotices),
       actions: <Widget>[
