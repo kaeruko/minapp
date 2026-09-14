@@ -238,7 +238,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
         runtimeTransport: widget.api.runtimeClient,
         editorFormats: maker.edits,
         errorMessage: core.girlsMessageFor,
-        pageTitle: isNovel ? 'ノベルゲームを作る' : '${maker.title}でつくる',
+        pageTitle: isNovel ? 'ノベルエディタ' : '${maker.title}でつくる',
         collectionTitle: isNovel ? 'あなたのノベル作品' : 'あなたの作品',
         emptyTitle: isNovel ? 'まだノベル作品がありません' : 'まだ作品がありません',
         emptyBody: isNovel
