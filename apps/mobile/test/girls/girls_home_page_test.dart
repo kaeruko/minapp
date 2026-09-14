@@ -106,7 +106,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('いまのグループ'), findsOneWidget);
-    expect(find.text('あなたがオーナーです ♡'), findsOneWidget);
+    expect(find.text('あなたがオーナーです'), findsOneWidget);
     expect(find.text('グループを開く'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('girls-footer-home')));

@@ -1687,7 +1687,7 @@ class _GroupHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(group.isOwner ? 'あなたがオーナーです ♡' : 'メンバーとして参加中'),
+                Text(group.isOwner ? 'あなたがオーナーです' : 'メンバーとして参加中'),
               ],
             ),
           ),

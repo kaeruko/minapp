@@ -636,7 +636,7 @@ class _CurrentGroupFirstView extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      group.isOwner ? 'あなたがオーナーです ♡' : 'メンバーとして参加中',
+                      group.isOwner ? 'あなたがオーナーです' : 'メンバーとして参加中',
                       style: const TextStyle(fontSize: 12),
                     ),
                     const SizedBox(height: 7),
