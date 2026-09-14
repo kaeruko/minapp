@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import uuid
 from typing import Any
 
 from aws_backend import _string_attr
+from hosted_authoring_manifest import read_authoring_manifest
 from hosted_catalog_backend import _files_json
 from hosted_platform_backend import _now_iso, _number_attr
 from zip_upload_normalization import normalize_uploaded_zip
@@ -26,8 +28,13 @@ def create_uploaded_app(
     A common desktop packaging shape (one top-level folder containing
     index.html) is normalized to the canonical root-index ZIP before storage.
     Ambiguous archive layouts still fail validation.
+
+    If the canonical ZIP contains minapp.json, its Authoring contract is
+    validated before any app data is written and stored atomically with the
+    app metadata. A malformed manifest never falls back to an ordinary app.
     """
     normalized_zip, files = normalize_uploaded_zip(zip_bytes)
+    authoring = read_authoring_manifest(normalized_zip)
     sha256 = hashlib.sha256(normalized_zip).hexdigest()
 
     owner = backend._user_by_auth_subject(auth_subject)
@@ -53,6 +60,19 @@ def create_uploaded_app(
         "source_updated_at": _string_attr(created_at),
         "created_at": _string_attr(created_at),
     }
+    if authoring is not None:
+        common["edits_json"] = _string_attr(
+            json.dumps(authoring.edits, separators=(",", ":"))
+        )
+        common["accepts_json"] = _string_attr(
+            json.dumps(authoring.accepts, separators=(",", ":"))
+        )
+        common["master_data_element_id"] = (
+            _string_attr(authoring.master_data_element_id)
+            if authoring.master_data_element_id is not None
+            else {"NULL": True}
+        )
+
     app_meta = {
         "pk": _string_attr(f"APP#{app_id}"),
         "sk": _string_attr("META"),
