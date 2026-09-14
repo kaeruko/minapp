@@ -272,8 +272,20 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
       return;
     }
 
+    final String? selectedGroupId = _selectedGroupId;
+    if (selectedGroupId == null) {
+      setState(() => _error = '先に、いま使うグループを選んでね。');
+      return;
+    }
+    if (!groups.any((HostedGroup group) => group.groupId == selectedGroupId)) {
+      setState(() => _error = '選んでいたグループに参加していません。別のグループを選んでね。');
+      return;
+    }
+
     setState(() => _error = null);
-    final Uri portalUri = Uri.parse(_girlsUploadPortalUrl);
+    final Uri portalUri = Uri.parse(_girlsUploadPortalUrl).replace(
+      queryParameters: <String, String>{'group_id': selectedGroupId},
+    );
     try {
       final bool opened = await launchUrl(
         portalUri,

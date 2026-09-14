@@ -459,10 +459,10 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
                     )
                   else
                     _LatestGroupCard(
-                      group: groups?.firstOrNull,
-                      onTap: groups == null || groups.isEmpty
+                      group: _currentGroup,
+                      onTap: _currentGroup == null
                           ? _openGroups
-                          : () => _openGroup(groups.first),
+                          : () => _openGroup(_currentGroup!),
                     ),
                 ],
               ),

@@ -269,7 +269,9 @@
   const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
   const ID_PATTERN = /^[0-9a-f]{32}$/;
   const LOGIN_ID_PATTERN = /^[a-z0-9][a-z0-9-]{2,31}$/;
-  const requestedGroupId = new URL(globalThis.location.href).searchParams.get("group_id");
+  const requestedGroupId = globalThis.location === undefined
+    ? null
+    : new URL(globalThis.location.href).searchParams.get("group_id");
   if (requestedGroupId !== null && !ID_PATTERN.test(requestedGroupId)) {
     throw new Error("Girls portal group_id query parameter is invalid.");
   }
