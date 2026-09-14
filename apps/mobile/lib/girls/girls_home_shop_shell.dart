@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
-import 'girls_apps_page.dart';
+import 'girls_apps_hub_page.dart';
 import 'girls_current_group_store.dart';
 import 'girls_email_settings_page.dart';
 import 'girls_footer_nav.dart';
