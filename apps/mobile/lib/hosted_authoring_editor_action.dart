@@ -4,6 +4,8 @@ import 'hosted_authoring_contract_api.dart';
 import 'hosted_authoring_projects_page.dart';
 import 'hosted_runtime_bridge.dart';
 
+const String _novelContentFormat = 'minapp/novel@1';
+
 Future<void> openHostedAuthoringProjects({
   required BuildContext context,
   required Uri baseUri,
@@ -47,22 +49,49 @@ Future<void> openHostedAuthoringProjects({
 
   await Navigator.of(context).push<void>(
     MaterialPageRoute<void>(
-      builder: (BuildContext context) => HostedAuthoringProjectsPage(
-        baseUri: baseUri,
-        accessToken: accessToken,
-        groupId: groupId,
-        editorAppId: editorAppId,
-        runtimeTransport: runtimeTransport,
-        definition: HostedAuthoringProjectDefinition(
-          contentFormat: contentFormat!,
-          pageTitle: pageTitle,
-          collectionTitle: collectionTitle,
-          emptyTitle: emptyTitle,
-          emptyBody: emptyBody,
-          projectTitle: projectTitle,
-        ),
-        errorMessage: errorMessage,
-      ),
+      builder: (BuildContext routeContext) {
+        final Widget page = HostedAuthoringProjectsPage(
+          baseUri: baseUri,
+          accessToken: accessToken,
+          groupId: groupId,
+          editorAppId: editorAppId,
+          runtimeTransport: runtimeTransport,
+          definition: HostedAuthoringProjectDefinition(
+            contentFormat: contentFormat!,
+            pageTitle: pageTitle,
+            collectionTitle: collectionTitle,
+            emptyTitle: emptyTitle,
+            emptyBody: emptyBody,
+            projectTitle: projectTitle,
+          ),
+          errorMessage: errorMessage,
+        );
+        if (contentFormat != _novelContentFormat) return page;
+
+        // MaterialPageRoute captures inherited themes at push time. Girls turns
+        // on its Novel chrome immediately before this push, so relying on a
+        // parent Theme rebuild can leave this first route with the old opaque
+        // surface color. Apply the Novel chrome inside the route itself so the
+        // project list and every nested Editor route capture the transparent
+        // treatment deterministically.
+        final ThemeData theme = Theme.of(routeContext);
+        return Theme(
+          data: theme.copyWith(
+            scaffoldBackgroundColor: Colors.transparent,
+            appBarTheme: theme.appBarTheme.copyWith(
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+            ),
+          ),
+          child: MediaQuery.removePadding(
+            context: routeContext,
+            removeTop: true,
+            child: page,
+          ),
+        );
+      },
     ),
   );
 }
