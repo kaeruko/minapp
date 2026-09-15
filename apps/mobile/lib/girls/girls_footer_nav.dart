@@ -10,11 +10,11 @@ const Color _footerSelectedText = Color(0xFF745B9E);
 /// Footer destinations are kept separate from page implementation so each Girls
 /// page can own its selected state without baking state into the SVG asset.
 enum GirlsFooterTab {
-  home('ホーム', 'assets/girls/cutouts/home_tab.png'),
-  groups('グループ', 'assets/girls/cutouts/groups_tab.png'),
-  shop('ショップ', 'assets/girls/cutouts/shop_tab.png'),
-  apps('アプリ', 'assets/girls/cutouts/apps_tab.png'),
-  more('その他', 'assets/girls/cutouts/more_tab.png');
+  home('ホーム', 'assets/girls/cutouts/home_tab.webp'),
+  groups('グループ', 'assets/girls/cutouts/groups_tab.webp'),
+  shop('ショップ', 'assets/girls/cutouts/shop_tab.webp'),
+  apps('アプリ', 'assets/girls/cutouts/apps_tab.webp'),
+  more('その他', 'assets/girls/cutouts/more_tab.webp');
 
   const GirlsFooterTab(this.label, this.assetName);
 
