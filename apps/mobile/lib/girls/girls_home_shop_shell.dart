@@ -355,18 +355,22 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
         ),
       ],
       body: GirlsScaffoldChromeScope(
-        child: Theme(
-          data: nestedTheme,
-          child: Navigator(
-            key: _navigatorKey,
-            observers: <NavigatorObserver>[_navigatorObserver],
-            initialRoute: '/girls/home',
-            onGenerateInitialRoutes: (
-              NavigatorState navigator,
-              String initialRoute,
-            ) => <Route<void>>[_rootRoute(GirlsFooterTab.home)],
-            onGenerateRoute: (RouteSettings settings) =>
-                _rootRoute(GirlsFooterTab.home),
+        child: MediaQuery.removePadding(
+          context: context,
+          removeTop: _novelFlowActive,
+          child: Theme(
+            data: nestedTheme,
+            child: Navigator(
+              key: _navigatorKey,
+              observers: <NavigatorObserver>[_navigatorObserver],
+              initialRoute: '/girls/home',
+              onGenerateInitialRoutes: (
+                NavigatorState navigator,
+                String initialRoute,
+              ) => <Route<void>>[_rootRoute(GirlsFooterTab.home)],
+              onGenerateRoute: (RouteSettings settings) =>
+                  _rootRoute(GirlsFooterTab.home),
+            ),
           ),
         ),
       ),
