@@ -382,10 +382,12 @@ jobs:
 
           echo "ipa_path=$ipa_path" >> "$GITHUB_OUTPUT"
 
-      - name: Install Girls App Store Connect API key
+      - name: Install and validate Girls App Store Connect API key
+        id: asc_key
         shell: bash
         env:
           APP_STORE_CONNECT_API_KEY_P8_BASE64: ${{ secrets.GIRLS_APP_STORE_CONNECT_API_KEY_P8_BASE64 }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.GIRLS_APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -euo pipefail
           key_dir="$HOME/.appstoreconnect/private_keys"
@@ -398,21 +400,51 @@ jobs:
           }
           chmod 600 "$key_path"
 
+          [[ "$(head -n 1 "$key_path")" == "-----BEGIN PRIVATE KEY-----" ]] || {
+            echo "Decoded Girls App Store Connect API key has an unexpected PEM header" >&2
+            exit 1
+          }
+          [[ "$(tail -n 1 "$key_path")" == "-----END PRIVATE KEY-----" ]] || {
+            echo "Decoded Girls App Store Connect API key has an unexpected PEM footer" >&2
+            exit 1
+          }
+          openssl pkey -in "$key_path" -noout >/dev/null || {
+            echo "Decoded Girls App Store Connect API key is not a valid private key" >&2
+            exit 1
+          }
+
+          xcrun altool \
+            --generate-jwt \
+            --api-key "$APP_STORE_CONNECT_API_KEY_ID" \
+            --api-issuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --p8-file-path "$key_path" \
+            >/dev/null
+
+          echo "key_path=$key_path" >> "$GITHUB_OUTPUT"
+
       - name: Upload Girls IPA to TestFlight
         shell: bash
         env:
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.GIRLS_APP_STORE_CONNECT_ISSUER_ID }}
           IPA_PATH: ${{ steps.build.outputs.ipa_path }}
+          API_KEY_PATH: ${{ steps.asc_key.outputs.key_path }}
         run: |
           set -euo pipefail
           [[ -f "$IPA_PATH" ]] || { echo "Girls IPA does not exist: $IPA_PATH" >&2; exit 1; }
+          [[ -f "$API_KEY_PATH" ]] || { echo "Girls App Store Connect API key does not exist: $API_KEY_PATH" >&2; exit 1; }
+
+          unzip -tq "$IPA_PATH" >/dev/null || {
+            echo "Girls IPA is not a valid ZIP archive" >&2
+            exit 1
+          }
 
           xcrun altool \
             --upload-app \
             --type ios \
             --file "$IPA_PATH" \
             --apiKey "$APP_STORE_CONNECT_API_KEY_ID" \
-            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --p8-file-path "$API_KEY_PATH"
 
       - name: Cleanup Girls signing material
         if: always()
