@@ -19,34 +19,35 @@ HostedGirlsApi _fakeApi() {
   return HostedGirlsApi(
     baseUri: Uri.parse('https://example.com'),
     client: MockClient((http.Request request) async {
-      final Map<String, Object?> payload;
-      switch (request.url.path) {
-        case '/hosted/groups':
-          payload = <String, Object?>{
-            'groups': <Object?>[
-              <String, Object?>{
-                'group_id': _currentGroup.groupId,
-                'name': _currentGroup.name,
-                'role': _currentGroup.role,
-                'status': _currentGroup.status,
-              },
-            ],
-          };
-        case '/hosted/groups/${_currentGroup.groupId}/members':
-          payload = <String, Object?>{
-            'members': <Object?>[
-              <String, Object?>{
-                'user_id': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-                'login_id': 'owner',
-                'role': 'owner',
-                'status': 'active',
-              },
-            ],
-          };
-        case '/hosted/groups/${_currentGroup.groupId}/apps':
-          payload = <String, Object?>{'apps': <Object?>[]};
-        default:
-          fail('Unexpected request: ${request.method} ${request.url}');
+      final String path = request.url.path;
+      late final Map<String, Object?> payload;
+      if (path == '/hosted/groups') {
+        payload = <String, Object?>{
+          'groups': <Object?>[
+            <String, Object?>{
+              'group_id': _currentGroup.groupId,
+              'name': _currentGroup.name,
+              'role': _currentGroup.role,
+              'status': _currentGroup.status,
+            },
+          ],
+        };
+      } else if (path ==
+          '/hosted/groups/${_currentGroup.groupId}/members') {
+        payload = <String, Object?>{
+          'members': <Object?>[
+            <String, Object?>{
+              'user_id': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              'login_id': 'owner',
+              'role': 'owner',
+              'status': 'active',
+            },
+          ],
+        };
+      } else if (path == '/hosted/groups/${_currentGroup.groupId}/apps') {
+        payload = <String, Object?>{'apps': <Object?>[]};
+      } else {
+        fail('Unexpected request: ${request.method} ${request.url}');
       }
       return http.Response(
         jsonEncode(payload),
