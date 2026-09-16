@@ -215,9 +215,22 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
             'Mascot prompt requires a current group for group navigation.',
           );
         }
-        return _openGroup(group);
+        return _showCurrentGroupId(group);
       case GirlsHomeMascotDestination.apps:
         return _openApps();
+    }
+  }
+
+  Future<void> _showCurrentGroupId(HostedGroup group) async {
+    try {
+      final HostedInvite invite = await widget.api.createInvite(
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
+      );
+      if (!mounted) return;
+      await _showGroupId(invite);
+    } catch (error) {
+      if (mounted) setState(() => _groupError = core.girlsMessageFor(error));
     }
   }
 
@@ -258,12 +271,14 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('🎀 グループIDができたよ'),
+        title: const Text('🎀 友達を招待しよう'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            const Text('友達はGirlsの「グループIDで参加」からこのIDを入力すると参加できます。'),
+            const Text(
+              'このグループIDを友達に送ってね。友達は「グループ」→「グループを探す」から入力できます。',
+            ),
             const SizedBox(height: 14),
             SelectableText(
               invite.code,
@@ -277,7 +292,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
             ),
             const SizedBox(height: 8),
             const Text(
-              '7日間有効です。新しいIDを発行すると前のIDは使えなくなります。',
+              'このグループIDは変わりません。いつでも同じIDを使えます。',
               style: TextStyle(fontSize: 12, color: Color(0xFF8C7893)),
             ),
             const SizedBox(height: 10),
@@ -286,7 +301,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
                 await Clipboard.setData(ClipboardData(text: invite.code));
               },
               icon: const Icon(Icons.copy_rounded),
-              label: const Text('IDをコピー'),
+              label: const Text('グループIDをコピー'),
             ),
           ],
         ),
@@ -345,7 +360,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       if (!mounted) return;
       setState(() {
         _groupError =
-            'グループ「${createdGroup.name}」は作成できたけれど、グループIDの発行に失敗しました。${core.girlsMessageFor(error)}';
+            'グループ「${createdGroup.name}」は作成できたけれど、グループIDの取得に失敗しました。${core.girlsMessageFor(error)}';
       });
     } finally {
       if (mounted) setState(() => _creatingGroup = false);
