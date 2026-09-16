@@ -25,6 +25,9 @@ locals {
         "README.md",
         "test_player_runtime_ready.js",
         "test_story_validator.js",
+        "assets/sample/bg_classroom.png",
+        "assets/sample/bg_rooftop.png",
+        "assets/sample/ren_normal.png",
       ]
     }
     novel-editor = {
@@ -63,6 +66,33 @@ resource "aws_s3_object" "hosted_builtin_source" {
 
   metadata = {
     sha256 = filesha256(data.archive_file.hosted_builtin_source[each.key].output_path)
+  }
+
+  depends_on = [
+    aws_s3_bucket_server_side_encryption_configuration.uploads,
+    aws_s3_bucket_public_access_block.uploads,
+    terraform_data.account_guard,
+  ]
+}
+
+# The editable Novel sample owns artwork separately from the Novel Player
+# template. Keeping it out of novel-starter/v4 avoids silently mutating an
+# already-versioned built-in source archive when sample art changes.
+data "archive_file" "hosted_novel_sample_assets" {
+  type        = "zip"
+  source_dir  = "${local.minapp_apps_source_root}/novel_starter/assets/sample"
+  output_path = "${path.module}/minapp-hosted-novel-sample-v1.zip"
+}
+
+resource "aws_s3_object" "hosted_novel_sample_assets" {
+  bucket       = aws_s3_bucket.uploads.id
+  key          = "hosted/samples/novel/v1/assets.zip"
+  source       = data.archive_file.hosted_novel_sample_assets.output_path
+  source_hash  = data.archive_file.hosted_novel_sample_assets.output_base64sha256
+  content_type = "application/zip"
+
+  metadata = {
+    sha256 = filesha256(data.archive_file.hosted_novel_sample_assets.output_path)
   }
 
   depends_on = [
