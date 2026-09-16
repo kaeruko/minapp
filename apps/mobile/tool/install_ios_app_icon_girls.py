@@ -10,12 +10,89 @@ import install_ios_app_icon as base
 import install_ios_app_icon_shared_files as shared
 
 
+LAUNCH_IMAGE_POINTS = 96
+
+
 def _girls_icon_source() -> Path:
     mobile_dir = Path(__file__).resolve().parent.parent
     source = mobile_dir.parent / "web" / "girls-assets" / "brand_icon.png"
     if not source.is_file():
         base.fail(f"Girls brand icon does not exist: {source}")
     return source
+
+
+def _install_girls_launch_image(iconset_dir: Path, source_path: Path) -> None:
+    assets_dir = iconset_dir.parent
+    launchset_dir = assets_dir / "LaunchImage.imageset"
+    launch_contents_path = launchset_dir / "Contents.json"
+    storyboard_path = assets_dir.parent / "Base.lproj" / "LaunchScreen.storyboard"
+
+    if not launchset_dir.is_dir():
+        base.fail(f"LaunchImage asset directory does not exist: {launchset_dir}")
+    if not launch_contents_path.is_file():
+        base.fail(f"LaunchImage Contents.json does not exist: {launch_contents_path}")
+    if not storyboard_path.is_file():
+        base.fail(f"LaunchScreen storyboard does not exist: {storyboard_path}")
+
+    storyboard = storyboard_path.read_text(encoding="utf-8")
+    if 'image="LaunchImage"' not in storyboard:
+        base.fail(
+            "Generated LaunchScreen storyboard does not reference LaunchImage: "
+            f"{storyboard_path}"
+        )
+
+    launch_contents = json.loads(launch_contents_path.read_text(encoding="utf-8"))
+    launch_images = launch_contents.get("images")
+    if not isinstance(launch_images, list) or not launch_images:
+        base.fail(
+            f"LaunchImage Contents.json has no non-empty images list: {launch_contents_path}"
+        )
+
+    expected_scales = {"1x": 1, "2x": 2, "3x": 3}
+    generated_scales: set[str] = set()
+
+    for index, item in enumerate(launch_images):
+        if not isinstance(item, dict):
+            base.fail(f"LaunchImage entry {index} is not an object: {item!r}")
+
+        filename = item.get("filename")
+        scale = item.get("scale")
+        if filename is None:
+            continue
+        if not isinstance(filename, str) or not filename:
+            base.fail(f"LaunchImage entry {index} has invalid filename: {item!r}")
+        if scale not in expected_scales:
+            base.fail(
+                f"LaunchImage entry {index} has unsupported scale {scale!r}: {item!r}"
+            )
+        if scale in generated_scales:
+            base.fail(f"LaunchImage Contents.json repeats scale {scale}: {launch_contents_path}")
+
+        pixel_size = LAUNCH_IMAGE_POINTS * expected_scales[scale]
+        target = launchset_dir / filename
+        subprocess.run(
+            [
+                "sips",
+                "-z",
+                str(pixel_size),
+                str(pixel_size),
+                str(source_path),
+                "--out",
+                str(target),
+            ],
+            check=True,
+        )
+        if not target.is_file():
+            base.fail(f"sips completed without creating Girls launch image: {target}")
+        base.validate_opaque_square(target, pixel_size)
+        generated_scales.add(scale)
+
+    missing_scales = set(expected_scales) - generated_scales
+    if missing_scales:
+        base.fail(
+            "LaunchImage Contents.json does not provide all expected scales; missing "
+            f"{sorted(missing_scales)}: {launch_contents_path}"
+        )
 
 
 def main() -> None:
@@ -95,13 +172,15 @@ def main() -> None:
             base.fail(f"sips completed without creating expected Girls icon: {target}")
         base.validate_opaque_square(target, pixel_size)
 
+    _install_girls_launch_image(iconset_dir, source_path)
     shared.configure_runner_info_plist(iconset_dir)
 
     shared_references = len(images) - len(target_sizes)
     print(
         "Installed MinApp Girls flower icon from "
         f"{source_path} into {len(target_sizes)} unique AppIcon files referenced by "
-        f"{len(images)} entries ({shared_references} shared filename references) "
+        f"{len(images)} entries ({shared_references} shared filename references), "
+        f"installed {LAUNCH_IMAGE_POINTS}pt flower LaunchImage assets, "
         "and configured microphone usage"
     )
 

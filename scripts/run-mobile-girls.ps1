@@ -12,6 +12,8 @@ $mobileDir = Join-Path $repoRoot "apps\mobile"
 $configureAndroidScript = Join-Path $PSScriptRoot "configure-mobile-android.ps1"
 $syncNovelEditorScript = Join-Path $PSScriptRoot "sync-novel-editor-dev.ps1"
 $girlsEntrypoint = Join-Path $mobileDir "lib\main_girls.dart"
+$gradleVariantEnvName = "ORG_GRADLE_PROJECT_minappVariant"
+$previousGradleVariant = [Environment]::GetEnvironmentVariable($gradleVariantEnvName, "Process")
 
 if (-not (Test-Path -LiteralPath $mobileDir -PathType Container)) {
     throw "Mobile app directory not found: $mobileDir"
@@ -46,6 +48,9 @@ try {
         throw "flutter pub get failed."
     }
 
+    [Environment]::SetEnvironmentVariable($gradleVariantEnvName, "girls", "Process")
+    Write-Host "Android native branding: Girls flower icon and launch theme"
+
     $flutterArgs = @(
         "run",
         "-t",
@@ -61,5 +66,10 @@ try {
     }
 }
 finally {
+    [Environment]::SetEnvironmentVariable(
+        $gradleVariantEnvName,
+        $previousGradleVariant,
+        "Process"
+    )
     Pop-Location
 }
