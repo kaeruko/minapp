@@ -7,6 +7,7 @@ locals {
     "GET /hosted/authoring/projects/{content_id}",
     "DELETE /hosted/authoring/projects/{content_id}",
     "POST /hosted/authoring/projects/{content_id}/document",
+    "POST /hosted/authoring/projects/{content_id}/samples/novel",
     "GET /hosted/authoring/projects/{content_id}/assets/{proxy+}",
     "POST /hosted/authoring/projects/{content_id}/assets/{proxy+}",
     "DELETE /hosted/authoring/projects/{content_id}/assets/{proxy+}",
