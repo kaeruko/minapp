@@ -29,7 +29,10 @@ val minappVariant = providers.gradleProperty("minappVariant").orNull
 if (minappVariant != null && minappVariant != "girls") {
     error("Unsupported minappVariant: $minappVariant")
 }
-val isGirlsVariant = minappVariant == "girls"
+val flutterTarget = providers.gradleProperty("target").orNull
+val girlsEntrypointRequested =
+    flutterTarget?.replace('\\', '/')?.endsWith("lib/main_girls.dart") == true
+val isGirlsVariant = minappVariant == "girls" || girlsEntrypointRequested
 
 android {
     namespace = "jp.cloxs.min"
