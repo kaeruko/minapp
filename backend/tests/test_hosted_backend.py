@@ -311,32 +311,30 @@ class HostedBackendTests(unittest.TestCase):
             [],
         )
 
-    def test_rotating_invite_invalidates_old_code(self) -> None:
+    def test_group_id_is_stable_across_reads(self) -> None:
         alice = self._register("alice")
         bob = self._register("bob")
         group = self.backend.create_group(alice, "秘密基地")
-        old_invite = self.backend.create_invite(alice, group["group_id"])
-        new_invite = self.backend.create_invite(alice, group["group_id"])
+        first = self.backend.create_invite(alice, group["group_id"])
+        second = self.backend.create_invite(alice, group["group_id"])
 
-        with self.assertRaises(ApiProblem) as caught:
-            self.backend.join_group(bob, old_invite["code"])
-        self.assertEqual(caught.exception.status_code, 404)
-        self.assertEqual(caught.exception.error, "invite_not_found")
-
-        joined = self.backend.join_group(bob, new_invite["code"])
+        self.assertEqual(first["code"], second["code"])
+        joined = self.backend.join_group(bob, first["code"])
         self.assertEqual(joined["group_id"], group["group_id"])
 
-    def test_revoked_invite_cannot_be_used(self) -> None:
+    def test_group_id_cannot_be_revoked(self) -> None:
         alice = self._register("alice")
         bob = self._register("bob")
         group = self.backend.create_group(alice, "創作部屋")
         invite = self.backend.create_invite(alice, group["group_id"])
-        self.backend.revoke_invite(alice, group["group_id"])
 
         with self.assertRaises(ApiProblem) as caught:
-            self.backend.join_group(bob, invite["code"])
-        self.assertEqual(caught.exception.status_code, 404)
-        self.assertEqual(caught.exception.error, "invite_not_found")
+            self.backend.revoke_invite(alice, group["group_id"])
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(caught.exception.error, "group_id_is_permanent")
+
+        joined = self.backend.join_group(bob, invite["code"])
+        self.assertEqual(joined["group_id"], group["group_id"])
 
     def test_owner_cannot_leave_group(self) -> None:
         alice = self._register("alice")
