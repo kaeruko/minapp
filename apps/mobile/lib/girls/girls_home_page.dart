@@ -9,6 +9,7 @@ import 'girls_apps_page.dart';
 import 'girls_email_settings_page.dart';
 import 'girls_footer_nav.dart';
 import 'girls_groups_page.dart';
+import 'girls_home_mascot_prompt.dart';
 import 'girls_scaffold.dart';
 import 'hosted_girls_api.dart';
 
@@ -24,6 +25,8 @@ const String _minappchiCardAsset = 'assets/girls/home/cards/minappchi_card.png';
 const String _novelCardAsset = 'assets/girls/home/cards/novel_card.png';
 const String _groupCreateCardAsset =
     'assets/girls/home/cards/group_create_card.png';
+const GirlsHomeMascotPromptResolver _mascotPromptResolver =
+    GirlsHomeMascotPromptResolver();
 
 enum _AccountAction { email, refresh, logout }
 
@@ -50,6 +53,7 @@ class GirlsHomePage extends StatefulWidget {
 class _GirlsHomePageState extends State<GirlsHomePage> {
   List<HostedGroup>? _groups;
   HostedGroup? _currentGroup;
+  GirlsHomeMascotPrompt? _mascotPrompt;
   bool _loadingGroups = false;
   bool _creatingGroup = false;
   String? _groupError;
@@ -85,12 +89,12 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     setState(() {
       _loadingGroups = true;
       _groupError = null;
+      _mascotPrompt = null;
     });
     try {
       final List<HostedGroup> groups = await widget.api.listGroups(
         widget.session.accessToken,
       );
-      if (!mounted) return;
       final String? currentId = _currentGroup?.groupId;
       HostedGroup? currentGroup;
       if (currentId != null) {
@@ -101,9 +105,31 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
           }
         }
       }
+
+      GirlsHomeMascotPrompt? mascotPrompt;
+      if (currentGroup != null) {
+        final List<HostedMember> members = await widget.api.listMembers(
+          accessToken: widget.session.accessToken,
+          groupId: currentGroup.groupId,
+        );
+        final List<HostedGroupApp> apps = await widget.api.listGroupApps(
+          accessToken: widget.session.accessToken,
+          groupId: currentGroup.groupId,
+        );
+        final int customAppCount = apps
+            .where((HostedGroupApp app) => app.builtinId == null)
+            .length;
+        mascotPrompt = _mascotPromptResolver.resolve(
+          memberCount: members.length,
+          customAppCount: customAppCount,
+        );
+      }
+
+      if (!mounted) return;
       setState(() {
         _groups = groups;
         _currentGroup = currentGroup;
+        _mascotPrompt = mascotPrompt;
       });
       if (currentId != null && currentGroup == null) {
         widget.onCurrentGroupChanged?.call(null);
@@ -178,6 +204,21 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       ),
     );
     if (mounted) await _loadGroups();
+  }
+
+  Future<void> _openMascotPrompt(GirlsHomeMascotPrompt prompt) {
+    switch (prompt.destination) {
+      case GirlsHomeMascotDestination.currentGroup:
+        final HostedGroup? group = _currentGroup;
+        if (group == null) {
+          throw StateError(
+            'Mascot prompt requires a current group for group navigation.',
+          );
+        }
+        return _openGroup(group);
+      case GirlsHomeMascotDestination.apps:
+        return _openApps();
+    }
   }
 
   Future<String?> _askForGroupName() {
@@ -383,6 +424,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   @override
   Widget build(BuildContext context) {
     final List<HostedGroup>? groups = _groups;
+    final GirlsHomeMascotPrompt? mascotPrompt = _mascotPrompt;
     return GirlsScaffold(
       leading: _BellButton(onTap: _showNotices),
       actions: <Widget>[
@@ -408,6 +450,13 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
+                  if (mascotPrompt != null) ...<Widget>[
+                    _MascotPromptCard(
+                      prompt: mascotPrompt,
+                      onTap: () => _openMascotPrompt(mascotPrompt),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   const _SectionHeading(title: 'ビルトインアプリ'),
                   const SizedBox(height: 8),
                   GridView.count(
@@ -538,6 +587,112 @@ class _RoundArtButton extends StatelessWidget {
               height: 30,
               fit: BoxFit.contain,
               excludeFromSemantics: true,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MascotPromptCard extends StatelessWidget {
+  const _MascotPromptCard({required this.prompt, required this.onTap});
+
+  final GirlsHomeMascotPrompt prompt;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: prompt.message,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const Key('girls-home-mascot-prompt'),
+          borderRadius: BorderRadius.circular(24),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                Image.asset(
+                  _mascotAsset,
+                  key: const Key('girls-home-mascot-image'),
+                  width: 62,
+                  height: 66,
+                  fit: BoxFit.contain,
+                  excludeFromSemantics: true,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.centerLeft,
+                    children: <Widget>[
+                      Positioned(
+                        left: -5,
+                        child: Transform.rotate(
+                          angle: .785398,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFFBF7),
+                              border: Border.all(
+                                color: const Color(0xFFE7B5C8),
+                                width: 1.2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 13,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBF7),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: const Color(0xFFE7B5C8),
+                            width: 1.2,
+                          ),
+                          boxShadow: const <BoxShadow>[
+                            BoxShadow(
+                              color: Color(0x18A36B8A),
+                              blurRadius: 8,
+                              offset: Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                prompt.message,
+                                style: const TextStyle(
+                                  color: _ink,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              color: _lavender,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),

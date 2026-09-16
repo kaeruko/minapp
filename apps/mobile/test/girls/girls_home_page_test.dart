@@ -19,8 +19,10 @@ HostedGirlsApi _fakeApi() {
   return HostedGirlsApi(
     baseUri: Uri.parse('https://example.com'),
     client: MockClient((http.Request request) async {
-      return http.Response(
-        jsonEncode(<String, Object?>{
+      final String path = request.url.path;
+      late final Map<String, Object?> payload;
+      if (path == '/hosted/groups') {
+        payload = <String, Object?>{
           'groups': <Object?>[
             <String, Object?>{
               'group_id': _currentGroup.groupId,
@@ -29,7 +31,26 @@ HostedGirlsApi _fakeApi() {
               'status': _currentGroup.status,
             },
           ],
-        }),
+        };
+      } else if (path ==
+          '/hosted/groups/${_currentGroup.groupId}/members') {
+        payload = <String, Object?>{
+          'members': <Object?>[
+            <String, Object?>{
+              'user_id': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              'login_id': 'owner',
+              'role': 'owner',
+              'status': 'active',
+            },
+          ],
+        };
+      } else if (path == '/hosted/groups/${_currentGroup.groupId}/apps') {
+        payload = <String, Object?>{'apps': <Object?>[]};
+      } else {
+        fail('Unexpected request: ${request.method} ${request.url}');
+      }
+      return http.Response(
+        jsonEncode(payload),
         200,
         headers: const <String, String>{
           'content-type': 'application/json; charset=utf-8',
@@ -63,6 +84,9 @@ void main() {
 
     expect(find.byKey(const Key('girls-header-leading-tray')), findsOneWidget);
     expect(find.byKey(const Key('girls-header-actions-tray')), findsOneWidget);
+    expect(find.byKey(const Key('girls-home-mascot-prompt')), findsOneWidget);
+    expect(find.byKey(const Key('girls-home-mascot-image')), findsOneWidget);
+    expect(find.text('友達を招待する？'), findsOneWidget);
     expect(find.text('ビルトインアプリ'), findsOneWidget);
     expect(find.text('友達の最新情報'), findsOneWidget);
     expect(find.byKey(const Key('girls-home-memo-app')), findsOneWidget);
