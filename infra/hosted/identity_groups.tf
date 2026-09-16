@@ -124,6 +124,12 @@ resource "aws_iam_role_policy" "hosted_identity_api_application" {
         Resource = [for source in aws_s3_object.hosted_builtin_source : "${aws_s3_bucket.uploads.arn}/${source.key}"]
       },
       {
+        Sid      = "HostedNovelSampleAssets"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
+        Resource = "${aws_s3_bucket.uploads.arn}/${aws_s3_object.hosted_novel_sample_assets.key}"
+      },
+      {
         Sid    = "HostedDraftSourceObjects"
         Effect = "Allow"
         Action = [
