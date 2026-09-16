@@ -20,6 +20,7 @@ from errors import ApiProblem
 MAX_GROUPS_PER_USER = 20
 MAX_MEMBERS_PER_GROUP = 20
 INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
+PERMANENT_GROUP_ID_EXPIRES_AT_EPOCH = 253402300799
 _INVITE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 _INVITE_CODE_RE = re.compile(r"^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{12}$")
 
@@ -73,12 +74,23 @@ def _normalize_invite_code(code: str) -> str:
         raise TypeError("invite code must be a string")
     compact = code.strip().upper().replace("-", "")
     if _INVITE_CODE_RE.fullmatch(compact) is None:
-        raise ApiProblem(400, "invalid_invite_code", "招待コードの形式が正しくありません。")
+        raise ApiProblem(400, "invalid_invite_code", "グループIDの形式が正しくありません。")
     return compact
 
 
 def _invite_hash(code: str) -> str:
     return hashlib.sha256(_normalize_invite_code(code).encode("ascii")).hexdigest()
+
+
+def _permanent_group_id_payload(group_id: str, code: str) -> dict[str, Any]:
+    # Keep the legacy response fields until the mobile API protocol is revised.
+    # Authorization never checks this sentinel expiry; the group ID is permanent.
+    return {
+        "group_id": group_id,
+        "code": code,
+        "expires_at": _iso_from_epoch(PERMANENT_GROUP_ID_EXPIRES_AT_EPOCH),
+        "valid_for_seconds": max(1, PERMANENT_GROUP_ID_EXPIRES_AT_EPOCH - _now_epoch()),
+    }
 
 
 class HostedAwsBackend(AwsBackend):
@@ -170,6 +182,8 @@ class HostedAwsBackend(AwsBackend):
             )
 
         group_id = uuid.uuid4().hex
+        group_code = _new_invite_code()
+        code_hash = _invite_hash(group_code)
         group_item = {
             "pk": _string_attr(f"GROUP#{group_id}"),
             "sk": _string_attr("META"),
@@ -178,6 +192,21 @@ class HostedAwsBackend(AwsBackend):
             "name": _string_attr(name),
             "created_by": _string_attr(owner.user_id),
             "visibility": _string_attr("private"),
+            "group_code": _string_attr(group_code),
+            "invite_hash": _string_attr(code_hash),
+            "invite_status": _string_attr("active"),
+            "invite_expires_at_epoch": _number_attr(PERMANENT_GROUP_ID_EXPIRES_AT_EPOCH),
+        }
+        invite_item = {
+            "pk": _string_attr(f"INVITE#{code_hash}"),
+            "sk": _string_attr("META"),
+            "entity": _string_attr("group_invite"),
+            "code_hash": _string_attr(code_hash),
+            "group_id": _string_attr(group_id),
+            "group_name": _string_attr(name),
+            "created_by": _string_attr(owner.user_id),
+            "status": _string_attr("active"),
+            "expires_at_epoch": _number_attr(PERMANENT_GROUP_ID_EXPIRES_AT_EPOCH),
         }
         group_member_item = self._membership_item(
             pk=f"GROUP#{group_id}",
@@ -195,7 +224,9 @@ class HostedAwsBackend(AwsBackend):
             group_name=name,
             role="owner",
         )
-        self._transact_put_new([group_item, group_member_item, user_membership_item])
+        self._transact_put_new(
+            [group_item, invite_item, group_member_item, user_membership_item]
+        )
 
         return {
             "group_id": group_id,
@@ -226,12 +257,14 @@ class HostedAwsBackend(AwsBackend):
     def create_invite(self, auth_subject: str, group_id: str) -> dict[str, Any]:
         owner = self._user_by_auth_subject(auth_subject)
         group_item = self._require_owner_group(owner.user_id, group_id)
-        group_name = _item_string(group_item, "name")
+        existing_code = _optional_item_string(group_item, "group_code")
+        if existing_code is not None:
+            return _permanent_group_id_payload(group_id, existing_code)
 
+        # Existing groups created before permanent IDs are migrated exactly once.
+        group_name = _item_string(group_item, "name")
         code = _new_invite_code()
         code_hash = _invite_hash(code)
-        expires_at_epoch = _now_epoch() + INVITE_TTL_SECONDS
-
         invite_item = {
             "pk": _string_attr(f"INVITE#{code_hash}"),
             "sk": _string_attr("META"),
@@ -241,60 +274,56 @@ class HostedAwsBackend(AwsBackend):
             "group_name": _string_attr(group_name),
             "created_by": _string_attr(owner.user_id),
             "status": _string_attr("active"),
-            "expires_at_epoch": _number_attr(expires_at_epoch),
+            "expires_at_epoch": _number_attr(PERMANENT_GROUP_ID_EXPIRES_AT_EPOCH),
         }
 
         replacement_group = dict(group_item)
+        replacement_group["group_code"] = _string_attr(code)
         replacement_group["invite_hash"] = _string_attr(code_hash)
         replacement_group["invite_status"] = _string_attr("active")
-        replacement_group["invite_expires_at_epoch"] = _number_attr(expires_at_epoch)
-
-        self._dynamodb.transact_write_items(
-            TransactItems=[
-                {
-                    "Put": {
-                        "TableName": self._table_name,
-                        "Item": invite_item,
-                        "ConditionExpression": "attribute_not_exists(pk)",
-                    }
-                },
-                {
-                    "Put": {
-                        "TableName": self._table_name,
-                        "Item": replacement_group,
-                        "ConditionExpression": "attribute_exists(pk)",
-                    }
-                },
-            ]
+        replacement_group["invite_expires_at_epoch"] = _number_attr(
+            PERMANENT_GROUP_ID_EXPIRES_AT_EPOCH
         )
 
-        return {
-            "group_id": group_id,
-            "code": code,
-            "expires_at": _iso_from_epoch(expires_at_epoch),
-            "valid_for_seconds": INVITE_TTL_SECONDS,
-        }
+        operations: list[dict[str, Any]] = [
+            {
+                "Put": {
+                    "TableName": self._table_name,
+                    "Item": invite_item,
+                    "ConditionExpression": "attribute_not_exists(pk)",
+                }
+            },
+            {
+                "Put": {
+                    "TableName": self._table_name,
+                    "Item": replacement_group,
+                    "ConditionExpression": "attribute_exists(pk)",
+                }
+            },
+        ]
+        previous_hash = _optional_item_string(group_item, "invite_hash")
+        if previous_hash is not None and previous_hash != code_hash:
+            operations.append(
+                {
+                    "Delete": {
+                        "TableName": self._table_name,
+                        "Key": {
+                            "pk": _string_attr(f"INVITE#{previous_hash}"),
+                            "sk": _string_attr("META"),
+                        },
+                    }
+                }
+            )
+        self._dynamodb.transact_write_items(TransactItems=operations)
+        return _permanent_group_id_payload(group_id, code)
 
     def revoke_invite(self, auth_subject: str, group_id: str) -> None:
         owner = self._user_by_auth_subject(auth_subject)
-        group_item = self._require_owner_group(owner.user_id, group_id)
-        if _optional_item_string(group_item, "invite_hash") is None or _optional_item_string(
-            group_item, "invite_status"
-        ) != "active":
-            raise ApiProblem(404, "active_invite_not_found", "有効な招待コードはありません。")
-
-        replacement_group = dict(group_item)
-        replacement_group["invite_status"] = _string_attr("revoked")
-        self._dynamodb.transact_write_items(
-            TransactItems=[
-                {
-                    "Put": {
-                        "TableName": self._table_name,
-                        "Item": replacement_group,
-                        "ConditionExpression": "attribute_exists(pk)",
-                    }
-                }
-            ]
+        self._require_owner_group(owner.user_id, group_id)
+        raise ApiProblem(
+            409,
+            "group_id_is_permanent",
+            "グループIDは固定のため、無効化や再発行はできません。",
         )
 
     def join_group(self, auth_subject: str, invite_code: str) -> dict[str, Any]:
@@ -305,23 +334,19 @@ class HostedAwsBackend(AwsBackend):
         code_hash = hashlib.sha256(normalized.encode("ascii")).hexdigest()
         invite_item = self._get_item(pk=f"INVITE#{code_hash}", sk="META")
         if invite_item is None:
-            raise ApiProblem(404, "invite_not_found", "招待コードが見つからないか、無効です。")
-
-        expires_at_epoch = _item_number(invite_item, "expires_at_epoch")
-        if expires_at_epoch <= _now_epoch():
-            raise ApiProblem(410, "invite_expired", "この招待コードの有効期限は切れています。")
+            raise ApiProblem(404, "invite_not_found", "グループIDが見つかりません。")
 
         group_id = _item_string(invite_item, "group_id")
         group_item = self._get_item(pk=f"GROUP#{group_id}", sk="META")
         if group_item is None:
-            raise RuntimeError(f"Invite points to missing group {group_id}")
+            raise RuntimeError(f"Group ID points to missing group {group_id}")
+        group_code = _optional_item_string(group_item, "group_code")
         if (
-            _optional_item_string(group_item, "invite_hash") != code_hash
-            or _optional_item_string(group_item, "invite_status") != "active"
+            group_code is None
+            or _normalize_invite_code(group_code) != normalized
+            or _optional_item_string(group_item, "invite_hash") != code_hash
         ):
-            raise ApiProblem(404, "invite_not_found", "招待コードが見つからないか、無効です。")
-        if _item_number(group_item, "invite_expires_at_epoch") <= _now_epoch():
-            raise ApiProblem(410, "invite_expired", "この招待コードの有効期限は切れています。")
+            raise ApiProblem(404, "invite_not_found", "グループIDが見つかりません。")
 
         if self._get_item(pk=f"USER#{user.user_id}", sk=f"GROUP#{group_id}") is not None:
             raise ApiProblem(409, "already_member", "すでにこのグループに参加しています。")
