@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'api.dart';
-import 'girls_app_core.dart' as core;
+import 'girls_app_core_legacy.dart' as core;
 import 'girls_group_app_management_page.dart';
 import 'girls_scaffold.dart';
 import 'hosted_app_webview.dart';
