@@ -87,14 +87,23 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
       List<HostedMember>? members;
       List<HostedGroupApp>? latestApps;
       if (current != null) {
-        members = await widget.api.listMembers(
+        final Future<List<HostedMember>> membersFuture = widget.api.listMembers(
           accessToken: widget.session.accessToken,
           groupId: current.groupId,
         );
-        final List<HostedGroupApp> apps = await widget.api.listGroupApps(
+        final Future<List<HostedGroupApp>> appsFuture = widget.api.listGroupApps(
           accessToken: widget.session.accessToken,
           groupId: current.groupId,
         );
+        final List<Object> details = await Future.wait<Object>(
+          <Future<Object>>[
+            membersFuture,
+            appsFuture,
+          ],
+          eagerError: true,
+        );
+        members = details[0] as List<HostedMember>;
+        final List<HostedGroupApp> apps = details[1] as List<HostedGroupApp>;
         latestApps = apps
             .where(_isVisibleGroupApp)
             .toList(growable: false)
