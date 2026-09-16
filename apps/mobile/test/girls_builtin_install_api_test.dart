@@ -61,6 +61,10 @@ Map<String, Object?> _sampleProject() {
   };
 }
 
+bool _isHydrateRequest(http.Request request) =>
+    request.method == 'POST' &&
+    request.url.path == '/hosted/authoring/projects/$_contentId/samples/novel';
+
 void main() {
   test('Novel Editor setup installs missing Player first, then Editor and sample', () async {
     final List<http.Request> captured = <http.Request>[];
@@ -93,6 +97,10 @@ void main() {
         expect(document['title'], _novelSampleTitle);
         return _json(201, _projectSummary());
       }
+      if (_isHydrateRequest(request)) {
+        expect(request.body, isEmpty);
+        return _json(200, _projectSummary());
+      }
       fail('Unexpected request: ${request.method} ${request.url}');
     });
     final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
@@ -105,7 +113,7 @@ void main() {
       groupId: _groupId,
     );
 
-    expect(captured, hasLength(5));
+    expect(captured, hasLength(6));
     expect(captured[0].method, 'GET');
     expect(captured[0].url.path, '/hosted/groups/$_groupId/apps');
     expect(captured[0].headers['authorization'], 'Bearer owner-token');
@@ -117,6 +125,7 @@ void main() {
     });
     expect(captured[3].url.path, '/hosted/authoring/groups/$_groupId/projects');
     expect(captured[4].url.path, '/hosted/authoring/projects');
+    expect(captured[5].url.path, '/hosted/authoring/projects/$_contentId/samples/novel');
     expect(app.appId, _appId);
     expect(app.groupId, _groupId);
     expect(app.sourceKind, 'builtin');
@@ -147,6 +156,9 @@ void main() {
           request.url.path == '/hosted/authoring/projects') {
         return _json(201, _projectSummary());
       }
+      if (_isHydrateRequest(request)) {
+        return _json(200, _projectSummary());
+      }
       fail('Unexpected request: ${request.method} ${request.url}');
     });
     final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
@@ -159,7 +171,7 @@ void main() {
       groupId: _groupId,
     );
 
-    expect(captured, hasLength(4));
+    expect(captured, hasLength(5));
     expect(captured[0].method, 'GET');
     expect(captured[1].url.path, '/hosted/groups/$_groupId/apps/install');
     expect(jsonDecode(captured[1].body), const <String, Object?>{
@@ -167,6 +179,7 @@ void main() {
     });
     expect(captured[2].url.path, '/hosted/authoring/groups/$_groupId/projects');
     expect(captured[3].url.path, '/hosted/authoring/projects');
+    expect(captured[4].url.path, '/hosted/authoring/projects/$_contentId/samples/novel');
     expect(app.builtinId, novelEditorBuiltinId);
   });
 
@@ -202,6 +215,9 @@ void main() {
           request.url.path == '/hosted/authoring/projects/$_contentId') {
         return _json(200, _sampleProject());
       }
+      if (_isHydrateRequest(request)) {
+        return _json(200, _projectSummary());
+      }
       fail('Unexpected request: ${request.method} ${request.url}');
     });
     final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
@@ -214,8 +230,9 @@ void main() {
       groupId: _groupId,
     );
 
-    expect(captured, hasLength(4));
-    expect(captured.every((http.Request request) => request.method == 'GET'), isTrue);
+    expect(captured, hasLength(5));
+    expect(captured.take(4).every((http.Request request) => request.method == 'GET'), isTrue);
+    expect(captured.last.url.path, '/hosted/authoring/projects/$_contentId/samples/novel');
     expect(app.builtinId, novelEditorBuiltinId);
   });
 
