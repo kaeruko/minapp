@@ -5,6 +5,10 @@ import zipfile
 from typing import Any
 
 from errors import ApiProblem
+from hosted_authoring_backend import (
+    MAX_AUTHORING_ASSET_BYTES,
+    MAX_AUTHORING_ASSET_TOTAL_BYTES,
+)
 
 NOVEL_CONTENT_FORMAT = "minapp/novel@1"
 NOVEL_SAMPLE_TITLE = "ひみつの放課後"
@@ -16,6 +20,7 @@ _SAMPLE_ASSET_MEMBERS = {
     "assets/sample/ren_normal.png": "ren_normal.png",
 }
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+_SAMPLE_ARCHIVE_MAX_BYTES = MAX_AUTHORING_ASSET_TOTAL_BYTES + 64 * 1024
 
 
 def legacy_novel_sample_document() -> dict[str, Any]:
@@ -366,16 +371,48 @@ def hydrate_novel_sample_project(
 
 
 def _sample_asset_bytes(backend: Any) -> dict[str, bytes]:
-    archive_bytes, files, _ = backend._read_zip_object(
-        bucket=backend._upload_bucket,
-        key=NOVEL_SAMPLE_SOURCE_KEY,
+    response = backend._s3.get_object(
+        Bucket=backend._upload_bucket,
+        Key=NOVEL_SAMPLE_SOURCE_KEY,
     )
-    expected_members = set(_SAMPLE_ASSET_MEMBERS.values())
-    if set(files) != expected_members:
-        raise RuntimeError("Novel sample asset archive has an unexpected file manifest")
+    body = response.get("Body")
+    if body is None or not hasattr(body, "read"):
+        raise RuntimeError("Novel sample asset archive has no readable S3 body")
+    archive_bytes = body.read(_SAMPLE_ARCHIVE_MAX_BYTES + 1)
+    if not isinstance(archive_bytes, bytes):
+        raise RuntimeError("Novel sample asset archive body did not return bytes")
+    if len(archive_bytes) > _SAMPLE_ARCHIVE_MAX_BYTES:
+        raise RuntimeError("Novel sample asset archive exceeds Authoring storage limits")
 
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(archive_bytes), "r")
+    except zipfile.BadZipFile as exc:
+        raise RuntimeError("Novel sample asset archive is not a valid ZIP") from exc
+
+    expected_members = set(_SAMPLE_ASSET_MEMBERS.values())
     result: dict[str, bytes] = {}
-    with zipfile.ZipFile(io.BytesIO(archive_bytes), "r") as archive:
+    with archive:
+        infos = archive.infolist()
+        names = [info.filename for info in infos]
+        if len(names) != len(expected_members) or set(names) != expected_members:
+            raise RuntimeError("Novel sample asset archive has an unexpected file manifest")
+
+        total_uncompressed = 0
+        for info in infos:
+            if info.is_dir():
+                raise RuntimeError("Novel sample asset archive contains a directory entry")
+            if info.flag_bits & 0x1:
+                raise RuntimeError("Novel sample asset archive must not be encrypted")
+            if info.file_size > MAX_AUTHORING_ASSET_BYTES:
+                raise RuntimeError(f"Novel sample asset exceeds the per-asset limit: {info.filename}")
+            total_uncompressed += info.file_size
+        if total_uncompressed > MAX_AUTHORING_ASSET_TOTAL_BYTES:
+            raise RuntimeError("Novel sample assets exceed the Authoring project storage limit")
+
+        bad_member = archive.testzip()
+        if bad_member is not None:
+            raise RuntimeError(f"Novel sample asset archive has a corrupt member: {bad_member}")
+
         for project_path, member in _SAMPLE_ASSET_MEMBERS.items():
             data = archive.read(member)
             if not data.startswith(_PNG_SIGNATURE):
