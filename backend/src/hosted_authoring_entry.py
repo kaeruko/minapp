@@ -24,6 +24,7 @@ from hosted_authoring_backend import (
     _AUTHORING_ASSET_TYPES,
     validate_authoring_asset_path,
 )
+from hosted_novel_sample import hydrate_novel_sample_project
 
 _CONTENT_ID_RE = r"([0-9a-f]{32})"
 _GROUP_ID_RE = r"([0-9a-f]{32})"
@@ -36,6 +37,9 @@ _GROUP_APP_CONTRACT_RE = re.compile(
 _GROUP_PROJECTS_RE = re.compile(rf"^/hosted/authoring/groups/{_GROUP_ID_RE}/projects$")
 _PROJECT_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}$")
 _DOCUMENT_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/document$")
+_NOVEL_SAMPLE_RE = re.compile(
+    rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/samples/novel$"
+)
 _ASSET_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/assets/(.+)$")
 _MAX_AUTHORING_JSON_BODY_BYTES = MAX_AUTHORING_DOCUMENT_BYTES + 64 * 1024
 _BACKEND: "AuthoringBackend | None" = None
@@ -372,6 +376,21 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
                 document_match.group(1),
                 expected_revision=_expected_revision_field(payload),
                 document=document,
+            ),
+        )
+
+    novel_sample_match = _NOVEL_SAMPLE_RE.fullmatch(path)
+    if novel_sample_match is not None:
+        if method != "POST":
+            return None
+        _require_no_body(event)
+        _require_no_query(event)
+        return _json_response(
+            200,
+            hydrate_novel_sample_project(
+                _get_backend(),
+                _auth_subject(event),
+                novel_sample_match.group(1),
             ),
         )
 
