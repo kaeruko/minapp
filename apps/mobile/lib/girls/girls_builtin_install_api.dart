@@ -148,15 +148,65 @@ class GirlsBuiltinInstallApi {
           'Novel sample lookup changed the requested project scope.',
         );
       }
-      if (project.document['title'] == _novelSampleTitle) return;
+      if (project.document['title'] == _novelSampleTitle) {
+        await _hydrateNovelSampleProject(
+          accessToken: accessToken,
+          groupId: groupId,
+          contentId: project.summary.contentId,
+        );
+        return;
+      }
     }
 
-    await projectsApi.createProject(
+    final HostedAuthoringProjectSummary created = await projectsApi.createProject(
       accessToken: accessToken,
       groupId: groupId,
       contentFormat: _novelContentFormat,
       document: _novelSampleDocument(),
     );
+    await _hydrateNovelSampleProject(
+      accessToken: accessToken,
+      groupId: groupId,
+      contentId: created.contentId,
+    );
+  }
+
+  Future<void> _hydrateNovelSampleProject({
+    required String accessToken,
+    required String groupId,
+    required String contentId,
+  }) async {
+    _validateRequestScope(accessToken: accessToken, groupId: groupId);
+    if (!_hostedIdPattern.hasMatch(contentId)) {
+      throw ArgumentError.value(
+        contentId,
+        'contentId',
+        'must be a 32-character lowercase hexadecimal ID',
+      );
+    }
+    final Uri uri = _baseUri.resolve(
+      '/hosted/authoring/projects/$contentId/samples/novel',
+    );
+    final http.Response response = await _client.post(
+      uri,
+      headers: <String, String>{
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+    );
+    final Map<String, Object?> payload = _decodeJsonObject(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw _apiException(response.statusCode, payload);
+    }
+    final HostedAuthoringProjectSummary hydrated =
+        HostedAuthoringProjectSummary.fromJson(payload);
+    if (hydrated.contentId != contentId ||
+        hydrated.groupId != groupId ||
+        hydrated.contentFormat != _novelContentFormat) {
+      throw const FormatException(
+        'Novel sample hydration changed the requested project scope.',
+      );
+    }
   }
 
   Map<String, Object?> _novelSampleDocument() {
