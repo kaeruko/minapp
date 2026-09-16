@@ -25,6 +25,12 @@ fun requiredKeystoreProperty(name: String): String =
     keystoreProperties.getProperty(name)?.takeIf { it.isNotBlank() }
         ?: error("Missing key.properties value: $name")
 
+val minappVariant = providers.gradleProperty("minappVariant").orNull
+if (minappVariant != null && minappVariant != "girls") {
+    error("Unsupported minappVariant: $minappVariant")
+}
+val isGirlsVariant = minappVariant == "girls"
+
 android {
     namespace = "jp.cloxs.min"
     compileSdk = flutter.compileSdkVersion
@@ -41,6 +47,12 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        manifestPlaceholders["appIcon"] =
+            if (isGirlsVariant) "@drawable/girls_brand_icon" else "@mipmap/ic_launcher"
+        manifestPlaceholders["launchTheme"] =
+            if (isGirlsVariant) "@style/GirlsLaunchTheme" else "@style/LaunchTheme"
+        manifestPlaceholders["appLabel"] = if (isGirlsVariant) "みんアプGirls" else "min"
     }
 
     signingConfigs {
