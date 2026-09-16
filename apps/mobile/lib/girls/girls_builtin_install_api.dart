@@ -2,11 +2,14 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../hosted_authoring_projects_api.dart';
 import 'api.dart';
 import 'hosted_girls_api.dart';
 
 const String novelEditorBuiltinId = 'novel-editor';
 const String novelPlayerBuiltinId = 'novel-starter';
+const String _novelContentFormat = 'minapp/novel@1';
+const String _novelSampleTitle = 'ひみつの放課後';
 
 final RegExp _hostedIdPattern = RegExp(r'^[0-9a-f]{32}$');
 
@@ -28,12 +31,17 @@ class GirlsBuiltinInstallApi {
       accessToken: accessToken,
       groupId: groupId,
     );
-    return _installBuiltin(
+    final HostedGroupApp editor = await _installBuiltin(
       accessToken: accessToken,
       groupId: groupId,
       builtinId: novelEditorBuiltinId,
       label: 'Novel Editor',
     );
+    await _ensureNovelSampleProject(
+      accessToken: accessToken,
+      groupId: groupId,
+    );
+    return editor;
   }
 
   Future<HostedGroupApp> ensureNovelEditor({
@@ -60,13 +68,19 @@ class GirlsBuiltinInstallApi {
         'Group app list contains duplicate Novel Editor installations.',
       );
     }
-    if (editors.length == 1) return editors.single;
-    return _installBuiltin(
+    final HostedGroupApp editor = editors.length == 1
+        ? editors.single
+        : await _installBuiltin(
+            accessToken: accessToken,
+            groupId: groupId,
+            builtinId: novelEditorBuiltinId,
+            label: 'Novel Editor',
+          );
+    await _ensureNovelSampleProject(
       accessToken: accessToken,
       groupId: groupId,
-      builtinId: novelEditorBuiltinId,
-      label: 'Novel Editor',
     );
+    return editor;
   }
 
   Future<HostedGroupApp> ensureNovelPlayer({
@@ -106,6 +120,154 @@ class GirlsBuiltinInstallApi {
       builtinId: novelPlayerBuiltinId,
       label: 'Novel Player',
     );
+  }
+
+  Future<void> _ensureNovelSampleProject({
+    required String accessToken,
+    required String groupId,
+  }) async {
+    final HostedAuthoringProjectsApi projectsApi = HostedAuthoringProjectsApi(
+      baseUri: _baseUri,
+      client: _client,
+    );
+    final List<HostedAuthoringProjectSummary> projects =
+        await projectsApi.listProjects(
+      accessToken: accessToken,
+      groupId: groupId,
+      contentFormat: _novelContentFormat,
+    );
+
+    for (final HostedAuthoringProjectSummary summary in projects) {
+      final HostedAuthoringProject project = await projectsApi.loadProject(
+        accessToken: accessToken,
+        contentId: summary.contentId,
+      );
+      if (project.summary.groupId != groupId ||
+          project.summary.contentFormat != _novelContentFormat) {
+        throw const FormatException(
+          'Novel sample lookup changed the requested project scope.',
+        );
+      }
+      if (project.document['title'] == _novelSampleTitle) return;
+    }
+
+    await projectsApi.createProject(
+      accessToken: accessToken,
+      groupId: groupId,
+      contentFormat: _novelContentFormat,
+      document: _novelSampleDocument(),
+    );
+  }
+
+  Map<String, Object?> _novelSampleDocument() {
+    return <String, Object?>{
+      'content_format': _novelContentFormat,
+      'schema_version': 1,
+      'content_revision': 1,
+      'title': _novelSampleTitle,
+      'start_scene': 'start',
+      'assets': <String, Object?>{},
+      'characters': <String, Object?>{},
+      'scenes': <String, Object?>{
+        'start': <String, Object?>{
+          'id': 'start',
+          'events': <Object?>[
+            <String, Object?>{
+              'id': 'evt-start-line',
+              'type': 'dialogue',
+              'text': 'なあ。\n今日、ちょっとだけ寄り道していかない？',
+            },
+            <String, Object?>{
+              'id': 'evt-start-choice',
+              'type': 'choice',
+              'options': <Object?>[
+                <String, Object?>{
+                  'id': 'ask',
+                  'label': '「どうしたの？」',
+                  'goto': 'rooftop',
+                },
+                <String, Object?>{
+                  'id': 'leave',
+                  'label': '「今日は帰るね」',
+                  'goto': 'leave',
+                },
+              ],
+            },
+          ],
+        },
+        'rooftop': <String, Object?>{
+          'id': 'rooftop',
+          'events': <Object?>[
+            <String, Object?>{
+              'id': 'evt-rooftop-line',
+              'type': 'dialogue',
+              'text': '屋上の空、すごくきれいだったから。\nきみに見せたかったんだ。',
+            },
+            <String, Object?>{
+              'id': 'evt-rooftop-choice',
+              'type': 'choice',
+              'options': <Object?>[
+                <String, Object?>{
+                  'id': 'sit',
+                  'label': 'となりに座る',
+                  'goto': 'together',
+                },
+                <String, Object?>{
+                  'id': 'photo',
+                  'label': '空の写真を撮る',
+                  'goto': 'photo',
+                },
+              ],
+            },
+          ],
+        },
+        'together': <String, Object?>{
+          'id': 'together',
+          'events': <Object?>[
+            <String, Object?>{
+              'id': 'evt-together-line',
+              'type': 'dialogue',
+              'text': '……よかった。\nこの場所、ふたりだけの秘密にしよう。',
+            },
+            <String, Object?>{
+              'id': 'evt-together-end',
+              'type': 'end',
+              'label': 'END - ふたりの秘密',
+            },
+          ],
+        },
+        'photo': <String, Object?>{
+          'id': 'photo',
+          'events': <Object?>[
+            <String, Object?>{
+              'id': 'evt-photo-line',
+              'type': 'dialogue',
+              'text': 'じゃあ同じ空を持って帰れるね。\n明日も、ここで会おう。',
+            },
+            <String, Object?>{
+              'id': 'evt-photo-end',
+              'type': 'end',
+              'label': 'END - 同じ空',
+            },
+          ],
+        },
+        'leave': <String, Object?>{
+          'id': 'leave',
+          'events': <Object?>[
+            <String, Object?>{
+              'id': 'evt-leave-line',
+              'type': 'dialogue',
+              'text': 'そっか。じゃあ、また明日。\n次はちゃんと誘うから。',
+            },
+            <String, Object?>{
+              'id': 'evt-leave-end',
+              'type': 'end',
+              'label': 'END - また明日',
+            },
+          ],
+        },
+      },
+    };
   }
 
   Future<List<HostedGroupApp>> _listGroupApps({

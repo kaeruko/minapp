@@ -10,6 +10,9 @@ import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 const String _groupId = '22222222222222222222222222222222';
 const String _appId = '44444444444444444444444444444444';
 const String _ownerUserId = '55555555555555555555555555555555';
+const String _contentId = '66666666666666666666666666666666';
+const String _novelContentFormat = 'minapp/novel@1';
+const String _novelSampleTitle = 'ひみつの放課後';
 
 http.Response _json(int status, Map<String, Object?> body) => http.Response(
   jsonEncode(body),
@@ -38,18 +41,59 @@ Map<String, Object?> _installedApp({
   };
 }
 
+Map<String, Object?> _projectSummary({String contentId = _contentId}) {
+  return <String, Object?>{
+    'content_id': contentId,
+    'group_id': _groupId,
+    'content_format': _novelContentFormat,
+    'status': 'draft',
+    'draft_revision': 1,
+    'assets': <Object?>[],
+    'created_at': '2026-09-16T01:00:00Z',
+    'updated_at': '2026-09-16T01:00:00Z',
+  };
+}
+
+Map<String, Object?> _sampleProject() {
+  return <String, Object?>{
+    ..._projectSummary(),
+    'document': <String, Object?>{'title': _novelSampleTitle},
+  };
+}
+
 void main() {
-  test('Novel Editor setup installs missing Player first, then Editor', () async {
+  test('Novel Editor setup installs missing Player first, then Editor and sample', () async {
     final List<http.Request> captured = <http.Request>[];
     final MockClient client = MockClient((http.Request request) async {
       captured.add(request);
-      if (request.method == 'GET') {
+      if (request.method == 'GET' &&
+          request.url.path == '/hosted/groups/$_groupId/apps') {
         return _json(200, const <String, Object?>{'apps': <Object?>[]});
       }
-      final Map<String, Object?> body =
-          jsonDecode(request.body) as Map<String, Object?>;
-      final String builtinId = body['builtin_id']! as String;
-      return _json(201, _installedApp(builtinId: builtinId));
+      if (request.method == 'GET' &&
+          request.url.path == '/hosted/authoring/groups/$_groupId/projects') {
+        expect(request.url.queryParameters['content_format'], _novelContentFormat);
+        return _json(200, const <String, Object?>{'projects': <Object?>[]});
+      }
+      if (request.method == 'POST' &&
+          request.url.path == '/hosted/groups/$_groupId/apps/install') {
+        final Map<String, Object?> body =
+            jsonDecode(request.body) as Map<String, Object?>;
+        final String builtinId = body['builtin_id']! as String;
+        return _json(201, _installedApp(builtinId: builtinId));
+      }
+      if (request.method == 'POST' &&
+          request.url.path == '/hosted/authoring/projects') {
+        final Map<String, Object?> body =
+            jsonDecode(request.body) as Map<String, Object?>;
+        expect(body['group_id'], _groupId);
+        expect(body['content_format'], _novelContentFormat);
+        final Map<String, Object?> document =
+            body['document']! as Map<String, Object?>;
+        expect(document['title'], _novelSampleTitle);
+        return _json(201, _projectSummary());
+      }
+      fail('Unexpected request: ${request.method} ${request.url}');
     });
     final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
       baseUri: Uri.parse('https://hosted.example.test'),
@@ -61,7 +105,7 @@ void main() {
       groupId: _groupId,
     );
 
-    expect(captured, hasLength(3));
+    expect(captured, hasLength(5));
     expect(captured[0].method, 'GET');
     expect(captured[0].url.path, '/hosted/groups/$_groupId/apps');
     expect(captured[0].headers['authorization'], 'Bearer owner-token');
@@ -71,24 +115,39 @@ void main() {
     expect(jsonDecode(captured[2].body), const <String, Object?>{
       'builtin_id': novelEditorBuiltinId,
     });
+    expect(captured[3].url.path, '/hosted/authoring/groups/$_groupId/projects');
+    expect(captured[4].url.path, '/hosted/authoring/projects');
     expect(app.appId, _appId);
     expect(app.groupId, _groupId);
     expect(app.sourceKind, 'builtin');
     expect(app.builtinId, novelEditorBuiltinId);
   });
 
-  test('Novel Editor setup reuses an already-installed Player', () async {
+  test('Novel Editor setup reuses an already-installed Player and seeds sample', () async {
     final List<http.Request> captured = <http.Request>[];
     final MockClient client = MockClient((http.Request request) async {
       captured.add(request);
-      if (request.method == 'GET') {
+      if (request.method == 'GET' &&
+          request.url.path == '/hosted/groups/$_groupId/apps') {
         return _json(200, <String, Object?>{
           'apps': <Object?>[
             _installedApp(builtinId: novelPlayerBuiltinId),
           ],
         });
       }
-      return _json(201, _installedApp());
+      if (request.method == 'GET' &&
+          request.url.path == '/hosted/authoring/groups/$_groupId/projects') {
+        return _json(200, const <String, Object?>{'projects': <Object?>[]});
+      }
+      if (request.method == 'POST' &&
+          request.url.path == '/hosted/groups/$_groupId/apps/install') {
+        return _json(201, _installedApp());
+      }
+      if (request.method == 'POST' &&
+          request.url.path == '/hosted/authoring/projects') {
+        return _json(201, _projectSummary());
+      }
+      fail('Unexpected request: ${request.method} ${request.url}');
     });
     final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
       baseUri: Uri.parse('https://hosted.example.test'),
@@ -100,35 +159,50 @@ void main() {
       groupId: _groupId,
     );
 
-    expect(captured, hasLength(2));
+    expect(captured, hasLength(4));
     expect(captured[0].method, 'GET');
-    expect(captured[1].method, 'POST');
+    expect(captured[1].url.path, '/hosted/groups/$_groupId/apps/install');
     expect(jsonDecode(captured[1].body), const <String, Object?>{
       'builtin_id': novelEditorBuiltinId,
     });
+    expect(captured[2].url.path, '/hosted/authoring/groups/$_groupId/projects');
+    expect(captured[3].url.path, '/hosted/authoring/projects');
     expect(app.builtinId, novelEditorBuiltinId);
   });
 
-  test('ensureNovelEditor reuses an already-installed Editor and Player', () async {
+  test('ensureNovelEditor reuses installed Editor, Player, and existing sample', () async {
     final List<http.Request> captured = <http.Request>[];
-    var getCount = 0;
+    var groupAppsGetCount = 0;
     final MockClient client = MockClient((http.Request request) async {
       captured.add(request);
-      expect(request.method, 'GET');
-      getCount += 1;
-      if (getCount == 1) {
+      if (request.method == 'GET' &&
+          request.url.path == '/hosted/groups/$_groupId/apps') {
+        groupAppsGetCount += 1;
+        if (groupAppsGetCount == 1) {
+          return _json(200, <String, Object?>{
+            'apps': <Object?>[
+              _installedApp(builtinId: novelPlayerBuiltinId),
+            ],
+          });
+        }
         return _json(200, <String, Object?>{
           'apps': <Object?>[
             _installedApp(builtinId: novelPlayerBuiltinId),
+            _installedApp(),
           ],
         });
       }
-      return _json(200, <String, Object?>{
-        'apps': <Object?>[
-          _installedApp(builtinId: novelPlayerBuiltinId),
-          _installedApp(),
-        ],
-      });
+      if (request.method == 'GET' &&
+          request.url.path == '/hosted/authoring/groups/$_groupId/projects') {
+        return _json(200, <String, Object?>{
+          'projects': <Object?>[_projectSummary()],
+        });
+      }
+      if (request.method == 'GET' &&
+          request.url.path == '/hosted/authoring/projects/$_contentId') {
+        return _json(200, _sampleProject());
+      }
+      fail('Unexpected request: ${request.method} ${request.url}');
     });
     final GirlsBuiltinInstallApi api = GirlsBuiltinInstallApi(
       baseUri: Uri.parse('https://hosted.example.test'),
@@ -140,7 +214,7 @@ void main() {
       groupId: _groupId,
     );
 
-    expect(captured, hasLength(2));
+    expect(captured, hasLength(4));
     expect(captured.every((http.Request request) => request.method == 'GET'), isTrue);
     expect(app.builtinId, novelEditorBuiltinId);
   });
