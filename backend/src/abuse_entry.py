@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import handler
@@ -28,6 +29,7 @@ from handler import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+_GROUP_SETTINGS_RE = re.compile(r"^/hosted/groups/[0-9a-f]{32}$")
 
 
 def _guard_login(event: dict[str, Any]) -> None:
@@ -143,14 +145,19 @@ def hosted_lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]
         path = _raw_path(event)
 
         # abuse_handlers_override.tf makes this function the deployed Hosted
-        # Lambda entrypoint. Shop routes therefore have to be composed here;
-        # otherwise they fall through hosted_entry -> hosted_handler and return
-        # the generic Hosted 404 without ever reaching hosted_shop_handler.
+        # Lambda entrypoint. Shop routes and the group-settings route therefore
+        # have to be composed here; otherwise they fall through hosted_entry ->
+        # hosted_handler and return the generic Hosted 404 without ever reaching
+        # hosted_shop_handler.
         if (
             path == "/shop/apps"
             or path.startswith("/shop/apps/")
             or path.startswith("/shop/content/")
             or (path.startswith("/apps/") and path.endswith("/shop-visibility"))
+            or (
+                method == "PATCH"
+                and _GROUP_SETTINGS_RE.fullmatch(path) is not None
+            )
         ):
             return hosted_shop_handler.lambda_handler(event, context)
 
