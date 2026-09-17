@@ -1,6 +1,16 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+
+bool isBuiltInMicrophoneOnlyPermissionRequest(
+  Set<WebViewPermissionResourceType> types,
+) {
+  return types.length == 1 &&
+      types.contains(WebViewPermissionResourceType.microphone);
+}
 
 class BuiltInWebViewPage extends StatefulWidget {
   const BuiltInWebViewPage({
@@ -17,9 +27,14 @@ class BuiltInWebViewPage extends StatefulWidget {
 }
 
 class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
+  static const MethodChannel _hostPermissionChannel = MethodChannel(
+    'jp.cloxs.min/host_permissions',
+  );
+
   WebViewController? _controller;
   String? _error;
   int _progress = 0;
+  bool _permissionPromptActive = false;
 
   static final RegExp _assetPathPattern = RegExp(
     r'^assets/builtin/[a-z0-9_-]+/index\.html$',
@@ -74,7 +89,11 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
       bool extraJavaScriptApplied = extraJavaScript == null;
 
       late final WebViewController controller;
-      controller = WebViewController()
+      controller = WebViewController(
+        onPermissionRequest: (WebViewPermissionRequest request) {
+          unawaited(_handleWebPermissionRequest(request));
+        },
+      )
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setNavigationDelegate(
           NavigationDelegate(
@@ -118,6 +137,101 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = 'ビルトインアプリを開けませんでした: $error');
+    }
+  }
+
+  Future<void> _handleWebPermissionRequest(
+    WebViewPermissionRequest request,
+  ) async {
+    if (!isBuiltInMicrophoneOnlyPermissionRequest(request.types)) {
+      await request.deny();
+      return;
+    }
+    if (!mounted || _permissionPromptActive) {
+      await request.deny();
+      return;
+    }
+
+    _permissionPromptActive = true;
+    try {
+      final bool approved = await _confirmMicrophoneAccess();
+      if (!approved || !mounted) {
+        await request.deny();
+        return;
+      }
+
+      final bool hostPermissionGranted = await _requestHostMicrophonePermission();
+      if (!hostPermissionGranted) {
+        await request.deny();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('マイクの使用が許可されていないため、録音できません。'),
+            ),
+          );
+        }
+        return;
+      }
+
+      await request.grant();
+    } catch (error) {
+      try {
+        await request.deny();
+      } catch (_) {
+        // Preserve the original permission-handling failure below.
+      }
+      if (mounted) {
+        setState(() => _error = 'マイクの許可処理に失敗しました: $error');
+      }
+    } finally {
+      _permissionPromptActive = false;
+    }
+  }
+
+  Future<bool> _confirmMicrophoneAccess() async {
+    final bool? approved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('🎤 マイクを使いますか？'),
+        content: Text(
+          '「${widget.title}」が録音のためにマイクを使おうとしています。\n\n'
+          '許可した場合だけ、このアプリからマイクを利用できます。',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('許可しない'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('マイクを許可'),
+          ),
+        ],
+      ),
+    );
+    return approved == true;
+  }
+
+  Future<bool> _requestHostMicrophonePermission() async {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        final bool? granted = await _hostPermissionChannel.invokeMethod<bool>(
+          'requestMicrophonePermission',
+        );
+        if (granted == null) {
+          throw StateError(
+            'Android microphone permission channel returned null.',
+          );
+        }
+        return granted;
+      case TargetPlatform.iOS:
+        return true;
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.linux:
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+        return false;
     }
   }
 
