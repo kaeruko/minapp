@@ -223,13 +223,18 @@ void main() {
 
     // The official catalog is a scrollable list. Adding more built-ins must not
     // make this regression test assume the class app is still in the first viewport.
-    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    final Finder classroomApp = find.text('ねんねぐみのじかんわり');
+    await tester.dragUntilVisible(
+      classroomApp,
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('クラスの公開アプリ (1)'), findsOneWidget);
-    expect(find.text('ねんねぐみのじかんわり'), findsOneWidget);
+    expect(classroomApp, findsOneWidget);
 
-    await tester.tap(find.text('ねんねぐみのじかんわり'));
+    await tester.tap(classroomApp);
     await tester.pumpAndSettle();
 
     expect(find.text('アプリの情報'), findsOneWidget);
