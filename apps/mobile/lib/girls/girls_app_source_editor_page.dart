@@ -80,7 +80,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
     try {
       _controller.value = TextEditingValue(
         text: value,
-        selection: TextSelection.collapsed(offset: value.length),
+        selection: const TextSelection.collapsed(offset: 0),
       );
     } finally {
       _updatingController = false;
@@ -175,22 +175,37 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
 
   @override
   Widget build(BuildContext context) {
+    final bool keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
       backgroundColor: _cream,
       appBar: AppBar(
         backgroundColor: _cream,
         foregroundColor: _ink,
         title: Text('${widget.title} のコード'),
+        actions: <Widget>[
+          if (!_loading && _archive != null)
+            IconButton(
+              key: const Key('girls-source-editor-save-appbar'),
+              tooltip: '保存してrevision更新',
+              onPressed: !_dirty || _saving ? null : _save,
+              icon: _saving
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_rounded),
+            ),
+        ],
       ),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
-            : _buildEditor(),
+            : _buildEditor(keyboardVisible: keyboardVisible),
       ),
     );
   }
 
-  Widget _buildEditor() {
+  Widget _buildEditor({required bool keyboardVisible}) {
     if (_archive == null) {
       return Padding(
         padding: const EdgeInsets.all(18),
@@ -212,31 +227,37 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
     return Column(
       children: <Widget>[
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            keyboardVisible ? 6 : 12,
+            16,
+            keyboardVisible ? 4 : 8,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .9),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  'revision ${widget.expectedRevision} を編集中。保存すると '
-                  'revision ${widget.expectedRevision + 1} になります。公開版は自動では変わりません。',
-                  style: const TextStyle(
-                    color: _lavender,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+              if (!keyboardVisible)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .9),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    'revision ${widget.expectedRevision} を編集中。保存すると '
+                    'revision ${widget.expectedRevision + 1} になります。公開版は自動では変わりません。',
+                    style: const TextStyle(
+                      color: _lavender,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
               if (_error != null) ...<Widget>[
-                const SizedBox(height: 8),
+                if (!keyboardVisible) const SizedBox(height: 8),
                 _EditorError(message: _error!),
               ],
-              const SizedBox(height: 8),
+              SizedBox(height: keyboardVisible ? 4 : 8),
               DropdownButtonFormField<String>(
                 key: const Key('girls-source-editor-file'),
                 initialValue: _selectedPath,
@@ -255,11 +276,13 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
                     .toList(growable: false),
                 onChanged: _saving ? null : _selectPath,
               ),
-              const SizedBox(height: 6),
-              const Text(
-                'HTML / CSS / JavaScript / JSON / TXT を編集できます。画像・音声などのファイルはそのまま保持します。',
-                style: TextStyle(fontSize: 11, color: _lavender),
-              ),
+              if (!keyboardVisible) ...<Widget>[
+                const SizedBox(height: 6),
+                const Text(
+                  'HTML / CSS / JavaScript / JSON / TXT を編集できます。画像・音声などのファイルはそのまま保持します。',
+                  style: TextStyle(fontSize: 11, color: _lavender),
+                ),
+              ],
             ],
           ),
         ),
@@ -293,20 +316,21 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-          child: FilledButton.icon(
-            key: const Key('girls-source-editor-save'),
-            onPressed: !_dirty || _saving ? null : _save,
-            icon: _saving
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.save_rounded),
-            label: Text(_saving ? '保存中…' : '保存してrevision更新'),
+        if (!keyboardVisible)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+            child: FilledButton.icon(
+              key: const Key('girls-source-editor-save'),
+              onPressed: !_dirty || _saving ? null : _save,
+              icon: _saving
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_rounded),
+              label: Text(_saving ? '保存中…' : '保存してrevision更新'),
+            ),
           ),
-        ),
       ],
     );
   }
