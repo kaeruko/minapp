@@ -58,6 +58,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   bool _creatingGroup = false;
   String? _groupError;
 
+  BuiltInApp get _memoApp => _findBuiltin('memo');
   BuiltInApp get _minappchiApp => _findBuiltin('minappchi');
   BuiltInApp get _novelApp => _findBuiltin('novel-starter');
 
@@ -149,12 +150,6 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
           assetPath: app.assetPath,
         ),
       ),
-    );
-  }
-
-  void _showMemoComingSoon() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('マイメモ帳は準備中だよ')),
     );
   }
 
@@ -486,8 +481,8 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
                       _HomeMenuCard(
                         key: const Key('girls-home-memo-app'),
                         assetName: _memoCardAsset,
-                        label: 'マイメモ帳（準備中）',
-                        onTap: _showMemoComingSoon,
+                        label: 'マイメモ帳',
+                        onTap: () => _launchBuiltin(_memoApp),
                       ),
                       _HomeMenuCard(
                         key: const Key('girls-home-minappchi-app'),
