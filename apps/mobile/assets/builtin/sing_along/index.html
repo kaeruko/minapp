@@ -132,6 +132,7 @@
     'use strict';
 
     const MAX_SECONDS = 60;
+    const BGM_MASTER_GAIN = 3.0;
     const TRACKS = Object.freeze({
       sparkle: Object.freeze({
         bpm: 124,
@@ -166,6 +167,22 @@
     const playButton = document.getElementById('play');
     const deleteButton = document.getElementById('delete');
 
+    for (const [name, element] of Object.entries({
+      trackSelect,
+      trackInfo,
+      timer,
+      statusBox,
+      previewButton,
+      recordButton,
+      stopButton,
+      playButton,
+      deleteButton,
+    })) {
+      if (!(element instanceof HTMLElement)) {
+        throw new Error(`Required element is missing: ${name}`);
+      }
+    }
+
     let audioContext = null;
     let bgmNodes = [];
     let mediaStream = null;
@@ -175,12 +192,12 @@
     let recordedAudio = null;
     let timerId = null;
     let startedAt = 0;
-    let mode = 'idle';
 
     function fail(error) {
       stopEverything();
+      const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
       statusBox.className = 'status error';
-      statusBox.textContent = `エラー: ${error instanceof Error ? error.message : String(error)}`;
+      statusBox.textContent = `エラー: ${message}`;
       setMode('error');
     }
 
@@ -202,7 +219,6 @@
     }
 
     function setMode(next) {
-      mode = next;
       const busy = next === 'preview' || next === 'recording' || next === 'playback';
       trackSelect.disabled = busy || next === 'error';
       previewButton.disabled = busy || next === 'error';
@@ -218,7 +234,7 @@
     }
 
     function beginTimer(onLimit) {
-      clearInterval(timerId);
+      if (timerId !== null) clearInterval(timerId);
       startedAt = performance.now();
       timerId = setInterval(() => {
         const elapsed = (performance.now() - startedAt) / 1000;
@@ -256,7 +272,7 @@
       oscillator.type = wave;
       oscillator.frequency.setValueAtTime(frequency, start);
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(gainValue, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(gainValue * BGM_MASTER_GAIN, start + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
       oscillator.connect(gain).connect(destination);
       oscillator.start(start);
@@ -284,6 +300,18 @@
         if (beatIndex % 2 === 0) {
           scheduleTone(context, context.destination, midiToHz(84), when, 0.035, 0.018, 'square');
         }
+      }
+    }
+
+    async function openMicrophone() {
+      try {
+        return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } catch (error) {
+        if (!(error instanceof Error)) throw error;
+        if (error.name === 'NotReadableError' || error.message.includes('Could not start audio source')) {
+          throw new Error(`マイクを開始できませんでした。ほかのアプリがマイクを使用中でないか、端末のマイク設定を確認してください。元のエラー: ${error.name}: ${error.message}`);
+        }
+        throw error;
       }
     }
 
@@ -327,7 +355,7 @@
       try {
         requireCapabilities();
         if (recordedBlob) throw new Error('録音済みです。「とりなおす」を押してから録音してください。');
-        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        mediaStream = await openMicrophone();
         const chunks = [];
         recorder = new MediaRecorder(mediaStream);
         recorder.addEventListener('dataavailable', (event) => {
