@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../hosted_authoring_contract_api.dart';
 import '../hosted_authoring_editor_action.dart';
@@ -14,12 +13,12 @@ import 'girls_apps_page.dart' as legacy;
 import 'girls_builtin_install_api.dart';
 import 'girls_footer_nav.dart';
 import 'girls_scaffold.dart';
+import 'girls_zip_upload_page.dart';
 import 'hosted_girls_api.dart';
 
 const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF745B9E);
 const Color _pink = Color(0xFFF9DDE8);
-const String _girlsUploadPortalUrl = 'https://minapp.cloxs.jp/girls.html';
 const String _novelContentFormat = 'minapp/novel@1';
 
 String _novelProjectTitle(HostedAuthoringProject project) {
@@ -260,7 +259,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
     return error;
   }
 
-  Future<void> _openUploadPortal() async {
+  Future<void> _openZipUpload() async {
     final HostedGroup? group = _currentGroup;
     final List<HostedGroup>? groups = _activeGroups;
     if (groups == null) return;
@@ -273,18 +272,21 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       return;
     }
 
-    final Uri portalUri = Uri.parse(_girlsUploadPortalUrl).replace(
-      queryParameters: <String, String>{'group_id': group.groupId},
+    final List<HostedGroup> orderedGroups = <HostedGroup>[
+      group,
+      ...groups.where((HostedGroup candidate) => candidate.groupId != group.groupId),
+    ];
+    setState(() => _error = null);
+    final bool? uploaded = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (BuildContext context) => GirlsZipUploadPage(
+          api: widget.api,
+          session: widget.session,
+          activeGroups: orderedGroups,
+        ),
+      ),
     );
-    try {
-      final bool opened = await launchUrl(
-        portalUri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!opened) throw StateError('外部ブラウザを開けませんでした。');
-    } catch (error) {
-      if (mounted) setState(() => _error = 'アプリ追加ページを開けませんでした: $error');
-    }
+    if (uploaded == true && mounted) await _load();
   }
 
   Future<void> _openMaker(HostedAuthoringAppContract maker) async {
@@ -367,12 +369,12 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
             const SizedBox(height: 12),
             FilledButton.icon(
               key: const Key('girls-my-apps-upload'),
-              onPressed: _busy ? null : _openUploadPortal,
+              onPressed: _busy ? null : _openZipUpload,
               style: FilledButton.styleFrom(
                 backgroundColor: _lavender,
                 padding: const EdgeInsets.symmetric(vertical: 15),
               ),
-              icon: const Icon(Icons.open_in_new_rounded),
+              icon: const Icon(Icons.folder_zip_rounded),
               label: const Text('ZIPからアプリを追加'),
             ),
             if (_error != null) ...<Widget>[
