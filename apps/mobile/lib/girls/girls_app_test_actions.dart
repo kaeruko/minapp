@@ -7,6 +7,7 @@ import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
 import 'girls_app_preview_api.dart';
+import 'girls_app_source_editor_page.dart';
 import 'girls_builtin_install_api.dart';
 import 'hosted_girls_api.dart';
 
@@ -34,6 +35,7 @@ class GirlsAppTestActions extends StatefulWidget {
 class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   late final GirlsAppPreviewApi _previewApi;
   late final GirlsBuiltinInstallApi _builtinInstallApi;
+  late final GirlsAppManagementApi _managementApi;
   bool _busy = false;
   String? _error;
   bool _novelSetupBusy = false;
@@ -50,6 +52,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
     super.initState();
     _previewApi = GirlsAppPreviewApi(baseUri: widget.api.baseUri);
     _builtinInstallApi = GirlsBuiltinInstallApi(baseUri: widget.api.baseUri);
+    _managementApi = GirlsAppManagementApi(baseUri: widget.api.baseUri);
     if (_isNovelEditor) {
       _novelSetupBusy = true;
       _prepareNovelEditor(initial: true);
@@ -60,6 +63,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   void dispose() {
     _previewApi.close();
     _builtinInstallApi.close();
+    _managementApi.close();
     super.dispose();
   }
 
@@ -118,6 +122,37 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
       ),
       titleSuffix: '更新版プレビュー',
     );
+  }
+
+  Future<void> _editSource() async {
+    final ManagedGirlsApp app = widget.detail.summary;
+    final int? sourceRevision = app.sourceRevision;
+    if (!app.app.editable || sourceRevision == null) {
+      throw StateError('Editable source revision is not available.');
+    }
+
+    final int? revision = await Navigator.of(context).push<int>(
+      MaterialPageRoute<int>(
+        builder: (BuildContext context) => GirlsAppSourceEditorPage(
+          api: _managementApi,
+          accessToken: widget.session.accessToken,
+          groupId: app.app.groupId,
+          appId: app.app.appId,
+          title: app.app.title,
+          expectedRevision: sourceRevision,
+        ),
+      ),
+    );
+    if (revision == null || !mounted) return;
+
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(content: Text('コードを保存しました。revision $revision')),
+    );
+
+    // The detail page owns its loaded revision. Returning to the app list makes
+    // that page discard the stale revision before the user can publish it.
+    Navigator.of(context).pop();
   }
 
   Future<void> _openSession({
@@ -180,6 +215,15 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
             hasUnpublishedUpdate ? '更新版をプレビュー' : '最新revisionをプレビュー',
           ),
         ),
+        if (detail.summary.app.editable && sourceRevision != null) ...<Widget>[
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            key: const Key('girls-app-edit-code'),
+            onPressed: _busy ? null : _editSource,
+            icon: const Icon(Icons.code_rounded),
+            label: const Text('コードを編集'),
+          ),
+        ],
         const SizedBox(height: 5),
         const Text(
           '自分で試した回数は「遊ばれた回数」には加算されません。',
