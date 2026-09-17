@@ -255,8 +255,11 @@ class HostedAwsBackend(AwsBackend):
         return members
 
     def create_invite(self, auth_subject: str, group_id: str) -> dict[str, Any]:
-        owner = self._user_by_auth_subject(auth_subject)
-        group_item = self._require_owner_group(owner.user_id, group_id)
+        user = self._user_by_auth_subject(auth_subject)
+        self._require_active_membership(user.user_id, group_id)
+        group_item = self._get_item(pk=f"GROUP#{group_id}", sk="META")
+        if group_item is None:
+            raise RuntimeError(f"Membership points to missing group {group_id}")
         existing_code = _optional_item_string(group_item, "group_code")
         if existing_code is not None:
             return _permanent_group_id_payload(group_id, existing_code)
@@ -272,7 +275,7 @@ class HostedAwsBackend(AwsBackend):
             "code_hash": _string_attr(code_hash),
             "group_id": _string_attr(group_id),
             "group_name": _string_attr(group_name),
-            "created_by": _string_attr(owner.user_id),
+            "created_by": _string_attr(user.user_id),
             "status": _string_attr("active"),
             "expires_at_epoch": _number_attr(PERMANENT_GROUP_ID_EXPIRES_AT_EPOCH),
         }
