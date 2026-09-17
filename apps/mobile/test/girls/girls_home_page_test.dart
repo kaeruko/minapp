@@ -98,8 +98,11 @@ void main() {
 
     await tester.tap(find.byKey(const Key('girls-home-memo-app')));
     await tester.pump();
-    expect(find.text('マイメモ帳は準備中だよ'), findsOneWidget);
-    await tester.pumpAndSettle(const Duration(seconds: 4));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('マイメモ帳'), findsOneWidget);
+    expect(find.text('マイメモ帳は準備中だよ'), findsNothing);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('girls-home-settings')));
     await tester.pumpAndSettle();
