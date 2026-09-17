@@ -108,7 +108,8 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
           ),
         );
 
-      await controller.clearLocalStorage();
+      // Built-in apps own their namespaced localStorage keys. Keep that storage
+      // across launches so apps such as マイメモ帳 and みんあぷっち can persist data.
       await controller.clearCache();
       await controller.loadFlutterAsset(widget.assetPath);
 
