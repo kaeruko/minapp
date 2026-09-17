@@ -118,7 +118,42 @@ def _existing_upload_for(
     )
     if matched is not None:
         _require_matching_title(matched, title)
-    return matched
+        return matched
+
+    same_title = [item for item in apps if _item_string(item, "title") == title]
+    legacy_same_title = [
+        item for item in same_title if _optional_item_string(item, "package_id") is None
+    ]
+
+    if package is not None:
+        return _single_match(
+            legacy_same_title,
+            error="ambiguous_legacy_upload",
+            message=(
+                "Multiple legacy uploads have this title and no stable package identity; "
+                "remove the duplicates before updating."
+            ),
+        )
+
+    packaged_same_title = [
+        item for item in same_title if _optional_item_string(item, "package_id") is not None
+    ]
+    if packaged_same_title:
+        raise ApiProblem(
+            409,
+            "missing_package_identity",
+            "An existing app with this title has a stable minapp-package.json identity. "
+            "Use that app's original minapp-package.json when updating it.",
+        )
+
+    return _single_match(
+        legacy_same_title,
+        error="ambiguous_legacy_upload",
+        message=(
+            "Multiple legacy uploads have this title and no stable package identity; "
+            "remove the duplicates before updating."
+        ),
+    )
 
 
 def create_uploaded_app(
@@ -133,8 +168,10 @@ def create_uploaded_app(
     A ZIP may contain ``minapp-package.json`` with a stable package_id. When
     that identity already belongs to one of the caller's editable uploads in
     the target group, the existing app receives a new source revision instead
-    of a new app_id. Re-uploading byte-identical legacy ZIPs without a package
-    manifest is also idempotent by normalized SHA-256.
+    of a new app_id. Re-uploading byte-identical ZIP content is idempotent by
+    normalized SHA-256. Legacy ZIPs without a package manifest may update a
+    single same-title legacy upload; duplicate legacy titles fail explicitly
+    instead of choosing an app heuristically.
 
     The caller only needs active membership in the target group. New apps are
     owned by that caller, and later source/preview/publish operations authorize
@@ -145,8 +182,8 @@ def create_uploaded_app(
     and checksum comparison. Ambiguous archive layouts still fail validation.
 
     If the canonical ZIP contains minapp.json, its Authoring contract is
-    validated before any app data is written. An existing package identity may
-    update source only when that contract remains unchanged.
+    validated before any app data is written. An existing app may update source
+    only when that contract remains unchanged.
     """
     normalized_zip, files = normalize_uploaded_zip(zip_bytes)
     authoring = read_authoring_manifest(normalized_zip)
