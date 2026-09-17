@@ -5,13 +5,13 @@ variable "hosted_identity_package_path" {
 }
 
 variable "hosted_provisioned_concurrency" {
-  description = "Pre-initialized Hosted API environments. Set 0 only while awaiting the regional concurrency quota increase."
+  description = "Pre-initialized Hosted API environments. Defaults to 0; set to 2 only when explicitly opting into warm environments and the regional concurrency quota supports it."
   type        = number
-  default     = 2
+  default     = 0
 
   validation {
     condition     = contains([0, 2], var.hosted_provisioned_concurrency)
-    error_message = "Use the approved two warm environments, or zero while the quota increase is pending."
+    error_message = "Use zero by default, or two when explicitly enabling warm Hosted API environments."
   }
 }
 
