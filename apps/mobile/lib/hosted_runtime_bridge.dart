@@ -486,8 +486,14 @@ class _RuntimeRefreshScope {
 
 class HostedContentNavigationPolicy {
   HostedContentNavigationPolicy(Uri contentUri)
-      : _contentUri = _validateContentUri(contentUri),
-        _allowedPathPrefix = _contentPathPrefix(contentUri);
+      : this._(contentUri, 'hosted');
+
+  HostedContentNavigationPolicy.shop(Uri contentUri)
+      : this._(contentUri, 'shop');
+
+  HostedContentNavigationPolicy._(Uri contentUri, String namespace)
+      : _contentUri = _validateContentUri(contentUri, namespace),
+        _allowedPathPrefix = _contentPathPrefix(contentUri, namespace);
 
   final Uri _contentUri;
   final String _allowedPathPrefix;
@@ -501,7 +507,7 @@ class HostedContentNavigationPolicy {
         target.path.startsWith(_allowedPathPrefix);
   }
 
-  static Uri _validateContentUri(Uri uri) {
+  static Uri _validateContentUri(Uri uri, String namespace) {
     if (uri.scheme != 'https' ||
         !uri.hasAuthority ||
         uri.userInfo.isNotEmpty ||
@@ -512,7 +518,7 @@ class HostedContentNavigationPolicy {
     }
     final List<String> segments = uri.pathSegments;
     if (segments.length != 4 ||
-        segments[0] != 'hosted' ||
+        segments[0] != namespace ||
         segments[1] != 'content' ||
         !_contentTokenPattern.hasMatch(segments[2]) ||
         segments[3] != 'index.html') {
@@ -521,9 +527,9 @@ class HostedContentNavigationPolicy {
     return uri;
   }
 
-  static String _contentPathPrefix(Uri uri) {
+  static String _contentPathPrefix(Uri uri, String namespace) {
     final List<String> segments = uri.pathSegments;
-    return '/hosted/content/${segments[2]}/';
+    return '/$namespace/content/${segments[2]}/';
   }
 
   static bool _containsTraversalSegment(Uri uri) {

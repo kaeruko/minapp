@@ -150,6 +150,10 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
   @override
   void initState() {
     super.initState();
+    _prepareWebView();
+  }
+
+  void _initializeSession() {
     final Uri contentUri = widget.contentUri;
     if (widget.authoringLaunch != null) {
       final _HostedAuthoringEditorNavigationPolicy policy =
@@ -158,6 +162,10 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
     } else if (_HostedPreviewNavigationPolicy.isPreviewUri(contentUri)) {
       final _HostedPreviewNavigationPolicy policy =
           _HostedPreviewNavigationPolicy(contentUri);
+      _allowsNavigation = policy.allows;
+    } else if (contentUri.pathSegments.firstOrNull == 'shop') {
+      final HostedContentNavigationPolicy policy =
+          HostedContentNavigationPolicy.shop(contentUri);
       _allowsNavigation = policy.allows;
     } else {
       final HostedContentNavigationPolicy policy =
@@ -190,11 +198,13 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
         preview: authoringPreviewHost,
       );
     }
-    _prepareWebView();
   }
 
   Future<void> _prepareWebView() async {
     try {
+      // Session validation can fail before a WebView exists. Keep it inside
+      // the same error boundary so release builds show an error, not gray.
+      _initializeSession();
       await WebViewCookieManager().clearCookies();
       final WebViewController controller = WebViewController(
         onPermissionRequest: (WebViewPermissionRequest request) {

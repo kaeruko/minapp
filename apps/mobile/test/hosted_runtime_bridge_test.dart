@@ -407,6 +407,98 @@ void main() {
         isFalse,
       );
     });
+
+    test('hosted content rejects shop entry and navigation', () {
+      final Uri shopUri = Uri.parse(
+        'https://hosted.example.test/shop/content/$_contentToken/index.html',
+      );
+      final HostedContentNavigationPolicy policy = HostedContentNavigationPolicy(
+        Uri.parse('https://hosted.example.test/hosted/content/$_contentToken/index.html'),
+      );
+
+      expect(() => HostedContentNavigationPolicy(shopUri), throwsArgumentError);
+      expect(policy.allows(shopUri), isFalse);
+    });
+  });
+
+  group('Shop navigation boundary', () {
+    const String origin = 'https://hosted.example.test';
+    const String entry = '$origin/shop/content/$_contentToken/index.html';
+
+    test('allows the shop entry and its assets within the current session', () {
+      final HostedContentNavigationPolicy policy =
+          HostedContentNavigationPolicy.shop(Uri.parse(entry));
+
+      expect(policy.allows(Uri.parse(entry)), isTrue);
+      expect(
+        policy.allows(
+          Uri.parse('$origin/shop/content/$_contentToken/assets/app.js'),
+        ),
+        isTrue,
+      );
+    });
+
+    test('rejects navigation outside the current shop session and HTTPS origin', () {
+      final HostedContentNavigationPolicy policy =
+          HostedContentNavigationPolicy.shop(Uri.parse(entry));
+      final List<String> rejectedTargets = <String>[
+        '$origin/shop/content/$_otherContentToken/index.html',
+        '$origin/shop/content/${_contentToken}suffix/index.html',
+        'https://evil.example/shop/content/$_contentToken/index.html',
+        'https://hosted.example.test:8443/shop/content/$_contentToken/index.html',
+        'http://hosted.example.test/shop/content/$_contentToken/index.html',
+        'https://user@hosted.example.test/shop/content/$_contentToken/index.html',
+        '$origin/hosted/content/$_contentToken/index.html',
+        '$origin/hosted/preview/$_contentToken/index.html',
+        '$origin/hosted/authoring-preview/$_contentToken/index.html',
+        '$origin/shop/preview/$_contentToken/index.html',
+        '$origin/shop/content/$_contentToken/../index.html',
+        'file:///tmp/index.html',
+        'javascript:alert(1)',
+      ];
+
+      for (final String target in rejectedTargets) {
+        expect(policy.allows(Uri.parse(target)), isFalse, reason: target);
+      }
+    });
+
+    test('requires an exact shop entry URL with a valid content token', () {
+      final List<String> rejectedEntries = <String>[
+        '$origin/hosted/content/$_contentToken/index.html',
+        '$origin/hosted/preview/$_contentToken/index.html',
+        '$origin/shop/preview/$_contentToken/index.html',
+        '$origin/shop/content/$_contentToken/other.html',
+        '$origin/shop/content/$_contentToken/index.html/extra',
+        '$origin/shop/content/$_contentToken/',
+        '$origin/shop/content/short/index.html',
+        '$origin/shop/content/${List<String>.filled(31, 'a').join()}/index.html',
+        '$origin/shop/content/${List<String>.filled(129, 'a').join()}/index.html',
+        '$origin/shop/content/${_contentToken}!/index.html',
+        '$entry?mode=preview',
+        '$entry#section',
+        'https://user@hosted.example.test/shop/content/$_contentToken/index.html',
+        'http://hosted.example.test/shop/content/$_contentToken/index.html',
+        '/shop/content/$_contentToken/index.html',
+      ];
+
+      for (final String entry in rejectedEntries) {
+        expect(
+          () => HostedContentNavigationPolicy.shop(Uri.parse(entry)),
+          throwsArgumentError,
+          reason: entry,
+        );
+      }
+    });
+
+    test('accepts the backend content token length boundaries', () {
+      for (final int length in <int>[32, 128]) {
+        final String token = List<String>.filled(length, 'a').join();
+        final Uri entry = Uri.parse('$origin/shop/content/$token/index.html');
+        final HostedContentNavigationPolicy policy =
+            HostedContentNavigationPolicy.shop(entry);
+        expect(policy.allows(entry), isTrue, reason: 'token length $length');
+      }
+    });
   });
 
   test('dedicated/school AppWebViewPage contract remains available unchanged', () {
