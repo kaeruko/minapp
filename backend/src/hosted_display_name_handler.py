@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from errors import ApiProblem
@@ -15,7 +16,8 @@ from handler import (
 from hosted_display_name_backend import HostedDisplayNameBackend
 
 _BACKEND: HostedDisplayNameBackend | None = None
-_PATH = "/hosted/me/display-name"
+_PROFILE_PATH = "/hosted/me/display-name"
+_GROUP_MEMBERS_RE = re.compile(r"^/hosted/groups/([0-9a-f]{32})/members$")
 
 
 def _get_backend() -> HostedDisplayNameBackend:
@@ -39,27 +41,40 @@ def _display_name(payload: dict[str, Any]) -> str:
 def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
     method = _request_method(event)
     path = _raw_path(event)
-    if path != _PATH:
-        return None
 
-    if method == "GET":
+    if path == _PROFILE_PATH:
+        if method == "GET":
+            return _json_response(
+                200,
+                _get_backend().get_my_display_name(_auth_subject(event)),
+            )
+
+        if method == "PATCH":
+            payload = _json_body(event)
+            _require_fields(payload, required={"display_name"})
+            return _json_response(
+                200,
+                _get_backend().set_my_display_name(
+                    _auth_subject(event),
+                    _display_name(payload),
+                ),
+            )
+
         return _json_response(
-            200,
-            _get_backend().get_my_display_name(_auth_subject(event)),
+            405,
+            {"error": "method_not_allowed", "message": "Method not allowed."},
         )
 
-    if method == "PATCH":
-        payload = _json_body(event)
-        _require_fields(payload, required={"display_name"})
+    members_match = _GROUP_MEMBERS_RE.fullmatch(path)
+    if method == "GET" and members_match is not None:
         return _json_response(
             200,
-            _get_backend().set_my_display_name(
-                _auth_subject(event),
-                _display_name(payload),
-            ),
+            {
+                "members": _get_backend().list_members(
+                    _auth_subject(event),
+                    members_match.group(1),
+                )
+            },
         )
 
-    return _json_response(
-        405,
-        {"error": "method_not_allowed", "message": "Method not allowed."},
-    )
+    return None
