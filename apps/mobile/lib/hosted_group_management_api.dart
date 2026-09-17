@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'api.dart';
+import 'hosted_api.dart';
 
 final RegExp _hostedGroupIdPattern = RegExp(r'^[0-9a-f]{32}$');
 
@@ -46,6 +47,37 @@ class HostedGroupManagementApi {
 
   void close() {
     if (_ownsClient) _client.close();
+  }
+
+  Future<HostedGroup> renameGroup({
+    required String accessToken,
+    required String groupId,
+    required String name,
+  }) async {
+    _validateToken(accessToken);
+    _validateId(groupId, 'groupId');
+    if (name.isEmpty ||
+        name != name.trim() ||
+        name.length > maxHostedGroupNameLength) {
+      throw ArgumentError.value(name, 'name', 'invalid Hosted group name');
+    }
+
+    final http.Response response = await _client.patch(
+      _baseUri.resolve('/hosted/groups/$groupId'),
+      headers: <String, String>{
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(<String, Object?>{'name': name}),
+    );
+    final HostedGroup group = HostedGroup.fromJson(_decodeJsonResponse(response));
+    if (group.groupId != groupId || group.name != name || !group.isOwner) {
+      throw const FormatException(
+        'Group rename response changed the requested scope.',
+      );
+    }
+    return group;
   }
 
   Future<void> leaveGroup({

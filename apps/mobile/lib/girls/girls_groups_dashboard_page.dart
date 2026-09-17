@@ -6,6 +6,7 @@ import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_builtin_install_api.dart';
 import 'girls_current_group_store.dart';
+import 'girls_group_settings_page.dart';
 import 'girls_scaffold.dart';
 import 'hosted_girls_api.dart';
 
@@ -172,6 +173,28 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
       ),
     );
     if (mounted) await _reload();
+  }
+
+  Future<void> _openGroupSettings(HostedGroup group) async {
+    final HostedGroup? updated = await Navigator.of(context).push<HostedGroup>(
+      MaterialPageRoute<HostedGroup>(
+        builder: (BuildContext context) => GirlsGroupSettingsPage(
+          api: widget.api,
+          session: widget.session,
+          group: group,
+        ),
+      ),
+    );
+    if (updated == null || !mounted) return;
+
+    final bool renamed = updated.name != group.name;
+    setState(() => _currentGroup = updated);
+    widget.onCurrentGroupChanged(updated);
+    await _reload();
+    if (!mounted || !renamed) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('グループ名を「${updated.name}」に変更したよ。')),
+    );
   }
 
   Future<void> _joinGroup() async {
@@ -366,6 +389,8 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
                 latestApps: _latestApps,
                 loading: _busy,
                 onOpen: () => _openGroup(current),
+                onSettings:
+                    current.isOwner ? () => _openGroupSettings(current) : null,
               ),
             if (_error != null) ...<Widget>[
               const SizedBox(height: 12),
@@ -426,6 +451,7 @@ class _CurrentGroupCard extends StatelessWidget {
     required this.latestApps,
     required this.loading,
     required this.onOpen,
+    this.onSettings,
   });
 
   final HostedGroup group;
@@ -433,6 +459,7 @@ class _CurrentGroupCard extends StatelessWidget {
   final List<HostedGroupApp>? latestApps;
   final bool loading;
   final VoidCallback onOpen;
+  final VoidCallback? onSettings;
 
   HostedMember? get _owner {
     final List<HostedMember>? currentMembers = members;
@@ -540,6 +567,29 @@ class _CurrentGroupCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
+          if (onSettings != null) ...<Widget>[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const Key('girls-current-group-settings'),
+                onPressed: loading ? null : onSettings,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: .56),
+                  foregroundColor: _ink,
+                  side: const BorderSide(color: Color(0xFFE8B9C7)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                icon: const Icon(Icons.settings_rounded),
+                label: const Text(
+                  'グループ設定',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
