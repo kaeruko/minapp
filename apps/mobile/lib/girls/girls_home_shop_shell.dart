@@ -263,6 +263,11 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
 
     switch (action) {
       case _AccountAction.email:
+        setState(() {
+          _novelFlowActive = false;
+          _novelFlowBaseDepth = null;
+          _footerHidden = false;
+        });
         await _navigatorKey.currentState?.push<void>(
           MaterialPageRoute<void>(
             builder: (BuildContext context) => GirlsEmailSettingsPage(
