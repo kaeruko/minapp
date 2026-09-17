@@ -246,22 +246,25 @@ class HostedMember {
     required this.loginId,
     required this.role,
     required this.status,
+    this.displayName,
   });
 
   final String userId;
   final String loginId;
   final String role;
   final String status;
+  final String? displayName;
 
   bool get isOwner => role == 'owner';
+  String get displayLabel => displayName ?? loginId;
 
   factory HostedMember.fromJson(Map<String, Object?> json) {
-    _requireExactFields(json, const <String>{
-      'user_id',
-      'login_id',
-      'role',
-      'status',
-    }, 'Hosted member');
+    _requireAllowedFields(
+      json,
+      required: const <String>{'user_id', 'login_id', 'role', 'status'},
+      optional: const <String>{'display_name'},
+      context: 'Hosted member',
+    );
     final String role = _requiredString(json, 'role');
     final String status = _requiredString(json, 'status');
     if ((role != 'owner' && role != 'member') || status != 'active') {
@@ -274,6 +277,7 @@ class HostedMember {
       loginId: _requiredString(json, 'login_id'),
       role: role,
       status: status,
+      displayName: _optionalHostedDisplayName(json, 'display_name'),
     );
   }
 }
@@ -991,6 +995,21 @@ String? _optionalString(Map<String, Object?> json, String key) {
   if (value is! String || value.isEmpty) {
     throw FormatException(
       'JSON field $key must be a non-empty string when present.',
+    );
+  }
+  return value;
+}
+
+String? _optionalHostedDisplayName(Map<String, Object?> json, String key) {
+  final Object? value = json[key];
+  if (value == null) return null;
+  if (value is! String ||
+      value.isEmpty ||
+      value.length > 40 ||
+      value.trim() != value ||
+      RegExp(r'[\x00-\x1f\x7f]').hasMatch(value)) {
+    throw FormatException(
+      'JSON field $key must be a trimmed non-empty display name up to 40 characters when present.',
     );
   }
   return value;
