@@ -25,6 +25,7 @@ locals {
     "GET /hosted/groups",
     "POST /hosted/groups",
     "POST /hosted/groups/join",
+    "PATCH /hosted/groups/{group_id}",
     "GET /hosted/groups/{group_id}/members",
     "POST /hosted/groups/{group_id}/invite",
     "DELETE /hosted/groups/{group_id}/invite",
