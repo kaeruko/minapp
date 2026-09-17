@@ -92,7 +92,7 @@ void main() {
     expect(html, contains('const BGM_MASTER_GAIN = 3.0;'));
     expect(html, contains('gainValue * BGM_MASTER_GAIN'));
     expect(html, contains('async function openMicrophone()'));
-    expect(html, contains('元のエラー: ${error.name}: ${error.message}'));
+    expect(html, contains(r'元のエラー: ${error.name}: ${error.message}'));
   });
 
   test('novel starter bundles required runtime files', () async {
