@@ -13,6 +13,9 @@ if str(BACKEND_SRC) not in sys.path:
 import hosted_display_name_handler  # noqa: E402
 
 
+GROUP_ID = "2" * 32
+
+
 class FakeBackend:
     def __init__(self) -> None:
         self.calls: list[tuple[Any, ...]] = []
@@ -41,10 +44,27 @@ class FakeBackend:
             "display_name": display_name,
         }
 
+    def list_members(self, auth_subject: str, group_id: str) -> list[dict[str, Any]]:
+        self.calls.append(("list_members", auth_subject, group_id))
+        return [
+            {
+                "user_id": "3" * 32,
+                "login_id": "review",
+                "role": "owner",
+                "status": "active",
+                "display_name": "ねんね",
+            }
+        ]
 
-def event(method: str, *, body: dict[str, Any] | None = None) -> dict[str, Any]:
+
+def event(
+    method: str,
+    *,
+    path: str = "/hosted/me/display-name",
+    body: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     result: dict[str, Any] = {
-        "rawPath": "/hosted/me/display-name",
+        "rawPath": path,
         "requestContext": {
             "http": {"method": method},
             "authorizer": {"jwt": {"claims": {"sub": "sub-alice"}}},
@@ -82,10 +102,26 @@ class HostedDisplayNameHandlerTests(unittest.TestCase):
         self.assertEqual(json.loads(response["body"])["display_name"], "ねんね")
         self.assertEqual(self.backend.calls, [("set", "sub-alice", "ねんね")])
 
+    def test_group_members_include_display_names(self) -> None:
+        response = hosted_display_name_handler.handle_request(
+            event("GET", path=f"/hosted/groups/{GROUP_ID}/members")
+        )
+        self.assertIsNotNone(response)
+        assert response is not None
+        self.assertEqual(response["statusCode"], 200)
+        payload = json.loads(response["body"])
+        self.assertEqual(payload["members"][0]["display_name"], "ねんね")
+        self.assertEqual(
+            self.backend.calls,
+            [("list_members", "sub-alice", GROUP_ID)],
+        )
+
     def test_other_path_is_not_claimed(self) -> None:
-        other = event("GET")
-        other["rawPath"] = "/hosted/me"
-        self.assertIsNone(hosted_display_name_handler.handle_request(other))
+        self.assertIsNone(
+            hosted_display_name_handler.handle_request(
+                event("GET", path="/hosted/me")
+            )
+        )
 
 
 if __name__ == "__main__":
