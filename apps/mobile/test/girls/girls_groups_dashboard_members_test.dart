@@ -35,12 +35,14 @@ Map<String, Object?> _member(
   int id,
   String loginId, {
   bool owner = false,
+  String? displayName,
 }) {
   return <String, Object?>{
     'user_id': _userId(id),
     'login_id': loginId,
     'role': owner ? 'owner' : 'member',
     'status': 'active',
+    if (displayName != null) 'display_name': displayName,
   };
 }
 
@@ -125,6 +127,20 @@ void main() {
       find.byKey(const Key('girls-current-group-members-all')),
       findsNothing,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('prefers display name and falls back to login ID', (
+    WidgetTester tester,
+  ) async {
+    await _pumpDashboard(tester, <Map<String, Object?>>[
+      _member(1, 'review', owner: true, displayName: 'ねんね'),
+      _member(2, 'alice'),
+    ]);
+
+    expect(find.text('ねんね'), findsOneWidget);
+    expect(find.text('review'), findsNothing);
+    expect(find.text('alice'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
