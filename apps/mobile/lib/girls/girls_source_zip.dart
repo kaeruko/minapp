@@ -216,7 +216,7 @@ class GirlsSourceArchive {
       } else if (method == 8) {
         try {
           data = Uint8List.fromList(
-            const ZLibDecoder(raw: true).convert(compressed),
+            ZLibDecoder(raw: true).convert(compressed),
           );
         } on Object catch (error) {
           throw FormatException('ZIPを展開できません: $path ($error)');
@@ -340,7 +340,7 @@ class GirlsSourceArchive {
       uint16(0x0800);
       uint16(0);
       uint16(0);
-      uint16(0);
+      uint16(0x0021);
       uint32(record.crc);
       uint32(record.bytes.length);
       uint32(record.bytes.length);
@@ -357,7 +357,7 @@ class GirlsSourceArchive {
       uint16(0x0800);
       uint16(0);
       uint16(0);
-      uint16(0);
+      uint16(0x0021);
       uint32(record.crc);
       uint32(record.bytes.length);
       uint32(record.bytes.length);
