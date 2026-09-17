@@ -71,6 +71,7 @@ def event(
         },
     }
     if body is not None:
+        result["headers"] = {"content-type": "application/json"}
         result["body"] = json.dumps(body)
     return result
 
