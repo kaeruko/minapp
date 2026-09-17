@@ -116,7 +116,7 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
         _loginId = profile.loginId;
         _savedDisplayName = profile.displayName;
         _displayNameController.text = profile.displayName ?? '';
-        _message = '表示名を保存したよ♡';
+        _message = '表示名を保存したよ';
       });
     } catch (error) {
       if (mounted) setState(() => _error = core.girlsMessageFor(error));
