@@ -15,26 +15,28 @@ void main() {
   testWidgets('shows the permanent group ID and copy action', (
     WidgetTester tester,
   ) async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'POST');
+      expect(request.url.path, '/hosted/groups/$_groupId/invite');
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'group_id': _groupId,
+          'code': _groupCode,
+          'expires_at': '2099-01-01T00:00:00Z',
+          'valid_for_seconds': 1,
+        }),
+        200,
+        headers: const <String, String>{
+          'content-type': 'application/json; charset=utf-8',
+        },
+      );
+    });
+    addTearDown(client.close);
+
     final HostedGirlsApi api = HostedGirlsApi(
       baseUri: Uri.parse('https://example.com'),
-      client: MockClient((http.Request request) async {
-        expect(request.method, 'POST');
-        expect(request.url.path, '/hosted/groups/$_groupId/invite');
-        return http.Response(
-          jsonEncode(<String, Object?>{
-            'group_id': _groupId,
-            'code': _groupCode,
-            'expires_at': '2099-01-01T00:00:00Z',
-            'valid_for_seconds': 1,
-          }),
-          200,
-          headers: const <String, String>{
-            'content-type': 'application/json; charset=utf-8',
-          },
-        );
-      }),
+      client: client,
     );
-    addTearDown(api.close);
 
     await tester.pumpWidget(
       MaterialApp(
