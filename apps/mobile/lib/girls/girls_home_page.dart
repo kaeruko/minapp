@@ -10,6 +10,7 @@ import 'girls_email_settings_page.dart';
 import 'girls_footer_nav.dart';
 import 'girls_groups_page.dart';
 import 'girls_home_mascot_prompt.dart';
+import 'girls_profile_page.dart';
 import 'girls_scaffold.dart';
 import 'hosted_girls_api.dart';
 
@@ -186,6 +187,17 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       ),
     );
     if (mounted) await _loadGroups();
+  }
+
+  Future<void> _openProfile() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => GirlsProfilePage(
+          api: widget.api,
+          session: widget.session,
+        ),
+      ),
+    );
   }
 
   Future<void> _openGroup(HostedGroup group) async {
@@ -445,9 +457,10 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
           onTap: _showAccountMenu,
         ),
         _RoundArtButton(
+          key: const Key('girls-home-profile'),
           assetName: _profileAsset,
           label: 'マイページ',
-          onTap: _showAccountMenu,
+          onTap: _openProfile,
         ),
       ],
       body: SingleChildScrollView(
