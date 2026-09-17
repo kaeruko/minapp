@@ -28,6 +28,7 @@ class GirlsProfilePage extends StatefulWidget {
 
 class _GirlsProfilePageState extends State<GirlsProfilePage> {
   final TextEditingController _displayNameController = TextEditingController();
+  final FocusNode _displayNameFocusNode = FocusNode();
 
   String? _loginId;
   String? _savedDisplayName;
@@ -44,8 +45,19 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
 
   @override
   void dispose() {
+    _displayNameFocusNode.dispose();
     _displayNameController.dispose();
     super.dispose();
+  }
+
+  void _editDisplayName() {
+    if (_saving) return;
+    _displayNameFocusNode.requestFocus();
+    final int length = _displayNameController.text.length;
+    _displayNameController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: length,
+    );
   }
 
   Future<void> _load() async {
@@ -214,13 +226,20 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
-                        const Text(
-                          '表示名',
-                          style: TextStyle(
-                            color: _ink,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                          ),
+                        const Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                '表示名',
+                                style: TextStyle(
+                                  color: _ink,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            Icon(Icons.edit_rounded, color: _lavender, size: 20),
+                          ],
                         ),
                         const SizedBox(height: 5),
                         const Text(
@@ -234,13 +253,23 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
                         TextField(
                           key: const Key('girls-profile-display-name'),
                           controller: _displayNameController,
+                          focusNode: _displayNameFocusNode,
                           enabled: !_saving,
                           maxLength: _maxDisplayNameLength,
                           textCapitalization: TextCapitalization.sentences,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: '名前',
                             hintText: '例：ねんね',
-                            prefixIcon: Icon(Icons.badge_rounded),
+                            prefixIcon: const Icon(Icons.badge_rounded),
+                            suffixIcon: IconButton(
+                              key: const Key('girls-profile-edit-display-name'),
+                              tooltip: '表示名を編集',
+                              onPressed: _saving ? null : _editDisplayName,
+                              icon: const Icon(
+                                Icons.edit_rounded,
+                                color: _lavender,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
