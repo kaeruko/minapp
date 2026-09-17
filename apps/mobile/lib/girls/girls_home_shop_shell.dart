@@ -8,6 +8,7 @@ import 'girls_email_settings_page.dart';
 import 'girls_footer_nav.dart';
 import 'girls_groups_dashboard_page.dart';
 import 'girls_home_page.dart';
+import 'girls_profile_page.dart';
 import 'girls_registration_onboarding.dart';
 import 'girls_scaffold.dart';
 import 'girls_shop_page.dart';
@@ -217,6 +218,23 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
     );
   }
 
+  Future<void> _openProfile() async {
+    setState(() {
+      _novelFlowActive = false;
+      _novelFlowBaseDepth = null;
+      _footerHidden = false;
+    });
+    await _navigatorKey.currentState?.push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => GirlsProfilePage(
+          api: widget.api,
+          session: widget.session,
+        ),
+      ),
+    );
+    if (mounted) _selectTab(_selectedTab);
+  }
+
   Future<void> _showAccountMenu() async {
     final _AccountAction? action = await showModalBottomSheet<_AccountAction>(
       context: context,
@@ -362,7 +380,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
           key: const Key('girls-shell-profile'),
           assetName: _profileAsset,
           label: 'マイページ',
-          onTap: _showAccountMenu,
+          onTap: _openProfile,
         ),
       ],
       body: GirlsScaffoldChromeScope(
