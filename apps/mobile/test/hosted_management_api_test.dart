@@ -62,6 +62,36 @@ void main() {
     expect(apps.single.stats.totalPlays, 8);
   });
 
+  test('group rename uses PATCH and keeps the requested group scope', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'PATCH');
+      expect(request.url.path, '/hosted/groups/$_groupId');
+      expect(request.headers['authorization'], 'Bearer $_token');
+      expect(jsonDecode(request.body), <String, Object?>{'name': 'しばちゃん部'});
+      return _json(200, <String, Object?>{
+        'group_id': _groupId,
+        'name': 'しばちゃん部',
+        'role': 'owner',
+        'status': 'active',
+        'visibility': 'private',
+      });
+    });
+    final HostedGroupManagementApi api = HostedGroupManagementApi(
+      baseUri: Uri.parse('https://hosted.example'),
+      client: client,
+    );
+
+    final result = await api.renameGroup(
+      accessToken: _token,
+      groupId: _groupId,
+      name: 'しばちゃん部',
+    );
+
+    expect(result.groupId, _groupId);
+    expect(result.name, 'しばちゃん部');
+    expect(result.isOwner, isTrue);
+  });
+
   test('ownership transfer keeps the requested group and user scope', () async {
     final MockClient client = MockClient((http.Request request) async {
       expect(request.method, 'POST');
@@ -124,6 +154,31 @@ void main() {
         accessToken: _token,
         groupId: _groupId,
         newOwnerUserId: _userId,
+      ),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('rename response fails closed when group scope is changed', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      return _json(200, <String, Object?>{
+        'group_id': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'name': 'しばちゃん部',
+        'role': 'owner',
+        'status': 'active',
+        'visibility': 'private',
+      });
+    });
+    final HostedGroupManagementApi api = HostedGroupManagementApi(
+      baseUri: Uri.parse('https://hosted.example'),
+      client: client,
+    );
+
+    expect(
+      () => api.renameGroup(
+        accessToken: _token,
+        groupId: _groupId,
+        name: 'しばちゃん部',
       ),
       throwsA(isA<FormatException>()),
     );
