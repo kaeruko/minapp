@@ -341,7 +341,7 @@ class _HostedAuthoringProjectsPageState
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) => HostedAppWebViewPage.session(
-          title: '${widget.definition.pageTitle}（下書きを再生）',
+          title: '戻る',
           contentUri: preview.contentUri,
           runtimeToken: preview.runtimeToken,
           runtimeTransport: widget.runtimeTransport,
