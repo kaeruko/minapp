@@ -795,15 +795,16 @@
     const allowed = new Set([
       "app_id", "group_id", "title", "source_kind", "created_at", "builtin_id", "builtin_asset_path",
       "parent_app_id", "source_sha256", "source_updated_at", "published_sha256", "published_at",
-      "deletion_state", "builtin_version", "source_revision", "published_version", "editable",
+      "deletion_state", "builtin_version", "source_revision", "published_version", "editable", "owner_user_id",
     ]);
     for (const field of Object.keys(app)) {
       if (!allowed.has(field)) throw new Error(`Hosted app upload response contained unexpected field: ${field}`);
     }
-    for (const field of ["app_id", "group_id", "title", "source_kind", "created_at"]) {
+    for (const field of ["app_id", "group_id", "title", "source_kind", "created_at", "owner_user_id"]) {
       if (!(field in app)) throw new Error(`Hosted app upload response is missing field: ${field}`);
     }
     if (!ID_PATTERN.test(app.app_id)) throw new Error("Uploaded app_id is invalid.");
+    if (!ID_PATTERN.test(app.owner_user_id)) throw new Error("Uploaded app owner_user_id is invalid.");
     if (app.group_id !== expectedGroupId) throw new Error("Uploaded app group_id mismatch.");
     if (app.source_kind !== "upload") throw new Error("Uploaded app source_kind mismatch.");
     if (app.source_revision !== 1) throw new Error("Uploaded app source_revision must be 1.");
