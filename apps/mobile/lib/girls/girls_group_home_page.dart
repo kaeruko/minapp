@@ -191,7 +191,7 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
             _GroupHeaderCard(
               group: widget.group,
               busy: _busy,
-              onInvite: widget.group.isOwner ? _showGroupId : null,
+              onInvite: _showGroupId,
             ),
             if (_error != null) ...<Widget>[
               const SizedBox(height: 12),
