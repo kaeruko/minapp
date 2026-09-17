@@ -8,6 +8,7 @@ import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
 import 'girls_app_preview_api.dart';
+import 'girls_app_source_editor_page.dart';
 import 'girls_shop_api.dart';
 import 'hosted_girls_api.dart';
 import 'hosted_girls_upload_api.dart';
@@ -253,6 +254,28 @@ class _GirlsGroupAppManagementPageState
     }
   }
 
+  Future<void> _editSource() async {
+    final HostedGroupApp app = _requireEditableApp();
+    final int? revision = await Navigator.of(context).push<int>(
+      MaterialPageRoute<int>(
+        builder: (BuildContext context) => GirlsAppSourceEditorPage(
+          api: _managementApi,
+          accessToken: widget.session.accessToken,
+          groupId: widget.group.groupId,
+          appId: app.appId,
+          title: app.title,
+          expectedRevision: app.sourceRevision!,
+        ),
+      ),
+    );
+    if (revision == null || !mounted) return;
+    await _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('コードを保存しました。revision $revision')),
+    );
+  }
+
   Future<void> _publish() async {
     final HostedGroupApp app = _requireEditableApp();
     setState(() {
@@ -442,6 +465,13 @@ class _GirlsGroupAppManagementPageState
                 onPressed: _busy ? null : _previewDraft,
                 icon: const Icon(Icons.play_circle_outline_rounded),
                 label: const Text('下書きを開く'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('girls-group-admin-edit-code'),
+                onPressed: _busy ? null : _editSource,
+                icon: const Icon(Icons.code_rounded),
+                label: const Text('コードを編集'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
