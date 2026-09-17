@@ -21,9 +21,10 @@ List<HostedMember> _orderedMembers(Iterable<HostedMember> members) {
   final List<HostedMember> ordered = members.toList(growable: false);
   ordered.sort((HostedMember a, HostedMember b) {
     if (a.isOwner != b.isOwner) return a.isOwner ? -1 : 1;
-    final int byLoginId =
-        a.loginId.toLowerCase().compareTo(b.loginId.toLowerCase());
-    return byLoginId != 0 ? byLoginId : a.userId.compareTo(b.userId);
+    final int byDisplayLabel = a.displayLabel
+        .toLowerCase()
+        .compareTo(b.displayLabel.toLowerCase());
+    return byDisplayLabel != 0 ? byDisplayLabel : a.userId.compareTo(b.userId);
   });
   return ordered;
 }
@@ -796,7 +797,7 @@ class _MemberRow extends StatelessWidget {
           const SizedBox(width: 9),
           Expanded(
             child: Text(
-              member.loginId,
+              member.displayLabel,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
