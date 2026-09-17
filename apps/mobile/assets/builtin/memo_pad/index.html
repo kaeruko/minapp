@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>マイメモ帳</title>
+  <style>
+    :root {
+      font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", system-ui, sans-serif;
+      color: #4f4348;
+      background: #fffaf7;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; }
+    button, textarea { font: inherit; }
+
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      background: #fffaf7;
+    }
+
+    .app {
+      width: min(100%, 680px);
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: 0 auto;
+      padding:
+        max(14px, env(safe-area-inset-top))
+        14px
+        max(14px, env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 44px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: .02em;
+    }
+
+    .clear-button {
+      border: 1px solid #e8d8de;
+      border-radius: 999px;
+      background: #fff;
+      color: #8b6c77;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .clear-button:active { transform: translateY(1px); }
+
+    .memo {
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+      resize: none;
+      border: 1px solid #eadfe3;
+      border-radius: 18px;
+      outline: none;
+      background: #fff;
+      color: #493e42;
+      padding: 18px;
+      font-size: 16px;
+      line-height: 1.75;
+      box-shadow: 0 6px 20px #8e687010;
+    }
+
+    .memo:focus {
+      border-color: #e4bccb;
+      box-shadow: 0 0 0 3px #f8dce766;
+    }
+
+    .memo::placeholder { color: #bcaeb3; }
+
+    .status {
+      min-height: 18px;
+      margin: 0;
+      padding: 0 4px;
+      color: #9b8990;
+      font-size: 11px;
+      text-align: right;
+    }
+
+    .status.error {
+      color: #b44f60;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="topbar">
+      <h1>マイメモ帳</h1>
+      <button id="clear-button" class="clear-button" type="button">ぜんぶ消す</button>
+    </div>
+
+    <textarea
+      id="memo"
+      class="memo"
+      aria-label="メモ"
+      placeholder="ここにメモしてね"
+      autofocus
+    ></textarea>
+
+    <p id="status" class="status" aria-live="polite">自動保存</p>
+  </main>
+
+  <script>
+    'use strict';
+
+    const STORAGE_KEY = 'minapp_memo_pad_v1';
+
+    const memo = document.getElementById('memo');
+    const clearButton = document.getElementById('clear-button');
+    const status = document.getElementById('status');
+
+    if (!(memo instanceof HTMLTextAreaElement)) {
+      throw new Error('memo textarea was not found');
+    }
+    if (!(clearButton instanceof HTMLButtonElement)) {
+      throw new Error('clear button was not found');
+    }
+    if (!(status instanceof HTMLElement)) {
+      throw new Error('status element was not found');
+    }
+
+    function showSaved() {
+      status.classList.remove('error');
+      status.textContent = '保存しました';
+    }
+
+    function showStorageError(error) {
+      status.classList.add('error');
+      status.textContent = '保存できませんでした';
+      throw error;
+    }
+
+    function loadMemo() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        memo.value = saved ?? '';
+      } catch (error) {
+        showStorageError(error);
+      }
+    }
+
+    function saveMemo() {
+      try {
+        localStorage.setItem(STORAGE_KEY, memo.value);
+        showSaved();
+      } catch (error) {
+        showStorageError(error);
+      }
+    }
+
+    function clearMemo() {
+      if (!window.confirm('メモをぜんぶ消す？')) {
+        return;
+      }
+
+      memo.value = '';
+      saveMemo();
+      memo.focus();
+    }
+
+    memo.addEventListener('input', saveMemo);
+    clearButton.addEventListener('click', clearMemo);
+
+    loadMemo();
+  </script>
+</body>
+</html>
