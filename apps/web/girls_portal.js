@@ -800,18 +800,20 @@
     for (const field of Object.keys(app)) {
       if (!allowed.has(field)) throw new Error(`Hosted app upload response contained unexpected field: ${field}`);
     }
-    for (const field of ["app_id", "group_id", "title", "source_kind", "created_at", "owner_user_id"]) {
+    for (const field of ["app_id", "group_id", "title", "source_kind", "created_at", "owner_user_id", "source_revision"]) {
       if (!(field in app)) throw new Error(`Hosted app upload response is missing field: ${field}`);
     }
     if (!ID_PATTERN.test(app.app_id)) throw new Error("Uploaded app_id is invalid.");
     if (!ID_PATTERN.test(app.owner_user_id)) throw new Error("Uploaded app owner_user_id is invalid.");
     if (app.group_id !== expectedGroupId) throw new Error("Uploaded app group_id mismatch.");
     if (app.source_kind !== "upload") throw new Error("Uploaded app source_kind mismatch.");
-    if (app.source_revision !== 1) throw new Error("Uploaded app source_revision must be 1.");
+    if (!Number.isInteger(app.source_revision) || app.source_revision < 1) {
+      throw new Error("Uploaded app source_revision must be a positive integer.");
+    }
     return app;
   }
 
-  function validatePublishResponse(payload, expectedAppId, expectedGroupId) {
+  function validatePublishResponse(payload, expectedAppId, expectedGroupId, expectedSourceRevision) {
     const published = requireExactFields(
       payload,
       ["app_id", "group_id", "published_version", "source_revision", "sha256", "files", "published_at"],
@@ -822,7 +824,9 @@
     if (!Number.isInteger(published.published_version) || published.published_version < 1) {
       throw new Error("Publish response has invalid published_version.");
     }
-    if (published.source_revision !== 1) throw new Error("Publish response source_revision mismatch.");
+    if (published.source_revision !== expectedSourceRevision) {
+      throw new Error("Publish response source_revision mismatch.");
+    }
     if (typeof published.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(published.sha256)) {
       throw new Error("Publish response sha256 is invalid.");
     }
@@ -859,7 +863,7 @@
     }
 
     uploadSubmit.disabled = true;
-    let createdAppId = null;
+    let savedAppId = null;
     try {
       const params = new URLSearchParams({ title });
       const created = await apiRequest(`/hosted/groups/${groupId}/apps/upload?${params.toString()}`, {
@@ -869,22 +873,22 @@
         authenticated: true,
       });
       const app = validateCreatedApp(created, groupId);
-      createdAppId = app.app_id;
-      const published = await apiRequest(`/hosted/groups/${groupId}/apps/${createdAppId}/publish`, {
+      savedAppId = app.app_id;
+      const published = await apiRequest(`/hosted/groups/${groupId}/apps/${savedAppId}/publish`, {
         method: "POST",
-        jsonBody: { revision: 1 },
+        jsonBody: { revision: app.source_revision },
         authenticated: true,
       });
-      validatePublishResponse(published, createdAppId, groupId);
+      validatePublishResponse(published, savedAppId, groupId, app.source_revision);
 
       appTitle.value = "";
       sourceFile.value = "";
       sourceCode.value = "";
       setMessage(uploadResult, `「${title}」をアップロードして公開したよ♡ Girlsアプリに戻って更新すると表示されます。`);
     } catch (error) {
-      const prefix = createdAppId === null
+      const prefix = savedAppId === null
         ? ""
-        : `アプリは下書きとして作成されました（app_id=${createdAppId}）が、公開に失敗しました。\n`;
+        : `アプリのソース保存までは完了しました（app_id=${savedAppId}）が、公開に失敗しました。\n`;
       setMessage(uploadError, `${prefix}${errorMessage(error)}`);
       if (error instanceof GirlsApiError && error.status === 401) {
         setOnlyPanel(loginPanel);
