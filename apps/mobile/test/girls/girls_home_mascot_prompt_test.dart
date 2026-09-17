@@ -30,10 +30,17 @@ void main() {
     expect(prompt.destination, GirlsHomeMascotDestination.apps);
   });
 
-  test('group with friends and an app has no onboarding prompt', () {
+  test('group with friends and a custom app gets play prompt', () {
+    final GirlsHomeMascotPrompt? prompt = resolver.resolve(
+      memberCount: 2,
+      customAppCount: 1,
+    );
+
+    expect(prompt, isNotNull);
+    expect(prompt!.message, 'みんなのアプリで遊ぼう！');
     expect(
-      resolver.resolve(memberCount: 2, customAppCount: 1),
-      isNull,
+      prompt.destination,
+      GirlsHomeMascotDestination.currentGroup,
     );
   });
 
