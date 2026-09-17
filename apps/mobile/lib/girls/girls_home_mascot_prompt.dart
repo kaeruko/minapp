@@ -41,6 +41,9 @@ class GirlsHomeMascotPromptResolver {
         destination: GirlsHomeMascotDestination.apps,
       );
     }
-    return null;
+    return const GirlsHomeMascotPrompt(
+      message: 'みんなのアプリで遊ぼう！',
+      destination: GirlsHomeMascotDestination.currentGroup,
+    );
   }
 }
