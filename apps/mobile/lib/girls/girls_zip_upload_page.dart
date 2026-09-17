@@ -111,25 +111,26 @@ class _GirlsZipUploadPageState extends State<GirlsZipUploadPage> {
       _error = null;
     });
 
-    HostedGroupApp? created;
+    HostedGroupApp? saved;
     try {
-      created = await _uploadApi.createFromZip(
+      saved = await _uploadApi.createFromZip(
         accessToken: widget.session.accessToken,
         groupId: _groupId,
         title: title,
         zipBytes: zipBytes,
       );
+      final int sourceRevision = saved.sourceRevision!;
       await _uploadApi.publish(
         accessToken: widget.session.accessToken,
         groupId: _groupId,
-        appId: created.appId,
-        revision: 1,
+        appId: saved.appId,
+        revision: sourceRevision,
       );
       if (!mounted) return;
       await showDialog<void>(
         context: context,
         builder: (BuildContext dialogContext) => AlertDialog(
-          title: const Text('🎀 アプリを追加したよ'),
+          title: const Text('🎀 アプリを公開したよ'),
           content: Text('「$title」をアップロードして公開しました。'),
           actions: <Widget>[
             FilledButton(
@@ -142,9 +143,9 @@ class _GirlsZipUploadPageState extends State<GirlsZipUploadPage> {
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
-      final String prefix = created == null
+      final String prefix = saved == null
           ? ''
-          : 'アプリ自体は下書きとして作成されました（app_id=${created.appId}）が、公開に失敗しました。\n';
+          : 'アプリのソース保存までは完了しました（app_id=${saved.appId}）が、公開に失敗しました。\n';
       setState(() => _error = '$prefix${_messageFor(error)}');
     } finally {
       if (mounted) setState(() => _busy = false);
