@@ -376,13 +376,36 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
     try {
       await controller.runJavaScript(_injector.scriptForFinishedDocument());
       if (_authoringBridgeSession != null) {
-        await controller.runJavaScript(
-          _authoringInjector.scriptForFinishedDocument(),
-        );
-      }
-      if (_authoringPreviewBridgeSession != null) {
-        await controller.runJavaScript(
-          _authoringPreviewInjector.scriptForFinishedDocument(),
+        final String authoringScript =
+            _authoringInjector.scriptForFinishedDocument();
+        final HostedAuthoringPreviewBridgeSession? previewSession =
+            _authoringPreviewBridgeSession;
+        if (previewSession == null) {
+          throw StateError(
+            'Authoring WebView has no Preview bridge session during injection.',
+          );
+        }
+        final String previewScript =
+            _authoringPreviewInjector.scriptForFinishedDocument();
+        // Native Authoring is installed in two layers. Do not expose the
+        // intermediate state (Authoring without Preview) through minappready;
+        // Editors should observe exactly one fully usable Authoring surface.
+        await controller.runJavaScript('''
+(() => {
+  const deferMinAppReady = (event) => event.stopImmediatePropagation();
+  window.addEventListener('minappready', deferMinAppReady, true);
+  try {
+    $authoringScript
+    $previewScript
+  } finally {
+    window.removeEventListener('minappready', deferMinAppReady, true);
+  }
+  window.dispatchEvent(new Event('minappready'));
+})();
+''');
+      } else if (_authoringPreviewBridgeSession != null) {
+        throw StateError(
+          'Authoring Preview bridge exists without an Authoring bridge session.',
         );
       }
       if (_usesGirlsNovelBackground) {
@@ -568,7 +591,7 @@ class _HostedPreviewNavigationPolicy {
     final List<String> segments = uri.pathSegments;
     return segments.length == 4 &&
         segments[0] == 'hosted' &&
-        segments[1] == 'preview';
+        (segments[1] == 'preview' || segments[1] == 'authoring-preview');
   }
 
   bool allows(Uri target) {
@@ -594,9 +617,10 @@ class _HostedPreviewNavigationPolicy {
       );
     }
     final List<String> segments = uri.pathSegments;
-    if (segments.length != 4 ||
-        segments[0] != 'hosted' ||
-        segments[1] != 'preview' ||
+    final bool supportedPreviewPath = segments.length == 4 &&
+        segments[0] == 'hosted' &&
+        (segments[1] == 'preview' || segments[1] == 'authoring-preview');
+    if (!supportedPreviewPath ||
         !_previewTokenPattern.hasMatch(segments[2]) ||
         segments[3] != 'index.html') {
       throw ArgumentError.value(
@@ -610,7 +634,7 @@ class _HostedPreviewNavigationPolicy {
 
   static String _contentPathPrefix(Uri uri) {
     final List<String> segments = uri.pathSegments;
-    return '/hosted/preview/${segments[2]}/';
+    return '/hosted/${segments[1]}/${segments[2]}/';
   }
 
   static bool _containsTraversalSegment(Uri uri) {
