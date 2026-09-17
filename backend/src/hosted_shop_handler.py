@@ -9,6 +9,7 @@ import hosted_handler
 from errors import ApiProblem
 from handler import (
     _auth_subject,
+    _group_name,
     _json_body,
     _json_response,
     _raw_path,
@@ -17,11 +18,13 @@ from handler import (
     _required_string,
 )
 from hosted_girls_shop_backend import HostedGirlsShopBackend
+from hosted_group_settings import rename_group
 from hosted_user_state_backend import HostedUserStateBackend
 
 _LOGGER = logging.getLogger(__name__)
 _BACKEND: HostedGirlsShopBackend | None = None
 _ID_RE = r"([0-9a-f]{32})"
+_GROUP_SETTINGS_RE = re.compile(rf"^/hosted/groups/{_ID_RE}$")
 _SHOP_ACTION_RE = re.compile(rf"^/shop/apps/{_ID_RE}/(launch|download|reports)$")
 _SHOP_VISIBILITY_RE = re.compile(rf"^/apps/{_ID_RE}/shop-visibility$")
 _SHOP_CONTENT_RE = re.compile(r"^/shop/content/([A-Za-z0-9_-]{32,128})/(.+)$")
@@ -89,6 +92,20 @@ def _handle_shop_request(event: dict[str, Any]) -> dict[str, Any] | None:
     method = _request_method(event)
     path = _raw_path(event)
     backend = _shared_backend()
+
+    group_settings_match = _GROUP_SETTINGS_RE.fullmatch(path)
+    if method == "PATCH" and group_settings_match is not None:
+        payload = _json_body(event)
+        _require_fields(payload, required={"name"})
+        return _json_response(
+            200,
+            rename_group(
+                backend,
+                _auth_subject(event),
+                group_settings_match.group(1),
+                _group_name(payload),
+            ),
+        )
 
     content_match = _SHOP_CONTENT_RE.fullmatch(path)
     if method == "GET" and content_match is not None:
