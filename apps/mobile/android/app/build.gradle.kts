@@ -45,7 +45,8 @@ android {
     }
 
     defaultConfig {
-        applicationId = "jp.cloxs.min"
+        applicationId =
+            if (isGirlsVariant) "jp.cloxs.minapp.girls" else "jp.cloxs.min"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
