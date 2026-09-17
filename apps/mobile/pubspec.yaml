@@ -36,6 +36,7 @@ flutter:
     - assets/builtin/novel_starter/face.jpg
     - assets/builtin/sing_along/index.html
     - assets/builtin/minappchi/index.html
+    - assets/builtin/memo_pad/index.html
     - assets/girls/character.png
     - assets/girls/mascot_pair.svg
     - assets/girls/mascot_white.svg

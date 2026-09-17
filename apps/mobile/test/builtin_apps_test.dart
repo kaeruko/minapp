@@ -6,7 +6,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('built-in app registry has unique valid entries', () {
-    expect(builtInApps, hasLength(7));
+    expect(builtInApps, hasLength(8));
     expect(
       builtInApps.map((BuiltInApp app) => app.id).toSet(),
       hasLength(builtInApps.length),
@@ -38,6 +38,10 @@ void main() {
       builtInApps.singleWhere((BuiltInApp app) => app.id == 'minappchi').title,
       'みんあぷっち',
     );
+    expect(
+      builtInApps.singleWhere((BuiltInApp app) => app.id == 'memo').title,
+      'マイメモ帳',
+    );
   });
 
   test('built-in app search filters every registered local app', () {
@@ -56,6 +60,7 @@ void main() {
     expect(filterBuiltInApps('ノベルゲーム').single.id, 'novel-starter');
     expect(filterBuiltInApps('カラオケ').single.id, 'sing-along');
     expect(filterBuiltInApps('みんアプっち').single.id, 'minappchi');
+    expect(filterBuiltInApps('メモ帳').single.id, 'memo');
   });
 
   test('every registered built-in app asset is bundled', () async {
@@ -64,6 +69,18 @@ void main() {
       expect(html, startsWith('<!doctype html>'));
       expect(html, contains('<title>${app.title}</title>'));
     }
+  });
+
+  test('memo pad provides fail-fast autosave controls', () async {
+    final BuiltInApp memo = builtInApps.singleWhere(
+      (BuiltInApp app) => app.id == 'memo',
+    );
+    final String html = await rootBundle.loadString(memo.assetPath);
+
+    expect(html, contains("const STORAGE_KEY = 'minapp_memo_pad_v1'"));
+    expect(html, contains("memo.addEventListener('input', saveMemo)"));
+    expect(html, contains("window.confirm('メモをぜんぶ消す？')"));
+    expect(html, contains("throw new Error('memo textarea was not found')"));
   });
 
   test('novel starter bundles required runtime files', () async {

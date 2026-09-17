@@ -118,6 +118,18 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     iconBorderColor: Color(0xFFFF8A94),
     iconColor: Color(0xFFA73548),
   ),
+  BuiltInApp(
+    id: 'memo',
+    title: 'マイメモ帳',
+    assetPath: 'assets/builtin/memo_pad/index.html',
+    searchableText:
+        'マイメモ帳 メモ メモ帳 ノート 自動保存 Girls 女子向け みんアプ公式',
+    icon: Icons.edit_note_rounded,
+    cardColor: Color(0xFFF0FBFF),
+    iconBackgroundColor: Color(0xFFD9F4FF),
+    iconBorderColor: Color(0xFF91D5ED),
+    iconColor: Color(0xFF477E94),
+  ),
 ];
 
 List<BuiltInApp> filterBuiltInApps(String query) {
