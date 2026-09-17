@@ -83,6 +83,18 @@ void main() {
     expect(html, contains("throw new Error('memo textarea was not found')"));
   });
 
+  test('karaoke uses louder BGM and preserves microphone diagnostics', () async {
+    final BuiltInApp karaoke = builtInApps.singleWhere(
+      (BuiltInApp app) => app.id == 'sing-along',
+    );
+    final String html = await rootBundle.loadString(karaoke.assetPath);
+
+    expect(html, contains('const BGM_MASTER_GAIN = 3.0;'));
+    expect(html, contains('gainValue * BGM_MASTER_GAIN'));
+    expect(html, contains('async function openMicrophone()'));
+    expect(html, contains(r'元のエラー: ${error.name}: ${error.message}'));
+  });
+
   test('novel starter bundles required runtime files', () async {
     expect(
       await rootBundle.loadString('assets/builtin/novel_starter/player.js'),
