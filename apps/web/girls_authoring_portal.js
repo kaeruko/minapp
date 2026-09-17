@@ -2,6 +2,7 @@
 
 (async function installGirlsAuthoringPortal() {
   await import("/authoring_resilience_host.js");
+  await import("/girls_app_source_editor.js");
 
   const portalApi = globalThis.MinAppHostedAuthoringPortal;
   if (!portalApi || typeof portalApi.HostedAuthoringPortalController !== "function") {
