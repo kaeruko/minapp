@@ -15,6 +15,18 @@ const Color _lavender = Color(0xFF8B6BB2);
 const Color _panelPink = Color(0xFFF8DCDD);
 const Color _softCream = Color(0xFFFFFBF6);
 const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
+const int _inlineMemberLimit = 4;
+
+List<HostedMember> _orderedMembers(Iterable<HostedMember> members) {
+  final List<HostedMember> ordered = members.toList(growable: false);
+  ordered.sort((HostedMember a, HostedMember b) {
+    if (a.isOwner != b.isOwner) return a.isOwner ? -1 : 1;
+    final int byLoginId =
+        a.loginId.toLowerCase().compareTo(b.loginId.toLowerCase());
+    return byLoginId != 0 ? byLoginId : a.userId.compareTo(b.userId);
+  });
+  return ordered;
+}
 
 /// The Girls group tab is centered on one explicit "current group".
 ///
@@ -461,18 +473,8 @@ class _CurrentGroupCard extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback? onSettings;
 
-  HostedMember? get _owner {
-    final List<HostedMember>? currentMembers = members;
-    if (currentMembers == null) return null;
-    for (final HostedMember member in currentMembers) {
-      if (member.isOwner) return member;
-    }
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final HostedMember? owner = _owner;
     final List<HostedGroupApp> apps = latestApps ?? const <HostedGroupApp>[];
     return Container(
       key: const Key('girls-current-group-dashboard-card'),
@@ -504,22 +506,8 @@ class _CurrentGroupCard extends StatelessWidget {
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 6),
-          if (loading && members == null)
-            const SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else
-            Text(
-              'オーナー: ${owner?.loginId ?? '—'}　メンバー数: ${members?.length ?? 0}',
-              style: const TextStyle(
-                color: _ink,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+          const SizedBox(height: 12),
+          _MembersPanel(members: members, loading: loading),
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
@@ -609,6 +597,224 @@ class _CurrentGroupCard extends StatelessWidget {
                 'グループを開く',
                 style: TextStyle(fontWeight: FontWeight.w900),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MembersPanel extends StatelessWidget {
+  const _MembersPanel({required this.members, required this.loading});
+
+  final List<HostedMember>? members;
+  final bool loading;
+
+  Future<void> _showAllMembers(
+    BuildContext context,
+    List<HostedMember> members,
+  ) async {
+    final List<HostedMember> ordered = _orderedMembers(members);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: _softCream,
+      builder: (BuildContext sheetContext) => SafeArea(
+        child: SizedBox(
+          key: const Key('girls-all-members-sheet'),
+          height: MediaQuery.sizeOf(sheetContext).height * .68,
+          child: Column(
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 4, 22, 14),
+                child: Row(
+                  children: <Widget>[
+                    const Icon(Icons.groups_rounded, color: _lavender),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'メンバー ${ordered.length}人',
+                        style: const TextStyle(
+                          color: _ink,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+                  itemCount: ordered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  itemBuilder: (BuildContext context, int index) =>
+                      _MemberRow(member: ordered[index]),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final List<HostedMember>? currentMembers = members;
+    final List<HostedMember> ordered = currentMembers == null
+        ? const <HostedMember>[]
+        : _orderedMembers(currentMembers);
+    final List<HostedMember> visible = ordered.length <= _inlineMemberLimit
+        ? ordered
+        : ordered.take(_inlineMemberLimit).toList(growable: false);
+
+    return Container(
+      key: const Key('girls-current-group-members'),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .58),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE8B9C7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.groups_rounded, size: 20, color: _lavender),
+              const SizedBox(width: 7),
+              const Expanded(
+                child: Text(
+                  'メンバー',
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              if (currentMembers != null)
+                Text(
+                  '${currentMembers.length}人',
+                  style: const TextStyle(
+                    color: Color(0xFF806D77),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (loading && currentMembers == null)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else if (currentMembers == null)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text(
+                'メンバー情報を読み込めませんでした。',
+                style: TextStyle(fontSize: 12, color: Color(0xFF8C7893)),
+              ),
+            )
+          else if (visible.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text(
+                'メンバーはいません。',
+                style: TextStyle(fontSize: 12, color: Color(0xFF8C7893)),
+              ),
+            )
+          else ...<Widget>[
+            ...visible.map(
+              (HostedMember member) => Padding(
+                padding: const EdgeInsets.only(bottom: 5),
+                child: _MemberRow(member: member),
+              ),
+            ),
+            if (ordered.length > _inlineMemberLimit)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  key: const Key('girls-current-group-members-all'),
+                  onPressed: () => _showAllMembers(context, ordered),
+                  icon: const Icon(Icons.expand_more_rounded, size: 19),
+                  label: Text(
+                    'あと${ordered.length - _inlineMemberLimit}人・全員を見る',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MemberRow extends StatelessWidget {
+  const _MemberRow({required this.member});
+
+  final HostedMember member;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: ValueKey<String>('girls-member-${member.userId}'),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+      decoration: BoxDecoration(
+        color: _softCream.withValues(alpha: .78),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: <Widget>[
+          CircleAvatar(
+            radius: 15,
+            backgroundColor: member.isOwner
+                ? const Color(0xFFFFE2A8)
+                : const Color(0xFFE9DDF5),
+            foregroundColor: _ink,
+            child: Icon(
+              member.isOwner
+                  ? Icons.workspace_premium_rounded
+                  : Icons.person_rounded,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              member.loginId,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: _ink,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            member.isOwner ? 'オーナー' : 'メンバー',
+            style: TextStyle(
+              color: member.isOwner
+                  ? const Color(0xFF946B18)
+                  : const Color(0xFF7B6992),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
