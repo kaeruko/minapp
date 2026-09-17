@@ -25,4 +25,6 @@ test("production portal publisher includes every Web Authoring asset referenced 
 
   assert.match(girlsAuthoring, /import\("\/authoring_resilience_host\.js"\)/);
   assert.match(publisher, /"authoring_resilience_host\.js"/);
+  assert.match(girlsAuthoring, /import\("\/girls_app_source_editor\.js"\)/);
+  assert.match(publisher, /"girls_app_source_editor\.js"/);
 });
