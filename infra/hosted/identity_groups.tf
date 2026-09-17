@@ -118,10 +118,12 @@ resource "aws_iam_role_policy" "hosted_identity_api_application" {
         Resource = aws_cognito_user_pool.main.arn
       },
       {
-        Sid      = "HostedBuiltinSourceTemplates"
-        Effect   = "Allow"
-        Action   = ["s3:GetObject"]
-        Resource = [for source in aws_s3_object.hosted_builtin_source : "${aws_s3_bucket.uploads.arn}/${source.key}"]
+        Sid    = "HostedBuiltinSourceTemplates"
+        Effect = "Allow"
+        Action = ["s3:GetObject"]
+        # Match the same template keys without coupling API configuration
+        # updates to deployment of independently maintained template ZIPs.
+        Resource = [for builtin_id, source in local.hosted_builtin_sources : "${aws_s3_bucket.uploads.arn}/hosted/templates/${builtin_id}/v${source.version}/source.zip"]
       },
       {
         Sid      = "HostedNovelSampleAssets"
@@ -167,11 +169,12 @@ resource "aws_lambda_function" "hosted_identity_api" {
   handler       = "hosted_shop_handler.lambda_handler"
   runtime       = "python3.12"
 
-  filename         = data.archive_file.api.output_path
-  source_code_hash = data.archive_file.api.output_base64sha256
+  filename         = var.hosted_identity_package_path != null ? var.hosted_identity_package_path : data.archive_file.api.output_path
+  source_code_hash = var.hosted_identity_package_path != null ? filebase64sha256(var.hosted_identity_package_path) : data.archive_file.api.output_base64sha256
 
-  memory_size = 512
+  memory_size = 1024
   timeout     = 10
+  publish     = true
 
   environment {
     variables = {
@@ -205,9 +208,14 @@ resource "aws_apigatewayv2_integration" "hosted_identity_api" {
   api_id = aws_apigatewayv2_api.api.id
 
   integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.hosted_identity_api.invoke_arn
+  integration_uri        = aws_lambda_alias.hosted_identity_live.invoke_arn
   integration_method     = "POST"
   payload_format_version = "2.0"
+
+  depends_on = [
+    aws_lambda_provisioned_concurrency_config.hosted_identity,
+    aws_lambda_permission.hosted_identity_live_gateway,
+  ]
 }
 
 resource "aws_apigatewayv2_route" "hosted_public" {

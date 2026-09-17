@@ -37,7 +37,7 @@ class GirlsBuiltinInstallApi {
       builtinId: novelEditorBuiltinId,
       label: 'Novel Editor',
     );
-    await _ensureNovelSampleProject(
+    await ensureNovelSampleProject(
       accessToken: accessToken,
       groupId: groupId,
     );
@@ -47,15 +47,22 @@ class GirlsBuiltinInstallApi {
   Future<HostedGroupApp> ensureNovelEditor({
     required String accessToken,
     required String groupId,
+    bool includeSample = true,
   }) async {
-    await ensureNovelPlayer(
-      accessToken: accessToken,
-      groupId: groupId,
-    );
     final List<HostedGroupApp> apps = await _listGroupApps(
       accessToken: accessToken,
       groupId: groupId,
     );
+    final List<HostedGroupApp> players = apps
+        .where((app) =>
+            app.sourceKind == 'builtin' &&
+            app.builtinId == novelPlayerBuiltinId)
+        .toList(growable: false);
+    if (players.length > 1) {
+      throw const FormatException(
+        'Group app list contains duplicate Novel Player installations.',
+      );
+    }
     final List<HostedGroupApp> editors = apps
         .where(
           (HostedGroupApp app) =>
@@ -68,6 +75,9 @@ class GirlsBuiltinInstallApi {
         'Group app list contains duplicate Novel Editor installations.',
       );
     }
+    if (players.isEmpty) {
+      await installNovelPlayer(accessToken: accessToken, groupId: groupId);
+    }
     final HostedGroupApp editor = editors.length == 1
         ? editors.single
         : await _installBuiltin(
@@ -76,10 +86,12 @@ class GirlsBuiltinInstallApi {
             builtinId: novelEditorBuiltinId,
             label: 'Novel Editor',
           );
-    await _ensureNovelSampleProject(
-      accessToken: accessToken,
-      groupId: groupId,
-    );
+    if (includeSample) {
+      await ensureNovelSampleProject(
+        accessToken: accessToken,
+        groupId: groupId,
+      );
+    }
     return editor;
   }
 
@@ -122,7 +134,7 @@ class GirlsBuiltinInstallApi {
     );
   }
 
-  Future<void> _ensureNovelSampleProject({
+  Future<void> ensureNovelSampleProject({
     required String accessToken,
     required String groupId,
   }) async {
@@ -158,7 +170,8 @@ class GirlsBuiltinInstallApi {
       }
     }
 
-    final HostedAuthoringProjectSummary created = await projectsApi.createProject(
+    final HostedAuthoringProjectSummary created =
+        await projectsApi.createProject(
       accessToken: accessToken,
       groupId: groupId,
       contentFormat: _novelContentFormat,
@@ -410,7 +423,8 @@ class GirlsBuiltinInstallApi {
     required String groupId,
   }) {
     if (accessToken.isEmpty) {
-      throw ArgumentError.value(accessToken, 'accessToken', 'must not be empty');
+      throw ArgumentError.value(
+          accessToken, 'accessToken', 'must not be empty');
     }
     if (!_hostedIdPattern.hasMatch(groupId)) {
       throw ArgumentError.value(

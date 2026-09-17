@@ -27,6 +27,7 @@ class HostedGirlsApi {
       client: resolvedClient,
     );
     return HostedGirlsApi._(
+      httpClient: resolvedClient,
       delegate: delegate,
       authClient: RefreshableAuthClient(
         baseUri: baseUri,
@@ -38,6 +39,7 @@ class HostedGirlsApi {
   }
 
   HostedGirlsApi._({
+    required this.httpClient,
     required HostedApi delegate,
     required RefreshableAuthClient authClient,
     required GirlsRegistrationOnboarding registrationOnboarding,
@@ -48,6 +50,9 @@ class HostedGirlsApi {
         _sessionStore = sessionStore;
 
   final HostedApi _delegate;
+  // Related screen clients share connections instead of repeating TLS setup.
+  // They borrow this client and must not close it.
+  final http.Client httpClient;
   final RefreshableAuthClient _authClient;
   final GirlsRegistrationOnboarding _registrationOnboarding;
   final GirlsSessionStore _sessionStore;

@@ -5,5 +5,5 @@ resource "aws_lambda_function" "api" {
 }
 
 resource "aws_lambda_function" "hosted_identity_api" {
-  handler = "abuse_entry.hosted_lambda_handler"
+  handler = "hosted_performance_entry.lambda_handler"
 }

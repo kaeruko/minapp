@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import 'girls_apps_hub_page.dart';
+import 'girls_apps_cache.dart';
 import 'girls_current_group_store.dart';
 import 'girls_email_settings_page.dart';
 import 'girls_footer_nav.dart';
@@ -47,6 +48,7 @@ class GirlsHomeShopShell extends StatefulWidget {
 
 class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  final GirlsAppsCache _appsCache = GirlsAppsCache();
   late final _GirlsShellNavigatorObserver _navigatorObserver;
   GirlsFooterTab _selectedTab = GirlsFooterTab.home;
   HostedGroup? _currentGroup;
@@ -170,6 +172,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               session: widget.session,
             ),
           GirlsFooterTab.apps => GirlsAppsPage(
+              cache: _appsCache,
               api: widget.api,
               session: widget.session,
               onHome: () => _selectTab(GirlsFooterTab.home),
@@ -180,6 +183,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
             ),
           // 「その他」の専用画面ができるまでは従来どおりアプリ画面を使う。
           GirlsFooterTab.more => GirlsAppsPage(
+              cache: _appsCache,
               api: widget.api,
               session: widget.session,
               onHome: () => _selectTab(GirlsFooterTab.home),
@@ -203,7 +207,8 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
       _novelFlowBaseDepth = null;
       _footerHidden = false;
     });
-    navigator.pushAndRemoveUntil(_rootRoute(tab), (Route<dynamic> route) => false);
+    navigator.pushAndRemoveUntil(
+        _rootRoute(tab), (Route<dynamic> route) => false);
   }
 
   void _showNotices() {
@@ -240,7 +245,8 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
                 ),
                 title: const Text('メールアドレス'),
                 subtitle: const Text('確認コードで紐づける'),
-                onTap: () => Navigator.of(sheetContext).pop(_AccountAction.email),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_AccountAction.email),
               ),
               ListTile(
                 leading: const Icon(Icons.refresh_rounded, color: _lavender),
@@ -367,7 +373,8 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               onGenerateInitialRoutes: (
                 NavigatorState navigator,
                 String initialRoute,
-              ) => <Route<void>>[_rootRoute(GirlsFooterTab.home)],
+              ) =>
+                  <Route<void>>[_rootRoute(GirlsFooterTab.home)],
               onGenerateRoute: (RouteSettings settings) =>
                   _rootRoute(GirlsFooterTab.home),
             ),

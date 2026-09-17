@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -7,6 +9,7 @@ import '../hosted_authoring_projects_api.dart';
 import 'api.dart';
 import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
+import 'girls_apps_cache.dart';
 import 'girls_apps_page.dart' as legacy;
 import 'girls_builtin_install_api.dart';
 import 'girls_footer_nav.dart';
@@ -21,7 +24,8 @@ const String _novelContentFormat = 'minapp/novel@1';
 
 String _novelProjectTitle(HostedAuthoringProject project) {
   if (project.summary.contentFormat != _novelContentFormat) {
-    throw const FormatException('Novel project has an unexpected content format.');
+    throw const FormatException(
+        'Novel project has an unexpected content format.');
   }
   if (project.document.isEmpty) return '新しいノベル';
   final Object? rawTitle = project.document['title'];
@@ -48,6 +52,7 @@ class GirlsAppsPage extends StatefulWidget {
     this.currentGroup,
     this.onCurrentGroupChanged,
     this.onFooterVisibilityChanged,
+    this.cache,
     super.key,
   });
 
@@ -58,6 +63,7 @@ class GirlsAppsPage extends StatefulWidget {
   final HostedGroup? currentGroup;
   final ValueChanged<HostedGroup?>? onCurrentGroupChanged;
   final ValueChanged<bool>? onFooterVisibilityChanged;
+  final GirlsAppsCache? cache;
 
   @override
   State<GirlsAppsPage> createState() => _GirlsAppsPageState();
@@ -75,22 +81,39 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
   String? _novelEditorAppId;
   bool _busy = false;
   String? _error;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
     super.initState();
     _currentGroup = widget.currentGroup;
-    _managementApi = GirlsAppManagementApi(baseUri: widget.api.baseUri);
-    _builtinInstallApi = GirlsBuiltinInstallApi(baseUri: widget.api.baseUri);
-    _contractApi = HostedAuthoringContractApi(baseUri: widget.api.baseUri);
+    _managementApi = GirlsAppManagementApi(
+        baseUri: widget.api.baseUri, client: widget.api.httpClient);
+    _builtinInstallApi = GirlsBuiltinInstallApi(
+        baseUri: widget.api.baseUri, client: widget.api.httpClient);
+    _contractApi = HostedAuthoringContractApi(
+        baseUri: widget.api.baseUri, client: widget.api.httpClient);
+    final GirlsAppsSnapshot? cached =
+        widget.cache?.read(widget.session.accessToken, _currentGroup?.groupId);
+    if (cached != null) {
+      _activeGroups = cached.groups;
+      _makers = cached.makers;
+      _apps = cached.apps;
+      _novelEditorAppId = cached.novelEditorAppId;
+    }
     _load();
   }
 
   @override
   void didUpdateWidget(covariant GirlsAppsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.currentGroup?.groupId != oldWidget.currentGroup?.groupId) {
+    if (widget.currentGroup?.groupId != oldWidget.currentGroup?.groupId ||
+        widget.session.accessToken != oldWidget.session.accessToken) {
       _currentGroup = widget.currentGroup;
+      _makers = null;
+      _apps = null;
+      _activeGroups = null;
+      _novelEditorAppId = null;
       _load();
     }
   }
@@ -105,15 +128,20 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
 
   Future<void> _load() async {
     if (!mounted) return;
+    final int generation = ++_loadGeneration;
+    final Stopwatch loadTime = Stopwatch()..start();
+    final bool hadSnapshot = _makers != null && _apps != null;
+    final String accessToken = widget.session.accessToken;
+    final String? previousId = _currentGroup?.groupId;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
       final List<HostedGroup> groups = await widget.api.listGroups(
-        widget.session.accessToken,
+        accessToken,
       );
-      final String? previousId = _currentGroup?.groupId;
+      if (!mounted || generation != _loadGeneration) return;
       HostedGroup? currentGroup;
       if (previousId != null) {
         for (final HostedGroup group in groups) {
@@ -134,29 +162,27 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
           _apps = const <ManagedGirlsApp>[];
           _novelEditorAppId = null;
         });
+        widget.cache?.clear();
         if (previousId != null) widget.onCurrentGroupChanged?.call(null);
         return;
       }
 
-      // Novel is the one default maker. ensureNovelEditor is idempotent and
-      // also ensures its matching Player exists before discovery.
-      final HostedGroupApp novelEditor = await _builtinInstallApi.ensureNovelEditor(
-        accessToken: widget.session.accessToken,
-        groupId: currentGroup.groupId,
-      );
-      final List<HostedAuthoringAppContract> contracts = await _contractApi.listApps(
-        accessToken: widget.session.accessToken,
-        groupId: currentGroup.groupId,
-      );
-      final List<ManagedGirlsApp> managed = await _managementApi.listApps(
-        widget.session.accessToken,
-      );
+      // Discover makers and managed apps concurrently. Sample artwork belongs
+      // to opening the Novel maker, not to displaying the app list.
+      final results = await (
+        _loadMakers(accessToken, currentGroup.groupId),
+        _managementApi.listApps(accessToken),
+      ).wait;
+      final HostedGroupApp novelEditor = results.$1.$1;
+      final List<HostedAuthoringAppContract> contracts = results.$1.$2;
+      final List<ManagedGirlsApp> managed = results.$2;
 
       final Set<String> authoringAppIds = contracts
           .map((HostedAuthoringAppContract contract) => contract.appId)
           .toSet();
       final List<HostedAuthoringAppContract> makers = contracts
-          .where((HostedAuthoringAppContract contract) => contract.edits.isNotEmpty)
+          .where((HostedAuthoringAppContract contract) =>
+              contract.edits.isNotEmpty)
           .toList(growable: false)
         ..sort((a, b) {
           if (a.appId == novelEditor.appId) return -1;
@@ -172,7 +198,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
           )
           .toList(growable: false);
 
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _activeGroups = groups;
         _currentGroup = currentGroup;
@@ -180,14 +206,58 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
         _apps = apps;
         _novelEditorAppId = novelEditor.appId;
       });
+      widget.cache?.write(
+          accessToken,
+          GirlsAppsSnapshot(
+            group: currentGroup,
+            novelEditorAppId: novelEditor.appId,
+            groups: groups,
+            makers: makers,
+            apps: apps,
+          ));
+      assert(() {
+        debugPrint('Girls apps loaded in ${loadTime.elapsedMilliseconds} ms '
+            '(previous list visible: $hadSnapshot)');
+        return true;
+      }());
       if (previousId != currentGroup.groupId) {
         widget.onCurrentGroupChanged?.call(currentGroup);
       }
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted && generation == _loadGeneration) {
+        widget.cache?.clear();
+        setState(() {
+          _error = core.girlsMessageFor(_loadError(error));
+          _makers = const [];
+          _apps = const [];
+          _activeGroups = null;
+          _novelEditorAppId = null;
+        });
+      }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _busy = false);
+      }
     }
+  }
+
+  Future<(HostedGroupApp, List<HostedAuthoringAppContract>)> _loadMakers(
+    String accessToken,
+    String groupId,
+  ) async {
+    final editor = await _builtinInstallApi.ensureNovelEditor(
+        accessToken: accessToken, groupId: groupId, includeSample: false);
+    final contracts =
+        await _contractApi.listApps(accessToken: accessToken, groupId: groupId);
+    return (editor, contracts);
+  }
+
+  Object _loadError(Object error) {
+    if (error is ParallelWaitError<Object?, (AsyncError?, AsyncError?)>) {
+      final errors = error.errors;
+      return errors.$1?.error ?? errors.$2!.error;
+    }
+    return error;
   }
 
   Future<void> _openUploadPortal() async {
@@ -228,7 +298,16 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
         maker.edits.length == 1 &&
         maker.edits.single == _novelContentFormat;
     if (isNovel) widget.onFooterVisibilityChanged?.call(true);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
+      if (isNovel) {
+        await _builtinInstallApi.ensureNovelSampleProject(
+            accessToken: widget.session.accessToken, groupId: group.groupId);
+        if (!mounted) return;
+      }
       await openHostedAuthoringProjects(
         context: context,
         baseUri: widget.api.baseUri,
@@ -241,15 +320,14 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
         pageTitle: isNovel ? 'ノベルエディタ' : '${maker.title}でつくる',
         collectionTitle: isNovel ? 'あなたのノベル作品' : 'あなたの作品',
         emptyTitle: isNovel ? 'まだノベル作品がありません' : 'まだ作品がありません',
-        emptyBody: isNovel
-            ? '「新しくつくる」から物語を作ってみよう。'
-            : '「新しくつくる」からはじめよう。',
+        emptyBody: isNovel ? '「新しくつくる」から物語を作ってみよう。' : '「新しくつくる」からはじめよう。',
         projectTitle: isNovel ? _novelProjectTitle : null,
       );
       if (mounted) await _load();
     } catch (error) {
       if (mounted) setState(() => _error = core.girlsMessageFor(error));
     } finally {
+      if (mounted) setState(() => _busy = false);
       if (isNovel) widget.onFooterVisibilityChanged?.call(false);
     }
   }
@@ -300,7 +378,11 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
             if (_error != null) ...<Widget>[
               const SizedBox(height: 12),
               _ErrorCard(message: _error!),
+              TextButton(
+                  onPressed: _busy ? null : _load,
+                  child: const Text('もう一度読み込む')),
             ],
+            if (_busy && makers != null) const LinearProgressIndicator(),
             const SizedBox(height: 24),
             const _SectionHeader(
               title: '作品をつくる',
@@ -311,6 +393,8 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
               const _LoadingCard()
             else if (_currentGroup == null)
               _SelectGroupCard(onSelect: widget.onGroups)
+            else if (_error != null && makers.isEmpty)
+              const SizedBox.shrink()
             else if (makers.isEmpty)
               const _EmptyMakerCard()
             else
@@ -331,6 +415,8 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
               const _LoadingCard()
             else if (_currentGroup == null)
               _SelectGroupCard(onSelect: widget.onGroups)
+            else if (_error != null && apps.isEmpty)
+              const SizedBox.shrink()
             else if (apps.isEmpty)
               const _EmptyAppsCard()
             else
@@ -376,7 +462,8 @@ class _SectionHeader extends StatelessWidget {
       children: <Widget>[
         Text(
           title,
-          style: const TextStyle(color: _ink, fontSize: 19, fontWeight: FontWeight.w900),
+          style: const TextStyle(
+              color: _ink, fontSize: 19, fontWeight: FontWeight.w900),
         ),
         if (subtitle != null) ...<Widget>[
           const SizedBox(height: 3),
@@ -447,7 +534,8 @@ class _MakerCard extends StatelessWidget {
               Container(
                 width: 44,
                 height: 44,
-                decoration: BoxDecoration(color: _pink, borderRadius: BorderRadius.circular(14)),
+                decoration: BoxDecoration(
+                    color: _pink, borderRadius: BorderRadius.circular(14)),
                 child: const Icon(Icons.edit_note_rounded, color: _lavender),
               ),
               const SizedBox(width: 13),
@@ -457,7 +545,10 @@ class _MakerCard extends StatelessWidget {
                   children: <Widget>[
                     Text(
                       maker.title,
-                      style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 16),
+                      style: const TextStyle(
+                          color: _ink,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16),
                     ),
                     const SizedBox(height: 3),
                     Text(
@@ -495,7 +586,8 @@ class _AppCard extends StatelessWidget {
         onTap: onTap,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
         leading: const Icon(Icons.apps_rounded, color: _lavender),
-        title: Text(app.app.title, style: const TextStyle(color: _ink, fontWeight: FontWeight.w800)),
+        title: Text(app.app.title,
+            style: const TextStyle(color: _ink, fontWeight: FontWeight.w800)),
         subtitle: Text(app.isHidden ? '非公開' : '公開中'),
         trailing: const Icon(Icons.chevron_right_rounded),
       ),
@@ -560,7 +652,8 @@ class _ErrorCard extends StatelessWidget {
       ),
       child: Text(
         message,
-        style: const TextStyle(color: Color(0xFFA04455), fontWeight: FontWeight.w700),
+        style: const TextStyle(
+            color: Color(0xFFA04455), fontWeight: FontWeight.w700),
       ),
     );
   }

@@ -15,10 +15,10 @@ const String _novelContentFormat = 'minapp/novel@1';
 const String _novelSampleTitle = 'ひみつの放課後';
 
 http.Response _json(int status, Map<String, Object?> body) => http.Response(
-  jsonEncode(body),
-  status,
-  headers: const <String, String>{'content-type': 'application/json'},
-);
+      jsonEncode(body),
+      status,
+      headers: const <String, String>{'content-type': 'application/json'},
+    );
 
 Map<String, Object?> _installedApp({
   String groupId = _groupId,
@@ -66,7 +66,31 @@ bool _isHydrateRequest(http.Request request) =>
     request.url.path == '/hosted/authoring/projects/$_contentId/samples/novel';
 
 void main() {
-  test('Novel Editor setup installs missing Player first, then Editor and sample', () async {
+  test('list discovery uses one read and never prepares sample content',
+      () async {
+    final List<http.Request> captured = [];
+    final client = MockClient((request) async {
+      captured.add(request);
+      expect(request.method, 'GET');
+      expect(request.url.path, '/hosted/groups/$_groupId/apps');
+      return _json(200, {
+        'apps': [
+          _installedApp(builtinId: novelPlayerBuiltinId),
+          _installedApp(),
+        ]
+      });
+    });
+    final api = GirlsBuiltinInstallApi(
+        baseUri: Uri.parse('https://hosted.example.test'), client: client);
+    final editor = await api.ensureNovelEditor(
+        accessToken: 'owner-token', groupId: _groupId, includeSample: false);
+    expect(editor.builtinId, novelEditorBuiltinId);
+    expect(captured, hasLength(1));
+  });
+
+  test(
+      'Novel Editor setup installs missing Player first, then Editor and sample',
+      () async {
     final List<http.Request> captured = <http.Request>[];
     final MockClient client = MockClient((http.Request request) async {
       captured.add(request);
@@ -76,7 +100,8 @@ void main() {
       }
       if (request.method == 'GET' &&
           request.url.path == '/hosted/authoring/groups/$_groupId/projects') {
-        expect(request.url.queryParameters['content_format'], _novelContentFormat);
+        expect(
+            request.url.queryParameters['content_format'], _novelContentFormat);
         return _json(200, const <String, Object?>{'projects': <Object?>[]});
       }
       if (request.method == 'POST' &&
@@ -125,14 +150,16 @@ void main() {
     });
     expect(captured[3].url.path, '/hosted/authoring/groups/$_groupId/projects');
     expect(captured[4].url.path, '/hosted/authoring/projects');
-    expect(captured[5].url.path, '/hosted/authoring/projects/$_contentId/samples/novel');
+    expect(captured[5].url.path,
+        '/hosted/authoring/projects/$_contentId/samples/novel');
     expect(app.appId, _appId);
     expect(app.groupId, _groupId);
     expect(app.sourceKind, 'builtin');
     expect(app.builtinId, novelEditorBuiltinId);
   });
 
-  test('Novel Editor setup reuses an already-installed Player and seeds sample', () async {
+  test('Novel Editor setup reuses an already-installed Player and seeds sample',
+      () async {
     final List<http.Request> captured = <http.Request>[];
     final MockClient client = MockClient((http.Request request) async {
       captured.add(request);
@@ -179,25 +206,18 @@ void main() {
     });
     expect(captured[2].url.path, '/hosted/authoring/groups/$_groupId/projects');
     expect(captured[3].url.path, '/hosted/authoring/projects');
-    expect(captured[4].url.path, '/hosted/authoring/projects/$_contentId/samples/novel');
+    expect(captured[4].url.path,
+        '/hosted/authoring/projects/$_contentId/samples/novel');
     expect(app.builtinId, novelEditorBuiltinId);
   });
 
-  test('ensureNovelEditor reuses installed Editor, Player, and existing sample', () async {
+  test('ensureNovelEditor reuses installed Editor, Player, and existing sample',
+      () async {
     final List<http.Request> captured = <http.Request>[];
-    var groupAppsGetCount = 0;
     final MockClient client = MockClient((http.Request request) async {
       captured.add(request);
       if (request.method == 'GET' &&
           request.url.path == '/hosted/groups/$_groupId/apps') {
-        groupAppsGetCount += 1;
-        if (groupAppsGetCount == 1) {
-          return _json(200, <String, Object?>{
-            'apps': <Object?>[
-              _installedApp(builtinId: novelPlayerBuiltinId),
-            ],
-          });
-        }
         return _json(200, <String, Object?>{
           'apps': <Object?>[
             _installedApp(builtinId: novelPlayerBuiltinId),
@@ -230,13 +250,19 @@ void main() {
       groupId: _groupId,
     );
 
-    expect(captured, hasLength(5));
-    expect(captured.take(4).every((http.Request request) => request.method == 'GET'), isTrue);
-    expect(captured.last.url.path, '/hosted/authoring/projects/$_contentId/samples/novel');
+    expect(captured, hasLength(4));
+    expect(
+        captured
+            .take(3)
+            .every((http.Request request) => request.method == 'GET'),
+        isTrue);
+    expect(captured.last.url.path,
+        '/hosted/authoring/projects/$_contentId/samples/novel');
     expect(app.builtinId, novelEditorBuiltinId);
   });
 
-  test('ensureNovelPlayer repairs a group that is missing the Player', () async {
+  test('ensureNovelPlayer repairs a group that is missing the Player',
+      () async {
     final List<http.Request> captured = <http.Request>[];
     final MockClient client = MockClient((http.Request request) async {
       captured.add(request);
