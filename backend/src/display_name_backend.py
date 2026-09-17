@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from aws_backend import _item_string, _string_attr
+from display_name_store import read_display_name, write_display_name
 from errors import ApiProblem
-from phase2_backend import _optional_item_string
 from phase4_moderation_backend import Phase4ModerationAwsBackend
 
 
@@ -12,37 +11,10 @@ class DisplayNameAwsBackend(Phase4ModerationAwsBackend):
     """Optional user display names without requiring a migration of existing user items."""
 
     def _display_name(self, user_id: str) -> str | None:
-        item = self._get_item(pk=f"USER#{user_id}", sk="DISPLAY_NAME")
-        if item is None:
-            return None
-        if _item_string(item, "entity") != "user_display_name":
-            raise RuntimeError("Display-name item has an unexpected entity type")
-        name = _optional_item_string(item, "display_name")
-        if name is None:
-            raise RuntimeError("Display-name item has no display_name")
-        if name != name.strip() or len(name) < 1 or len(name) > 40:
-            raise RuntimeError("Stored display_name is invalid")
-        return name
+        return read_display_name(self, user_id)
 
     def _write_display_name(self, user_id: str, display_name: str) -> None:
-        if not isinstance(display_name, str):
-            raise TypeError("display_name must be a string")
-        if display_name != display_name.strip() or len(display_name) < 1 or len(display_name) > 40:
-            raise ValueError("display_name must be 1-40 characters without surrounding whitespace")
-        if any(ord(char) < 0x20 or ord(char) == 0x7F for char in display_name):
-            raise ValueError("display_name must not contain control characters")
-        self._dynamodb.put_item(
-            TableName=self._table_name,
-            Item={
-                "pk": _string_attr(f"USER#{user_id}"),
-                "sk": _string_attr("DISPLAY_NAME"),
-                "entity": _string_attr("user_display_name"),
-                "user_id": _string_attr(user_id),
-                "display_name": _string_attr(display_name),
-            },
-            ConditionExpression="attribute_not_exists(pk) OR user_id = :user_id",
-            ExpressionAttributeValues={":user_id": _string_attr(user_id)},
-        )
+        write_display_name(self, user_id, display_name)
 
     def get_my_display_name(self, auth_subject: str) -> dict[str, Any]:
         user = self._user_by_auth_subject(auth_subject)
