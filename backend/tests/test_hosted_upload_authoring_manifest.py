@@ -42,6 +42,11 @@ class FakeUploadBackend:
     def _require_active_membership(self, user_id: str, group_id: str) -> None:
         self.membership = (user_id, group_id)
 
+    def _group_app_items(self, group_id: str) -> list[dict[str, object]]:
+        if group_id != "2" * 32:
+            raise AssertionError(group_id)
+        return []
+
     def _require_app_capacity(self, group_id: str) -> None:
         self.capacity_group_id = group_id
 
