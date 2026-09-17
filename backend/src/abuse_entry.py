@@ -9,6 +9,7 @@ import hosted_authoring_capability_entry
 import hosted_authoring_delete_entry
 import hosted_authoring_entry
 import hosted_authoring_publish_entry
+import hosted_display_name_handler
 import hosted_entry
 import hosted_handler
 import hosted_preview_state_entry
@@ -124,6 +125,10 @@ def hosted_lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]
         preview_state_response = hosted_preview_state_entry.handle_request(event)
         if preview_state_response is not None:
             return preview_state_response
+
+        display_name_response = hosted_display_name_handler.handle_request(event)
+        if display_name_response is not None:
+            return display_name_response
 
         authoring_capability_response = hosted_authoring_capability_entry.handle_request(event)
         if authoring_capability_response is not None:
