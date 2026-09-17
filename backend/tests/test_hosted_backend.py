@@ -322,6 +322,18 @@ class HostedBackendTests(unittest.TestCase):
         joined = self.backend.join_group(bob, first["code"])
         self.assertEqual(joined["group_id"], group["group_id"])
 
+    def test_group_member_can_read_same_permanent_group_id(self) -> None:
+        alice = self._register("alice")
+        bob = self._register("bob")
+        group = self.backend.create_group(alice, "みんなのアトリエ")
+        owner_view = self.backend.create_invite(alice, group["group_id"])
+        self.backend.join_group(bob, owner_view["code"])
+
+        member_view = self.backend.create_invite(bob, group["group_id"])
+
+        self.assertEqual(member_view["code"], owner_view["code"])
+        self.assertEqual(member_view["group_id"], group["group_id"])
+
     def test_group_id_cannot_be_revoked(self) -> None:
         alice = self._register("alice")
         bob = self._register("bob")
