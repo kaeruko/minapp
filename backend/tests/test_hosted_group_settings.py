@@ -12,6 +12,7 @@ BACKEND_SRC = Path(__file__).resolve().parents[1] / "src"
 if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
 
+import abuse_entry  # noqa: E402
 import hosted_shop_handler  # noqa: E402
 from aws_backend import _string_attr  # noqa: E402
 from hosted_group_settings import rename_group  # noqa: E402
@@ -161,6 +162,20 @@ class HostedGroupSettingsTests(unittest.TestCase):
         payload = json.loads(response["body"])
         self.assertEqual(payload["group_id"], GROUP_ID)
         self.assertEqual(payload["name"], "新しい名前")
+        self.assertEqual(len(backend._dynamodb.transactions), 1)
+
+    def test_deployed_hosted_entry_routes_group_patch_to_shop_handler(self) -> None:
+        backend = FakeBackend()
+        with patch.object(hosted_shop_handler, "_shared_backend", return_value=backend):
+            response = abuse_entry.hosted_lambda_handler(
+                _event("PATCH", f"/hosted/groups/{GROUP_ID}", {"name": "みんなのアトリエ"}),
+                None,
+            )
+
+        self.assertEqual(response["statusCode"], 200)
+        payload = json.loads(response["body"])
+        self.assertEqual(payload["group_id"], GROUP_ID)
+        self.assertEqual(payload["name"], "みんなのアトリエ")
         self.assertEqual(len(backend._dynamodb.transactions), 1)
 
     def test_patch_route_rejects_unknown_fields_before_write(self) -> None:
