@@ -17,6 +17,8 @@ const Color _text = Color(0xFF5D4037);
 const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
 const String _girlsLoginHeroBackgroundAsset =
     'assets/girls/generated/login_hero_bg.svg';
+const String _groupHomeBackgroundAsset =
+    'assets/girls/backgrounds/group_home_background.jpg';
 
 
 class GirlsApp extends StatelessWidget {
@@ -1405,7 +1407,7 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
   Widget build(BuildContext context) {
     final List<HostedGroupApp>? apps = _apps;
     return Scaffold(
-      body: _GirlsBackground(
+      body: _GirlsGroupHomeBackground(
         child: SafeArea(
           child: Column(
             children: <Widget>[
@@ -1485,6 +1487,27 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _GirlsGroupHomeBackground extends StatelessWidget {
+  const _GirlsGroupHomeBackground({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      key: const Key('girls-group-home-background'),
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage(_groupHomeBackgroundAsset),
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+        ),
+      ),
+      child: child,
     );
   }
 }
