@@ -272,7 +272,7 @@ class _GirlsGroupAppManagementPageState
     await _load();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('コードを保存しました。revision $revision')),
+      const SnackBar(content: Text('コードを保存しました。現在版を更新しました。')),
     );
   }
 
@@ -449,8 +449,8 @@ class _GirlsGroupAppManagementPageState
                     const SizedBox(height: 8),
                     Text('作者: ${_authorLabel ?? '確認中…'}'),
                     Text('作者ID: ${app.ownerUserId}'),
-                    Text('最新revision: ${app.sourceRevision}'),
-                    Text('公開バージョン: ${app.publishedVersion ?? '-'}'),
+                    Text('現在版: ${app.sourceRevision == null ? 'なし' : '保存済み'}'),
+                    Text('公開版: ${app.publishedVersion == null ? 'なし' : 'あり'}'),
                   ],
                 ),
               ),
@@ -492,7 +492,7 @@ class _GirlsGroupAppManagementPageState
                 key: const Key('girls-group-admin-publish'),
                 onPressed: _busy ? null : _publish,
                 icon: const Icon(Icons.cloud_upload_rounded),
-                label: const Text('最新版を公開'),
+                label: const Text('現在版を公開'),
               ),
               const SizedBox(height: 22),
               const Text(
@@ -506,7 +506,7 @@ class _GirlsGroupAppManagementPageState
               const SizedBox(height: 6),
               if (!app.isPublished)
                 const Text(
-                  '最新版を公開すると、ほかのグループのみんなが見られるショップへ出せるようになります。',
+                  '現在版を公開すると、ほかのグループのみんなが見られるショップへ出せるようになります。',
                   style: TextStyle(fontSize: 12, color: _lavender),
                 )
               else ...<Widget>[

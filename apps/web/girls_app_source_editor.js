@@ -541,7 +541,7 @@
     });
     if (!response.ok) throw new Error(await responseError(response));
     const revision = Number(response.headers.get("x-minapp-source-revision"));
-    if (!Number.isInteger(revision) || revision < 1) throw new Error("ソースrevisionを確認できませんでした。");
+    if (!Number.isInteger(revision) || revision < 1) throw new Error("現在版を確認できませんでした。");
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.length === 0 || bytes.length > MAX_UPLOAD_BYTES) throw new Error("取得したZIPのサイズが不正です。");
     return { revision, bytes };
@@ -563,7 +563,7 @@
       activePath = "index.html";
       renderFiles();
       renderActiveFile();
-      setStatus(`revision ${source.revision} を編集中`);
+      setStatus("現在版を編集中");
     } catch (error) {
       setStatus(errorMessage(error), "error");
       throw error;
@@ -672,7 +672,7 @@
       if (!update.ok) throw new Error(await responseError(update));
       const updatePayload = await update.json();
       if (!Number.isInteger(updatePayload.revision) || updatePayload.revision !== currentRevision + 1) {
-        throw new Error("ソース更新revisionが不正です。");
+        throw new Error("現在版の更新情報が不正です。");
       }
       const nextRevision = updatePayload.revision;
       const publish = await authenticatedFetch(
@@ -685,14 +685,14 @@
       );
       if (!publish.ok) {
         currentRevision = nextRevision;
-        throw new Error(`下書きはrevision ${nextRevision}として保存されましたが、公開に失敗しました: ${await responseError(publish)}`);
+        throw new Error(`現在版は保存されましたが、公開版の更新に失敗しました: ${await responseError(publish)}`);
       }
       const publishPayload = await publish.json();
       if (publishPayload.source_revision !== nextRevision || !Number.isInteger(publishPayload.published_version)) {
-        throw new Error("公開レスポンスのrevision情報が不正です。");
+        throw new Error("公開結果の版情報が不正です。");
       }
       currentRevision = nextRevision;
-      setStatus(`保存して公開しました（v${publishPayload.published_version} / revision ${nextRevision}）。`);
+      setStatus("現在版を保存して公開版を更新しました。");
       const refresh = document.getElementById("girls-apps-refresh");
       if (refresh instanceof HTMLButtonElement) refresh.click();
     } catch (error) {

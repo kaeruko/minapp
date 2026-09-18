@@ -425,7 +425,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
     final ManagedGirlsAppDetail? detail = _detail;
     final int? revision = detail?.summary.sourceRevision;
     if (detail == null || revision == null) {
-      setState(() => _error = '保存するrevisionを確認できません。');
+      setState(() => _error = '保存する現在版を確認できません。');
       return;
     }
     setState(() {
@@ -462,7 +462,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
     final ManagedGirlsAppDetail? detail = _detail;
     final int? revision = detail?.summary.sourceRevision;
     if (detail == null || revision == null) {
-      setState(() => _error = '更新元のrevisionを確認できません。');
+      setState(() => _error = '更新元の現在版を確認できません。');
       return;
     }
     final PlatformFile? file = await FilePicker.pickFile(
@@ -646,7 +646,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
                       ? null
                       : _publish,
                   icon: const Icon(Icons.cloud_upload_rounded),
-                  label: const Text('最新版を公開'),
+                  label: const Text('現在版を公開'),
                 ),
                 const SizedBox(height: 8),
               ] else if (detail.summary.app.sourceKind == 'builtin') ...<Widget>[
@@ -674,7 +674,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
               ),
               const SizedBox(height: 24),
               const Text(
-                'バージョン履歴',
+                '保存履歴',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 8),
@@ -688,7 +688,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
                       Icons.description_rounded,
                       color: _lavender,
                     ),
-                    title: Text('revision ${item.revision}'),
+                    title: const Text('保存'),
                     subtitle: Text(_formatDate(item.createdAt)),
                   ),
                 ),
@@ -705,9 +705,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
                   (GirlsPublishedHistoryItem item) => ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.public_rounded, color: _lavender),
-                    title: Text(
-                      'v${item.version}  /  revision ${item.sourceRevision}',
-                    ),
+                    title: const Text('公開版'),
                     subtitle: Text(_formatDate(item.publishedAt)),
                   ),
                 ),
@@ -779,8 +777,8 @@ class _AppSummary extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Text('公開バージョン: ${app.app.publishedVersion ?? '-'}'),
-          Text('最新revision: ${app.sourceRevision ?? '-'}'),
+          Text('公開版: ${app.app.publishedVersion == null ? 'なし' : 'あり'}'),
+          Text('現在版: ${app.sourceRevision == null ? 'なし' : '保存済み'}'),
           Text(
             '最終更新: ${app.sourceUpdatedAt == null ? '-' : _formatDate(app.sourceUpdatedAt!)}',
           ),

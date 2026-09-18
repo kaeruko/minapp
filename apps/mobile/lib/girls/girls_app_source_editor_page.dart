@@ -222,7 +222,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
           if (!_loading && _archive != null)
             IconButton(
               key: const Key('girls-source-editor-save-appbar'),
-              tooltip: '保存してrevision更新',
+              tooltip: '現在版を保存',
               onPressed: !_dirty || _saving ? null : _save,
               icon: _saving
                   ? const SizedBox.square(
@@ -276,8 +276,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Text(
-                        'revision ${widget.expectedRevision} を編集中。保存すると '
-                        'revision ${widget.expectedRevision + 1} になります。公開版は自動では変わりません。',
+                        '現在版を編集中。保存しても公開版は変わりません。',
                         style: const TextStyle(
                           color: _lavender,
                           fontSize: 12,
@@ -347,7 +346,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.save_rounded),
-                  label: Text(_saving ? '保存中…' : '保存してrevision更新'),
+                  label: Text(_saving ? '保存中…' : '現在版を保存'),
                 ),
               ),
       ],
