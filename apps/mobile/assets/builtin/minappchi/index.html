@@ -322,7 +322,7 @@
     const saveStatus = document.getElementById('save-status');
 
     let state = null;
-    let persistentMode = false;
+    let storageMode = null;
     let started = false;
     let busy = false;
 
@@ -334,6 +334,10 @@
         typeof window.minapp.state.get === 'function' &&
         typeof window.minapp.state.set === 'function'
       );
+    }
+
+    function isBuiltInLocalStorageEnvironment() {
+      return window.location.protocol === 'file:';
     }
 
     function newEgg(generation, now = Date.now()) {
@@ -457,13 +461,22 @@
     }
 
     async function persist() {
-      if (!persistentMode) {
-        setSaveStatus('この環境ではセーブなし');
+      if (storageMode === 'minapp') {
+        if (!hasMinAppState()) {
+          throw new Error('MinApp state bridge disappeared while saving.');
+        }
+        await window.minapp.state.set(SAVE_KEY, state);
+        setSaveStatus('セーブしました');
         return;
       }
-      if (!hasMinAppState()) throw new Error('MinApp state bridge disappeared while saving.');
-      await window.minapp.state.set(SAVE_KEY, state);
-      setSaveStatus('セーブしました');
+
+      if (storageMode === 'local') {
+        window.localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+        setSaveStatus('端末にセーブしました');
+        return;
+      }
+
+      throw new Error('Storage mode is not initialized.');
     }
 
     function dots(value, max, filled, empty) {
@@ -591,9 +604,9 @@
       setMessage('あたらしい たまごが やってきた。');
     }));
 
-    async function bootPersistent() {
+    async function bootMinAppState() {
       if (!hasMinAppState()) throw new Error('MinApp state bridge is unavailable.');
-      persistentMode = true;
+      storageMode = 'minapp';
       try {
         const saved = await window.minapp.state.get(SAVE_KEY);
         state = validateState(saved);
@@ -613,32 +626,64 @@
       render();
     }
 
-    function bootSession() {
-      if (persistentMode) return;
-      state = newEgg(1);
+    async function bootLocalStorage() {
+      storageMode = 'local';
+      const raw = window.localStorage.getItem(SAVE_KEY);
+
+      if (raw === null) {
+        state = newEgg(1);
+        await persist();
+        setMessage('たまごが やってきた！');
+      } else {
+        let saved;
+        try {
+          saved = JSON.parse(raw);
+        } catch (error) {
+          throw new Error(
+            `Invalid local saved state JSON: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+        state = validateState(saved);
+        setSaveStatus('端末のセーブを読み込みました');
+      }
+
+      const changed = advanceTo(Date.now());
+      if (changed) await persist();
       started = true;
-      setSaveStatus('この環境ではセーブなし');
-      setMessage('おためしモード。みんアプで開くとセーブできるよ。');
       render();
     }
 
+    function stopForStorageError(error) {
+      setMessage(
+        `セーブを開始できません: ${error instanceof Error ? error.message : String(error)}`,
+        true
+      );
+      setSaveStatus('セーブ失敗');
+      snackButton.disabled = true;
+      flushButton.disabled = true;
+      nextEggButton.disabled = true;
+    }
+
     async function handleMinAppReady() {
+      if (started) return;
       try {
-        await bootPersistent();
+        await bootMinAppState();
       } catch (error) {
-        setMessage(`セーブを開始できません: ${error instanceof Error ? error.message : String(error)}`, true);
-        setSaveStatus('セーブ失敗');
-        snackButton.disabled = true;
-        flushButton.disabled = true;
-        nextEggButton.disabled = true;
+        stopForStorageError(error);
       }
     }
 
     window.addEventListener('minappready', handleMinAppReady);
-    if (hasMinAppState()) handleMinAppReady();
-    else {
+
+    if (isBuiltInLocalStorageEnvironment()) {
+      bootLocalStorage().catch(stopForStorageError);
+    } else if (hasMinAppState()) {
+      handleMinAppReady();
+    } else {
       window.setTimeout(() => {
-        if (!persistentMode && !started) bootSession();
+        if (!started) {
+          stopForStorageError(new Error('MinApp state bridge is unavailable.'));
+        }
       }, 1200);
     }
 
