@@ -323,7 +323,15 @@ class _GirlsGroupAppManagementPageState
             title: '${app.title}（下書きを開く）',
             contentUri: launch.contentUri,
             runtimeToken: launch.runtimeToken,
-            runtimeTransport: widget.api.runtimeClient,
+            runtimeTransport: GirlsPreviewRuntimeTransport(
+              delegate: widget.api.runtimeClient,
+              previewApi: _previewApi,
+              accessToken: widget.session.accessToken,
+              groupId: app.groupId,
+              appId: app.appId,
+              runtimeToken: launch.runtimeToken,
+              groupScope: true,
+            ),
           ),
         ),
       );
