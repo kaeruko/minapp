@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../hosted_runtime_bridge.dart';
 import 'api.dart';
 
 final RegExp _idPattern = RegExp(r'^[0-9a-f]{32}$');
@@ -176,6 +177,46 @@ class GirlsAppPreviewApi {
     );
   }
 
+  Future<String> refreshDraftRuntime({
+    required String accessToken,
+    required String groupId,
+    required String appId,
+    required String expiredRuntimeToken,
+    required bool groupScope,
+  }) async {
+    _validateToken(accessToken);
+    _validateId(groupId, 'groupId');
+    _validateId(appId, 'appId');
+    if (!_runtimeTokenPattern.hasMatch(expiredRuntimeToken)) {
+      throw ArgumentError.value(
+        expiredRuntimeToken,
+        'expiredRuntimeToken',
+        'must be a valid Runtime token',
+      );
+    }
+
+    final String path = groupScope
+        ? '/hosted/groups/$groupId/apps/$appId/preview-runtime-session'
+        : '/hosted/my/apps/$appId/preview-runtime-session';
+    final Map<String, Object?> payload = await _postJson(
+      path: path,
+      accessToken: accessToken,
+      body: <String, Object?>{'runtime_token': expiredRuntimeToken},
+    );
+    _requireExactFields(payload, const <String>{
+      'runtime_token',
+      'runtime_expires_in',
+    }, 'Draft preview Runtime refresh response');
+    final String runtimeToken = _requiredString(payload, 'runtime_token');
+    if (!_runtimeTokenPattern.hasMatch(runtimeToken)) {
+      throw const FormatException(
+        'Draft preview Runtime refresh returned an invalid Runtime token.',
+      );
+    }
+    _requiredPositiveInt(payload, 'runtime_expires_in');
+    return runtimeToken;
+  }
+
   Future<_RuntimeSession> _createRuntimeSession({
     required String accessToken,
     required String groupId,
@@ -204,6 +245,18 @@ class GirlsAppPreviewApi {
   Future<Map<String, Object?>> _postEmpty({
     required String path,
     required String accessToken,
+  }) {
+    return _postJson(
+      path: path,
+      accessToken: accessToken,
+      body: const <String, Object?>{},
+    );
+  }
+
+  Future<Map<String, Object?>> _postJson({
+    required String path,
+    required String accessToken,
+    required Map<String, Object?> body,
   }) async {
     if (!path.startsWith('/')) {
       throw ArgumentError.value(path, 'path', 'must start with /.');
@@ -215,7 +268,7 @@ class GirlsAppPreviewApi {
         'Authorization': 'Bearer $accessToken',
         'Content-Type': 'application/json',
       },
-      body: '{}',
+      body: jsonEncode(body),
     );
     final String? contentType = response.headers['content-type'];
     if (contentType == null ||
@@ -250,6 +303,117 @@ class GirlsAppPreviewApi {
       );
     }
     return decoded;
+  }
+}
+
+class GirlsPreviewRuntimeTransport implements HostedRuntimeTransport {
+  GirlsPreviewRuntimeTransport({
+    required HostedRuntimeTransport delegate,
+    required GirlsAppPreviewApi previewApi,
+    required String accessToken,
+    required String groupId,
+    required String appId,
+    required String runtimeToken,
+    required bool groupScope,
+  })  : _delegate = delegate,
+        _previewApi = previewApi,
+        _accessToken = accessToken,
+        _groupId = groupId,
+        _appId = appId,
+        _bridgeToken = runtimeToken,
+        _currentToken = runtimeToken,
+        _groupScope = groupScope;
+
+  final HostedRuntimeTransport _delegate;
+  final GirlsAppPreviewApi _previewApi;
+  final String _accessToken;
+  final String _groupId;
+  final String _appId;
+  final String _bridgeToken;
+  final bool _groupScope;
+  String _currentToken;
+  Future<String>? _refreshFuture;
+
+  @override
+  Future<Object?> getState(String runtimeToken, String key) =>
+      _run(runtimeToken, (String token) => _delegate.getState(token, key));
+
+  @override
+  Future<Object?> setState(String runtimeToken, String key, Object? value) =>
+      _run(
+        runtimeToken,
+        (String token) => _delegate.setState(token, key, value),
+      );
+
+  @override
+  Future<void> deleteState(String runtimeToken, String key) =>
+      _run(runtimeToken, (String token) => _delegate.deleteState(token, key));
+
+  @override
+  Future<Object?> getUserState(String runtimeToken, String key) =>
+      _run(runtimeToken, (String token) => _delegate.getUserState(token, key));
+
+  @override
+  Future<Object?> setUserState(
+    String runtimeToken,
+    String key,
+    Object? value,
+  ) =>
+      _run(
+        runtimeToken,
+        (String token) => _delegate.setUserState(token, key, value),
+      );
+
+  @override
+  Future<void> deleteUserState(String runtimeToken, String key) => _run(
+        runtimeToken,
+        (String token) => _delegate.deleteUserState(token, key),
+      );
+
+  Future<T> _run<T>(
+    String suppliedToken,
+    Future<T> Function(String token) operation,
+  ) async {
+    if (suppliedToken != _bridgeToken) {
+      throw StateError('Draft preview Runtime scope token changed unexpectedly.');
+    }
+    final String attemptedToken = _currentToken;
+    try {
+      return await operation(attemptedToken);
+    } on ApiException catch (error) {
+      if (error.statusCode != 404 ||
+          error.code != 'runtime_session_not_found') {
+        rethrow;
+      }
+      final String refreshedToken = await _refresh(attemptedToken);
+      return operation(refreshedToken);
+    }
+  }
+
+  Future<String> _refresh(String expiredToken) async {
+    if (_currentToken != expiredToken) return _currentToken;
+    final Future<String>? existing = _refreshFuture;
+    if (existing != null) return existing;
+
+    final Future<String> refresh = _previewApi.refreshDraftRuntime(
+      accessToken: _accessToken,
+      groupId: _groupId,
+      appId: _appId,
+      expiredRuntimeToken: expiredToken,
+      groupScope: _groupScope,
+    );
+    _refreshFuture = refresh;
+    try {
+      final String nextToken = await refresh;
+      if (_currentToken == expiredToken) {
+        _currentToken = nextToken;
+      }
+      return _currentToken;
+    } finally {
+      if (identical(_refreshFuture, refresh)) {
+        _refreshFuture = null;
+      }
+    }
   }
 }
 
