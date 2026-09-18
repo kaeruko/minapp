@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'api.dart';
-import 'girls_app_core.dart' as core;
+import 'girls_errors.dart';
 import 'girls_home_page.dart';
 import 'hosted_girls_api.dart';
 
-export 'girls_app_core.dart' hide GirlsApp;
 
 const Color _lavender = Color(0xFFB39DDB);
 const Color _lavenderDark = Color(0xFF745B9E);
@@ -329,7 +328,7 @@ class _GirlsAuthPageState extends State<_GirlsAuthPage> {
       }
       if (mounted) widget.onAuthenticated(result);
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -381,7 +380,7 @@ class _GirlsAuthPageState extends State<_GirlsAuthPage> {
       }
       if (mounted) widget.onAuthenticated(auth);
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
