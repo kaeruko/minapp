@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'girls_app_core.dart' as core;
 import 'girls_app_management_api.dart';
+import 'girls_scaffold.dart';
 import 'girls_source_zip.dart';
 
 const Color _cream = Color(0xFFFFFAF0);
@@ -106,7 +107,8 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
           'expected=${widget.expectedRevision}, actual=${download.revision}.',
         );
       }
-      final GirlsSourceArchive archive = GirlsSourceArchive.decode(download.bytes);
+      final GirlsSourceArchive archive =
+          GirlsSourceArchive.decode(download.bytes);
       final List<String> textPaths = archive.textPaths;
       if (textPaths.isEmpty) {
         throw const FormatException('編集できるUTF-8テキストファイルがありません。');
@@ -115,9 +117,8 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
       for (final String path in textPaths) {
         texts[path] = archive.readText(path);
       }
-      final String selected = textPaths.contains('index.html')
-          ? 'index.html'
-          : textPaths.first;
+      final String selected =
+          textPaths.contains('index.html') ? 'index.html' : textPaths.first;
       if (!mounted) return;
       setState(() {
         _archive = archive;
@@ -180,6 +181,8 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
     final bool keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
       backgroundColor: _cream,
+      // The authenticated shell already subtracts the keyboard height.
+      resizeToAvoidBottomInset: !GirlsScaffoldChromeScope.isEmbedded(context),
       appBar: AppBar(
         backgroundColor: _cream,
         foregroundColor: _ink,
@@ -317,6 +320,10 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
                 ),
               ),
         Expanded(
+          // Both surrounding controls change type when the IME opens. Keep
+          // this subtree keyed so Flutter does not dispose EditableText and
+          // close its input connection while reconciling the middle children.
+          key: const Key('girls-source-editor-viewport'),
           child: Padding(
             padding: EdgeInsets.fromLTRB(
               keyboardVisible ? 12 : 16,
