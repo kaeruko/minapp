@@ -259,35 +259,6 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFF7EE),
-            border: Border.all(color: const Color(0xFFE4C8D2), width: 1.5),
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Row(children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                    colors: [Color(0xFFE4D7F3), Color(0xFFF4D5DC)]),
-                borderRadius: BorderRadius.circular(17),
-              ),
-              child:
-                  const Icon(Icons.web_rounded, color: _testLavender, size: 34),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-                child: Text(app.app.title,
-                    style: const TextStyle(
-                        color: Color(0xFF604943),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800))),
-          ]),
-        ),
-        const SizedBox(height: 12),
         FilledButton.icon(
           key: const Key('girls-app-preview-latest'),
           onPressed: disabled || app.sourceRevision == null
