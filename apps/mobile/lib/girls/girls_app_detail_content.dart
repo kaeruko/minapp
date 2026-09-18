@@ -10,6 +10,7 @@ const _rose = Color(0xFFB98295);
 class GirlsAppDetailContent extends StatelessWidget {
   const GirlsAppDetailContent({
     required this.detail,
+    required this.authorLabel,
     required this.actions,
     required this.busy,
     required this.onVisibilityChanged,
@@ -20,6 +21,7 @@ class GirlsAppDetailContent extends StatelessWidget {
   });
 
   final ManagedGirlsAppDetail detail;
+  final String authorLabel;
   final Widget actions;
   final bool busy;
   final VoidCallback? onVisibilityChanged;
@@ -68,10 +70,29 @@ class GirlsAppDetailContent extends StatelessWidget {
           const Icon(Icons.auto_awesome_rounded, color: _rose, size: 22),
           const SizedBox(width: 10),
           Expanded(
-              child: Text(app.app.title,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(app.app.title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: _ink,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900)),
+                const SizedBox(height: 4),
+                Text(
+                  'アップした人：$authorLabel',
+                  key: const Key('girls-app-author'),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                      color: _ink, fontSize: 22, fontWeight: FontWeight.w900))),
+                    color: _rose,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
           if (app.app.editable)
             IconButton(
               key: const Key('girls-app-download-source'),
