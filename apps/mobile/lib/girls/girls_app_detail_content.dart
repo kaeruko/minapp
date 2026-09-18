@@ -33,14 +33,6 @@ class GirlsAppDetailContent extends StatelessWidget {
     return '${date.year}年${date.month}月${date.day}日';
   }
 
-  static Widget _heading(String text) => Padding(
-        padding: const EdgeInsets.only(top: 16, bottom: 10),
-        child: Text(text,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-                color: _ink, fontSize: 21, fontWeight: FontWeight.w900)),
-      );
-
   static Widget _card(Widget child) => Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -72,7 +64,6 @@ class GirlsAppDetailContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _heading('アプリ名'),
         _card(Row(children: [
           const Icon(Icons.auto_awesome_rounded, color: _rose, size: 22),
           const SizedBox(width: 10),
@@ -89,7 +80,7 @@ class GirlsAppDetailContent extends StatelessWidget {
               icon: const Text('📦', style: TextStyle(fontSize: 20)),
             ),
         ])),
-        _heading('アプリ情報'),
+        const SizedBox(height: 12),
         _card(Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
             const Expanded(
@@ -164,7 +155,7 @@ class GirlsAppDetailContent extends StatelessWidget {
             ),
           ],
         ])),
-        _heading('プレビュー'),
+        const SizedBox(height: 12),
         actions,
         const SizedBox(height: 20),
         FilledButton.icon(
