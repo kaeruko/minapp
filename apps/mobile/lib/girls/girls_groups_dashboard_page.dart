@@ -15,6 +15,8 @@ const Color _lavender = Color(0xFF8B6BB2);
 const Color _panelPink = Color(0xFFF8DCDD);
 const Color _softCream = Color(0xFFFFFBF6);
 const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
+const String _groupDashboardBackgroundAsset =
+    'assets/girls/backgrounds/group_home_background.jpg';
 const int _inlineMemberLimit = 4;
 
 List<HostedMember> _orderedMembers(Iterable<HostedMember> members) {
@@ -387,6 +389,13 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
 
     return GirlsScaffold(
       title: 'グループ',
+      pageBackgroundDecoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage(_groupDashboardBackgroundAsset),
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+        ),
+      ),
       body: RefreshIndicator(
         onRefresh: _reload,
         child: ListView(
