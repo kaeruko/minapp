@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
@@ -10,14 +8,13 @@ import '../hosted_authoring_projects_api.dart';
 import 'api.dart';
 import 'girls_errors.dart';
 import 'girls_app_management_api.dart';
+import 'girls_app_detail_content.dart';
 import 'girls_app_test_actions.dart';
 import 'girls_builtin_install_api.dart';
 import 'girls_footer_nav.dart';
 import 'girls_scaffold.dart';
 import 'hosted_girls_api.dart';
-import 'hosted_girls_upload_api.dart';
 
-const Color _cream = Color(0xFFFFFAF0);
 const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF745B9E);
 const Color _pink = Color(0xFFF9DDE8);
@@ -27,7 +24,8 @@ const String _novelContentFormat = 'minapp/novel@1';
 
 String _novelProjectTitle(HostedAuthoringProject project) {
   if (project.summary.contentFormat != _novelContentFormat) {
-    throw const FormatException('Novel project has an unexpected content format.');
+    throw const FormatException(
+        'Novel project has an unexpected content format.');
   }
   // An empty document is the Authoring contract's intentional
   // uninitialized draft state. The Novel Editor fills it on first open.
@@ -86,7 +84,8 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
   void initState() {
     super.initState();
     _currentGroup = widget.currentGroup;
-    _managementApi = GirlsAppManagementApi(baseUri: widget.api.baseUri);
+    _managementApi = GirlsAppManagementApi(
+        baseUri: widget.api.baseUri, client: widget.api.httpClient);
     _builtinInstallApi = GirlsBuiltinInstallApi(baseUri: widget.api.baseUri);
     _load();
   }
@@ -393,7 +392,8 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
   @override
   void initState() {
     super.initState();
-    _managementApi = GirlsAppManagementApi(baseUri: widget.api.baseUri);
+    _managementApi = GirlsAppManagementApi(
+        baseUri: widget.api.baseUri, client: widget.api.httpClient);
     _load();
   }
 
@@ -458,55 +458,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
     }
   }
 
-  Future<void> _updateZip() async {
-    final ManagedGirlsAppDetail? detail = _detail;
-    final int? revision = detail?.summary.sourceRevision;
-    if (detail == null || revision == null) {
-      setState(() => _error = '更新元の編集版を確認できません。');
-      return;
-    }
-    final PlatformFile? file = await FilePicker.pickFile(
-      type: FileType.custom,
-      allowedExtensions: const <String>['zip'],
-    );
-    if (file == null || !mounted) return;
-    if (file.extension?.toLowerCase() != 'zip') {
-      setState(() => _error = '拡張子 .zip のファイルを選んでください。');
-      return;
-    }
-    late final Uint8List bytes;
-    try {
-      bytes = await file.readAsBytes();
-    } catch (error) {
-      if (mounted) setState(() => _error = 'ZIPを読み込めませんでした: $error');
-      return;
-    }
-    if (bytes.isEmpty || bytes.length > maxGirlsZipUploadBytes) {
-      setState(() => _error = 'ZIPは1byte以上2MB以下にしてください。');
-      return;
-    }
-
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await _managementApi.updateSource(
-        accessToken: widget.session.accessToken,
-        groupId: detail.summary.app.groupId,
-        appId: detail.summary.app.appId,
-        expectedRevision: revision,
-        zipBytes: bytes,
-      );
-      if (mounted) await _load();
-    } catch (error) {
-      if (mounted) setState(() => _error = girlsMessageFor(error));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _publish() async {
+  Future<void> _publish({bool makeVisible = false}) async {
     final ManagedGirlsAppDetail? detail = _detail;
     final int? revision = detail?.summary.sourceRevision;
     if (detail == null || revision == null) return;
@@ -521,6 +473,13 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
         appId: detail.summary.app.appId,
         revision: revision,
       );
+      if (makeVisible && detail.summary.isHidden) {
+        await _managementApi.setHidden(
+          accessToken: widget.session.accessToken,
+          appId: detail.summary.app.appId,
+          hidden: false,
+        );
+      }
       if (mounted) await _load();
     } catch (error) {
       if (mounted) setState(() => _error = girlsMessageFor(error));
@@ -589,17 +548,30 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
     }
   }
 
+  Future<void> _changeVisibility() async {
+    final detail = _detail;
+    if (detail == null) return;
+    if (!detail.summary.app.isPublished) {
+      await _publish(makeVisible: true);
+    } else {
+      await _toggleHidden();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final ManagedGirlsAppDetail? detail = _detail;
+    final detail = _detail;
     return Scaffold(
-      backgroundColor: _cream,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: _cream,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: _ink,
-        title: Text(detail?.summary.app.title ?? 'アプリ詳細'),
-        actions: <Widget>[
+        title: const Text('アプリ詳細'),
+        centerTitle: true,
+        actions: [
           IconButton(
+            tooltip: '最新の情報に更新',
             onPressed: _busy ? null : _load,
             icon: const Icon(Icons.refresh_rounded),
           ),
@@ -607,239 +579,67 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
-          children: <Widget>[
-            if (_error != null) ...<Widget>[
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 28),
+          children: [
+            if (_error != null) ...[
               _ErrorCard(message: _error!),
-              const SizedBox(height: 12),
+              TextButton(
+                  onPressed: _busy ? null : _load,
+                  child: const Text('もう一度読み込む')),
             ],
-            if (detail == null)
+            if (detail == null && _busy)
               const Padding(
                 padding: EdgeInsets.all(40),
                 child: Center(child: CircularProgressIndicator()),
-              )
-            else ...<Widget>[
-              _AppSummary(detail: detail),
-              const SizedBox(height: 14),
-              GirlsAppTestActions(
-                api: widget.api,
-                session: widget.session,
+              ),
+            if (detail != null) ...[
+              GirlsAppDetailContent(
                 detail: detail,
+                busy: _busy,
+                onVisibilityChanged: detail.summary.app.isPublished ||
+                        (detail.summary.app.editable &&
+                            detail.summary.sourceRevision != null)
+                    ? _changeVisibility
+                    : null,
+                onPublish: _publish,
+                onDownload:
+                    detail.summary.sourceRevision == null ? null : _downloadZip,
+                onDelete: _delete,
+                actions: GirlsAppTestActions(
+                  api: widget.api,
+                  session: widget.session,
+                  detail: detail,
+                  detailLayout: true,
+                  disabled: _busy,
+                ),
               ),
-              const SizedBox(height: 14),
-              if (detail.summary.app.editable) ...<Widget>[
-                OutlinedButton.icon(
-                  key: const Key('girls-app-download-source'),
-                  onPressed: _busy ? null : _downloadZip,
-                  icon: const Icon(Icons.download_rounded),
-                  label: const Text('現在のZIPを保存'),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _updateZip,
-                  icon: const Icon(Icons.folder_zip_rounded),
-                  label: const Text('新しいZIPで更新'),
-                ),
-                const SizedBox(height: 8),
-                FilledButton.icon(
-                  onPressed: _busy || detail.summary.sourceRevision == null
-                      ? null
-                      : _publish,
-                  icon: const Icon(Icons.cloud_upload_rounded),
-                  label: const Text('編集版を公開'),
-                ),
-                const SizedBox(height: 8),
-              ] else if (detail.summary.app.sourceKind == 'builtin') ...<Widget>[
-                const _BuiltinManagedNotice(),
-                const SizedBox(height: 8),
-              ],
-              OutlinedButton.icon(
-                onPressed: _busy ? null : _toggleHidden,
-                icon: Icon(
-                  detail.summary.isHidden
-                      ? Icons.visibility_rounded
-                      : Icons.visibility_off_rounded,
-                ),
-                label: Text(detail.summary.isHidden ? '再公開する' : '非表示にする'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                key: const Key('girls-app-delete'),
-                onPressed: _busy ? null : _delete,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFA04455),
-                ),
-                icon: const Icon(Icons.delete_outline_rounded),
-                label: const Text('アプリを削除'),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                '保存履歴',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 8),
-              if (detail.sourceHistory.isEmpty)
-                const Text('まだ更新履歴がありません。')
-              else
-                ...detail.sourceHistory.map(
-                  (GirlsSourceHistoryItem item) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(
-                      Icons.description_rounded,
-                      color: _lavender,
+              const SizedBox(height: 20),
+              ExpansionTile(
+                title: const Text('保存・公開の履歴',
+                    style: TextStyle(fontSize: 13, color: _lavender)),
+                tilePadding: EdgeInsets.zero,
+                children: [
+                  for (final item in detail.sourceHistory)
+                    ListTile(
+                      leading: const Icon(Icons.description_outlined),
+                      title: const Text('保存'),
+                      subtitle: Text(_formatDate(item.createdAt)),
                     ),
-                    title: const Text('保存'),
-                    subtitle: Text(_formatDate(item.createdAt)),
-                  ),
-                ),
-              const SizedBox(height: 14),
-              const Text(
-                '公開履歴',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  for (final item in detail.publishedHistory)
+                    ListTile(
+                      leading: const Icon(Icons.public_rounded),
+                      title: const Text('公開'),
+                      subtitle: Text(_formatDate(item.publishedAt)),
+                    ),
+                  if (detail.sourceHistory.isEmpty &&
+                      detail.publishedHistory.isEmpty)
+                    const ListTile(title: Text('まだ履歴がありません。')),
+                ],
               ),
-              const SizedBox(height: 8),
-              if (detail.publishedHistory.isEmpty)
-                const Text('まだ公開履歴がありません。')
-              else
-                ...detail.publishedHistory.map(
-                  (GirlsPublishedHistoryItem item) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.public_rounded, color: _lavender),
-                    title: const Text('公開版'),
-                    subtitle: Text(_formatDate(item.publishedAt)),
-                  ),
-                ),
             ],
           ],
         ),
       ),
-    );
-  }
-}
-
-class _AppSummary extends StatelessWidget {
-  const _AppSummary({required this.detail});
-
-  final ManagedGirlsAppDetail detail;
-
-  @override
-  Widget build(BuildContext context) {
-    final ManagedGirlsApp app = detail.summary;
-    final String status = app.isHidden
-        ? '非公開'
-        : app.app.isPublished
-        ? '公開中'
-        : '下書き';
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .88),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFF0D6DF)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            app.app.title,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: _ink,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            status,
-            style: const TextStyle(
-              color: _lavender,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: _Stat(
-                  label: '遊ばれた回数',
-                  value: '${app.stats.totalPlays}回',
-                ),
-              ),
-              Expanded(
-                child: _Stat(
-                  label: '遊んだ人数',
-                  value: '${app.stats.uniqueUsers}人',
-                ),
-              ),
-              Expanded(
-                child: _Stat(label: '今月', value: '${app.stats.monthlyPlays}回'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text('公開版: ${app.app.publishedVersion == null ? 'なし' : 'あり'}'),
-          Text('編集版: ${app.sourceRevision == null ? 'なし' : '保存済み'}'),
-          Text(
-            '最終更新: ${app.sourceUpdatedAt == null ? '-' : _formatDate(app.sourceUpdatedAt!)}',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BuiltinManagedNotice extends StatelessWidget {
-  const _BuiltinManagedNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _mint.withValues(alpha: .58),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Icon(Icons.auto_awesome_rounded, color: _lavender),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'この公式ツール本体はみんアプ側で更新します。作品の内容は「ノベルゲームを作る」から編集してください。',
-              style: TextStyle(color: _ink, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: <Widget>[
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
-            color: _lavender,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 11, color: _ink),
-          textAlign: TextAlign.center,
-        ),
-      ],
     );
   }
 }
@@ -937,8 +737,8 @@ class _ManagedAppCard extends StatelessWidget {
     final String status = app.isHidden
         ? '非公開'
         : app.app.isPublished
-        ? '公開中'
-        : '下書き';
+            ? '公開中'
+            : '下書き';
     return Material(
       color: Colors.white.withValues(alpha: .9),
       borderRadius: BorderRadius.circular(20),

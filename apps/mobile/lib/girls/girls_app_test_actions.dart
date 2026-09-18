@@ -20,6 +20,8 @@ class GirlsAppTestActions extends StatefulWidget {
     required this.session,
     required this.detail,
     this.authoringContractApi,
+    this.detailLayout = false,
+    this.disabled = false,
     super.key,
   });
 
@@ -27,6 +29,8 @@ class GirlsAppTestActions extends StatefulWidget {
   final AuthenticatedSession session;
   final ManagedGirlsAppDetail detail;
   final HostedAuthoringContractApi? authoringContractApi;
+  final bool detailLayout;
+  final bool disabled;
 
   @override
   State<GirlsAppTestActions> createState() => _GirlsAppTestActionsState();
@@ -36,6 +40,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   late final GirlsAppPreviewApi _previewApi;
   late final GirlsBuiltinInstallApi _builtinInstallApi;
   late final GirlsAppManagementApi _managementApi;
+  late final HostedAuthoringContractApi _contractApi;
   bool _busy = false;
   String? _error;
   bool _novelSetupBusy = false;
@@ -50,9 +55,14 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   @override
   void initState() {
     super.initState();
-    _previewApi = GirlsAppPreviewApi(baseUri: widget.api.baseUri);
-    _builtinInstallApi = GirlsBuiltinInstallApi(baseUri: widget.api.baseUri);
-    _managementApi = GirlsAppManagementApi(baseUri: widget.api.baseUri);
+    _previewApi = GirlsAppPreviewApi(
+        baseUri: widget.api.baseUri, client: widget.api.httpClient);
+    _builtinInstallApi = GirlsBuiltinInstallApi(
+        baseUri: widget.api.baseUri, client: widget.api.httpClient);
+    _managementApi = GirlsAppManagementApi(
+        baseUri: widget.api.baseUri, client: widget.api.httpClient);
+    _contractApi = HostedAuthoringContractApi(
+        baseUri: widget.api.baseUri, client: widget.api.httpClient);
     if (_isNovelEditor) {
       _novelSetupBusy = true;
       _prepareNovelEditor(initial: true);
@@ -64,6 +74,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
     _previewApi.close();
     _builtinInstallApi.close();
     _managementApi.close();
+    _contractApi.close();
     super.dispose();
   }
 
@@ -120,7 +131,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
         groupId: app.app.groupId,
         appId: app.app.appId,
       ),
-      titleSuffix: '更新版プレビュー',
+      titleSuffix: 'プレビュー',
     );
   }
 
@@ -185,6 +196,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   }
 
   Widget _runtimeActions() {
+    if (widget.detailLayout) return _detailActions();
     final ManagedGirlsAppDetail detail = widget.detail;
     final int? sourceRevision = detail.summary.sourceRevision;
     return Column(
@@ -201,9 +213,8 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
         const SizedBox(height: 8),
         OutlinedButton.icon(
           key: const Key('girls-app-preview-latest'),
-          onPressed: _busy || sourceRevision == null
-              ? null
-              : _previewLatestRevision,
+          onPressed:
+              _busy || sourceRevision == null ? null : _previewLatestRevision,
           icon: const Icon(Icons.preview_rounded),
           label: const Text('編集版をプレビュー'),
         ),
@@ -236,6 +247,81 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _detailActions() {
+    final app = widget.detail.summary;
+    final disabled = _busy || widget.disabled;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF7EE),
+            border: Border.all(color: const Color(0xFFE4C8D2), width: 1.5),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Row(children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                    colors: [Color(0xFFE4D7F3), Color(0xFFF4D5DC)]),
+                borderRadius: BorderRadius.circular(17),
+              ),
+              child:
+                  const Icon(Icons.web_rounded, color: _testLavender, size: 34),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+                child: Text(app.app.title,
+                    style: const TextStyle(
+                        color: Color(0xFF604943),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800))),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          key: const Key('girls-app-preview-latest'),
+          onPressed: disabled || app.sourceRevision == null
+              ? null
+              : _previewLatestRevision,
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFF2CDD5),
+            foregroundColor: const Color(0xFF604943),
+            minimumSize: const Size.fromHeight(52),
+            textStyle:
+                const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          ),
+          icon: const Icon(Icons.play_circle_fill_rounded,
+              color: Color(0xFFB98295)),
+          label: const Text('プレビュー'),
+        ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(_error!, style: const TextStyle(color: _testError)),
+          ),
+        if (app.app.editable && app.sourceRevision != null) ...[
+          const SizedBox(height: 14),
+          TextButton.icon(
+            key: const Key('girls-app-edit-code'),
+            onPressed: disabled ? null : _editSource,
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF604943),
+              minimumSize: const Size.fromHeight(48),
+              textStyle:
+                  const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            ),
+            icon: const Icon(Icons.edit_outlined, color: Color(0xFFB98295)),
+            label: const Text('アプリを編集'),
           ),
         ],
       ],
@@ -296,7 +382,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
       groupId: app.groupId,
       editorAppId: app.appId,
       runtimeTransport: widget.api.runtimeClient,
-      authoringContractApi: widget.authoringContractApi,
+      authoringContractApi: widget.authoringContractApi ?? _contractApi,
       errorMessage: girlsMessageFor,
       nonEditorChild: _runtimeActions(),
     );
