@@ -1,4 +1,4 @@
-enum GirlsHomeMascotDestination { currentGroup, apps }
+enum GirlsHomeMascotDestination { invite, currentGroup, apps }
 
 class GirlsHomeMascotPrompt {
   const GirlsHomeMascotPrompt({
@@ -32,7 +32,7 @@ class GirlsHomeMascotPromptResolver {
     if (memberCount == 1) {
       return const GirlsHomeMascotPrompt(
         message: '友達を招待する？',
-        destination: GirlsHomeMascotDestination.currentGroup,
+        destination: GirlsHomeMascotDestination.invite,
       );
     }
     if (customAppCount == 0) {
