@@ -39,10 +39,16 @@ _GROUP_APP_VISIBILITY_RE = re.compile(
 _GROUP_APP_PREVIEW_SESSION_RE = re.compile(
     rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/preview-session$"
 )
+_GROUP_APP_PREVIEW_RUNTIME_SESSION_RE = re.compile(
+    rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/preview-runtime-session$"
+)
 _MY_APP_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}$")
 _MY_APP_VISIBILITY_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/visibility$")
 _MY_APP_THUMBNAIL_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/thumbnail$")
 _MY_APP_PREVIEW_SESSION_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/preview-session$")
+_MY_APP_PREVIEW_RUNTIME_SESSION_RE = re.compile(
+    rf"^/hosted/my/apps/{_ID_RE}/preview-runtime-session$"
+)
 _PREVIEW_CONTENT_RE = re.compile(r"^/hosted/preview/([A-Za-z0-9_-]{32,128})/(.+)$")
 
 
@@ -254,6 +260,22 @@ def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
             ),
         )
 
+    preview_runtime_match = _MY_APP_PREVIEW_RUNTIME_SESSION_RE.fullmatch(path)
+    if method == "POST" and preview_runtime_match is not None:
+        payload = _json_body(event)
+        _require_fields(payload, required={"runtime_token"})
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
+        return _json_response(
+            201,
+            hosted_preview_session.refresh_author_preview_runtime_session(
+                backend,
+                auth_subject,
+                preview_runtime_match.group(1),
+                payload["runtime_token"],
+            ),
+        )
+
     group_preview_match = _GROUP_APP_PREVIEW_SESSION_RE.fullmatch(path)
     if method == "POST" and group_preview_match is not None:
         payload = _json_body(event)
@@ -268,6 +290,24 @@ def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
                 auth_subject,
                 group_id,
                 app_id,
+            ),
+        )
+
+    group_preview_runtime_match = _GROUP_APP_PREVIEW_RUNTIME_SESSION_RE.fullmatch(path)
+    if method == "POST" and group_preview_runtime_match is not None:
+        payload = _json_body(event)
+        _require_fields(payload, required={"runtime_token"})
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
+        group_id, app_id = group_preview_runtime_match.groups()
+        return _json_response(
+            201,
+            hosted_preview_session.refresh_group_preview_runtime_session(
+                backend,
+                auth_subject,
+                group_id,
+                app_id,
+                payload["runtime_token"],
             ),
         )
     return None
