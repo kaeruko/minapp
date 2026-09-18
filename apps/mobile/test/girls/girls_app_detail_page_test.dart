@@ -70,7 +70,7 @@ Future<void> showPage(WidgetTester tester, MockClient client,
     ),
   ));
   await tester.pumpAndSettle();
-  expect(find.text('アプリ名'), findsOneWidget,
+  expect(find.text('私の小さな星物語'), findsWidgets,
       reason: tester
           .widgetList<Text>(find.byType(Text))
           .map((text) => text.data)
@@ -89,8 +89,11 @@ void main() {
                   : {'apps': <Object?>[]})),
           width: width);
       expect(find.text('アプリ詳細'), findsOneWidget);
-      expect(find.text('アプリ名'), findsOneWidget);
-      expect(find.text('アプリ情報'), findsOneWidget);
+      expect(find.text('アプリ名'), findsNothing);
+      expect(find.text('アプリ情報'), findsNothing);
+      expect(find.text('プレビュー'), findsOneWidget);
+      final AppBar appBar = tester.widget<AppBar>(find.byType(AppBar));
+      expect(appBar.primary, isFalse);
       expect(find.text('3456回'), findsOneWidget);
       final published = find.byKey(const Key('girls-app-published-date'));
       final updated = find.byKey(const Key('girls-app-updated-date'));
