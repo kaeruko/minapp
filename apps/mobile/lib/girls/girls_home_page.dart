@@ -4,7 +4,8 @@ import 'package:flutter/services.dart';
 import 'api.dart';
 import 'builtin_apps.dart';
 import 'builtin_webview.dart';
-import 'girls_app_core.dart' as core;
+import 'girls_errors.dart';
+import 'girls_group_home_page.dart';
 import 'girls_apps_page.dart';
 import 'girls_email_settings_page.dart';
 import 'girls_footer_nav.dart';
@@ -137,7 +138,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         widget.onCurrentGroupChanged?.call(null);
       }
     } catch (error) {
-      if (mounted) setState(() => _groupError = core.girlsMessageFor(error));
+      if (mounted) setState(() => _groupError = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _loadingGroups = false);
     }
@@ -203,7 +204,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   Future<void> _openGroup(HostedGroup group) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (BuildContext context) => core.GirlsGroupHomePage(
+        builder: (BuildContext context) => GirlsGroupHomePage(
           api: widget.api,
           session: widget.session,
           group: group,
@@ -241,7 +242,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       if (!mounted) return;
       await _showGroupId(invite);
     } catch (error) {
-      if (mounted) setState(() => _groupError = core.girlsMessageFor(error));
+      if (mounted) setState(() => _groupError = girlsMessageFor(error));
     }
   }
 
@@ -348,7 +349,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       if (mounted) {
         setState(() {
           _creatingGroup = false;
-          _groupError = core.girlsMessageFor(error);
+          _groupError = girlsMessageFor(error);
         });
       }
       return;
@@ -371,7 +372,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       if (!mounted) return;
       setState(() {
         _groupError =
-            'グループ「${createdGroup.name}」は作成できたけれど、グループIDの取得に失敗しました。${core.girlsMessageFor(error)}';
+            'グループ「${createdGroup.name}」は作成できたけれど、グループIDの取得に失敗しました。${girlsMessageFor(error)}';
       });
     } finally {
       if (mounted) setState(() => _creatingGroup = false);
