@@ -386,6 +386,7 @@ class GirlsAppDetailPage extends StatefulWidget {
 class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
   late final GirlsAppManagementApi _managementApi;
   ManagedGirlsAppDetail? _detail;
+  String? _authorLabel;
   bool _busy = false;
   String? _error;
 
@@ -413,7 +414,26 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
         accessToken: widget.session.accessToken,
         appId: widget.appId,
       );
-      if (mounted) setState(() => _detail = detail);
+      final List<HostedMember> members = await widget.api.listMembers(
+        accessToken: widget.session.accessToken,
+        groupId: detail.summary.app.groupId,
+      );
+      final List<HostedMember> authors = members
+          .where((HostedMember member) =>
+              member.userId == detail.summary.app.ownerUserId)
+          .toList(growable: false);
+      if (authors.length > 1) {
+        throw StateError('Group member list contains duplicate app owner IDs.');
+      }
+      final String authorLabel = authors.isEmpty
+          ? '退出済みユーザー (${detail.summary.app.ownerUserId.substring(0, 8)}…)'
+          : authors.single.displayLabel;
+      if (mounted) {
+        setState(() {
+          _detail = detail;
+          _authorLabel = authorLabel;
+        });
+      }
     } catch (error) {
       if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
@@ -596,6 +616,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
             if (detail != null) ...[
               GirlsAppDetailContent(
                 detail: detail,
+                authorLabel: _authorLabel ?? '確認中…',
                 busy: _busy,
                 onVisibilityChanged: detail.summary.app.isPublished ||
                         (detail.summary.app.editable &&
