@@ -9,6 +9,7 @@ import 'girls_builtin_install_api.dart';
 import 'girls_current_group_store.dart';
 import 'girls_group_settings_page.dart';
 import 'girls_scaffold.dart';
+import 'hosted_app_webview.dart';
 import 'hosted_girls_api.dart';
 
 const Color _ink = Color(0xFF604943);
@@ -63,6 +64,7 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
   List<HostedMember>? _members;
   List<HostedGroupApp>? _latestApps;
   bool _busy = false;
+  String? _launchingAppId;
   String? _error;
 
   @override
@@ -175,6 +177,38 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
       if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _launchLatestApp(HostedGroup group, HostedGroupApp app) async {
+    if (!app.isPublished) {
+      setState(() => _error = '「${app.title}」はまだ公開されていません。');
+      return;
+    }
+    setState(() {
+      _launchingAppId = app.appId;
+      _error = null;
+    });
+    try {
+      final launch = await widget.api.createLaunch(
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
+        appId: app.appId,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (BuildContext context) => HostedAppWebViewPage(
+            title: app.title,
+            launch: launch,
+            runtimeTransport: widget.api.runtimeClient,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _launchingAppId = null);
     }
   }
 
@@ -411,6 +445,9 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
                 members: _members,
                 latestApps: _latestApps,
                 loading: _busy,
+                launchingAppId: _launchingAppId,
+                onLaunchApp: (HostedGroupApp app) =>
+                    _launchLatestApp(current, app),
                 onOpen: () => _openGroup(current),
                 onSettings:
                     current.isOwner ? () => _openGroupSettings(current) : null,
@@ -473,6 +510,8 @@ class _CurrentGroupCard extends StatelessWidget {
     required this.members,
     required this.latestApps,
     required this.loading,
+    required this.launchingAppId,
+    required this.onLaunchApp,
     required this.onOpen,
     this.onSettings,
   });
@@ -481,6 +520,8 @@ class _CurrentGroupCard extends StatelessWidget {
   final List<HostedMember>? members;
   final List<HostedGroupApp>? latestApps;
   final bool loading;
+  final String? launchingAppId;
+  final ValueChanged<HostedGroupApp> onLaunchApp;
   final VoidCallback onOpen;
   final VoidCallback? onSettings;
 
@@ -557,7 +598,11 @@ class _CurrentGroupCard extends StatelessWidget {
                     children: apps
                         .map(
                           (HostedGroupApp app) => Expanded(
-                            child: _LatestAppItem(app: app),
+                            child: _LatestAppItem(
+                              app: app,
+                              loading: launchingAppId == app.appId,
+                              onTap: () => onLaunchApp(app),
+                            ),
                           ),
                         )
                         .toList(growable: false),
@@ -864,30 +909,56 @@ class _GroupPicture extends StatelessWidget {
 }
 
 class _LatestAppItem extends StatelessWidget {
-  const _LatestAppItem({required this.app});
+  const _LatestAppItem({
+    required this.app,
+    required this.loading,
+    required this.onTap,
+  });
 
   final HostedGroupApp app;
+  final bool loading;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 3),
-      child: Column(
-        children: <Widget>[
-          _AppPicture(app: app),
-          const SizedBox(height: 5),
-          Text(
-            app.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: _ink,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: ValueKey<String>('girls-latest-app-${app.appId}'),
+          borderRadius: BorderRadius.circular(16),
+          onTap: loading ? null : onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: <Widget>[
+                if (loading)
+                  const SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                else
+                  _AppPicture(app: app),
+                const SizedBox(height: 5),
+                Text(
+                  app.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: _ink,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
