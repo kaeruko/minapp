@@ -564,6 +564,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
+        primary: false,
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         foregroundColor: _ink,
