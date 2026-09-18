@@ -6,13 +6,18 @@ import time
 from typing import Any
 
 from aws_backend import _item_string, _string_attr
+from errors import ApiProblem
 from hosted_app_management import (
     PREVIEW_SESSION_SECONDS,
     PREVIEW_TTL_GRACE_SECONDS,
     _author_editable_app,
 )
-from hosted_catalog_backend import _files_json
-from hosted_platform_backend import RUNTIME_SESSION_TTL_SECONDS, _number_attr
+from hosted_catalog_backend import _files_json, _optional_number, _optional_string
+from hosted_platform_backend import (
+    RUNTIME_SESSION_TTL_SECONDS,
+    _number_attr,
+    _runtime_token_hash,
+)
 
 
 def _create_preview_session_for_authorized_app(
@@ -105,3 +110,134 @@ def create_group_preview_session(
         editable=True,
     )
     return _create_preview_session_for_authorized_app(backend, user, app, app_id)
+
+
+def _refresh_preview_runtime_for_authorized_app(
+    backend: Any,
+    user: Any,
+    app: dict[str, Any],
+    app_id: str,
+    expired_runtime_token: str,
+) -> dict[str, Any]:
+    group_id = _item_string(app, "group_id")
+    token_hash = _runtime_token_hash(expired_runtime_token)
+    previous = backend._get_item(
+        pk=f"RUNTIMESESSION#{token_hash}",
+        sk="META",
+    )
+    if previous is None:
+        raise ApiProblem(
+            404,
+            "runtime_session_not_found",
+            "Runtime session is invalid or expired.",
+        )
+
+    preview_state_id = _optional_string(previous, "preview_state_id")
+    preview_state_ttl_epoch = _optional_number(
+        previous,
+        "preview_state_ttl_epoch",
+    )
+    if preview_state_id is None or preview_state_ttl_epoch is None:
+        raise ApiProblem(
+            409,
+            "preview_runtime_session_required",
+            "The supplied Runtime session is not a draft preview session.",
+        )
+    if (
+        _item_string(previous, "group_id") != group_id
+        or _item_string(previous, "app_id") != app_id
+        or _item_string(previous, "user_id") != user.user_id
+    ):
+        raise ApiProblem(
+            403,
+            "preview_runtime_scope_mismatch",
+            "The supplied Runtime session does not belong to this preview.",
+        )
+
+    now_epoch = int(time.time())
+    previous_expires_at = _optional_number(previous, "expires_at_epoch")
+    if previous_expires_at is None:
+        raise RuntimeError("Preview Runtime session has no expires_at_epoch")
+    if previous_expires_at > now_epoch:
+        raise ApiProblem(
+            409,
+            "preview_runtime_session_still_active",
+            "The supplied Runtime session has not expired.",
+        )
+    if preview_state_ttl_epoch <= now_epoch:
+        raise ApiProblem(
+            404,
+            "preview_runtime_state_expired",
+            "The draft preview state has expired.",
+        )
+
+    runtime_expires_at = min(
+        now_epoch + RUNTIME_SESSION_TTL_SECONDS,
+        preview_state_ttl_epoch,
+    )
+    if runtime_expires_at <= now_epoch:
+        raise ApiProblem(
+            404,
+            "preview_runtime_state_expired",
+            "The draft preview state has expired.",
+        )
+
+    runtime_token = secrets.token_urlsafe(32)
+    runtime_token_hash = hashlib.sha256(runtime_token.encode("ascii")).hexdigest()
+    runtime_session = {
+        "pk": _string_attr(f"RUNTIMESESSION#{runtime_token_hash}"),
+        "sk": _string_attr("META"),
+        "entity": _string_attr("runtime_session"),
+        "group_id": _string_attr(group_id),
+        "app_id": _string_attr(app_id),
+        "user_id": _string_attr(user.user_id),
+        "expires_at_epoch": _number_attr(runtime_expires_at),
+        "ttl_epoch": _number_attr(
+            runtime_expires_at + PREVIEW_TTL_GRACE_SECONDS
+        ),
+        "preview_state_id": _string_attr(preview_state_id),
+        "preview_state_ttl_epoch": _number_attr(preview_state_ttl_epoch),
+    }
+    backend._transact_put_new([runtime_session])
+    return {
+        "runtime_token": runtime_token,
+        "runtime_expires_in": runtime_expires_at - now_epoch,
+    }
+
+
+def refresh_author_preview_runtime_session(
+    backend: Any,
+    auth_subject: str,
+    app_id: str,
+    expired_runtime_token: str,
+) -> dict[str, Any]:
+    user, app = _author_editable_app(backend, auth_subject, app_id)
+    return _refresh_preview_runtime_for_authorized_app(
+        backend,
+        user,
+        app,
+        app_id,
+        expired_runtime_token,
+    )
+
+
+def refresh_group_preview_runtime_session(
+    backend: Any,
+    auth_subject: str,
+    group_id: str,
+    app_id: str,
+    expired_runtime_token: str,
+) -> dict[str, Any]:
+    user, app = backend._require_app_management_access(
+        auth_subject,
+        group_id,
+        app_id,
+        editable=True,
+    )
+    return _refresh_preview_runtime_for_authorized_app(
+        backend,
+        user,
+        app,
+        app_id,
+        expired_runtime_token,
+    )
