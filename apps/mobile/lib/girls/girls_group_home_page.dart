@@ -12,6 +12,8 @@ const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF8B6BB2);
 const Color _panelPink = Color(0xFFF8DCDD);
 const Color _softCream = Color(0xFFFFFBF6);
+const String _groupHomeBackgroundAsset =
+    'assets/girls/backgrounds/group_home_background.jpg';
 
 class GirlsGroupHomePage extends StatefulWidget {
   const GirlsGroupHomePage({
@@ -170,6 +172,13 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
     final List<HostedGroupApp>? apps = _apps;
     return GirlsScaffold(
       title: 'みんアプ Girls',
+      pageBackgroundDecoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage(_groupHomeBackgroundAsset),
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+        ),
+      ),
       leading: IconButton(
         tooltip: '戻る',
         onPressed: () => Navigator.of(context).pop(),
