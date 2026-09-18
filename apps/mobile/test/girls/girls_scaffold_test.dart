@@ -10,6 +10,7 @@ void main() {
     double textScale = 1,
     String? title = 'グループ',
     VoidCallback? onAction,
+    Decoration? pageBackgroundDecoration,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
@@ -41,6 +42,7 @@ void main() {
                 icon: const Icon(Icons.settings),
               ),
             ],
+            pageBackgroundDecoration: pageBackgroundDecoration,
             body: ListView.builder(
               key: const Key('scrolling-content'),
               itemExtent: 80,
@@ -90,6 +92,32 @@ void main() {
     expect(tester.getTopLeft(find.text('Item 2')).dy, lessThan(trackedBefore));
     await tester.tap(find.byKey(const Key('header-action')));
     expect(taps, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('page background decoration covers title and body', (
+    WidgetTester tester,
+  ) async {
+    const String asset = 'assets/girls/backgrounds/group_home_background.jpg';
+    await showShell(
+      tester,
+      pageBackgroundDecoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage(asset),
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+        ),
+      ),
+    );
+
+    final DecoratedBox background = tester.widget<DecoratedBox>(
+      find.byKey(const Key('girls-page-background')),
+    );
+    final BoxDecoration decoration = background.decoration as BoxDecoration;
+    final DecorationImage image = decoration.image!;
+    expect((image.image as AssetImage).assetName, asset);
+    expect(find.text('グループ'), findsOneWidget);
+    expect(find.byKey(const Key('scrolling-content')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
