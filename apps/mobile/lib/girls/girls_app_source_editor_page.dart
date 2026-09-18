@@ -175,8 +175,10 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bool keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final double keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bool keyboardVisible = keyboardInset > 0;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: _cream,
       appBar: AppBar(
         backgroundColor: _cream,
@@ -198,9 +200,13 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
         ],
       ),
       body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _buildEditor(keyboardVisible: keyboardVisible),
+        bottom: !keyboardVisible,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: keyboardInset),
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _buildEditor(keyboardVisible: keyboardVisible),
+        ),
       ),
     );
   }
@@ -289,28 +295,31 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextField(
-              key: const Key('girls-source-editor-code'),
-              controller: _controller,
-              enabled: !_saving,
-              expands: true,
-              maxLines: null,
-              minLines: null,
-              keyboardType: TextInputType.multiline,
-              textAlignVertical: TextAlignVertical.top,
-              autocorrect: false,
-              enableSuggestions: false,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 13,
-                height: 1.45,
-              ),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: .94),
-                contentPadding: const EdgeInsets.all(12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
+            child: SizedBox.expand(
+              child: TextField(
+                key: const Key('girls-source-editor-code'),
+                controller: _controller,
+                enabled: !_saving,
+                expands: true,
+                maxLines: null,
+                minLines: null,
+                keyboardType: TextInputType.multiline,
+                textAlignVertical: TextAlignVertical.top,
+                autocorrect: false,
+                enableSuggestions: false,
+                scrollPadding: EdgeInsets.zero,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  height: 1.45,
+                ),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: .94),
+                  contentPadding: const EdgeInsets.all(12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
               ),
             ),
