@@ -4,7 +4,7 @@ import '../hosted_app_webview.dart';
 import '../hosted_authoring_contract_api.dart';
 import '../hosted_authoring_editor_action.dart';
 import 'api.dart';
-import 'girls_app_core.dart' as core;
+import 'girls_errors.dart';
 import 'girls_app_management_api.dart';
 import 'girls_app_preview_api.dart';
 import 'girls_app_source_editor_page.dart';
@@ -91,7 +91,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
       if (!mounted) return;
       setState(() {
         _novelSetupReady = false;
-        _novelSetupError = core.girlsMessageFor(error);
+        _novelSetupError = girlsMessageFor(error);
       });
     } finally {
       if (mounted) setState(() => _novelSetupBusy = false);
@@ -178,7 +178,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
         ),
       );
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted && _busy) setState(() => _busy = false);
     }
@@ -305,7 +305,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
       editorAppId: app.appId,
       runtimeTransport: widget.api.runtimeClient,
       authoringContractApi: widget.authoringContractApi,
-      errorMessage: core.girlsMessageFor,
+      errorMessage: girlsMessageFor,
       nonEditorChild: _runtimeActions(),
     );
   }

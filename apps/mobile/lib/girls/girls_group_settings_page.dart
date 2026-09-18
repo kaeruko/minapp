@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../hosted_group_management_api.dart';
 import 'api.dart';
-import 'girls_app_core.dart' as core;
+import 'girls_errors.dart';
 import 'hosted_girls_api.dart';
 
 const Color _ink = Color(0xFF604943);
@@ -63,7 +63,7 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
       setState(() => _groupIdCode = invite.code);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = core.girlsMessageFor(error));
+      setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _loadingGroupId = false);
     }
@@ -114,7 +114,7 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
       Navigator.of(context).pop<HostedGroup>(updated);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = core.girlsMessageFor(error));
+      setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

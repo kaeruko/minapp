@@ -3,7 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import 'api.dart';
-import 'girls_app_core.dart' as core;
+import 'girls_errors.dart';
+import 'girls_group_home_page.dart';
 import 'girls_builtin_install_api.dart';
 import 'girls_current_group_store.dart';
 import 'girls_group_settings_page.dart';
@@ -141,7 +142,7 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = core.girlsMessageFor(error));
+      setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -171,7 +172,7 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
         SnackBar(content: Text('「${group.name}」をいまのグループにしたよ。')),
       );
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -180,7 +181,7 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
   Future<void> _openGroup(HostedGroup group) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (BuildContext context) => core.GirlsGroupHomePage(
+        builder: (BuildContext context) => GirlsGroupHomePage(
           api: widget.api,
           session: widget.session,
           group: group,
@@ -244,7 +245,7 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
         ),
       );
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -280,7 +281,7 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
       if (!mounted) return;
       await _showGroupId(created, invite);
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

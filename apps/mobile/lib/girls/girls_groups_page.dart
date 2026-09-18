@@ -4,7 +4,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
-import 'girls_app_core.dart' as core;
+import 'girls_errors.dart';
+import 'girls_group_home_page.dart';
 import 'girls_current_group_store.dart';
 import 'girls_footer_nav.dart';
 import 'girls_scaffold.dart';
@@ -80,7 +81,7 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
         SnackBar(content: Text('「${group.name}」をいまのグループにしたよ。')),
       );
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -112,7 +113,7 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
         setState(() => _groups = groups);
       }
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -206,7 +207,7 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
       setState(() => _groups = groups);
       await _openGroup(group);
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -233,7 +234,7 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = core.girlsMessageFor(error);
+          _error = girlsMessageFor(error);
         });
       }
       return;
@@ -264,14 +265,14 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
         if (!mounted) return;
         setState(() {
           _error =
-              'グループ「${createdGroup.name}」は作成できたけれど、グループIDの発行に失敗し、その後の一覧更新にも失敗しました。${core.girlsMessageFor(error)} / ${core.girlsMessageFor(reloadError)}';
+              'グループ「${createdGroup.name}」は作成できたけれど、グループIDの発行に失敗し、その後の一覧更新にも失敗しました。${girlsMessageFor(error)} / ${girlsMessageFor(reloadError)}';
         });
         return;
       }
       if (!mounted) return;
       setState(() {
         _error =
-            'グループ「${createdGroup.name}」は作成できたけれど、グループIDの発行に失敗しました。${core.girlsMessageFor(error)}';
+            'グループ「${createdGroup.name}」は作成できたけれど、グループIDの発行に失敗しました。${girlsMessageFor(error)}';
       });
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -355,7 +356,7 @@ class _GirlsGroupsPageState extends State<GirlsGroupsPage> {
   Future<void> _openGroup(HostedGroup group) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (BuildContext context) => core.GirlsGroupHomePage(
+        builder: (BuildContext context) => GirlsGroupHomePage(
           api: widget.api,
           session: widget.session,
           group: group,

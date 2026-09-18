@@ -6,7 +6,7 @@ import '../hosted_authoring_contract_api.dart';
 import '../hosted_authoring_editor_action.dart';
 import '../hosted_authoring_projects_api.dart';
 import 'api.dart';
-import 'girls_app_core.dart' as core;
+import 'girls_errors.dart';
 import 'girls_app_management_api.dart';
 import 'girls_apps_cache.dart';
 import 'girls_apps_page.dart' as legacy;
@@ -226,7 +226,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       if (mounted && generation == _loadGeneration) {
         widget.cache?.clear();
         setState(() {
-          _error = core.girlsMessageFor(_loadError(error));
+          _error = girlsMessageFor(_loadError(error));
           _makers = const [];
           _apps = const [];
           _activeGroups = null;
@@ -318,7 +318,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
         editorAppId: maker.appId,
         runtimeTransport: widget.api.runtimeClient,
         editorFormats: maker.edits,
-        errorMessage: core.girlsMessageFor,
+        errorMessage: girlsMessageFor,
         pageTitle: isNovel ? 'ノベルエディタ' : '${maker.title}でつくる',
         collectionTitle: isNovel ? 'あなたのノベル作品' : 'あなたの作品',
         emptyTitle: isNovel ? 'まだノベル作品がありません' : 'まだ作品がありません',
@@ -327,7 +327,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       );
       if (mounted) await _load();
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
       if (isNovel) widget.onFooterVisibilityChanged?.call(false);

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'api.dart';
-import 'girls_app_core_legacy.dart' as core;
+import 'girls_errors.dart';
 import 'girls_group_app_management_page.dart';
 import 'girls_scaffold.dart';
 import 'hosted_app_webview.dart';
@@ -56,7 +56,7 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
       if (!mounted) return;
       setState(() => _apps = apps);
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -110,7 +110,7 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
         ),
       );
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -142,7 +142,7 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
         ),
       );
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _launchingAppId = null);
     }

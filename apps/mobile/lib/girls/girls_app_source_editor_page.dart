@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'girls_app_core.dart' as core;
+import 'girls_errors.dart';
 import 'girls_app_management_api.dart';
 import 'girls_scaffold.dart';
 import 'girls_source_zip.dart';
@@ -133,7 +133,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = core.girlsMessageFor(error);
+        _error = girlsMessageFor(error);
       });
     }
   }
@@ -170,7 +170,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
       Navigator.of(context).pop<int>(revision);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = core.girlsMessageFor(error));
+      setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

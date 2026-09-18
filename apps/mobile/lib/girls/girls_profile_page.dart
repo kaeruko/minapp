@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
-import 'girls_app_core.dart' as core;
+import 'girls_errors.dart';
 import 'hosted_girls_api.dart';
 
 const Color _ink = Color(0xFF604943);
@@ -75,7 +75,7 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
         _displayNameController.text = profile.displayName ?? '';
       });
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -119,7 +119,7 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
         _message = '表示名を保存したよ';
       });
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

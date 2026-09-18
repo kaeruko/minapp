@@ -4,7 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../hosted_app_webview.dart';
 import '../ugc_safety.dart';
-import 'girls_app_core.dart' as core;
+import 'girls_errors.dart';
 import 'girls_scaffold.dart';
 import 'girls_shop_api.dart';
 import 'hosted_girls_api.dart';
@@ -68,7 +68,7 @@ class _GirlsShopPageState extends State<GirlsShopPage> {
         _apps = apps;
       });
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -301,7 +301,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
     try {
       await action();
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

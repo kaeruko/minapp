@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../hosted_app_webview.dart';
 import 'api.dart';
-import 'girls_app_core.dart' as core;
+import 'girls_errors.dart';
 import 'girls_app_management_api.dart';
 import 'girls_app_preview_api.dart';
 import 'girls_app_source_editor_page.dart';
@@ -121,7 +121,7 @@ class _GirlsGroupAppManagementPageState
         }
         shopListed = matchesInShop == 1;
       } catch (error) {
-        shopError = core.girlsMessageFor(error);
+        shopError = girlsMessageFor(error);
       }
 
       if (!mounted) return;
@@ -132,7 +132,7 @@ class _GirlsGroupAppManagementPageState
         _shopError = shopError;
       });
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -172,7 +172,7 @@ class _GirlsGroupAppManagementPageState
         ),
       );
     } catch (error) {
-      if (mounted) setState(() => _shopError = core.girlsMessageFor(error));
+      if (mounted) setState(() => _shopError = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _shopBusy = false);
     }
@@ -204,7 +204,7 @@ class _GirlsGroupAppManagementPageState
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('ZIPを保存しました。')));
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -248,7 +248,7 @@ class _GirlsGroupAppManagementPageState
       );
       if (mounted) await _load();
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -291,7 +291,7 @@ class _GirlsGroupAppManagementPageState
       );
       if (mounted) await _load();
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -328,7 +328,7 @@ class _GirlsGroupAppManagementPageState
         ),
       );
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted && _busy) setState(() => _busy = false);
     }
@@ -353,7 +353,7 @@ class _GirlsGroupAppManagementPageState
       );
       await _load();
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -392,7 +392,7 @@ class _GirlsGroupAppManagementPageState
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
