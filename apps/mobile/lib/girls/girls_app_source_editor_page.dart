@@ -175,16 +175,45 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
 
   @override
   Widget build(BuildContext context) {
-    final double keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    final bool keyboardVisible = keyboardInset > 0;
+    final bool keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
-      resizeToAvoidBottomInset: false,
       backgroundColor: _cream,
       appBar: AppBar(
         backgroundColor: _cream,
         foregroundColor: _ink,
         title: Text('${widget.title} のコード'),
         actions: <Widget>[
+          if (!_loading && _archive != null)
+            PopupMenuButton<String>(
+              key: const Key('girls-source-editor-file-menu'),
+              tooltip: '編集するファイル',
+              enabled: !_saving,
+              icon: const Icon(Icons.folder_open_rounded),
+              onSelected: (String path) => _selectPath(path),
+              itemBuilder: (BuildContext context) => _textPaths
+                  .map(
+                    (String path) => PopupMenuItem<String>(
+                      value: path,
+                      child: Row(
+                        children: <Widget>[
+                          SizedBox(
+                            width: 28,
+                            child: path == _selectedPath
+                                ? const Icon(Icons.check_rounded, size: 18)
+                                : null,
+                          ),
+                          Expanded(
+                            child: Text(
+                              path,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
+            ),
           if (!_loading && _archive != null)
             IconButton(
               key: const Key('girls-source-editor-save-appbar'),
@@ -200,13 +229,9 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
         ],
       ),
       body: SafeArea(
-        bottom: !keyboardVisible,
-        child: Padding(
-          padding: EdgeInsets.only(bottom: keyboardInset),
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _buildEditor(keyboardVisible: keyboardVisible),
-        ),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _buildEditor(keyboardVisible: keyboardVisible),
       ),
     );
   }
@@ -227,6 +252,13 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
             ),
           ],
         ),
+      );
+    }
+
+    if (keyboardVisible) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        child: _buildCodeField(),
       );
     }
 
@@ -295,34 +327,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SizedBox.expand(
-              child: TextField(
-                key: const Key('girls-source-editor-code'),
-                controller: _controller,
-                enabled: !_saving,
-                expands: true,
-                maxLines: null,
-                minLines: null,
-                keyboardType: TextInputType.multiline,
-                textAlignVertical: TextAlignVertical.top,
-                autocorrect: false,
-                enableSuggestions: false,
-                scrollPadding: EdgeInsets.zero,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 13,
-                  height: 1.45,
-                ),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.white.withValues(alpha: .94),
-                  contentPadding: const EdgeInsets.all(12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-            ),
+            child: _buildCodeField(),
           ),
         ),
         if (!keyboardVisible)
@@ -341,6 +346,37 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildCodeField() {
+    return SizedBox.expand(
+      child: TextField(
+        key: const Key('girls-source-editor-code'),
+        controller: _controller,
+        enabled: !_saving,
+        expands: true,
+        maxLines: null,
+        minLines: null,
+        keyboardType: TextInputType.multiline,
+        textAlignVertical: TextAlignVertical.top,
+        autocorrect: false,
+        enableSuggestions: false,
+        scrollPadding: EdgeInsets.zero,
+        style: const TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 13,
+          height: 1.45,
+        ),
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: .94),
+          contentPadding: const EdgeInsets.all(12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
     );
   }
 }
