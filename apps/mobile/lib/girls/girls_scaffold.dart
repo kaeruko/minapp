@@ -40,6 +40,7 @@ class GirlsScaffold extends StatelessWidget {
     this.actions = const <Widget>[],
     required this.body,
     required this.bottomNavigationBar,
+    this.pageBackgroundDecoration,
     super.key,
   });
 
@@ -48,11 +49,16 @@ class GirlsScaffold extends StatelessWidget {
   final List<Widget> actions;
   final Widget body;
   final Widget bottomNavigationBar;
+  final Decoration? pageBackgroundDecoration;
 
   @override
   Widget build(BuildContext context) {
     if (GirlsScaffoldChromeScope.isEmbedded(context)) {
-      return _GirlsEmbeddedPage(title: title, body: body);
+      return _GirlsEmbeddedPage(
+        title: title,
+        body: body,
+        pageBackgroundDecoration: pageBackgroundDecoration,
+      );
     }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -91,7 +97,11 @@ class GirlsScaffold extends StatelessWidget {
                   children: <Widget>[
                     GirlsCommonHeader(leading: leading, actions: actions),
                     Expanded(
-                      child: _GirlsPageContent(title: title, body: body),
+                      child: _GirlsPageSurface(
+                        title: title,
+                        body: body,
+                        decoration: pageBackgroundDecoration,
+                      ),
                     ),
                   ],
                 ),
@@ -105,16 +115,49 @@ class GirlsScaffold extends StatelessWidget {
 }
 
 class _GirlsEmbeddedPage extends StatelessWidget {
-  const _GirlsEmbeddedPage({required this.title, required this.body});
+  const _GirlsEmbeddedPage({
+    required this.title,
+    required this.body,
+    required this.pageBackgroundDecoration,
+  });
 
   final String? title;
   final Widget body;
+  final Decoration? pageBackgroundDecoration;
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      child: _GirlsPageContent(title: title, body: body),
+      child: _GirlsPageSurface(
+        title: title,
+        body: body,
+        decoration: pageBackgroundDecoration,
+      ),
+    );
+  }
+}
+
+class _GirlsPageSurface extends StatelessWidget {
+  const _GirlsPageSurface({
+    required this.title,
+    required this.body,
+    required this.decoration,
+  });
+
+  final String? title;
+  final Widget body;
+  final Decoration? decoration;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget content = _GirlsPageContent(title: title, body: body);
+    final Decoration? currentDecoration = decoration;
+    if (currentDecoration == null) return content;
+    return DecoratedBox(
+      key: const Key('girls-page-background'),
+      decoration: currentDecoration,
+      child: content,
     );
   }
 }
