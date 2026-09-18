@@ -485,7 +485,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  const _SectionHeading(title: 'ビルトインアプリ'),
+                  const _SectionHeading(title: 'アプリ'),
                   const SizedBox(height: 8),
                   GridView.count(
                     shrinkWrap: true,
