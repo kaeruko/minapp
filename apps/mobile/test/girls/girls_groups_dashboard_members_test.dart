@@ -46,7 +46,10 @@ Map<String, Object?> _member(
   };
 }
 
-HostedGirlsApi _fakeApi(List<Map<String, Object?>> members) {
+HostedGirlsApi _fakeApi(
+  List<Map<String, Object?>> members, {
+  List<Map<String, Object?>> apps = const <Map<String, Object?>>[],
+}) {
   return HostedGirlsApi(
     baseUri: Uri.parse('https://example.com'),
     client: MockClient((http.Request request) async {
@@ -68,7 +71,7 @@ HostedGirlsApi _fakeApi(List<Map<String, Object?>> members) {
         payload = <String, Object?>{'members': members};
       } else if (request.method == 'GET' &&
           path == '/hosted/groups/${_group.groupId}/apps') {
-        payload = <String, Object?>{'apps': <Object?>[]};
+        payload = <String, Object?>{'apps': apps};
       } else {
         fail('Unexpected request: ${request.method} ${request.url}');
       }
@@ -85,14 +88,15 @@ HostedGirlsApi _fakeApi(List<Map<String, Object?>> members) {
 
 Future<void> _pumpDashboard(
   WidgetTester tester,
-  List<Map<String, Object?>> members,
-) async {
+  List<Map<String, Object?>> members, {
+  List<Map<String, Object?>> apps = const <Map<String, Object?>>[],
+}) async {
   await tester.binding.setSurfaceSize(const Size(420, 900));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(
     MaterialApp(
       home: GirlsGroupsDashboardPage(
-        api: _fakeApi(members),
+        api: _fakeApi(members, apps: apps),
         session: const AuthenticatedSession(
           accessToken: 'test-token',
           expiresIn: 3600,
@@ -107,6 +111,37 @@ Future<void> _pumpDashboard(
 }
 
 void main() {
+  testWidgets('latest app card is tappable', (WidgetTester tester) async {
+    const String appId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    await _pumpDashboard(
+      tester,
+      <Map<String, Object?>>[
+        _member(1, 'review', owner: true),
+      ],
+      apps: <Map<String, Object?>>[
+        <String, Object?>{
+          'app_id': appId,
+          'group_id': _group.groupId,
+          'title': 'うさぎのおやつやさん',
+          'source_kind': 'zip',
+          'created_at': '2026-09-18T00:00:00Z',
+          'published_version': 1,
+          'owner_user_id': _userId(1),
+          'editable': false,
+          'source_revision': null,
+        },
+      ],
+    );
+
+    final Finder latest = find.byKey(
+      const ValueKey<String>('girls-latest-app-$appId'),
+    );
+    expect(latest, findsOneWidget);
+    final InkWell inkWell = tester.widget<InkWell>(latest);
+    expect(inkWell.onTap, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('shows every member inline when the group has four or fewer', (
     WidgetTester tester,
   ) async {
