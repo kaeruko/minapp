@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../hosted_app_webview.dart';
+import '../hosted_runtime_bridge.dart';
 import '../hosted_authoring_contract_api.dart';
 import '../hosted_authoring_editor_action.dart';
 import 'api.dart';
@@ -132,6 +133,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
         appId: app.app.appId,
       ),
       titleSuffix: 'プレビュー',
+      refreshDraftRuntime: true,
     );
   }
 
@@ -169,6 +171,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
   Future<void> _openSession({
     required Future<GirlsAppTestSession> Function() create,
     required String titleSuffix,
+    bool refreshDraftRuntime = false,
   }) async {
     setState(() {
       _busy = true;
@@ -177,6 +180,17 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
     try {
       final GirlsAppTestSession launch = await create();
       if (!mounted) return;
+      final HostedRuntimeTransport runtimeTransport = refreshDraftRuntime
+          ? GirlsPreviewRuntimeTransport(
+              delegate: widget.api.runtimeClient,
+              previewApi: _previewApi,
+              accessToken: widget.session.accessToken,
+              groupId: widget.detail.summary.app.groupId,
+              appId: widget.detail.summary.app.appId,
+              runtimeToken: launch.runtimeToken,
+              groupScope: false,
+            )
+          : widget.api.runtimeClient;
       setState(() => _busy = false);
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -184,7 +198,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
             title: '${widget.detail.summary.app.title}（$titleSuffix）',
             contentUri: launch.contentUri,
             runtimeToken: launch.runtimeToken,
-            runtimeTransport: widget.api.runtimeClient,
+            runtimeTransport: runtimeTransport,
           ),
         ),
       );
