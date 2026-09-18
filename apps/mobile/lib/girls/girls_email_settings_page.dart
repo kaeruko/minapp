@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'api.dart';
-import 'girls_app_core.dart' as core;
+import 'girls_errors.dart';
 import 'hosted_girls_api.dart';
 
 const Color _ink = Color(0xFF604943);
@@ -70,7 +70,7 @@ class _GirlsEmailSettingsPageState extends State<GirlsEmailSettingsPage> {
         _emailController.text = status.email ?? '';
       });
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -104,7 +104,7 @@ class _GirlsEmailSettingsPageState extends State<GirlsEmailSettingsPage> {
         }
       });
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -133,7 +133,7 @@ class _GirlsEmailSettingsPageState extends State<GirlsEmailSettingsPage> {
         _message = 'メールアドレスを紐づけました♡';
       });
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _verifying = false);
     }
