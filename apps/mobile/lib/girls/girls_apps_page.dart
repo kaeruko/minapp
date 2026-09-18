@@ -8,7 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../hosted_authoring_editor_action.dart';
 import '../hosted_authoring_projects_api.dart';
 import 'api.dart';
-import 'girls_app_core.dart' as core;
+import 'girls_errors.dart';
 import 'girls_app_management_api.dart';
 import 'girls_app_test_actions.dart';
 import 'girls_builtin_install_api.dart';
@@ -147,7 +147,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
         widget.onCurrentGroupChanged?.call(currentGroup);
       }
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -233,7 +233,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
         editorAppId: editor.appId,
         runtimeTransport: widget.api.runtimeClient,
         editorFormats: const <String>[_novelContentFormat],
-        errorMessage: core.girlsMessageFor,
+        errorMessage: girlsMessageFor,
         pageTitle: 'ノベルゲームを作る',
         collectionTitle: 'あなたのノベル作品',
         emptyTitle: 'まだノベル作品がありません',
@@ -242,7 +242,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       );
       if (mounted) await _load();
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted && _busy) setState(() => _busy = false);
     }
@@ -415,7 +415,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
       );
       if (mounted) setState(() => _detail = detail);
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -452,7 +452,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('ZIPを保存しました。')));
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -500,7 +500,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
       );
       if (mounted) await _load();
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -523,7 +523,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
       );
       if (mounted) await _load();
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -544,7 +544,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
       );
       if (mounted) await _load();
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -583,7 +583,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
-      if (mounted) setState(() => _error = core.girlsMessageFor(error));
+      if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
