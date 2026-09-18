@@ -33,6 +33,7 @@ class GirlsAppSourceEditorPage extends StatefulWidget {
 
 class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _editorFocusNode = FocusNode();
   GirlsSourceArchive? _archive;
   Map<String, String> _originalTexts = <String, String>{};
   Map<String, String> _draftTexts = <String, String>{};
@@ -60,6 +61,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
 
   @override
   void dispose() {
+    _editorFocusNode.dispose();
     _controller
       ..removeListener(_onTextChanged)
       ..dispose();
@@ -255,96 +257,92 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
       );
     }
 
-    if (keyboardVisible) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        child: _buildCodeField(),
-      );
-    }
-
     return Column(
       children: <Widget>[
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            keyboardVisible ? 6 : 12,
-            16,
-            keyboardVisible ? 4 : 8,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              if (!keyboardVisible)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .9),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    'revision ${widget.expectedRevision} を編集中。保存すると '
-                    'revision ${widget.expectedRevision + 1} になります。公開版は自動では変わりません。',
-                    style: const TextStyle(
-                      color: _lavender,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              if (_error != null) ...<Widget>[
-                if (!keyboardVisible) const SizedBox(height: 8),
-                _EditorError(message: _error!),
-              ],
-              SizedBox(height: keyboardVisible ? 4 : 8),
-              DropdownButtonFormField<String>(
-                key: const Key('girls-source-editor-file'),
-                initialValue: _selectedPath,
-                decoration: const InputDecoration(
-                  labelText: '編集するファイル',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                items: _textPaths
-                    .map(
-                      (String path) => DropdownMenuItem<String>(
-                        value: path,
-                        child: Text(path, overflow: TextOverflow.ellipsis),
+        keyboardVisible
+            ? const SizedBox.shrink()
+            : Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .9),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                    )
-                    .toList(growable: false),
-                onChanged: _saving ? null : _selectPath,
-              ),
-              if (!keyboardVisible) ...<Widget>[
-                const SizedBox(height: 6),
-                const Text(
-                  'HTML / CSS / JavaScript / JSON / TXT を編集できます。画像・音声などのファイルはそのまま保持します。',
-                  style: TextStyle(fontSize: 11, color: _lavender),
+                      child: Text(
+                        'revision ${widget.expectedRevision} を編集中。保存すると '
+                        'revision ${widget.expectedRevision + 1} になります。公開版は自動では変わりません。',
+                        style: const TextStyle(
+                          color: _lavender,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (_error != null) ...<Widget>[
+                      const SizedBox(height: 8),
+                      _EditorError(message: _error!),
+                    ],
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      key: const Key('girls-source-editor-file'),
+                      initialValue: _selectedPath,
+                      decoration: const InputDecoration(
+                        labelText: '編集するファイル',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: _textPaths
+                          .map(
+                            (String path) => DropdownMenuItem<String>(
+                              value: path,
+                              child: Text(
+                                path,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged: _saving ? null : _selectPath,
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'HTML / CSS / JavaScript / JSON / TXT を編集できます。画像・音声などのファイルはそのまま保持します。',
+                      style: TextStyle(fontSize: 11, color: _lavender),
+                    ),
+                  ],
                 ),
-              ],
-            ],
-          ),
-        ),
+              ),
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: EdgeInsets.fromLTRB(
+              keyboardVisible ? 12 : 16,
+              keyboardVisible ? 8 : 0,
+              keyboardVisible ? 12 : 16,
+              keyboardVisible ? 8 : 0,
+            ),
             child: _buildCodeField(),
           ),
         ),
-        if (!keyboardVisible)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-            child: FilledButton.icon(
-              key: const Key('girls-source-editor-save'),
-              onPressed: !_dirty || _saving ? null : _save,
-              icon: _saving
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.save_rounded),
-              label: Text(_saving ? '保存中…' : '保存してrevision更新'),
-            ),
-          ),
+        keyboardVisible
+            ? const SizedBox.shrink()
+            : Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                child: FilledButton.icon(
+                  key: const Key('girls-source-editor-save'),
+                  onPressed: !_dirty || _saving ? null : _save,
+                  icon: _saving
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_rounded),
+                  label: Text(_saving ? '保存中…' : '保存してrevision更新'),
+                ),
+              ),
       ],
     );
   }
@@ -354,6 +352,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
       child: TextField(
         key: const Key('girls-source-editor-code'),
         controller: _controller,
+        focusNode: _editorFocusNode,
         enabled: !_saving,
         expands: true,
         maxLines: null,
