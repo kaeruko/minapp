@@ -15,7 +15,7 @@ void main() {
     expect(prompt!.message, '友達を招待する？');
     expect(
       prompt.destination,
-      GirlsHomeMascotDestination.currentGroup,
+      GirlsHomeMascotDestination.invite,
     );
   });
 

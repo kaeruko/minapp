@@ -215,14 +215,18 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
 
   Future<void> _openMascotPrompt(GirlsHomeMascotPrompt prompt) {
     switch (prompt.destination) {
+      case GirlsHomeMascotDestination.invite:
+        final HostedGroup? group = _currentGroup;
+        if (group == null) {
+          throw StateError('Invite mascot prompt requires a current group.');
+        }
+        return _showCurrentGroupId(group);
       case GirlsHomeMascotDestination.currentGroup:
         final HostedGroup? group = _currentGroup;
         if (group == null) {
-          throw StateError(
-            'Mascot prompt requires a current group for group navigation.',
-          );
+          throw StateError('Play mascot prompt requires a current group.');
         }
-        return _showCurrentGroupId(group);
+        return _openGroup(group);
       case GirlsHomeMascotDestination.apps:
         return _openApps();
     }
