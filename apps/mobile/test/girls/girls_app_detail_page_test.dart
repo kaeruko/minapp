@@ -12,6 +12,7 @@ import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
 const appId = 'a123456789abcdef0123456789abcdef';
 const groupId = 'b123456789abcdef0123456789abcdef';
+const ownerUserId = 'c123456789abcdef0123456789abcdef';
 
 Map<String, Object?> fixture(
         {bool hidden = false, int? version = 1, int revision = 1}) =>
@@ -21,7 +22,7 @@ Map<String, Object?> fixture(
       'title': '私の小さな星物語',
       'source_kind': 'zip',
       'created_at': '2026-09-01T00:00:00Z',
-      'owner_user_id': 'c123456789abcdef0123456789abcdef',
+      'owner_user_id': ownerUserId,
       'editable': true,
       'source_revision': revision,
       'published_version': version,
@@ -48,6 +49,23 @@ http.Response jsonResponse(Object value, [int status = 200]) => http.Response(
       headers: {'content-type': 'application/json'},
     );
 
+Object fallbackResponse(Uri url) {
+  if (url.path == '/hosted/groups/$groupId/members') {
+    return {
+      'members': [
+        {
+          'user_id': ownerUserId,
+          'login_id': 'owner-login',
+          'role': 'owner',
+          'status': 'active',
+          'display_name': 'ねんね',
+        }
+      ]
+    };
+  }
+  return {'apps': <Object?>[]};
+}
+
 Future<void> showPage(WidgetTester tester, MockClient client,
     {double width = 390, double scale = 1}) async {
   tester.view.devicePixelRatio = 1;
@@ -70,7 +88,7 @@ Future<void> showPage(WidgetTester tester, MockClient client,
     ),
   ));
   await tester.pumpAndSettle();
-  expect(find.text('私の小さな星物語'), findsWidgets,
+  expect(find.text('私の小さな星物語'), findsOneWidget,
       reason: tester
           .widgetList<Text>(find.byType(Text))
           .map((text) => text.data)
@@ -86,12 +104,13 @@ void main() {
           MockClient((request) async => jsonResponse(
               request.url.path == '/hosted/my/apps/$appId'
                   ? fixture()
-                  : {'apps': <Object?>[]})),
+                  : fallbackResponse(request.url))),
           width: width);
       expect(find.text('アプリ詳細'), findsOneWidget);
       expect(find.text('アプリ名'), findsNothing);
       expect(find.text('アプリ情報'), findsNothing);
       expect(find.text('プレビュー'), findsOneWidget);
+      expect(find.text('アップした人：ねんね'), findsOneWidget);
       final AppBar appBar = tester.widget<AppBar>(find.byType(AppBar));
       expect(appBar.primary, isFalse);
       expect(find.text('3456回'), findsOneWidget);
@@ -122,7 +141,7 @@ void main() {
       }
       return jsonResponse(request.url.path == '/hosted/my/apps/$appId'
           ? fixture()
-          : {'apps': <Object?>[]});
+          : fallbackResponse(request.url));
     }));
     final preview = find.byKey(const Key('girls-app-preview-latest'));
     await tester.ensureVisible(preview);
@@ -147,7 +166,7 @@ void main() {
       }
       return jsonResponse(request.url.path == '/hosted/my/apps/$appId'
           ? fixture(hidden: hidden)
-          : {'apps': <Object?>[]});
+          : fallbackResponse(request.url));
     }));
     final toggle = find.byKey(const Key('girls-app-visibility'));
     await tester.tap(toggle);
@@ -177,7 +196,7 @@ void main() {
       }
       return jsonResponse(request.url.path == '/hosted/my/apps/$appId'
           ? fixture(hidden: hidden, version: version)
-          : {'apps': <Object?>[]});
+          : fallbackResponse(request.url));
     }));
     await tester.tap(find.byKey(const Key('girls-app-visibility')));
     await tester.pumpAndSettle();
@@ -207,7 +226,7 @@ void main() {
       }
       return jsonResponse(request.url.path == '/hosted/my/apps/$appId'
           ? fixture()
-          : {'apps': <Object?>[]});
+          : fallbackResponse(request.url));
     }));
     final edit = find.byKey(const Key('girls-app-edit-code'));
     await tester.ensureVisible(edit);
