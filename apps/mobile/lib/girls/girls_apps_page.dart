@@ -425,7 +425,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
     final ManagedGirlsAppDetail? detail = _detail;
     final int? revision = detail?.summary.sourceRevision;
     if (detail == null || revision == null) {
-      setState(() => _error = '保存する現在版を確認できません。');
+      setState(() => _error = '保存する編集版を確認できません。');
       return;
     }
     setState(() {
@@ -462,7 +462,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
     final ManagedGirlsAppDetail? detail = _detail;
     final int? revision = detail?.summary.sourceRevision;
     if (detail == null || revision == null) {
-      setState(() => _error = '更新元の現在版を確認できません。');
+      setState(() => _error = '更新元の編集版を確認できません。');
       return;
     }
     final PlatformFile? file = await FilePicker.pickFile(
@@ -646,7 +646,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
                       ? null
                       : _publish,
                   icon: const Icon(Icons.cloud_upload_rounded),
-                  label: const Text('現在版を公開'),
+                  label: const Text('編集版を公開'),
                 ),
                 const SizedBox(height: 8),
               ] else if (detail.summary.app.sourceKind == 'builtin') ...<Widget>[
@@ -778,7 +778,7 @@ class _AppSummary extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text('公開版: ${app.app.publishedVersion == null ? 'なし' : 'あり'}'),
-          Text('現在版: ${app.sourceRevision == null ? 'なし' : '保存済み'}'),
+          Text('編集版: ${app.sourceRevision == null ? 'なし' : '保存済み'}'),
           Text(
             '最終更新: ${app.sourceUpdatedAt == null ? '-' : _formatDate(app.sourceUpdatedAt!)}',
           ),

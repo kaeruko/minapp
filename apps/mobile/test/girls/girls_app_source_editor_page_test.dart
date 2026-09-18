@@ -82,11 +82,11 @@ void main() {
             )));
     await tester.pumpAndSettle();
     expect(
-      find.text('現在版を編集中。保存しても公開版は変わりません。'),
+      find.text('編集版を編集中。保存しても公開版は変わりません。'),
       findsOneWidget,
     );
     expect(find.textContaining('revision'), findsNothing);
-    expect(find.text('現在版を保存'), findsOneWidget);
+    expect(find.text('編集版を保存'), findsOneWidget);
     final codeField = find.byKey(const Key('girls-source-editor-code'));
     await tester.tap(codeField);
     await tester.pump();

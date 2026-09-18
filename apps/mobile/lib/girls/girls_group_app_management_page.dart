@@ -272,7 +272,7 @@ class _GirlsGroupAppManagementPageState
     await _load();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('コードを保存しました。現在版を更新しました。')),
+      const SnackBar(content: Text('コードを保存しました。編集版を更新しました。')),
     );
   }
 
@@ -449,7 +449,7 @@ class _GirlsGroupAppManagementPageState
                     const SizedBox(height: 8),
                     Text('作者: ${_authorLabel ?? '確認中…'}'),
                     Text('作者ID: ${app.ownerUserId}'),
-                    Text('現在版: ${app.sourceRevision == null ? 'なし' : '保存済み'}'),
+                    Text('編集版: ${app.sourceRevision == null ? 'なし' : '保存済み'}'),
                     Text('公開版: ${app.publishedVersion == null ? 'なし' : 'あり'}'),
                   ],
                 ),
@@ -478,7 +478,7 @@ class _GirlsGroupAppManagementPageState
                 key: const Key('girls-group-admin-download'),
                 onPressed: _busy ? null : _downloadZip,
                 icon: const Icon(Icons.download_rounded),
-                label: const Text('現在のZIPを保存'),
+                label: const Text('編集のZIPを保存'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
@@ -492,7 +492,7 @@ class _GirlsGroupAppManagementPageState
                 key: const Key('girls-group-admin-publish'),
                 onPressed: _busy ? null : _publish,
                 icon: const Icon(Icons.cloud_upload_rounded),
-                label: const Text('現在版を公開'),
+                label: const Text('編集版を公開'),
               ),
               const SizedBox(height: 22),
               const Text(
@@ -506,7 +506,7 @@ class _GirlsGroupAppManagementPageState
               const SizedBox(height: 6),
               if (!app.isPublished)
                 const Text(
-                  '現在版を公開すると、ほかのグループのみんなが見られるショップへ出せるようになります。',
+                  '編集版を公開すると、ほかのグループのみんなが見られるショップへ出せるようになります。',
                   style: TextStyle(fontSize: 12, color: _lavender),
                 )
               else ...<Widget>[
@@ -544,7 +544,7 @@ class _GirlsGroupAppManagementPageState
               ),
               const SizedBox(height: 6),
               const Text(
-                '現在の表示状態はgroup apps一覧APIには含まれないため、変更したい状態を明示して選びます。',
+                '編集の表示状態はgroup apps一覧APIには含まれないため、変更したい状態を明示して選びます。',
                 style: TextStyle(fontSize: 12, color: _lavender),
               ),
               const SizedBox(height: 8),

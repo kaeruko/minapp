@@ -147,7 +147,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
 
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(
-      const SnackBar(content: Text('コードを保存しました。現在版を更新しました。')),
+      const SnackBar(content: Text('コードを保存しました。編集版を更新しました。')),
     );
 
     // The detail page owns its loaded revision. Returning to the app list makes
@@ -205,7 +205,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
               ? null
               : _previewLatestRevision,
           icon: const Icon(Icons.preview_rounded),
-          label: const Text('現在版をプレビュー'),
+          label: const Text('編集版をプレビュー'),
         ),
         if (detail.summary.app.editable && sourceRevision != null) ...<Widget>[
           const SizedBox(height: 8),
