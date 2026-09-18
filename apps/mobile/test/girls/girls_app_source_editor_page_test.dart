@@ -49,15 +49,27 @@ void main() {
       );
       addTearDown(api.close);
 
+      final ValueNotifier<EdgeInsets> viewInsets =
+          ValueNotifier<EdgeInsets>(EdgeInsets.zero);
+      addTearDown(viewInsets.dispose);
+
       await tester.pumpWidget(
         MaterialApp(
           builder: (BuildContext context, Widget? child) {
-            final MediaQueryData media = MediaQuery.of(context);
-            return MediaQuery(
-              data: media.copyWith(
-                viewInsets: const EdgeInsets.only(bottom: 300),
-              ),
-              child: child!,
+            return ValueListenableBuilder<EdgeInsets>(
+              valueListenable: viewInsets,
+              builder:
+                  (
+                    BuildContext context,
+                    EdgeInsets currentInsets,
+                    Widget? ignored,
+                  ) {
+                    final MediaQueryData media = MediaQuery.of(context);
+                    return MediaQuery(
+                      data: media.copyWith(viewInsets: currentInsets),
+                      child: child!,
+                    );
+                  },
             );
           },
           home: GirlsAppSourceEditorPage(
@@ -80,6 +92,23 @@ void main() {
         find.byKey(const Key('girls-source-editor-file-menu')),
         findsOneWidget,
       );
+      await tester.tap(codeField);
+      await tester.pump();
+
+      final EditableText beforeResize = tester.widget<EditableText>(
+        find.byType(EditableText),
+      );
+      final FocusNode focusNode = beforeResize.focusNode;
+      expect(focusNode.hasFocus, isTrue);
+
+      viewInsets.value = const EdgeInsets.only(bottom: 300);
+      await tester.pumpAndSettle();
+
+      final EditableText afterResize = tester.widget<EditableText>(
+        find.byType(EditableText),
+      );
+      expect(identical(afterResize.focusNode, focusNode), isTrue);
+      expect(afterResize.focusNode.hasFocus, isTrue);
       expect(tester.getSize(codeField).height, greaterThan(80));
       expect(tester.takeException(), isNull);
     },
