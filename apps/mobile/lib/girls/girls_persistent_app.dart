@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'girls_app.dart';
-import 'girls_app_core.dart' as core;
+import 'girls_errors.dart';
 import 'girls_home_shop_shell.dart';
 import 'hosted_girls_api.dart';
 
@@ -97,7 +97,7 @@ class _GirlsPersistentAppState extends State<GirlsPersistentApp> {
       if (!mounted) return;
       _scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(
-          content: Text('ログアウトできませんでした。${core.girlsMessageFor(error)}'),
+          content: Text('ログアウトできませんでした。${girlsMessageFor(error)}'),
         ),
       );
       return;
@@ -138,7 +138,7 @@ class _GirlsPersistentAppState extends State<GirlsPersistentApp> {
     if (restoreError != null) {
       return _authenticatedMaterialApp(
         home: _RestoreErrorPage(
-          message: core.girlsMessageFor(restoreError),
+          message: girlsMessageFor(restoreError),
           onRetry: _restore,
           onForgetSavedLogin: _forgetSavedLogin,
         ),
