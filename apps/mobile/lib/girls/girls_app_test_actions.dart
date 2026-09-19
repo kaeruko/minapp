@@ -20,6 +20,7 @@ class GirlsAppTestActions extends StatefulWidget {
     required this.api,
     required this.session,
     required this.detail,
+    required this.onSourceSaved,
     this.authoringContractApi,
     this.detailLayout = false,
     this.disabled = false,
@@ -29,6 +30,7 @@ class GirlsAppTestActions extends StatefulWidget {
   final HostedGirlsApi api;
   final AuthenticatedSession session;
   final ManagedGirlsAppDetail detail;
+  final Future<void> Function(int revision) onSourceSaved;
   final HostedAuthoringContractApi? authoringContractApi;
   final bool detailLayout;
   final bool disabled;
@@ -163,9 +165,9 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
       const SnackBar(content: Text('コードを保存しました。編集版を更新しました。')),
     );
 
-    // The detail page owns its loaded revision. Returning to the app list makes
-    // that page discard the stale revision before the user can publish it.
-    Navigator.of(context).pop();
+    // Reload the detail page in place so its source revision is current before
+    // the user previews or publishes the edited version.
+    await widget.onSourceSaved(revision);
   }
 
   Future<void> _openSession({
