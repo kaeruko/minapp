@@ -211,6 +211,59 @@ void main() {
         isTrue);
   });
 
+  testWidgets(
+      'saving source returns to app detail and reloads the saved revision',
+      (tester) async {
+    int revision = 1;
+    int detailLoads = 0;
+    final archive = GirlsSourceArchive.fromEntries(
+        {'index.html': Uint8List.fromList(utf8.encode('<html>hello</html>'))});
+
+    await showPage(tester, MockClient((request) async {
+      if (request.method == 'GET' &&
+          request.url.path == '/hosted/my/apps/$appId') {
+        detailLoads += 1;
+        return jsonResponse(fixture(revision: revision));
+      }
+      if (request.method == 'GET' && request.url.path.endsWith('/source')) {
+        return http.Response.bytes(archive.encode(), 200, headers: {
+          'content-type': 'application/zip',
+          'x-minapp-source-revision': '$revision',
+          'x-minapp-source-sha256': '0' * 64,
+        });
+      }
+      if (request.method == 'POST' && request.url.path.endsWith('/source')) {
+        expect(request.url.queryParameters['revision'], '$revision');
+        revision += 1;
+        return jsonResponse({'revision': revision});
+      }
+      return jsonResponse(fallbackResponse(request.url));
+    }));
+
+    final edit = find.byKey(const Key('girls-app-edit-code'));
+    await tester.ensureVisible(edit);
+    await tester.tap(edit);
+    await tester.pumpAndSettle();
+
+    final editor = find.byKey(const Key('girls-source-editor-code'));
+    expect(editor, findsOneWidget);
+    await tester.enterText(editor, '<html>changed</html>');
+    await tester.pump();
+
+    final save = find.byKey(const Key('girls-source-editor-save'));
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+
+    expect(find.text('アプリ詳細'), findsOneWidget);
+    expect(find.byKey(const Key('girls-source-editor-code')), findsNothing);
+    expect(find.byKey(const Key('girls-app-publish-update')), findsOneWidget);
+    expect(find.text('コードを保存しました。編集版を更新しました。'), findsOneWidget);
+    expect(detailLoads, 2);
+    expect(revision, 2);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('edit opens source editor and delete still requires confirmation',
       (tester) async {
     final archive = GirlsSourceArchive.fromEntries(
