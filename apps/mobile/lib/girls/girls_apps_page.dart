@@ -404,7 +404,10 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({
+    int? expectedSourceRevision,
+    bool clearDetailOnError = false,
+  }) async {
     setState(() {
       _busy = true;
       _error = null;
@@ -414,6 +417,13 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
         accessToken: widget.session.accessToken,
         appId: widget.appId,
       );
+      if (expectedSourceRevision != null &&
+          detail.summary.sourceRevision != expectedSourceRevision) {
+        throw StateError(
+          'Reloaded source revision ${detail.summary.sourceRevision} '
+          'does not match saved revision $expectedSourceRevision.',
+        );
+      }
       final List<HostedMember> members = await widget.api.listMembers(
         accessToken: widget.session.accessToken,
         groupId: detail.summary.app.groupId,
@@ -435,10 +445,22 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
         });
       }
     } catch (error) {
-      if (mounted) setState(() => _error = girlsMessageFor(error));
+      if (mounted) {
+        setState(() {
+          if (clearDetailOnError) _detail = null;
+          _error = girlsMessageFor(error);
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _reloadAfterSourceSave(int revision) async {
+    await _load(
+      expectedSourceRevision: revision,
+      clearDetailOnError: true,
+    );
   }
 
   Future<void> _downloadZip() async {
@@ -631,6 +653,7 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
                   api: widget.api,
                   session: widget.session,
                   detail: detail,
+                  onSourceSaved: _reloadAfterSourceSave,
                   detailLayout: true,
                   disabled: _busy,
                 ),
