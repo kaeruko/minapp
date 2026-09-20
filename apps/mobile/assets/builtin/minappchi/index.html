@@ -326,6 +326,66 @@
     let started = false;
     let busy = false;
 
+    const builtInStatePending = new Map();
+    let builtInStateSequence = 0;
+
+    function hasBuiltInStateBridge() {
+      return Boolean(
+        window.MinAppBuiltinState &&
+        typeof window.MinAppBuiltinState.postMessage === 'function'
+      );
+    }
+
+    function requestBuiltInState(method, key, value) {
+      if (!hasBuiltInStateBridge()) {
+        return Promise.reject(new Error('Built-in state bridge is unavailable.'));
+      }
+      if (method !== 'get' && method !== 'set') {
+        return Promise.reject(new Error(`Unsupported built-in state method: ${method}`));
+      }
+      builtInStateSequence += 1;
+      const id = `minappchi-${builtInStateSequence}`;
+      const request = { version: 1, id, method, key };
+      if (method === 'set') request.value = value;
+
+      return new Promise((resolve, reject) => {
+        builtInStatePending.set(id, { resolve, reject });
+        try {
+          window.MinAppBuiltinState.postMessage(JSON.stringify(request));
+        } catch (error) {
+          builtInStatePending.delete(id);
+          reject(error);
+        }
+      });
+    }
+
+    window.__minappBuiltinStateResolve = (response) => {
+      if (
+        !response ||
+        typeof response !== 'object' ||
+        response.version !== 1 ||
+        typeof response.id !== 'string' ||
+        typeof response.ok !== 'boolean'
+      ) {
+        throw new Error('Built-in state response is invalid.');
+      }
+      const pending = builtInStatePending.get(response.id);
+      if (!pending) {
+        throw new Error(`Unknown built-in state response id: ${response.id}`);
+      }
+      builtInStatePending.delete(response.id);
+
+      if (!response.ok) {
+        if (typeof response.error !== 'string' || response.error.length === 0) {
+          pending.reject(new Error('Built-in state request failed without diagnostics.'));
+          return;
+        }
+        pending.reject(new Error(response.error));
+        return;
+      }
+      pending.resolve(response);
+    };
+
     function hasMinAppState() {
       return Boolean(
         window.minapp &&
@@ -461,6 +521,12 @@
     }
 
     async function persist() {
+      if (storageMode === 'builtin') {
+        await requestBuiltInState('set', SAVE_KEY, state);
+        setSaveStatus('端末にセーブしました');
+        return;
+      }
+
       if (storageMode === 'minapp') {
         if (!hasMinAppState()) {
           throw new Error('MinApp state bridge disappeared while saving.');
@@ -604,6 +670,32 @@
       setMessage('あたらしい たまごが やってきた。');
     }));
 
+    async function bootBuiltInState() {
+      if (!hasBuiltInStateBridge()) {
+        throw new Error('Built-in state bridge is unavailable.');
+      }
+      storageMode = 'builtin';
+      const saved = await requestBuiltInState('get', SAVE_KEY);
+      if (saved.found === false) {
+        state = newEgg(1);
+        await persist();
+        setMessage('たまごが やってきた！');
+      } else if (
+        saved.found === true &&
+        Object.prototype.hasOwnProperty.call(saved, 'value')
+      ) {
+        state = validateState(saved.value);
+        setSaveStatus('端末のセーブを読み込みました');
+      } else {
+        throw new Error('Built-in state get response is invalid.');
+      }
+
+      const changed = advanceTo(Date.now());
+      if (changed) await persist();
+      started = true;
+      render();
+    }
+
     async function bootMinAppState() {
       if (!hasMinAppState()) throw new Error('MinApp state bridge is unavailable.');
       storageMode = 'minapp';
@@ -675,10 +767,12 @@
 
     window.addEventListener('minappready', handleMinAppReady);
 
-    if (isBuiltInLocalStorageEnvironment()) {
-      bootLocalStorage().catch(stopForStorageError);
+    if (hasBuiltInStateBridge()) {
+      bootBuiltInState().catch(stopForStorageError);
     } else if (hasMinAppState()) {
       handleMinAppReady();
+    } else if (isBuiltInLocalStorageEnvironment()) {
+      bootLocalStorage().catch(stopForStorageError);
     } else {
       window.setTimeout(() => {
         if (!started) {
