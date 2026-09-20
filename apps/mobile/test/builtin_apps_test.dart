@@ -83,6 +83,21 @@ void main() {
     expect(html, contains("throw new Error('memo textarea was not found')"));
   });
 
+  test('minappchi uses the native built-in state bridge before local storage', () async {
+    final BuiltInApp minappchi = builtInApps.singleWhere(
+      (BuiltInApp app) => app.id == 'minappchi',
+    );
+    final String html = await rootBundle.loadString(minappchi.assetPath);
+
+    expect(html, contains('window.MinAppBuiltinState.postMessage'));
+    expect(html, contains("storageMode = 'builtin'"));
+    expect(html, contains('bootBuiltInState().catch(stopForStorageError)'));
+    expect(
+      html.indexOf('if (hasBuiltInStateBridge())'),
+      lessThan(html.indexOf('else if (isBuiltInLocalStorageEnvironment())')),
+    );
+  });
+
   test('karaoke uses louder BGM and preserves microphone diagnostics', () async {
     final BuiltInApp karaoke = builtInApps.singleWhere(
       (BuiltInApp app) => app.id == 'sing-along',
