@@ -92,7 +92,7 @@ void main() {
     expect(find.byKey(const Key('girls-shell-profile')), findsOneWidget);
     expect(find.byKey(const Key('girls-footer-home')), findsOneWidget);
     expect(find.byKey(const Key('girls-footer-shop')), findsOneWidget);
-    expect(find.text('ビルトインアプリ'), findsOneWidget);
+    expect(find.text('公式アプリ'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('girls-footer-shop')));
     await _finishRouteTransition(tester);
@@ -108,7 +108,7 @@ void main() {
 
     expect(find.byKey(const Key('girls-common-header')), findsOneWidget);
     expect(find.byKey(const Key('girls-footer-home')), findsOneWidget);
-    expect(find.text('ビルトインアプリ'), findsOneWidget);
+    expect(find.text('公式アプリ'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

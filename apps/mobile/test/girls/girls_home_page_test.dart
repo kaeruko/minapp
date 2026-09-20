@@ -87,7 +87,7 @@ void main() {
     expect(find.byKey(const Key('girls-home-mascot-prompt')), findsOneWidget);
     expect(find.byKey(const Key('girls-home-mascot-image')), findsOneWidget);
     expect(find.text('友達を招待する？'), findsOneWidget);
-    expect(find.text('ビルトインアプリ'), findsOneWidget);
+    expect(find.text('公式アプリ'), findsOneWidget);
     expect(find.text('友達の最新情報'), findsOneWidget);
     expect(find.byKey(const Key('girls-home-memo-app')), findsOneWidget);
     expect(find.byKey(const Key('girls-home-minappchi-app')), findsOneWidget);
@@ -138,7 +138,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('girls-footer-home')));
     await tester.pumpAndSettle();
-    expect(find.text('ビルトインアプリ'), findsOneWidget);
+    expect(find.text('公式アプリ'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
