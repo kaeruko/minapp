@@ -195,6 +195,7 @@ class _CatalogPageState extends State<CatalogPage> {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) => BuiltInWebViewPage(
+          appId: app.id,
           title: app.title,
           assetPath: app.assetPath,
         ),

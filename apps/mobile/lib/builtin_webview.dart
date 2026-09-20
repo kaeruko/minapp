@@ -1,9 +1,109 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+
+const String _builtInStateChannelName = 'MinAppBuiltinState';
+const String _builtInStatePreferencePrefix = 'builtin_state_v1';
+final RegExp _builtInAppIdPattern = RegExp(r'^[a-z0-9_-]{1,64}$');
+final RegExp _builtInStateKeyPattern = RegExp(r'^[A-Za-z0-9._:-]{1,128}$');
+final RegExp _builtInStateRequestIdPattern =
+    RegExp(r'^[A-Za-z0-9._-]{1,64}$');
+
+@immutable
+class BuiltInStateRequest {
+  const BuiltInStateRequest({
+    required this.id,
+    required this.method,
+    required this.key,
+    this.value,
+  });
+
+  final String id;
+  final String method;
+  final String key;
+  final Object? value;
+
+  factory BuiltInStateRequest.decode(String raw) {
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } on FormatException catch (error) {
+      throw FormatException('Built-in state request is not valid JSON: $error');
+    }
+    if (decoded is! Map) {
+      throw const FormatException(
+        'Built-in state request must be a JSON object.',
+      );
+    }
+
+    final Map<String, Object?> payload = <String, Object?>{};
+    for (final MapEntry<Object?, Object?> entry
+        in decoded.entries.cast<MapEntry<Object?, Object?>>()) {
+      final Object? rawKey = entry.key;
+      if (rawKey is! String) {
+        throw const FormatException(
+          'Built-in state request keys must be strings.',
+        );
+      }
+      payload[rawKey] = entry.value;
+    }
+
+    if (payload['version'] != 1) {
+      throw const FormatException('Built-in state request version must be 1.');
+    }
+    final Object? rawId = payload['id'];
+    final Object? rawMethod = payload['method'];
+    final Object? rawKey = payload['key'];
+    if (rawId is! String || !_builtInStateRequestIdPattern.hasMatch(rawId)) {
+      throw const FormatException('Built-in state request id is invalid.');
+    }
+    if (rawMethod is! String || (rawMethod != 'get' && rawMethod != 'set')) {
+      throw const FormatException('Built-in state request method is invalid.');
+    }
+    if (rawKey is! String || !_builtInStateKeyPattern.hasMatch(rawKey)) {
+      throw const FormatException('Built-in state request key is invalid.');
+    }
+
+    final Set<String> expectedKeys = rawMethod == 'set'
+        ? <String>{'version', 'id', 'method', 'key', 'value'}
+        : <String>{'version', 'id', 'method', 'key'};
+    final Set<String> actualKeys = payload.keys.toSet();
+    if (actualKeys.length != expectedKeys.length ||
+        !actualKeys.containsAll(expectedKeys)) {
+      throw const FormatException('Built-in state request fields are invalid.');
+    }
+
+    return BuiltInStateRequest(
+      id: rawId,
+      method: rawMethod,
+      key: rawKey,
+      value: payload['value'],
+    );
+  }
+}
+
+String builtInStatePreferenceKey(String appId, String key) {
+  if (!_builtInAppIdPattern.hasMatch(appId)) {
+    throw ArgumentError.value(
+      appId,
+      'appId',
+      'must be a lowercase built-in app id',
+    );
+  }
+  if (!_builtInStateKeyPattern.hasMatch(key)) {
+    throw ArgumentError.value(
+      key,
+      'key',
+      'must be a valid built-in state key',
+    );
+  }
+  return '$_builtInStatePreferencePrefix::$appId::$key';
+}
 
 bool isBuiltInMicrophoneOnlyPermissionRequest(
   Set<WebViewPermissionResourceType> types,
@@ -14,11 +114,13 @@ bool isBuiltInMicrophoneOnlyPermissionRequest(
 
 class BuiltInWebViewPage extends StatefulWidget {
   const BuiltInWebViewPage({
+    required this.appId,
     required this.title,
     required this.assetPath,
     super.key,
   });
 
+  final String appId;
   final String title;
   final String assetPath;
 
@@ -52,8 +154,19 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
   @override
   void initState() {
     super.initState();
+    _validateAppId(widget.appId);
     _validateAssetPath(widget.assetPath);
     _prepareWebView();
+  }
+
+  static void _validateAppId(String appId) {
+    if (!_builtInAppIdPattern.hasMatch(appId)) {
+      throw ArgumentError.value(
+        appId,
+        'appId',
+        'Built-in app id is invalid.',
+      );
+    }
   }
 
   static void _validateAssetPath(String assetPath) {
@@ -93,42 +206,48 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
         onPermissionRequest: (WebViewPermissionRequest request) {
           unawaited(_handleWebPermissionRequest(request));
         },
-      )
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setNavigationDelegate(
-          NavigationDelegate(
-            onProgress: (int progress) {
-              if (mounted) {
-                setState(() => _progress = progress);
-              }
-            },
-            onPageFinished: (String _) async {
-              if (extraJavaScriptApplied || extraJavaScript == null) {
-                return;
-              }
-              try {
-                await controller.runJavaScript(extraJavaScript);
-                extraJavaScriptApplied = true;
-              } catch (error) {
-                if (!mounted) return;
-                setState(
-                  () => _error =
-                      'ビルトインアプリの追加処理を読み込めませんでした: $error',
-                );
-              }
-            },
-            onNavigationRequest: (NavigationRequest request) {
-              final Uri? target = Uri.tryParse(request.url);
-              if (target == null || !_isAllowedNavigation(target)) {
-                return NavigationDecision.prevent;
-              }
-              return NavigationDecision.navigate;
-            },
-          ),
-        );
+      );
+      await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+      await controller.addJavaScriptChannel(
+        _builtInStateChannelName,
+        onMessageReceived: (JavaScriptMessage message) {
+          unawaited(_handleBuiltInStateMessage(controller, message));
+        },
+      );
+      await controller.setNavigationDelegate(
+        NavigationDelegate(
+          onProgress: (int progress) {
+            if (mounted) {
+              setState(() => _progress = progress);
+            }
+          },
+          onPageFinished: (String _) async {
+            if (extraJavaScriptApplied || extraJavaScript == null) {
+              return;
+            }
+            try {
+              await controller.runJavaScript(extraJavaScript);
+              extraJavaScriptApplied = true;
+            } catch (error) {
+              if (!mounted) return;
+              setState(
+                () => _error =
+                    'ビルトインアプリの追加処理を読み込めませんでした: $error',
+              );
+            }
+          },
+          onNavigationRequest: (NavigationRequest request) {
+            final Uri? target = Uri.tryParse(request.url);
+            if (target == null || !_isAllowedNavigation(target)) {
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+        ),
+      );
 
-      // Built-in apps own their namespaced localStorage keys. Keep that storage
-      // across launches so apps such as マイメモ帳 and みんあぷっち can persist data.
+      // Cache is disposable. Persistent built-in state is stored through the
+      // native state bridge in SharedPreferences, outside WebView cache/storage.
       await controller.clearCache();
       await controller.loadFlutterAsset(widget.assetPath);
 
@@ -138,6 +257,100 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
       if (!mounted) return;
       setState(() => _error = 'ビルトインアプリを開けませんでした: $error');
     }
+  }
+
+  Future<void> _handleBuiltInStateMessage(
+    WebViewController controller,
+    JavaScriptMessage message,
+  ) async {
+    BuiltInStateRequest? request;
+    try {
+      request = BuiltInStateRequest.decode(message.message);
+      final SharedPreferences preferences = await SharedPreferences.getInstance();
+      final String preferenceKey =
+          builtInStatePreferenceKey(widget.appId, request.key);
+
+      if (request.method == 'get') {
+        final String? rawValue = preferences.getString(preferenceKey);
+        Object? value;
+        if (rawValue != null) {
+          try {
+            value = jsonDecode(rawValue);
+          } on FormatException catch (error) {
+            throw StateError(
+              'Stored built-in state is not valid JSON for ${request.key}: $error',
+            );
+          }
+        }
+        await _sendBuiltInStateResponse(
+          controller,
+          <String, Object?>{
+            'version': 1,
+            'id': request.id,
+            'ok': true,
+            'found': rawValue != null,
+            if (rawValue != null) 'value': value,
+          },
+        );
+        return;
+      }
+
+      final String encoded = jsonEncode(request.value);
+      final bool stored = await preferences.setString(preferenceKey, encoded);
+      if (!stored) {
+        throw StateError(
+          'SharedPreferences refused to store built-in state for ${request.key}.',
+        );
+      }
+      await _sendBuiltInStateResponse(
+        controller,
+        <String, Object?>{
+          'version': 1,
+          'id': request.id,
+          'ok': true,
+        },
+      );
+    } catch (error) {
+      final BuiltInStateRequest? failedRequest = request;
+      if (failedRequest == null) {
+        if (mounted) {
+          setState(
+            () => _error = '公式アプリの保存要求を読み取れませんでした: $error',
+          );
+        }
+        return;
+      }
+
+      try {
+        await _sendBuiltInStateResponse(
+          controller,
+          <String, Object?>{
+            'version': 1,
+            'id': failedRequest.id,
+            'ok': false,
+            'error': error.toString(),
+          },
+        );
+      } catch (responseError) {
+        if (mounted) {
+          setState(
+            () => _error =
+                '公式アプリの保存処理に失敗しました: $error\n'
+                'エラー応答の送信にも失敗しました: $responseError',
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _sendBuiltInStateResponse(
+    WebViewController controller,
+    Map<String, Object?> response,
+  ) {
+    final String payload = jsonEncode(response);
+    return controller.runJavaScript(
+      'window.__minappBuiltinStateResolve($payload);',
+    );
   }
 
   Future<void> _handleWebPermissionRequest(
