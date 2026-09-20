@@ -206,45 +206,45 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
         onPermissionRequest: (WebViewPermissionRequest request) {
           unawaited(_handleWebPermissionRequest(request));
         },
-      )
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..addJavaScriptChannel(
-          _builtInStateChannelName,
-          onMessageReceived: (JavaScriptMessage message) {
-            unawaited(_handleBuiltInStateMessage(controller, message));
+      );
+      await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+      await controller.addJavaScriptChannel(
+        _builtInStateChannelName,
+        onMessageReceived: (JavaScriptMessage message) {
+          unawaited(_handleBuiltInStateMessage(controller, message));
+        },
+      );
+      await controller.setNavigationDelegate(
+        NavigationDelegate(
+          onProgress: (int progress) {
+            if (mounted) {
+              setState(() => _progress = progress);
+            }
           },
-        )
-        ..setNavigationDelegate(
-          NavigationDelegate(
-            onProgress: (int progress) {
-              if (mounted) {
-                setState(() => _progress = progress);
-              }
-            },
-            onPageFinished: (String _) async {
-              if (extraJavaScriptApplied || extraJavaScript == null) {
-                return;
-              }
-              try {
-                await controller.runJavaScript(extraJavaScript);
-                extraJavaScriptApplied = true;
-              } catch (error) {
-                if (!mounted) return;
-                setState(
-                  () => _error =
-                      'ビルトインアプリの追加処理を読み込めませんでした: $error',
-                );
-              }
-            },
-            onNavigationRequest: (NavigationRequest request) {
-              final Uri? target = Uri.tryParse(request.url);
-              if (target == null || !_isAllowedNavigation(target)) {
-                return NavigationDecision.prevent;
-              }
-              return NavigationDecision.navigate;
-            },
-          ),
-        );
+          onPageFinished: (String _) async {
+            if (extraJavaScriptApplied || extraJavaScript == null) {
+              return;
+            }
+            try {
+              await controller.runJavaScript(extraJavaScript);
+              extraJavaScriptApplied = true;
+            } catch (error) {
+              if (!mounted) return;
+              setState(
+                () => _error =
+                    'ビルトインアプリの追加処理を読み込めませんでした: $error',
+              );
+            }
+          },
+          onNavigationRequest: (NavigationRequest request) {
+            final Uri? target = Uri.tryParse(request.url);
+            if (target == null || !_isAllowedNavigation(target)) {
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+        ),
+      );
 
       // Cache is disposable. Persistent built-in state is stored through the
       // native state bridge in SharedPreferences, outside WebView cache/storage.
