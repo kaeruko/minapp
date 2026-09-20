@@ -105,7 +105,7 @@
   <main class="app">
     <div class="topbar">
       <h1>マイメモ帳</h1>
-      <button id="clear-button" class="clear-button" type="button">ぜんぶ消す</button>
+      <button id="clear-button" class="clear-button" type="button" disabled>ぜんぶ消す</button>
     </div>
 
     <textarea
@@ -113,16 +113,26 @@
       class="memo"
       aria-label="メモ"
       placeholder="ここにメモしてね"
+      readonly
       autofocus
     ></textarea>
 
-    <p id="status" class="status" aria-live="polite">自動保存</p>
+    <p id="status" class="status" aria-live="polite">読み込み中…</p>
   </main>
 
   <script>
     'use strict';
 
     const STORAGE_KEY = 'minapp_memo_pad_v1';
+    const builtInStatePending = new Map();
+    let builtInStateSequence = 0;
+    let loaded = false;
+    let storageFailed = false;
+    let revision = 0;
+    const useBuiltInState = Boolean(
+      window.MinAppBuiltinState &&
+      typeof window.MinAppBuiltinState.postMessage === 'function'
+    );
 
     const memo = document.getElementById('memo');
     const clearButton = document.getElementById('clear-button');
@@ -138,36 +148,114 @@
       throw new Error('status element was not found');
     }
 
-    function showSaved() {
-      status.classList.remove('error');
-      status.textContent = '保存しました';
+    function requestBuiltInState(method, key, value) {
+      const id = `memo-pad-${++builtInStateSequence}`;
+      const request = { version: 1, id, method, key };
+      if (method === 'set') request.value = value;
+      return new Promise((resolve, reject) => {
+        const timeout = window.setTimeout(() => {
+          builtInStatePending.delete(id);
+          reject(new Error('保存先から応答がありません。開き直してください。'));
+        }, 10000);
+        builtInStatePending.set(id, { resolve, reject, timeout });
+        try {
+          window.MinAppBuiltinState.postMessage(JSON.stringify(request));
+        } catch (error) {
+          window.clearTimeout(timeout);
+          builtInStatePending.delete(id);
+          reject(error);
+        }
+      });
     }
 
-    function showStorageError(error) {
+    window.__minappBuiltinStateResolve = (response) => {
+      if (!response || typeof response.id !== 'string') {
+        for (const pending of builtInStatePending.values()) {
+          window.clearTimeout(pending.timeout);
+          pending.reject(new Error('保存先からの応答が不正です。'));
+        }
+        builtInStatePending.clear();
+        return;
+      }
+      const pending = builtInStatePending.get(response.id);
+      if (!pending) return; // A response may arrive after its request timed out.
+      window.clearTimeout(pending.timeout);
+      builtInStatePending.delete(response.id);
+      if (response.version !== 1 || typeof response.ok !== 'boolean') {
+        pending.reject(new Error('保存先からの応答が不正です。'));
+      } else if (!response.ok) {
+        pending.reject(new Error(response.error || '端末への保存に失敗しました。'));
+      } else {
+        pending.resolve(response);
+      }
+    };
+
+    function showStorageError(error, loading = false) {
+      storageFailed = true;
+      memo.readOnly = true;
+      clearButton.disabled = true;
       status.classList.add('error');
-      status.textContent = '保存できませんでした';
-      throw error;
+      status.textContent = `${loading ? '読み込み' : '保存'}できませんでした。表示中のメモをコピーしてから開き直してください。 ${error instanceof Error ? error.message : String(error)}`;
     }
 
-    function loadMemo() {
+    function validateMemo(value) {
+      if (typeof value !== 'string') throw new Error('保存されたメモが不正です。');
+      return value;
+    }
+
+    async function writeMemo(value) {
+      if (useBuiltInState) {
+        await requestBuiltInState('set', STORAGE_KEY, value);
+      } else {
+        window.localStorage.setItem(STORAGE_KEY, value);
+      }
+    }
+
+    async function loadMemo() {
+      memo.readOnly = true;
+      clearButton.disabled = true;
       try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        memo.value = saved ?? '';
+        if (useBuiltInState) {
+          const saved = await requestBuiltInState('get', STORAGE_KEY);
+          if (saved.found === true && Object.prototype.hasOwnProperty.call(saved, 'value')) {
+            memo.value = validateMemo(saved.value);
+          } else if (saved.found === false) {
+            // Only import when native storage has never held a memo. An empty
+            // native string is an intentional deletion and must stay empty.
+            const legacy = window.localStorage.getItem(STORAGE_KEY);
+            memo.value = legacy === null ? '' : validateMemo(legacy);
+            if (legacy !== null) await writeMemo(memo.value);
+          } else {
+            throw new Error('保存先からの応答が不正です。');
+          }
+        } else {
+          const saved = window.localStorage.getItem(STORAGE_KEY);
+          memo.value = saved === null ? '' : validateMemo(saved);
+        }
+        loaded = true;
+        memo.readOnly = false;
+        clearButton.disabled = false;
+        status.textContent = '自動保存';
       } catch (error) {
-        showStorageError(error);
+        showStorageError(error, true);
       }
     }
 
     function saveMemo() {
-      try {
-        localStorage.setItem(STORAGE_KEY, memo.value);
-        showSaved();
-      } catch (error) {
-        showStorageError(error);
-      }
+      if (!loaded || storageFailed) return;
+      const value = memo.value;
+      const savedRevision = ++revision;
+      status.textContent = '保存中…';
+      // Hand off every snapshot during the input event. The native store owns
+      // the FIFO across page lifetimes; a JS queue would lose unsent edits when
+      // this WebView closes. Earlier acknowledgements never mark newer text saved.
+      writeMemo(value).then(() => {
+        if (!storageFailed && savedRevision === revision) status.textContent = '保存しました';
+      }).catch((error) => showStorageError(error));
     }
 
     function clearMemo() {
+      if (!loaded || storageFailed) return;
       if (!window.confirm('メモをぜんぶ消す？')) {
         return;
       }

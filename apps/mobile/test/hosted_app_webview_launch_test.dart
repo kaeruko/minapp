@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:minapp_mobile/app_webview.dart';
 import 'package:minapp_mobile/hosted_app_webview.dart';
 import 'package:minapp_mobile/hosted_runtime_bridge.dart';
 import 'package:webview_flutter/webview_flutter.dart' show WebViewWidget;
@@ -26,6 +28,7 @@ void main() {
     WidgetTester tester,
     String path, {
     String runtimeToken = _runtimeToken,
+    bool settle = true,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -37,8 +40,83 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      await tester.pump();
+    }
   }
+
+  for (final String operation in <String>[
+    'javascript',
+    'bridge',
+    'navigation',
+  ]) {
+    testWidgets('Hosted content waits for $operation registration',
+        (WidgetTester tester) async {
+      final Completer<void> registration = Completer<void>();
+      platform.pendingSetup[operation] = registration.future;
+      const String path = '/hosted/content/$_contentToken/index.html';
+
+      await openSession(tester, path, settle: false);
+
+      final _FakeWebViewController controller = platform.controller!;
+      expect(controller.requests, isEmpty);
+      expect(find.byType(WebViewWidget), findsNothing);
+
+      registration.complete();
+      await tester.pumpAndSettle();
+
+      expect(controller.requests.single.uri, Uri.parse('$_origin$path'));
+      expect(controller.channels, contains('MinAppNativeBridge'));
+      expect(controller.navigation, isNotNull);
+      expect(controller.localStorageClears, 1);
+      expect(controller.cacheClears, 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('failed bridge registration stops before loading child content',
+      (WidgetTester tester) async {
+    final Completer<void> registration = Completer<void>();
+    platform.pendingSetup['bridge'] = registration.future;
+    await openSession(
+      tester,
+      '/hosted/content/$_contentToken/index.html',
+      settle: false,
+    );
+
+    registration.completeError(StateError('bridge unavailable'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isStateError);
+    expect(platform.controller!.requests, isEmpty);
+    expect(find.byType(WebViewWidget), findsNothing);
+    expect(find.textContaining('bridge unavailable'), findsOneWidget);
+  });
+
+  testWidgets('school content waits for navigation policy registration',
+      (WidgetTester tester) async {
+    final Completer<void> registration = Completer<void>();
+    platform.pendingSetup['navigation'] = registration.future;
+    final Uri launchUri =
+        Uri.parse('$_origin/launch/$_contentToken/index.html');
+    await tester.pumpWidget(MaterialApp(
+      home: AppWebViewPage(title: '教室の作品', launchUrl: launchUri),
+    ));
+    await tester.pump();
+
+    final _FakeWebViewController controller = platform.controller!;
+    expect(controller.requests, isEmpty);
+    registration.complete();
+    await tester.pumpAndSettle();
+
+    expect(controller.requests.single.uri, launchUri);
+    expect(controller.navigation, isNotNull);
+    expect(controller.localStorageClears, 1);
+    expect(controller.cacheClears, 1);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Shop session opens its content and keeps navigation scoped',
       (WidgetTester tester) async {
@@ -184,6 +262,7 @@ class _FakeRuntimeTransport extends Fake implements HostedRuntimeTransport {
 
 class _FakeWebViewPlatform extends WebViewPlatform {
   _FakeWebViewController? controller;
+  final Map<String, Future<void>> pendingSetup = <String, Future<void>>{};
 
   @override
   PlatformWebViewCookieManager createPlatformCookieManager(
@@ -195,7 +274,7 @@ class _FakeWebViewPlatform extends WebViewPlatform {
   PlatformWebViewController createPlatformWebViewController(
     PlatformWebViewControllerCreationParams params,
   ) {
-    return controller = _FakeWebViewController(params);
+    return controller = _FakeWebViewController(params, pendingSetup);
   }
 
   @override
@@ -228,23 +307,32 @@ class _FakeWebViewWidget extends PlatformWebViewWidget {
 }
 
 class _FakeWebViewController extends PlatformWebViewController {
-  _FakeWebViewController(super.params) : super.implementation();
+  _FakeWebViewController(super.params, this.pendingSetup)
+      : super.implementation();
 
+  final Map<String, Future<void>> pendingSetup;
   final List<LoadRequestParams> requests = <LoadRequestParams>[];
   final List<String> scripts = <String>[];
   final Map<String, JavaScriptChannelParams> channels =
       <String, JavaScriptChannelParams>{};
   _FakeNavigationDelegate? navigation;
   JavaScriptMode? javaScriptMode;
+  int localStorageClears = 0;
+  int cacheClears = 0;
 
   @override
-  Future<void> clearCache() async {}
+  Future<void> clearCache() async {
+    cacheClears += 1;
+  }
 
   @override
-  Future<void> clearLocalStorage() async {}
+  Future<void> clearLocalStorage() async {
+    localStorageClears += 1;
+  }
 
   @override
   Future<void> setJavaScriptMode(JavaScriptMode mode) async {
+    await pendingSetup['javascript'];
     javaScriptMode = mode;
   }
 
@@ -257,11 +345,13 @@ class _FakeWebViewController extends PlatformWebViewController {
   Future<void> setPlatformNavigationDelegate(
     PlatformNavigationDelegate handler,
   ) async {
+    await pendingSetup['navigation'];
     navigation = handler as _FakeNavigationDelegate;
   }
 
   @override
   Future<void> addJavaScriptChannel(JavaScriptChannelParams channel) async {
+    await pendingSetup['bridge'];
     channels[channel.name] = channel;
   }
 

@@ -39,24 +39,26 @@ class _AppWebViewPageState extends State<AppWebViewPage> {
   Future<void> _prepareWebView() async {
     try {
       await WebViewCookieManager().clearCookies();
-      final WebViewController controller = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setNavigationDelegate(
-          NavigationDelegate(
-            onProgress: (int progress) {
-              if (mounted) {
-                setState(() => _progress = progress);
-              }
-            },
-            onNavigationRequest: (NavigationRequest request) {
-              final Uri? target = Uri.tryParse(request.url);
-              if (target == null || !_isAllowedNavigation(target)) {
-                return NavigationDecision.prevent;
-              }
-              return NavigationDecision.navigate;
-            },
-          ),
-        );
+      final WebViewController controller = WebViewController();
+      await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+      await controller.setNavigationDelegate(
+        NavigationDelegate(
+          onProgress: (int progress) {
+            if (mounted) {
+              setState(() => _progress = progress);
+            }
+          },
+          onNavigationRequest: (NavigationRequest request) {
+            final Uri? target = Uri.tryParse(request.url);
+            if (target == null || !_isAllowedNavigation(target)) {
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+        ),
+      );
+      // Browser data is disposable for these same-origin child apps. Built-in
+      // durable saves use native storage and are unaffected by this cleanup.
       await controller.clearLocalStorage();
       await controller.clearCache();
       await controller.loadRequest(widget.launchUrl);

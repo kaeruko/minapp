@@ -210,31 +210,33 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
         onPermissionRequest: (WebViewPermissionRequest request) {
           unawaited(_handleWebPermissionRequest(request));
         },
-      )
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..addJavaScriptChannel(
-          'MinAppNativeBridge',
-          onMessageReceived: _onBridgeMessage,
-        )
-        ..setNavigationDelegate(
-          NavigationDelegate(
-            onProgress: (int progress) {
-              if (mounted) {
-                setState(() => _progress = progress);
-              }
-            },
-            onNavigationRequest: (NavigationRequest request) {
-              final Uri? target = Uri.tryParse(request.url);
-              if (target == null || !_allowsNavigation(target)) {
-                return NavigationDecision.prevent;
-              }
-              return NavigationDecision.navigate;
-            },
-            onPageFinished: (String url) {
-              _injectBridgeForFinishedDocument(url);
-            },
-          ),
-        );
+      );
+      // Register the persistence bridge and navigation policy before child code
+      // can run. Platform channel registration is asynchronous.
+      await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+      await controller.addJavaScriptChannel(
+        'MinAppNativeBridge',
+        onMessageReceived: _onBridgeMessage,
+      );
+      await controller.setNavigationDelegate(
+        NavigationDelegate(
+          onProgress: (int progress) {
+            if (mounted) {
+              setState(() => _progress = progress);
+            }
+          },
+          onNavigationRequest: (NavigationRequest request) {
+            final Uri? target = Uri.tryParse(request.url);
+            if (target == null || !_allowsNavigation(target)) {
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+          onPageFinished: (String url) {
+            _injectBridgeForFinishedDocument(url);
+          },
+        ),
+      );
       if (_usesGirlsNovelBackground) {
         await controller.setBackgroundColor(Colors.transparent);
       }
@@ -250,6 +252,9 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
           onMessageReceived: _onAuthoringPreviewBridgeMessage,
         );
       }
+      // Child apps share the WebView browser store. Treat browser data as
+      // disposable; durable app/user data belongs to minapp.state/userState.
+      // These clears do not touch Runtime state or built-in native saves.
       await controller.clearLocalStorage();
       await controller.clearCache();
       if (!mounted) {

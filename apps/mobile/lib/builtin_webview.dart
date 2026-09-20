@@ -4,11 +4,13 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import 'builtin_state_store.dart';
+
+export 'builtin_state_store.dart' show builtInStatePreferenceKey;
+
 const String _builtInStateChannelName = 'MinAppBuiltinState';
-const String _builtInStatePreferencePrefix = 'builtin_state_v1';
 final RegExp _builtInAppIdPattern = RegExp(r'^[a-z0-9_-]{1,64}$');
 final RegExp _builtInStateKeyPattern = RegExp(r'^[A-Za-z0-9._:-]{1,128}$');
 final RegExp _builtInStateRequestIdPattern =
@@ -85,24 +87,6 @@ class BuiltInStateRequest {
       value: payload['value'],
     );
   }
-}
-
-String builtInStatePreferenceKey(String appId, String key) {
-  if (!_builtInAppIdPattern.hasMatch(appId)) {
-    throw ArgumentError.value(
-      appId,
-      'appId',
-      'must be a lowercase built-in app id',
-    );
-  }
-  if (!_builtInStateKeyPattern.hasMatch(key)) {
-    throw ArgumentError.value(
-      key,
-      'key',
-      'must be a valid built-in state key',
-    );
-  }
-  return '$_builtInStatePreferencePrefix::$appId::$key';
 }
 
 bool isBuiltInMicrophoneOnlyPermissionRequest(
@@ -246,9 +230,8 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
         ),
       );
 
-      // Cache is disposable. Persistent built-in state is stored through the
-      // native state bridge in SharedPreferences, outside WebView cache/storage.
-      await controller.clearCache();
+      // These assets ship with the app and do not need a global WebView cache
+      // purge. Saves use the native bridge, outside disposable browser storage.
       await controller.loadFlutterAsset(widget.assetPath);
 
       if (!mounted) return;
@@ -266,42 +249,23 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
     BuiltInStateRequest? request;
     try {
       request = BuiltInStateRequest.decode(message.message);
-      final SharedPreferences preferences = await SharedPreferences.getInstance();
-      final String preferenceKey =
-          builtInStatePreferenceKey(widget.appId, request.key);
-
       if (request.method == 'get') {
-        final String? rawValue = preferences.getString(preferenceKey);
-        Object? value;
-        if (rawValue != null) {
-          try {
-            value = jsonDecode(rawValue);
-          } on FormatException catch (error) {
-            throw StateError(
-              'Stored built-in state is not valid JSON for ${request.key}: $error',
-            );
-          }
-        }
+        final BuiltInStateValue saved =
+            await builtInStateStore.get(widget.appId, request.key);
         await _sendBuiltInStateResponse(
           controller,
           <String, Object?>{
             'version': 1,
             'id': request.id,
             'ok': true,
-            'found': rawValue != null,
-            if (rawValue != null) 'value': value,
+            'found': saved.found,
+            if (saved.found) 'value': saved.value,
           },
         );
         return;
       }
 
-      final String encoded = jsonEncode(request.value);
-      final bool stored = await preferences.setString(preferenceKey, encoded);
-      if (!stored) {
-        throw StateError(
-          'SharedPreferences refused to store built-in state for ${request.key}.',
-        );
-      }
+      await builtInStateStore.set(widget.appId, request.key, request.value);
       await _sendBuiltInStateResponse(
         controller,
         <String, Object?>{

@@ -105,7 +105,7 @@ V1ではdescriptor TTLのclient許容上限を24時間とする。有効期限�
 
 通常のログアウトでは選択中の教室を維持する。「教室を変更」ではaccess token/pending login stateを破棄し、WebView cookie/localStorage/cacheと保存済みtenant descriptorを削除して教室コード入力へ戻る。
 
-## 安全境界
+## 安全境界（従来の専用教室 WebView）
 
 - production buildのDirectory base URLは公開Google Driveファイルから起動時に取得する
 - Google Drive取得または内容検証に失敗した場合は別経路へフォールバックしない
@@ -133,3 +133,7 @@ Google Play上のパッケージIDは `jp.cloxs.min` を使う。
 `pubspec.yaml` にも明示する。命名規則に合わないパスと外部サイトへの遷移は
 `BuiltInWebViewPage` で拒否し、bundleに存在しないassetは別経路へフォールバックせず
 読み込みエラーとして表示する。
+
+ビルトインのセーブは native bridge 経由で端末の SharedPreferences に保存し、WebView の
+キャッシュ消去から分離する。メモ・育成のセーブ、Hosted の共有／個人データ、一覧キャッシュの
+保存先と削除条件は [アプリのキャッシュとセーブデータ](../../docs/APP_STORAGE_LIFECYCLE.md) を参照。

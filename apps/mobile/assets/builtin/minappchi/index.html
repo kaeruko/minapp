@@ -325,6 +325,8 @@
     let storageMode = null;
     let started = false;
     let busy = false;
+    let booting = false;
+    let storageFailed = false;
 
     const builtInStatePending = new Map();
     let builtInStateSequence = 0;
@@ -349,10 +351,15 @@
       if (method === 'set') request.value = value;
 
       return new Promise((resolve, reject) => {
-        builtInStatePending.set(id, { resolve, reject });
+        const timeout = window.setTimeout(() => {
+          builtInStatePending.delete(id);
+          reject(new Error('保存先から応答がありません。開き直してください。'));
+        }, 10000);
+        builtInStatePending.set(id, { resolve, reject, timeout });
         try {
           window.MinAppBuiltinState.postMessage(JSON.stringify(request));
         } catch (error) {
+          window.clearTimeout(timeout);
           builtInStatePending.delete(id);
           reject(error);
         }
@@ -360,21 +367,23 @@
     }
 
     window.__minappBuiltinStateResolve = (response) => {
-      if (
-        !response ||
-        typeof response !== 'object' ||
-        response.version !== 1 ||
-        typeof response.id !== 'string' ||
-        typeof response.ok !== 'boolean'
-      ) {
-        throw new Error('Built-in state response is invalid.');
+      if (!response || typeof response.id !== 'string') {
+        for (const pending of builtInStatePending.values()) {
+          window.clearTimeout(pending.timeout);
+          pending.reject(new Error('Built-in state response is invalid.'));
+        }
+        builtInStatePending.clear();
+        return;
       }
       const pending = builtInStatePending.get(response.id);
-      if (!pending) {
-        throw new Error(`Unknown built-in state response id: ${response.id}`);
-      }
+      if (!pending) return; // A response may arrive after its request timed out.
+      window.clearTimeout(pending.timeout);
       builtInStatePending.delete(response.id);
 
+      if (response.version !== 1 || typeof response.ok !== 'boolean') {
+        pending.reject(new Error('Built-in state response is invalid.'));
+        return;
+      }
       if (!response.ok) {
         if (typeof response.error !== 'string' || response.error.length === 0) {
           pending.reject(new Error('Built-in state request failed without diagnostics.'));
@@ -578,10 +587,10 @@
       fullnessText.textContent = dots(state.fullness, MAX_FULLNESS, '●', '○');
       healthText.textContent = dots(state.health, MAX_HEALTH, '♥', '♡');
       ageText.textContent = `第${state.generation}代 ・ ${formatAge(now)}`;
-      snackButton.disabled = state.phase !== 'alive' || busy;
-      flushButton.disabled = state.phase !== 'alive' || busy;
+      snackButton.disabled = !started || state.phase !== 'alive' || busy;
+      flushButton.disabled = !started || state.phase !== 'alive' || busy;
       nextEggButton.hidden = state.phase !== 'dead';
-      nextEggButton.disabled = busy;
+      nextEggButton.disabled = !started || busy;
 
       if (state.phase === 'egg') {
         const egg = document.createElement('div');
@@ -628,7 +637,7 @@
     }
 
     async function withAction(action) {
-      if (busy || !state) return;
+      if (!started || storageFailed || busy || !state) return;
       busy = true;
       render();
       try {
@@ -637,10 +646,10 @@
         await persist();
         if (changedByTime && state.phase === 'dead') setMessage(state.deathCause);
       } catch (error) {
-        setMessage(`エラー: ${error instanceof Error ? error.message : String(error)}`, true);
+        stopForStorageError(error);
       } finally {
         busy = false;
-        render();
+        if (started) render();
       }
     }
 
@@ -677,9 +686,12 @@
       storageMode = 'builtin';
       const saved = await requestBuiltInState('get', SAVE_KEY);
       if (saved.found === false) {
-        state = newEgg(1);
+        // Native state is authoritative. Import a validated legacy save only
+        // once, and retain the original even if the native write fails.
+        const legacy = window.localStorage.getItem(SAVE_KEY);
+        state = legacy === null ? newEgg(1) : validateState(JSON.parse(legacy));
         await persist();
-        setMessage('たまごが やってきた！');
+        setMessage(legacy === null ? 'たまごが やってきた！' : 'これまでのセーブを引き継ぎました。');
       } else if (
         saved.found === true &&
         Object.prototype.hasOwnProperty.call(saved, 'value')
@@ -746,8 +758,10 @@
     }
 
     function stopForStorageError(error) {
+      started = false;
+      storageFailed = true;
       setMessage(
-        `セーブを開始できません: ${error instanceof Error ? error.message : String(error)}`,
+        `セーブできないため停止しました。開き直してください: ${error instanceof Error ? error.message : String(error)}`,
         true
       );
       setSaveStatus('セーブ失敗');
@@ -756,42 +770,52 @@
       nextEggButton.disabled = true;
     }
 
-    async function handleMinAppReady() {
-      if (started) return;
+    async function startBoot(boot) {
+      if (started || booting || storageFailed || storageMode !== null) return;
+      booting = true;
       try {
-        await bootMinAppState();
+        await boot();
       } catch (error) {
         stopForStorageError(error);
+      } finally {
+        booting = false;
       }
+    }
+
+    function handleMinAppReady() {
+      return startBoot(bootMinAppState);
     }
 
     window.addEventListener('minappready', handleMinAppReady);
 
     if (hasBuiltInStateBridge()) {
-      bootBuiltInState().catch(stopForStorageError);
+      startBoot(bootBuiltInState);
     } else if (hasMinAppState()) {
       handleMinAppReady();
     } else if (isBuiltInLocalStorageEnvironment()) {
-      bootLocalStorage().catch(stopForStorageError);
+      startBoot(bootLocalStorage);
     } else {
       window.setTimeout(() => {
-        if (!started) {
+        if (!started && !booting && !storageFailed) {
           stopForStorageError(new Error('MinApp state bridge is unavailable.'));
         }
       }, 1200);
     }
 
     window.setInterval(async () => {
-      if (!state || busy) {
-        render();
-        return;
-      }
+      if (!started || storageFailed || !state || busy) return;
+      // Ticks and button actions share one lock across their entire save, so a
+      // slow acknowledgement cannot overlap another mutation or write.
+      busy = true;
+      render();
       try {
         const changed = advanceTo(Date.now());
         if (changed) await persist();
-        render();
       } catch (error) {
-        setMessage(`時間更新エラー: ${error instanceof Error ? error.message : String(error)}`, true);
+        stopForStorageError(error);
+      } finally {
+        busy = false;
+        if (started) render();
       }
     }, 1000);
   </script>

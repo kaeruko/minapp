@@ -91,7 +91,7 @@ void main() {
 
     expect(html, contains('window.MinAppBuiltinState.postMessage'));
     expect(html, contains("storageMode = 'builtin'"));
-    expect(html, contains('bootBuiltInState().catch(stopForStorageError)'));
+    expect(html, contains('startBoot(bootBuiltInState)'));
     expect(
       html.indexOf('if (hasBuiltInStateBridge())'),
       lessThan(html.indexOf('else if (isBuiltInLocalStorageEnvironment())')),

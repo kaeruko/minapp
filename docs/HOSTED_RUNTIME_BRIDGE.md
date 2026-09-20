@@ -58,6 +58,8 @@ await minapp.userState.delete("progress")
 
 `minapp.state` is shared for the Runtime app scope. `minapp.userState` is private to the authenticated Runtime user; child code never supplies a `user_id`.
 
+These are durable server records, independent of WebView cache, launch tokens, and published versions. Browser `localStorage` and cookies are disposable: the mobile host clears the shared browser store before opening a user app. Use `userState` for personal notes/progress and `state` only for intentionally shared data. Locally bundled home apps have separate device-local native saves; see [app storage lifecycle](APP_STORAGE_LIFECYCLE.md).
+
 The Flutter Runtime transport contract requires both scopes. There is no optional private-state transport, compatibility adapter, or fallback from `userState` to shared `state`. A transport that cannot provide both contracts is not a valid Hosted Runtime transport.
 
 Shared state and private state use separate explicit quotas. Shared state is bounded per app; private state is bounded per authenticated user and app. A private quota failure stays a private-state error and never writes the value into shared state. The backend does not compress, truncate, move, or reinterpret the value to make the request succeed.
