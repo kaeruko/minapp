@@ -139,18 +139,29 @@ try {
     $dirty = -not [string]::IsNullOrWhiteSpace($status)
     Write-Host "  branch=$branch"
 
-    if ($branch -eq 'main' -and -not $dirty -and -not $SkipPull) {
+    if ($dirty -and -not $SkipPull) {
+        throw @"
+minapp_apps has local changes, so deployment stopped before Terraform.
+
+Repository: $minappAppsRoot
+Branch:     $branch
+
+Run:
+  git -C "$minappAppsRoot" status --short
+
+Then either commit/stash the changes and re-run this script, or explicitly use -SkipPull only when you intentionally want to deploy the current dirty working tree.
+"@
+    }
+
+    if ($branch -eq 'main' -and -not $SkipPull) {
         Write-Host '  clean main checkout: pulling latest minapp_apps with --ff-only'
         Invoke-External `
             -FilePath 'git' `
             -Arguments @('-C', $minappAppsRoot, 'pull', '--ff-only') `
             -Context 'minapp_apps fast-forward pull'
     }
-    elseif ($dirty) {
-        Write-Host '  local changes detected: syncing the current working tree without pulling'
-    }
     elseif ($SkipPull) {
-        Write-Host '  SkipPull specified: syncing the current checkout without pulling'
+        Write-Host '  SkipPull specified: intentionally syncing the current checkout without pulling'
     }
     else {
         Write-Host "  non-main branch '$branch': syncing that branch without pulling"
