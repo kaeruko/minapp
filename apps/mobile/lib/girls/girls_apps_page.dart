@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../hosted_app_webview.dart';
 import '../hosted_authoring_editor_action.dart';
 import '../hosted_authoring_projects_api.dart';
 import 'api.dart';
@@ -200,6 +201,40 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
     return _openDetailById(app.app.appId);
   }
 
+  Future<void> _launchPublishedApp(ManagedGirlsApp app) async {
+    if (!app.app.isPublished || app.isHidden) {
+      throw StateError(
+        'Published app launch requires a visible published app.',
+      );
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final launch = await widget.api.createLaunch(
+        accessToken: widget.session.accessToken,
+        groupId: app.app.groupId,
+        appId: app.app.appId,
+      );
+      if (!mounted) return;
+      setState(() => _busy = false);
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (BuildContext context) => HostedAppWebViewPage(
+            title: app.app.title,
+            launch: launch,
+            runtimeTransport: widget.api.runtimeClient,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = girlsMessageFor(error));
+    } finally {
+      if (mounted && _busy) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _openNovelMaker() async {
     final List<HostedGroup>? activeGroups = _activeGroups;
     if (activeGroups == null) return;
@@ -319,6 +354,10 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
                   child: _ManagedAppCard(
                     app: app,
                     onTap: _busy ? null : () => _openDetail(app),
+                    onPlayPublished:
+                        _busy || !app.app.isPublished || app.isHidden
+                            ? null
+                            : () => _launchPublishedApp(app),
                   ),
                 ),
               ),
@@ -773,9 +812,14 @@ class _NoCurrentGroup extends StatelessWidget {
 }
 
 class _ManagedAppCard extends StatelessWidget {
-  const _ManagedAppCard({required this.app, required this.onTap});
+  const _ManagedAppCard({
+    required this.app,
+    required this.onTap,
+    required this.onPlayPublished,
+  });
   final ManagedGirlsApp app;
   final VoidCallback? onTap;
+  final VoidCallback? onPlayPublished;
 
   @override
   Widget build(BuildContext context) {
@@ -826,6 +870,15 @@ class _ManagedAppCard extends StatelessWidget {
                   ],
                 ),
               ),
+              if (onPlayPublished != null)
+                IconButton(
+                  key: ValueKey<String>(
+                    'girls-app-play-published-${app.app.appId}',
+                  ),
+                  tooltip: '公開版で遊ぶ',
+                  onPressed: onPlayPublished,
+                  icon: const Text('▶️', style: TextStyle(fontSize: 21)),
+                ),
               const Icon(Icons.chevron_right_rounded, color: _lavender),
             ],
           ),
