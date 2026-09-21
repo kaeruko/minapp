@@ -363,6 +363,8 @@ class HostedGroupApp {
     required this.title,
     required this.sourceKind,
     required this.createdAt,
+    this.sourceUpdatedAt,
+    this.publishedAt,
     required this.publishedVersion,
     this.builtinId,
     this.builtinAssetPath,
@@ -376,6 +378,8 @@ class HostedGroupApp {
   final String title;
   final String sourceKind;
   final DateTime createdAt;
+  final DateTime? sourceUpdatedAt;
+  final DateTime? publishedAt;
   final int? publishedVersion;
   final String? builtinId;
   final String? builtinAssetPath;
@@ -448,12 +452,24 @@ class HostedGroupApp {
         'Editable hosted group app has no source_revision.',
       );
     }
+
+    DateTime? optionalDate(String key) {
+      final Object? raw = json[key];
+      if (raw == null) return null;
+      if (raw is! String || raw.isEmpty) {
+        throw FormatException('Hosted group app has invalid $key.');
+      }
+      return DateTime.parse(raw).toUtc();
+    }
+
     return HostedGroupApp(
       appId: _requireHexId(json, 'app_id'),
       groupId: _requireHexId(json, 'group_id'),
       title: _requiredString(json, 'title'),
       sourceKind: _requiredString(json, 'source_kind'),
       createdAt: DateTime.parse(_requiredString(json, 'created_at')).toUtc(),
+      sourceUpdatedAt: optionalDate('source_updated_at'),
+      publishedAt: optionalDate('published_at'),
       publishedVersion: publishedVersion as int?,
       builtinId: _optionalString(json, 'builtin_id'),
       builtinAssetPath: _optionalString(json, 'builtin_asset_path'),
