@@ -126,10 +126,16 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
         latestApps = apps
             .where(_isVisibleGroupApp)
             .toList(growable: false)
-          ..sort(
-            (HostedGroupApp a, HostedGroupApp b) =>
-                b.createdAt.compareTo(a.createdAt),
-          );
+          ..sort((HostedGroupApp a, HostedGroupApp b) {
+            final DateTime? aUpdatedAt = a.sourceUpdatedAt;
+            final DateTime? bUpdatedAt = b.sourceUpdatedAt;
+            if (aUpdatedAt == null || bUpdatedAt == null) {
+              throw StateError(
+                'Published group app is missing source_updated_at.',
+              );
+            }
+            return bUpdatedAt.compareTo(aUpdatedAt);
+          });
         if (latestApps.length > 3) {
           latestApps = latestApps.take(3).toList(growable: false);
         }
