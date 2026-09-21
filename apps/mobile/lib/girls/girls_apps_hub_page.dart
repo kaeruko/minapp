@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../hosted_app_webview.dart';
 import '../hosted_authoring_contract_api.dart';
 import '../hosted_authoring_editor_action.dart';
 import '../hosted_authoring_projects_api.dart';
@@ -347,6 +348,40 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
     if (mounted) await _load();
   }
 
+  Future<void> _launchPublishedApp(ManagedGirlsApp app) async {
+    if (!app.app.isPublished || app.isHidden) {
+      throw StateError(
+        'Published app launch requires a visible published app.',
+      );
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final launch = await widget.api.createLaunch(
+        accessToken: widget.session.accessToken,
+        groupId: app.app.groupId,
+        appId: app.app.appId,
+      );
+      if (!mounted) return;
+      setState(() => _busy = false);
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (BuildContext context) => HostedAppWebViewPage(
+            title: app.app.title,
+            launch: launch,
+            runtimeTransport: widget.api.runtimeClient,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = girlsMessageFor(error));
+    } finally {
+      if (mounted && _busy) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<HostedAuthoringAppContract>? makers = _makers;
@@ -428,6 +463,10 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
                   child: _AppCard(
                     app: app,
                     onTap: _busy ? null : () => _openDetail(app),
+                    onPlayPublished:
+                        _busy || !app.app.isPublished || app.isHidden
+                            ? null
+                            : () => _launchPublishedApp(app),
                   ),
                 ),
               ),
@@ -574,10 +613,15 @@ class _MakerCard extends StatelessWidget {
 }
 
 class _AppCard extends StatelessWidget {
-  const _AppCard({required this.app, required this.onTap});
+  const _AppCard({
+    required this.app,
+    required this.onTap,
+    required this.onPlayPublished,
+  });
 
   final ManagedGirlsApp app;
   final VoidCallback? onTap;
+  final VoidCallback? onPlayPublished;
 
   @override
   Widget build(BuildContext context) {
@@ -591,7 +635,21 @@ class _AppCard extends StatelessWidget {
         title: Text(app.app.title,
             style: const TextStyle(color: _ink, fontWeight: FontWeight.w800)),
         subtitle: Text(app.isHidden ? '非公開' : '公開中'),
-        trailing: const Icon(Icons.chevron_right_rounded),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (onPlayPublished != null)
+              IconButton(
+                key: ValueKey<String>(
+                  'girls-app-play-published-${app.app.appId}',
+                ),
+                tooltip: '公開版で遊ぶ',
+                onPressed: onPlayPublished,
+                icon: const Text('▶️', style: TextStyle(fontSize: 21)),
+              ),
+            const Icon(Icons.chevron_right_rounded),
+          ],
+        ),
       ),
     );
   }

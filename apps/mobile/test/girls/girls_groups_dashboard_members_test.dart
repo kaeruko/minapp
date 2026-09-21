@@ -125,6 +125,7 @@ void main() {
           'title': 'うさぎのおやつやさん',
           'source_kind': 'zip',
           'created_at': '2026-09-18T00:00:00Z',
+          'source_updated_at': '2026-09-20T00:00:00Z',
           'published_version': 1,
           'owner_user_id': _userId(1),
           'editable': false,
@@ -139,6 +140,68 @@ void main() {
     expect(latest, findsOneWidget);
     final InkWell inkWell = tester.widget<InkWell>(latest);
     expect(inkWell.onTap, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('latest apps are selected by update time instead of creation time',
+      (WidgetTester tester) async {
+    Map<String, Object?> app({
+      required String id,
+      required String title,
+      required String createdAt,
+      required String updatedAt,
+    }) {
+      return <String, Object?>{
+        'app_id': id,
+        'group_id': _group.groupId,
+        'title': title,
+        'source_kind': 'zip',
+        'created_at': createdAt,
+        'source_updated_at': updatedAt,
+        'published_version': 1,
+        'owner_user_id': _userId(1),
+        'editable': false,
+        'source_revision': null,
+      };
+    }
+
+    await _pumpDashboard(
+      tester,
+      <Map<String, Object?>>[
+        _member(1, 'review', owner: true),
+      ],
+      apps: <Map<String, Object?>>[
+        app(
+          id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          title: '作成は最新・更新は古い',
+          createdAt: '2026-09-21T00:00:00Z',
+          updatedAt: '2026-09-01T00:00:00Z',
+        ),
+        app(
+          id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          title: '更新3',
+          createdAt: '2026-09-10T00:00:00Z',
+          updatedAt: '2026-09-18T00:00:00Z',
+        ),
+        app(
+          id: 'cccccccccccccccccccccccccccccccc',
+          title: '更新2',
+          createdAt: '2026-09-09T00:00:00Z',
+          updatedAt: '2026-09-19T00:00:00Z',
+        ),
+        app(
+          id: 'dddddddddddddddddddddddddddddddd',
+          title: '更新1',
+          createdAt: '2026-09-08T00:00:00Z',
+          updatedAt: '2026-09-20T00:00:00Z',
+        ),
+      ],
+    );
+
+    expect(find.text('更新1'), findsOneWidget);
+    expect(find.text('更新2'), findsOneWidget);
+    expect(find.text('更新3'), findsOneWidget);
+    expect(find.text('作成は最新・更新は古い'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

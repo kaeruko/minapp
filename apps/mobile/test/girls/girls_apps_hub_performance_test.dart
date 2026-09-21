@@ -14,6 +14,7 @@ const _groupId = '11111111111111111111111111111111';
 const _editorId = '22222222222222222222222222222222';
 const _playerId = '33333333333333333333333333333333';
 const _userId = '44444444444444444444444444444444';
+const _publishedAppId = '55555555555555555555555555555555';
 const _group = HostedGroup(
     groupId: _groupId, name: 'My group', role: 'owner', status: 'active');
 
@@ -30,6 +31,27 @@ Map<String, Object?> _builtin(bool editor) => {
       'builtin_id': editor ? 'novel-editor' : 'novel-starter',
       'created_at': '2026-09-17T00:00:00Z',
       'editable': false,
+    };
+
+Map<String, Object?> _publishedApp() => {
+      'app_id': _publishedAppId,
+      'group_id': _groupId,
+      'owner_user_id': _userId,
+      'title': 'みんあぷっち',
+      'source_kind': 'zip',
+      'created_at': '2026-09-10T00:00:00Z',
+      'source_updated_at': '2026-09-21T00:00:00Z',
+      'published_at': '2026-09-21T00:00:00Z',
+      'published_version': 2,
+      'editable': true,
+      'source_revision': 2,
+      'visibility': 'visible',
+      'stats': {
+        'total_plays': 3,
+        'unique_users': 1,
+        'monthly_plays': 3,
+      },
+      'group_name': 'My group',
     };
 
 http.Response _response(http.Request request) {
@@ -62,7 +84,7 @@ http.Response _response(http.Request request) {
         ]
       });
     case '/hosted/my/apps':
-      return _json({'apps': <Object>[]});
+      return _json({'apps': [_publishedApp()]});
   }
   throw StateError('Unexpected request: ${request.method} ${request.url.path}');
 }
@@ -107,6 +129,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(paths, hasLength(4));
     expect(find.text('Novel maker'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('みんあぷっち'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('みんあぷっち'), findsOneWidget);
+    expect(
+      find.byKey(
+        const ValueKey<String>(
+          'girls-app-play-published-$_publishedAppId',
+        ),
+      ),
+      findsOneWidget,
+    );
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(tester.takeException(), isNull);
   });
