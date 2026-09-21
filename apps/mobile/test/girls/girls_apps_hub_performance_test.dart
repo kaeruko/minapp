@@ -129,6 +129,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(paths, hasLength(4));
     expect(find.text('Novel maker'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('みんあぷっち'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('みんあぷっち'), findsOneWidget);
     expect(
       find.byKey(
