@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import 'girls_account_deletion_page.dart';
 import 'girls_apps_hub_page.dart';
 import 'girls_apps_cache.dart';
 import 'girls_current_group_store.dart';
@@ -20,7 +21,7 @@ const Color _pink = Color(0xFFE79AAF);
 const String _profileAsset = 'assets/girls/cutouts/profile.png';
 const String _settingsAsset = 'assets/girls/cutouts/settings.png';
 
-enum _AccountAction { email, refresh, logout }
+enum _AccountAction { email, refresh, deleteAccount, logout }
 
 /// One authenticated Girls chrome around the nested in-app navigator.
 ///
@@ -273,6 +274,20 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
                     Navigator.of(sheetContext).pop(_AccountAction.refresh),
               ),
               ListTile(
+                key: const Key('girls-settings-delete-account'),
+                leading: const Icon(
+                  Icons.person_remove_rounded,
+                  color: Color(0xFFB5465C),
+                ),
+                title: const Text(
+                  'アカウントを削除',
+                  style: TextStyle(color: Color(0xFFB5465C)),
+                ),
+                subtitle: const Text('アカウントと自分が所有するグループを完全に削除'),
+                onTap: () => Navigator.of(sheetContext)
+                    .pop(_AccountAction.deleteAccount),
+              ),
+              ListTile(
                 leading: const Icon(Icons.logout_rounded, color: _pink),
                 title: const Text('ログアウト'),
                 onTap: () =>
@@ -303,6 +318,24 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
       case _AccountAction.refresh:
         await _loadCurrentGroup();
         if (mounted) _selectTab(_selectedTab);
+      case _AccountAction.deleteAccount:
+        setState(() {
+          _novelFlowActive = false;
+          _novelFlowBaseDepth = null;
+          _footerHidden = false;
+        });
+        final bool? deleted = await _navigatorKey.currentState?.push<bool>(
+          MaterialPageRoute<bool>(
+            builder: (BuildContext context) => GirlsAccountDeletionPage(
+              api: widget.api,
+              session: widget.session,
+              currentGroupStore: widget.currentGroupStore,
+            ),
+          ),
+        );
+        if (deleted == true && mounted) {
+          widget.onLogout();
+        }
       case _AccountAction.logout:
         widget.onLogout();
       case null:
