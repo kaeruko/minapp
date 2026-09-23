@@ -259,6 +259,21 @@ void main() {
     expect(requestCount, 3);
   });
 
+  test('account deletion uses authenticated DELETE endpoint', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'DELETE');
+      expect(
+        request.url,
+        Uri.parse('https://girls-api.example.com/hosted/account'),
+      );
+      expect(request.headers['Authorization'], 'Bearer $token');
+      return http.Response('', 204);
+    });
+    final HostedGirlsApi api = HostedGirlsApi(baseUri: baseUri, client: client);
+
+    await api.deleteAccount(token);
+  });
+
   test('invalid group ID fails before making a network request', () async {
     final MockClient client = MockClient((http.Request request) async {
       fail('Network request must not be made for an invalid group ID.');
