@@ -80,6 +80,18 @@ class HostedGroupManagementApi {
     return group;
   }
 
+  Future<void> deleteGroup({
+    required String accessToken,
+    required String groupId,
+  }) {
+    _validateToken(accessToken);
+    _validateId(groupId, 'groupId');
+    return _delete(
+      path: '/hosted/groups/$groupId',
+      accessToken: accessToken,
+    );
+  }
+
   Future<void> leaveGroup({
     required String accessToken,
     required String groupId,
