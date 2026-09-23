@@ -94,6 +94,18 @@ void main() {
     expect(find.byKey(const Key('girls-footer-shop')), findsOneWidget);
     expect(find.text('公式アプリ'), findsOneWidget);
 
+    await tester.tap(find.byKey(const Key('girls-shell-settings')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('girls-settings-delete-account')),
+      findsOneWidget,
+    );
+    expect(find.text('アカウントを削除'), findsOneWidget);
+    Navigator.of(
+      tester.element(find.byKey(const Key('girls-settings-delete-account'))),
+    ).pop();
+    await tester.pumpAndSettle();
+
     await tester.tap(find.byKey(const Key('girls-footer-shop')));
     await _finishRouteTransition(tester);
 

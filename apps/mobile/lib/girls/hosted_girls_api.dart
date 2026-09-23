@@ -139,6 +139,10 @@ class HostedGirlsApi {
     );
   }
 
+  Future<void> deleteAccount(String accessToken) {
+    return _delegate.deleteAccount(accessToken);
+  }
+
   Future<HostedEmailStatus> fetchEmailStatus(String accessToken) {
     return _delegate.fetchEmailStatus(accessToken);
   }

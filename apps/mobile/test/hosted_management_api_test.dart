@@ -118,6 +118,24 @@ void main() {
     expect(result.ownerUserId, _userId);
   });
 
+  test('group deletion requires authenticated DELETE', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'DELETE');
+      expect(request.url.path, '/hosted/groups/$_groupId');
+      expect(request.headers['authorization'], 'Bearer $_token');
+      return http.Response('', 204);
+    });
+    final HostedGroupManagementApi api = HostedGroupManagementApi(
+      baseUri: Uri.parse('https://hosted.example'),
+      client: client,
+    );
+
+    await api.deleteGroup(
+      accessToken: _token,
+      groupId: _groupId,
+    );
+  });
+
   test('member removal requires an exact 204 response', () async {
     final MockClient client = MockClient((http.Request request) async {
       expect(request.method, 'DELETE');
