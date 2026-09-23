@@ -496,6 +496,7 @@ abstract interface class HostedPlatformApi {
     required String recoveryCode,
     required String newPassword,
   });
+  Future<void> deleteAccount(String accessToken);
   Future<List<HostedGroup>> listGroups(String accessToken);
   Future<HostedGroup> createGroup({
     required String accessToken,
@@ -618,6 +619,15 @@ class HostedApi implements HostedPlatformApi {
           'new_password': newPassword,
         },
       ),
+    );
+  }
+
+  @override
+  Future<void> deleteAccount(String accessToken) {
+    return _emptyRequest(
+      method: 'DELETE',
+      path: '/hosted/account',
+      accessToken: accessToken,
     );
   }
 
