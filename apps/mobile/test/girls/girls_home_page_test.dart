@@ -103,6 +103,10 @@ void main() {
     expect(find.text('マイメモ帳は準備中だよ'), findsNothing);
     await tester.pageBack();
     await tester.pumpAndSettle();
+    expect(find.text('✨ このアプリをアレンジする？'), findsOneWidget);
+    expect(find.text('このアプリをアレンジする！'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('girls-builtin-arrange-later')));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('girls-home-settings')));
     await tester.pumpAndSettle();
