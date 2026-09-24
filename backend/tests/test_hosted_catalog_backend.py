@@ -116,7 +116,7 @@ class HostedCatalogBackendTests(unittest.TestCase):
         builtins = self.backend.list_builtin_templates()
         self.assertEqual(
             {item["builtin_id"] for item in builtins},
-            {"shiba-game", "shiba-goshujin"},
+            {"memo", "minappchi", "shiba-game", "shiba-goshujin"},
         )
         self.assertTrue(all(item["version"] == 1 for item in builtins))
         self.assertTrue(all("source_key" not in item for item in builtins))

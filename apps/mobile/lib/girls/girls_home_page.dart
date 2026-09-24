@@ -58,6 +58,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   GirlsHomeMascotPrompt? _mascotPrompt;
   bool _loadingGroups = false;
   bool _creatingGroup = false;
+  bool _arrangingBuiltin = false;
   String? _groupError;
 
   BuiltInApp get _memoApp => _findBuiltin('memo');
@@ -154,6 +155,130 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         ),
       ),
     );
+    if (!mounted) return;
+    await _offerBuiltinArrangement(app);
+  }
+
+  Future<void> _offerBuiltinArrangement(BuiltInApp app) async {
+    final bool? arrange = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: const Color(0xFFFFFBF7),
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              const Text(
+                '✨ このアプリをアレンジする？',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '「${app.title}」をコピーして、自分好みに変えられるよ。',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF806B73),
+                  height: 1.6,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                key: const Key('girls-builtin-arrange-confirm'),
+                onPressed: _arrangingBuiltin
+                    ? null
+                    : () => Navigator.of(sheetContext).pop(true),
+                icon: const Icon(Icons.auto_fix_high_rounded),
+                label: const Text(
+                  'このアプリをアレンジする！',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              TextButton(
+                key: const Key('girls-builtin-arrange-later'),
+                onPressed: _arrangingBuiltin
+                    ? null
+                    : () => Navigator.of(sheetContext).pop(false),
+                child: const Text('またあとで'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (arrange != true || !mounted) return;
+    await _arrangeBuiltin(app);
+  }
+
+  Future<void> _arrangeBuiltin(BuiltInApp app) async {
+    if (_arrangingBuiltin) return;
+    final HostedGroup? group = _currentGroup;
+    if (group == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('先にグループを選ぶと、アプリをアレンジできるよ。')),
+      );
+      return;
+    }
+
+    setState(() {
+      _arrangingBuiltin = true;
+      _groupError = null;
+    });
+    try {
+      final List<HostedGroupApp> apps = await widget.api.listGroupApps(
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
+      );
+      final List<HostedGroupApp> installed = apps
+          .where(
+            (HostedGroupApp candidate) =>
+                candidate.sourceKind == 'builtin' &&
+                candidate.builtinId == app.id,
+          )
+          .toList(growable: false);
+      if (installed.length > 1) {
+        throw StateError(
+          'Group has duplicate built-in installations for ${app.id}.',
+        );
+      }
+
+      final HostedGroupApp parent = installed.isEmpty
+          ? await widget.api.installBuiltin(
+              accessToken: widget.session.accessToken,
+              groupId: group.groupId,
+              builtinId: app.id,
+            )
+          : installed.single;
+      final HostedGroupApp forked = await widget.api.forkApp(
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
+        appId: parent.appId,
+        title: '${app.title} アレンジ',
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (BuildContext context) => GirlsAppDetailPage(
+            api: widget.api,
+            session: widget.session,
+            appId: forked.appId,
+          ),
+        ),
+      );
+      if (mounted) await _loadGroups();
+    } catch (error) {
+      if (mounted) setState(() => _groupError = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _arrangingBuiltin = false);
+    }
   }
 
   Future<void> _openGroups() async {

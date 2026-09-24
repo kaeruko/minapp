@@ -224,6 +224,20 @@ class HostedGirlsApi {
     );
   }
 
+  Future<HostedGroupApp> forkApp({
+    required String accessToken,
+    required String groupId,
+    required String appId,
+    required String title,
+  }) {
+    return _delegate.forkApp(
+      accessToken: accessToken,
+      groupId: groupId,
+      appId: appId,
+      title: title,
+    );
+  }
+
   Future<HostedLaunchGrant> createLaunch({
     required String accessToken,
     required String groupId,

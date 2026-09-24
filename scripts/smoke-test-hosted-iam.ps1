@@ -207,8 +207,12 @@ Assert-PolicyStatement `
     -Sid 'HostedBuiltinSourceTemplates' `
     -ExpectedActions @('s3:GetObject') `
     -ExpectedResources @(
+        "arn:aws:s3:::$UploadBucketName/hosted/templates/memo/v1/source.zip",
+        "arn:aws:s3:::$UploadBucketName/hosted/templates/minappchi/v1/source.zip",
         "arn:aws:s3:::$UploadBucketName/hosted/templates/shiba-game/v1/source.zip",
-        "arn:aws:s3:::$UploadBucketName/hosted/templates/shiba-goshujin/v1/source.zip"
+        "arn:aws:s3:::$UploadBucketName/hosted/templates/shiba-goshujin/v1/source.zip",
+        "arn:aws:s3:::$UploadBucketName/hosted/templates/novel-editor/v1/source.zip",
+        "arn:aws:s3:::$UploadBucketName/hosted/templates/novel-starter/v4/source.zip"
     )
 Assert-PolicyStatement `
     -PolicyDocument $application.PolicyDocument `

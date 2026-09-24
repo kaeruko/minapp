@@ -36,6 +36,20 @@ HOSTED_CONTENT_SESSION_SECONDS = 10 * 60
 HOSTED_CONTENT_TTL_GRACE_SECONDS = 24 * 60 * 60
 
 BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = {
+    "memo": {
+        "builtin_id": "memo",
+        "version": 1,
+        "title": "マイメモ帳",
+        "asset_path": "assets/builtin/memo_pad/index.html",
+        "source_key": "hosted/templates/memo/v1/source.zip",
+    },
+    "minappchi": {
+        "builtin_id": "minappchi",
+        "version": 1,
+        "title": "みんあぷっち",
+        "asset_path": "assets/builtin/minappchi/index.html",
+        "source_key": "hosted/templates/minappchi/v1/source.zip",
+    },
     "shiba-game": {
         "builtin_id": "shiba-game",
         "version": 1,

@@ -259,6 +259,54 @@ void main() {
     expect(requestCount, 3);
   });
 
+  test('forkApp creates an editable copy of an installed builtin', () async {
+    const String parentAppId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const String forkedAppId = 'cccccccccccccccccccccccccccccccc';
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'POST');
+      expect(
+        request.url,
+        Uri.parse(
+          'https://girls-api.example.com/hosted/groups/$groupId/apps/$parentAppId/fork',
+        ),
+      );
+      expect(request.headers['Authorization'], 'Bearer $token');
+      expect(
+        jsonDecode(request.body),
+        <String, Object?>{'title': 'マイメモ帳 アレンジ'},
+      );
+      return _jsonResponse(<String, Object?>{
+        'app_id': forkedAppId,
+        'group_id': groupId,
+        'title': 'マイメモ帳 アレンジ',
+        'source_kind': 'fork',
+        'created_at': '2026-09-25T00:00:00Z',
+        'source_updated_at': '2026-09-25T00:00:00Z',
+        'parent_app_id': parentAppId,
+        'builtin_id': 'memo',
+        'builtin_version': 1,
+        'builtin_asset_path': 'assets/builtin/memo_pad/index.html',
+        'source_revision': 1,
+        'editable': true,
+        'owner_user_id': 'dddddddddddddddddddddddddddddddd',
+      }, statusCode: 201);
+    });
+    final HostedGirlsApi api = HostedGirlsApi(baseUri: baseUri, client: client);
+
+    final HostedGroupApp forked = await api.forkApp(
+      accessToken: token,
+      groupId: groupId,
+      appId: parentAppId,
+      title: 'マイメモ帳 アレンジ',
+    );
+
+    expect(forked.appId, forkedAppId);
+    expect(forked.sourceKind, 'fork');
+    expect(forked.editable, isTrue);
+    expect(forked.sourceRevision, 1);
+    expect(forked.builtinId, 'memo');
+  });
+
   test('account deletion uses authenticated DELETE endpoint', () async {
     final MockClient client = MockClient((http.Request request) async {
       expect(request.method, 'DELETE');

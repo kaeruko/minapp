@@ -58,7 +58,14 @@ class HostedLegalBackendTests(unittest.TestCase):
 
         self.assertEqual(
             {item["builtin_id"] for item in builtins},
-            {"shiba-game", "shiba-goshujin", "novel-starter", "novel-editor"},
+            {
+                "memo",
+                "minappchi",
+                "shiba-game",
+                "shiba-goshujin",
+                "novel-starter",
+                "novel-editor",
+            },
         )
         novel = next(
             item for item in builtins if item["builtin_id"] == "novel-starter"
