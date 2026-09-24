@@ -213,6 +213,25 @@ void main() {
         find.byKey(const Key('girls-source-editor-file-menu')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const Key('girls-source-editor-help')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('girls-source-editor-help')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('girls-source-editor-help-dialog')),
+        findsOneWidget,
+      );
+      expect(find.text('コード編集で迷ったら？'), findsOneWidget);
+      expect(
+        find.text('わからないところは、AIに相談しながら進めて大丈夫だよ。'),
+        findsOneWidget,
+      );
+      expect(find.text('使い方ガイドを見る'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('girls-source-editor-help-close')));
+      await tester.pumpAndSettle();
+
       await tester.tap(codeField);
       await tester.pump();
 
