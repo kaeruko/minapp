@@ -528,6 +528,12 @@ abstract interface class HostedPlatformApi {
     required String groupId,
     required String builtinId,
   });
+  Future<HostedGroupApp> forkApp({
+    required String accessToken,
+    required String groupId,
+    required String appId,
+    required String title,
+  });
   Future<HostedLaunchGrant> createLaunch({
     required String accessToken,
     required String groupId,
@@ -769,6 +775,37 @@ class HostedApi implements HostedPlatformApi {
         app.builtinId != builtinId) {
       throw const FormatException(
         'Builtin install response changed the requested scope.',
+      );
+    }
+    return app;
+  }
+
+  @override
+  Future<HostedGroupApp> forkApp({
+    required String accessToken,
+    required String groupId,
+    required String appId,
+    required String title,
+  }) async {
+    _validateHostedId(groupId, 'groupId');
+    _validateHostedId(appId, 'appId');
+    if (title.isEmpty || title != title.trim() || title.length > 80) {
+      throw ArgumentError.value(title, 'title', 'invalid Hosted app title');
+    }
+    final HostedGroupApp app = HostedGroupApp.fromJson(
+      await _jsonRequest(
+        method: 'POST',
+        path: '/hosted/groups/$groupId/apps/$appId/fork',
+        accessToken: accessToken,
+        body: <String, Object?>{'title': title},
+      ),
+    );
+    if (app.groupId != groupId ||
+        app.sourceKind != 'fork' ||
+        !app.editable ||
+        app.sourceRevision != 1) {
+      throw const FormatException(
+        'Fork response changed the requested scope.',
       );
     }
     return app;
