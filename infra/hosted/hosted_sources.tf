@@ -8,6 +8,16 @@ locals {
   minapp_apps_source_root = var.minapp_apps_source_root != null ? abspath(var.minapp_apps_source_root) : abspath("${path.module}/../../../minapp_apps")
 
   hosted_builtin_sources = {
+    memo = {
+      version    = 1
+      source_dir = abspath("${path.module}/../../apps/mobile/assets/builtin/memo_pad")
+      excludes   = []
+    }
+    minappchi = {
+      version    = 1
+      source_dir = abspath("${path.module}/../../apps/mobile/assets/builtin/minappchi")
+      excludes   = []
+    }
     shiba-game = {
       version    = 1
       source_dir = abspath("${path.module}/../../apps/mobile/assets/builtin/shiba_donguri")
