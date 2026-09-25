@@ -161,7 +161,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              'わからないところは、AIに相談しながら進めて大丈夫だよ。',
+              'わからないところは、AIに相談しながら進めよう。',
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
             SizedBox(height: 12),

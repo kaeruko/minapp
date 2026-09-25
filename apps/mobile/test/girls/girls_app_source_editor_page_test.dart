@@ -225,7 +225,7 @@ void main() {
       );
       expect(find.text('コード編集で迷ったら？'), findsOneWidget);
       expect(
-        find.text('わからないところは、AIに相談しながら進めて大丈夫だよ。'),
+        find.text('わからないところは、AIに相談しながら進めよう。'),
         findsOneWidget,
       );
       expect(find.text('使い方ガイドを見る'), findsOneWidget);
