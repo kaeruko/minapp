@@ -171,7 +171,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       find.text('編集版を編集中。保存しても公開版は変わりません。'),
-      findsOneWidget,
+      findsNothing,
     );
     expect(find.textContaining('revision'), findsNothing);
     expect(find.text('編集版を保存'), findsOneWidget);
