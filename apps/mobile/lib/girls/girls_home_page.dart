@@ -7,6 +7,7 @@ import 'builtin_webview.dart';
 import 'girls_errors.dart';
 import 'girls_group_home_page.dart';
 import 'girls_apps_page.dart';
+import 'girls_current_group_store.dart';
 import 'girls_email_settings_page.dart';
 import 'girls_footer_nav.dart';
 import 'girls_groups_page.dart';
@@ -39,6 +40,7 @@ class GirlsHomePage extends StatefulWidget {
     required this.onLogout,
     this.currentGroup,
     this.onCurrentGroupChanged,
+    this.currentGroupStore = const SharedPreferencesGirlsCurrentGroupStore(),
     super.key,
   });
 
@@ -47,6 +49,7 @@ class GirlsHomePage extends StatefulWidget {
   final VoidCallback onLogout;
   final HostedGroup? currentGroup;
   final ValueChanged<HostedGroup?>? onCurrentGroupChanged;
+  final GirlsCurrentGroupStore currentGroupStore;
 
   @override
   State<GirlsHomePage> createState() => _GirlsHomePageState();
@@ -99,7 +102,8 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       final List<HostedGroup> groups = await widget.api.listGroups(
         widget.session.accessToken,
       );
-      final String? currentId = _currentGroup?.groupId;
+      final String? currentId =
+          _currentGroup?.groupId ?? await widget.currentGroupStore.load();
       HostedGroup? currentGroup;
       if (currentId != null) {
         for (final HostedGroup group in groups) {
