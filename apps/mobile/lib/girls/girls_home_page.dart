@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -13,6 +15,8 @@ import 'girls_footer_nav.dart';
 import 'girls_groups_page.dart';
 import 'girls_home_mascot_prompt.dart';
 import 'girls_profile_page.dart';
+import 'girls_source_zip.dart';
+import 'hosted_girls_upload_api.dart';
 import 'girls_scaffold.dart';
 import 'hosted_girls_api.dart';
 
@@ -30,6 +34,22 @@ const String _groupCreateCardAsset =
     'assets/girls/home/cards/group_create_card.png';
 const GirlsHomeMascotPromptResolver _mascotPromptResolver =
     GirlsHomeMascotPromptResolver();
+
+const Map<String, List<String>> _arrangeBuiltinAssets =
+    <String, List<String>>{
+  'memo': <String>[
+    'assets/builtin/memo_pad/index.html',
+  ],
+  'minappchi': <String>[
+    'assets/builtin/minappchi/index.html',
+  ],
+  'novel-starter': <String>[
+    'assets/builtin/novel_starter/index.html',
+    'assets/builtin/novel_starter/player.js',
+    'assets/builtin/novel_starter/story-validator.js',
+    'assets/builtin/novel_starter/face.jpg',
+  ],
+};
 
 enum _AccountAction { email, refresh, logout }
 
@@ -223,6 +243,37 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     await _arrangeBuiltin(app);
   }
 
+  Future<Uint8List> _arrangeSourceZip(BuiltInApp app) async {
+    final List<String>? assetPaths = _arrangeBuiltinAssets[app.id];
+    if (assetPaths == null || assetPaths.isEmpty) {
+      throw StateError('Built-in app is not arrangeable: ${app.id}.');
+    }
+    final int slash = app.assetPath.lastIndexOf('/');
+    if (slash <= 0 || !app.assetPath.endsWith('/index.html')) {
+      throw StateError(
+        'Built-in app has an invalid arrange source path: ${app.assetPath}.',
+      );
+    }
+    final String sourceRoot = app.assetPath.substring(0, slash + 1);
+    final Map<String, Uint8List> entries = <String, Uint8List>{};
+    for (final String assetPath in assetPaths) {
+      if (!assetPath.startsWith(sourceRoot)) {
+        throw StateError(
+          'Arrange asset is outside the built-in source root: $assetPath.',
+        );
+      }
+      final String relativePath = assetPath.substring(sourceRoot.length);
+      if (relativePath.isEmpty || entries.containsKey(relativePath)) {
+        throw StateError('Arrange asset path is invalid: $assetPath.');
+      }
+      final ByteData data = await rootBundle.load(assetPath);
+      entries[relativePath] = Uint8List.fromList(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      );
+    }
+    return GirlsSourceArchive.fromEntries(entries).encode();
+  }
+
   Future<void> _arrangeBuiltin(BuiltInApp app) async {
     if (_arrangingBuiltin) return;
     final HostedGroup? group = _currentGroup;
@@ -237,44 +288,32 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       _arrangingBuiltin = true;
       _groupError = null;
     });
+    final HostedGirlsUploadApi uploadApi = HostedGirlsUploadApi(
+      baseUri: widget.api.baseUri,
+      client: widget.api.httpClient,
+    );
     try {
-      final List<HostedGroupApp> apps = await widget.api.listGroupApps(
+      final Uint8List sourceZip = await _arrangeSourceZip(app);
+      final HostedGroupApp arranged = await uploadApi.createFromZip(
         accessToken: widget.session.accessToken,
         groupId: group.groupId,
+        title: '${app.title} アレンジ',
+        zipBytes: sourceZip,
       );
-      final List<HostedGroupApp> installed = apps
-          .where(
-            (HostedGroupApp candidate) =>
-                candidate.sourceKind == 'builtin' &&
-                candidate.builtinId == app.id,
-          )
-          .toList(growable: false);
-      if (installed.length > 1) {
-        throw StateError(
-          'Group has duplicate built-in installations for ${app.id}.',
+      if (arranged.groupId != group.groupId ||
+          !arranged.editable ||
+          arranged.sourceRevision == null) {
+        throw const FormatException(
+          'Arranged app response changed the requested scope.',
         );
       }
-
-      final HostedGroupApp parent = installed.isEmpty
-          ? await widget.api.installBuiltin(
-              accessToken: widget.session.accessToken,
-              groupId: group.groupId,
-              builtinId: app.id,
-            )
-          : installed.single;
-      final HostedGroupApp forked = await widget.api.forkApp(
-        accessToken: widget.session.accessToken,
-        groupId: group.groupId,
-        appId: parent.appId,
-        title: '${app.title} アレンジ',
-      );
       if (!mounted) return;
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (BuildContext context) => GirlsAppDetailPage(
             api: widget.api,
             session: widget.session,
-            appId: forked.appId,
+            appId: arranged.appId,
           ),
         ),
       );
@@ -282,6 +321,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     } catch (error) {
       if (mounted) setState(() => _groupError = girlsMessageFor(error));
     } finally {
+      uploadApi.close();
       if (mounted) setState(() => _arrangingBuiltin = false);
     }
   }
