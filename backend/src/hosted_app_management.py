@@ -124,20 +124,6 @@ def list_managed_apps(backend: Any, auth_subject: str) -> list[dict[str, Any]]:
     return result
 
 
-def _source_history(backend: Any, app_id: str) -> list[dict[str, Any]]:
-    rows = []
-    for item in backend._source_manifests(app_id):
-        rows.append(
-            {
-                "revision": _optional_number(item, "source_revision"),
-                "created_at": _item_string(item, "created_at"),
-                "sha256": _item_string(item, "source_sha256"),
-            }
-        )
-    rows.sort(key=lambda row: row["revision"] or 0, reverse=True)
-    return rows
-
-
 def _published_history(backend: Any, app_id: str) -> list[dict[str, Any]]:
     rows = []
     for item in backend._published_manifests(app_id):
@@ -156,7 +142,7 @@ def _published_history(backend: Any, app_id: str) -> list[dict[str, Any]]:
 def get_managed_app(backend: Any, auth_subject: str, app_id: str) -> dict[str, Any]:
     _, app = _author_detail_app(backend, auth_subject, app_id)
     payload = _managed_payload(backend, app)
-    payload["source_history"] = _source_history(backend, app_id)
+    payload["source_history"] = []
     payload["published_history"] = _published_history(backend, app_id)
     return payload
 
