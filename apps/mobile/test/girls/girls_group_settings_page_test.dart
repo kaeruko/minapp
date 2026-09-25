@@ -180,16 +180,22 @@ void main() {
 
     await tester.tap(find.byKey(const Key('open-settings')));
     await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('girls-group-settings-delete')),
-      findsOneWidget,
+    final Finder deleteButton = find.byKey(
+      const Key('girls-group-settings-delete'),
     );
+    await tester.dragUntilVisible(
+      deleteButton,
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.pumpAndSettle();
+    expect(deleteButton, findsOneWidget);
     expect(
       find.byKey(const Key('girls-group-settings-leave')),
       findsNothing,
     );
 
-    await tester.tap(find.byKey(const Key('girls-group-settings-delete')));
+    await tester.tap(deleteButton);
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('girls-group-settings-remove-confirm')),
@@ -321,9 +327,12 @@ void main() {
       findsNothing,
     );
 
-    await tester.tap(
-      find.byKey(const Key('girls-group-settings-change-owner')),
+    final Finder changeOwner = find.byKey(
+      const Key('girls-group-settings-change-owner'),
     );
+    await tester.ensureVisible(changeOwner);
+    await tester.pumpAndSettle();
+    await tester.tap(changeOwner);
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(
