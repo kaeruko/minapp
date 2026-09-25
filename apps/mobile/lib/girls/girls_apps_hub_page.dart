@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -9,18 +11,60 @@ import '../hosted_authoring_projects_api.dart';
 import 'api.dart';
 import 'girls_errors.dart';
 import 'girls_app_management_api.dart';
+import 'girls_app_source_editor_page.dart';
 import 'girls_apps_cache.dart';
 import 'girls_apps_page.dart' as legacy;
 import 'girls_builtin_install_api.dart';
 import 'girls_footer_nav.dart';
 import 'girls_scaffold.dart';
+import 'girls_source_zip.dart';
 import 'girls_zip_upload_page.dart';
 import 'hosted_girls_api.dart';
+import 'hosted_girls_upload_api.dart';
 
 const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF745B9E);
 const Color _pink = Color(0xFFF9DDE8);
 const String _novelContentFormat = 'minapp/novel@1';
+const String _blankAppStarterHtml = '''<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>わたしのアプリ</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+      color: #604943;
+      background: linear-gradient(160deg, #fff7fb, #fff4df);
+    }
+    main {
+      width: min(100%, 520px);
+      padding: 32px 24px;
+      text-align: center;
+      background: rgba(255, 255, 255, .9);
+      border: 2px solid #f0dfe8;
+      border-radius: 28px;
+      box-shadow: 0 12px 32px rgba(139, 107, 178, .12);
+    }
+    h1 { margin: 0 0 12px; }
+    p { margin: 0; line-height: 1.7; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>わたしのアプリ</h1>
+    <p>ここから自由にアレンジしてみよう ✨</p>
+  </main>
+</body>
+</html>
+''';
 
 String _novelProjectTitle(HostedAuthoringProject project) {
   if (project.summary.contentFormat != _novelContentFormat) {
@@ -260,6 +304,136 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
     return error;
   }
 
+  Future<String?> _askBlankAppTitle() async {
+    final TextEditingController controller = TextEditingController(
+      text: 'わたしのアプリ',
+    );
+    String? validationError;
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (BuildContext dialogContext) => StatefulBuilder(
+          builder: (
+            BuildContext context,
+            void Function(void Function()) setDialogState,
+          ) {
+            void submit() {
+              final String raw = controller.text;
+              if (raw.isEmpty) {
+                setDialogState(() => validationError = 'アプリ名を入力してね。');
+                return;
+              }
+              if (raw != raw.trim()) {
+                setDialogState(() => validationError = '前後の空白を消してね。');
+                return;
+              }
+              if (raw.length > 80) {
+                setDialogState(
+                  () => validationError = 'アプリ名は80文字までだよ。',
+                );
+                return;
+              }
+              Navigator.of(dialogContext).pop(raw);
+            }
+
+            return AlertDialog(
+              key: const Key('girls-create-blank-app-dialog'),
+              title: const Text('新しいアプリをつくる'),
+              content: TextField(
+                key: const Key('girls-create-blank-app-title'),
+                controller: controller,
+                autofocus: true,
+                maxLength: 80,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => submit(),
+                decoration: InputDecoration(
+                  labelText: 'アプリ名',
+                  hintText: '例：推し活タイマー',
+                  errorText: validationError,
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  key: const Key('girls-create-blank-app-cancel'),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('やめる'),
+                ),
+                FilledButton.icon(
+                  key: const Key('girls-create-blank-app-confirm'),
+                  onPressed: submit,
+                  icon: const Icon(Icons.auto_awesome_rounded),
+                  label: const Text('つくる'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _createBlankApp() async {
+    final HostedGroup? group = _currentGroup;
+    if (group == null) {
+      setState(() => _error = '先に「グループ」から、いま使うグループを選んでね。');
+      return;
+    }
+    final String? title = await _askBlankAppTitle();
+    if (title == null || !mounted) return;
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final HostedGirlsUploadApi uploadApi = HostedGirlsUploadApi(
+      baseUri: widget.api.baseUri,
+      client: widget.api.httpClient,
+    );
+    try {
+      final GirlsSourceArchive archive = GirlsSourceArchive.fromEntries(
+        <String, Uint8List>{
+          'index.html': Uint8List.fromList(utf8.encode(_blankAppStarterHtml)),
+        },
+      );
+      final HostedGroupApp created = await uploadApi.createFromZip(
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
+        title: title,
+        zipBytes: archive.encode(),
+      );
+      if (created.groupId != group.groupId ||
+          !created.editable ||
+          created.sourceRevision != 1 ||
+          created.sourceKind != 'zip') {
+        throw const FormatException(
+          'New app response changed the requested app scope.',
+        );
+      }
+      if (!mounted) return;
+      setState(() => _busy = false);
+      await Navigator.of(context).push<int>(
+        MaterialPageRoute<int>(
+          builder: (BuildContext context) => GirlsAppSourceEditorPage(
+            api: _managementApi,
+            accessToken: widget.session.accessToken,
+            groupId: group.groupId,
+            appId: created.appId,
+            title: created.title,
+            expectedRevision: created.sourceRevision!,
+          ),
+        ),
+      );
+      if (mounted) await _load();
+    } catch (error) {
+      if (mounted) setState(() => _error = girlsMessageFor(error));
+    } finally {
+      uploadApi.close();
+      if (mounted && _busy) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _openZipUpload() async {
     final HostedGroup? group = _currentGroup;
     final List<HostedGroup>? groups = _activeGroups;
@@ -403,11 +577,24 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
             _CurrentGroupCard(group: _currentGroup, onChange: widget.onGroups),
             const SizedBox(height: 12),
             FilledButton.icon(
-              key: const Key('girls-my-apps-upload'),
-              onPressed: _busy ? null : _openZipUpload,
+              key: const Key('girls-create-blank-app'),
+              onPressed: _busy ? null : _createBlankApp,
               style: FilledButton.styleFrom(
                 backgroundColor: _lavender,
                 padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+              icon: const Icon(Icons.auto_awesome_rounded),
+              label: const Text(
+                '新しいアプリをつくる',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+            const SizedBox(height: 9),
+            OutlinedButton.icon(
+              key: const Key('girls-my-apps-upload'),
+              onPressed: _busy ? null : _openZipUpload,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               icon: const Icon(Icons.folder_zip_rounded),
               label: const Text('ZIPからアプリを追加'),
