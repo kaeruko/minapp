@@ -258,6 +258,34 @@ class GirlsSourceArchive {
 
   bool isTextFile(String path) => _textSuffixes.contains(_suffixOf(path));
 
+  bool containsPath(String path) => _entries.containsKey(path);
+
+  void addFile(String path, Uint8List bytes) {
+    final String checkedPath = _validatePath(path);
+    if (_entries.containsKey(checkedPath)) {
+      throw FormatException('同名のファイルがすでにあります: $checkedPath');
+    }
+    if (_entries.length >= maxGirlsSourceEditorFiles) {
+      throw const FormatException('ファイル数は100個以下にしてください。');
+    }
+    int expandedBytes = bytes.length;
+    for (final Uint8List existing in _entries.values) {
+      expandedBytes += existing.length;
+    }
+    if (expandedBytes > maxGirlsSourceEditorExpandedBytes) {
+      throw const FormatException('ファイルの合計サイズは8MB以下にしてください。');
+    }
+    _entries[checkedPath] = Uint8List.fromList(bytes);
+  }
+
+  void addTextFile(String path, {String initialText = ''}) {
+    final String checkedPath = _validatePath(path);
+    if (!_textSuffixes.contains(_suffixOf(checkedPath))) {
+      throw FormatException('コード編集できる種類のファイルではありません: $checkedPath');
+    }
+    addFile(checkedPath, Uint8List.fromList(utf8.encode(initialText)));
+  }
+
   String readText(String path) {
     final Uint8List? bytes = _entries[path];
     if (bytes == null) {
