@@ -408,8 +408,8 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       }
       if (!mounted) return;
       setState(() => _busy = false);
-      await Navigator.of(context).push<int>(
-        MaterialPageRoute<int>(
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
           builder: (BuildContext context) => GirlsAppSourceEditorPage(
             api: _managementApi,
             accessToken: widget.session.accessToken,
@@ -417,6 +417,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
             appId: created.appId,
             title: created.title,
             expectedRevision: created.sourceRevision!,
+            onSaved: (int _) => _load(),
           ),
         ),
       );
