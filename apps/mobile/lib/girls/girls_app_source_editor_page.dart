@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -45,9 +48,11 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
   String? _error;
   bool _loading = true;
   bool _saving = false;
+  bool _archiveDirty = false;
   bool _updatingController = false;
 
   bool get _dirty {
+    if (_archiveDirty) return true;
     if (_originalTexts.length != _draftTexts.length) return true;
     for (final MapEntry<String, String> entry in _originalTexts.entries) {
       if (_draftTexts[entry.key] != entry.value) return true;
@@ -128,6 +133,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
         _originalTexts = Map<String, String>.from(texts);
         _draftTexts = Map<String, String>.from(texts);
         _selectedPath = selected;
+        _archiveDirty = false;
         _loading = false;
       });
       _setControllerText(texts[selected]!);
@@ -150,6 +156,162 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
     _setControllerText(value);
   }
 
+  Future<void> _showAddFileMenu() async {
+    if (_saving || _archive == null) return;
+    final String? action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: _cream,
+      builder: (BuildContext sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                key: const Key('girls-source-editor-add-code-file'),
+                leading: const Icon(Icons.note_add_rounded, color: _lavender),
+                title: const Text(
+                  'コードファイルを作る',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+                subtitle: const Text('HTML / CSS / JavaScript / JSON / TXT'),
+                onTap: () => Navigator.of(sheetContext).pop('code'),
+              ),
+              ListTile(
+                key: const Key('girls-source-editor-add-asset-file'),
+                leading: const Icon(Icons.image_rounded, color: _lavender),
+                title: const Text(
+                  '画像・音声を追加',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+                subtitle: const Text('PNG / JPG / GIF / WebP / MP3 など'),
+                onTap: () => Navigator.of(sheetContext).pop('asset'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'code') {
+      await _addCodeFile();
+      return;
+    }
+    if (action == 'asset') {
+      await _addAssetFile();
+      return;
+    }
+    throw StateError('Unknown source add action: $action');
+  }
+
+  Future<void> _addCodeFile() async {
+    final GirlsSourceArchive? archive = _archive;
+    if (archive == null) return;
+    String path = 'style.css';
+    String? validationError;
+    final String? createdPath = await showDialog<String>(
+      context: context,
+      builder: (BuildContext dialogContext) => StatefulBuilder(
+        builder: (
+          BuildContext context,
+          void Function(void Function()) setDialogState,
+        ) {
+          void submit() {
+            try {
+              archive.addTextFile(path);
+              Navigator.of(dialogContext).pop(path);
+            } catch (error) {
+              setDialogState(() => validationError = girlsMessageFor(error));
+            }
+          }
+
+          return AlertDialog(
+            key: const Key('girls-source-editor-add-code-dialog'),
+            title: const Text('コードファイルを追加'),
+            content: TextFormField(
+              key: const Key('girls-source-editor-add-code-path'),
+              initialValue: path,
+              autofocus: true,
+              textInputAction: TextInputAction.done,
+              onChanged: (String value) => path = value,
+              onFieldSubmitted: (_) => submit(),
+              decoration: InputDecoration(
+                labelText: 'ファイル名',
+                hintText: '例：style.css / scripts/app.js',
+                errorText: validationError,
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('やめる'),
+              ),
+              FilledButton.icon(
+                key: const Key('girls-source-editor-add-code-confirm'),
+                onPressed: submit,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('追加'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (!mounted || createdPath == null) return;
+
+    final List<String> textPaths = archive.textPaths;
+    setState(() {
+      _archiveDirty = true;
+      _textPaths = textPaths;
+      _originalTexts[createdPath] = '';
+      _draftTexts[createdPath] = '';
+      _selectedPath = createdPath;
+      _error = null;
+    });
+    _setControllerText('');
+  }
+
+  Future<void> _addAssetFile() async {
+    final GirlsSourceArchive? archive = _archive;
+    if (archive == null) return;
+    final PlatformFile? file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: const <String>[
+        'png',
+        'jpg',
+        'jpeg',
+        'gif',
+        'webp',
+        'ico',
+        'mp3',
+        'm4a',
+        'ogg',
+        'wav',
+      ],
+    );
+    if (file == null || !mounted) return;
+
+    try {
+      final Uint8List bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        throw const FormatException('空のファイルは追加できません。');
+      }
+      final String assetPath = 'assets/${file.name}';
+      archive.addFile(assetPath, bytes);
+      if (!mounted) return;
+      setState(() {
+        _archiveDirty = true;
+        _error = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$assetPath を追加したよ。')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = girlsMessageFor(error));
+    }
+  }
   Future<void> _showHelp() async {
     await showDialog<void>(
       context: context,
@@ -287,6 +449,13 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
             icon: const Icon(Icons.help_outline_rounded),
           ),
           if (!_loading && _archive != null)
+            IconButton(
+              key: const Key('girls-source-editor-add-file'),
+              tooltip: 'ファイルを追加',
+              onPressed: _saving ? null : _showAddFileMenu,
+              icon: const Icon(Icons.add_box_outlined),
+            ),
+          if (!_loading && _archive != null)
             PopupMenuButton<String>(
               key: const Key('girls-source-editor-file-menu'),
               tooltip: '編集するファイル',
@@ -395,7 +564,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'HTML / CSS / JavaScript / JSON / TXT を編集できます。画像・音声などのファイルはそのまま保持します。',
+                      'HTML / CSS / JavaScript / JSON / TXT を編集できます。＋からコードファイルや画像・音声も追加できます。',
                       style: TextStyle(fontSize: 11, color: _lavender),
                     ),
                   ],
