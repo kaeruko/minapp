@@ -207,6 +207,91 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('saving keeps editor open and supports another save',
+      (WidgetTester tester) async {
+    final GirlsSourceArchive archive = GirlsSourceArchive.fromEntries(
+      <String, Uint8List>{
+        'index.html': Uint8List.fromList(utf8.encode('<html>original</html>')),
+      },
+    );
+    final List<int> updateRevisions = <int>[];
+    final List<int> savedCallbacks = <int>[];
+    final GirlsAppManagementApi api = GirlsAppManagementApi(
+      baseUri: Uri.parse('https://example.com'),
+      client: MockClient((http.Request request) async {
+        if (request.method == 'GET') {
+          return http.Response.bytes(
+            archive.encode(),
+            200,
+            headers: <String, String>{
+              'content-type': 'application/zip',
+              'x-minapp-source-revision': '1',
+              'x-minapp-source-sha256': '0' * 64,
+            },
+          );
+        }
+        if (request.method == 'POST') {
+          final int expectedRevision = int.parse(
+            request.url.queryParameters['revision']!,
+          );
+          updateRevisions.add(expectedRevision);
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'revision': expectedRevision + 1,
+            }),
+            200,
+            headers: const <String, String>{
+              'content-type': 'application/json',
+            },
+          );
+        }
+        fail('Unexpected request: ${request.method} ${request.url}');
+      }),
+    );
+    addTearDown(api.close);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GirlsAppSourceEditorPage(
+          api: api,
+          accessToken: 'test-token',
+          groupId: _groupId,
+          appId: _appId,
+          title: 'わたしのアプリ',
+          expectedRevision: 1,
+          onSaved: (int revision) async {
+            savedCallbacks.add(revision);
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final Finder code = find.byKey(const Key('girls-source-editor-code'));
+    final Finder save = find.byKey(const Key('girls-source-editor-save'));
+
+    await tester.enterText(code, '<html>first</html>');
+    await tester.pump();
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(GirlsAppSourceEditorPage), findsOneWidget);
+    expect(find.text('編集版を保存したよ。引き続き編集できます。'), findsOneWidget);
+    expect(updateRevisions, <int>[1]);
+    expect(savedCallbacks, <int>[2]);
+    expect(tester.widget<FilledButton>(save).onPressed, isNull);
+
+    await tester.enterText(code, '<html>second</html>');
+    await tester.pump();
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(GirlsAppSourceEditorPage), findsOneWidget);
+    expect(updateRevisions, <int>[1, 2]);
+    expect(savedCallbacks, <int>[2, 3]);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('source editor inside Girls shell keeps its input connection',
       (WidgetTester tester) async {
     tester.view.devicePixelRatio = 1;
