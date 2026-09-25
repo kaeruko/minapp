@@ -426,9 +426,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
         await onSaved(revision);
         if (!mounted) return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('編集版を保存したよ。引き続き編集できます。')),
-      );
+
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = girlsMessageFor(error));
