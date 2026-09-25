@@ -56,7 +56,10 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.group.name);
-    _managementApi = HostedGroupManagementApi(baseUri: widget.api.baseUri);
+    _managementApi = HostedGroupManagementApi(
+      baseUri: widget.api.baseUri,
+      client: widget.api.httpClient,
+    );
     if (widget.group.isOwner) {
       _loadGroupId();
     } else {
