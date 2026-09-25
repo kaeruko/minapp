@@ -146,8 +146,8 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
       throw StateError('Editable source revision is not available.');
     }
 
-    final int? revision = await Navigator.of(context).push<int>(
-      MaterialPageRoute<int>(
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
         builder: (BuildContext context) => GirlsAppSourceEditorPage(
           api: _managementApi,
           accessToken: widget.session.accessToken,
@@ -155,19 +155,10 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
           appId: app.app.appId,
           title: app.app.title,
           expectedRevision: sourceRevision,
+          onSaved: widget.onSourceSaved,
         ),
       ),
     );
-    if (revision == null || !mounted) return;
-
-    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(
-      const SnackBar(content: Text('コードを保存しました。編集版を更新しました。')),
-    );
-
-    // Reload the detail page in place so its source revision is current before
-    // the user previews or publishes the edited version.
-    await widget.onSourceSaved(revision);
   }
 
   Future<void> _openSession({
