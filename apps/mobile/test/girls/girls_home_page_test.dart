@@ -15,6 +15,8 @@ const HostedGroup _currentGroup = HostedGroup(
   role: 'owner',
   status: 'active',
 );
+const String _arrangedAppId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+const String _ownerUserId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 class _MemoryCurrentGroupStore implements GirlsCurrentGroupStore {
   _MemoryCurrentGroupStore(this.value);
@@ -35,11 +37,12 @@ class _MemoryCurrentGroupStore implements GirlsCurrentGroupStore {
   }
 }
 
-HostedGirlsApi _fakeApi() {
+HostedGirlsApi _fakeApi({List<String>? requests}) {
   return HostedGirlsApi(
     baseUri: Uri.parse('https://example.com'),
     client: MockClient((http.Request request) async {
       final String path = request.url.path;
+      requests?.add('${request.method} $path');
       late final Map<String, Object?> payload;
       if (path == '/hosted/groups') {
         payload = <String, Object?>{
@@ -57,7 +60,7 @@ HostedGirlsApi _fakeApi() {
         payload = <String, Object?>{
           'members': <Object?>[
             <String, Object?>{
-              'user_id': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              'user_id': _ownerUserId,
               'login_id': 'owner',
               'role': 'owner',
               'status': 'active',
@@ -66,12 +69,50 @@ HostedGirlsApi _fakeApi() {
         };
       } else if (path == '/hosted/groups/${_currentGroup.groupId}/apps') {
         payload = <String, Object?>{'apps': <Object?>[]};
+      } else if (request.method == 'POST' &&
+          path == '/hosted/groups/${_currentGroup.groupId}/apps/upload') {
+        expect(request.url.queryParameters['title'], 'マイメモ帳 アレンジ');
+        expect(request.headers['content-type'], 'application/zip');
+        expect(request.bodyBytes, isNotEmpty);
+        payload = <String, Object?>{
+          'app_id': _arrangedAppId,
+          'group_id': _currentGroup.groupId,
+          'title': 'マイメモ帳 アレンジ',
+          'source_kind': 'zip',
+          'created_at': '2026-09-25T00:00:00Z',
+          'source_updated_at': '2026-09-25T00:00:00Z',
+          'owner_user_id': _ownerUserId,
+          'editable': true,
+          'source_revision': 1,
+        };
+      } else if (request.method == 'GET' &&
+          path == '/hosted/my/apps/$_arrangedAppId') {
+        payload = <String, Object?>{
+          'app_id': _arrangedAppId,
+          'group_id': _currentGroup.groupId,
+          'title': 'マイメモ帳 アレンジ',
+          'source_kind': 'zip',
+          'created_at': '2026-09-25T00:00:00Z',
+          'source_updated_at': '2026-09-25T00:00:00Z',
+          'owner_user_id': _ownerUserId,
+          'editable': true,
+          'source_revision': 1,
+          'published_version': null,
+          'visibility': 'visible',
+          'stats': <String, Object?>{
+            'total_plays': 0,
+            'unique_users': 0,
+            'monthly_plays': 0,
+          },
+          'source_history': <Object?>[],
+          'published_history': <Object?>[],
+        };
       } else {
         fail('Unexpected request: ${request.method} ${request.url}');
       }
       return http.Response(
         jsonEncode(payload),
-        200,
+        request.method == 'POST' ? 201 : 200,
         headers: const <String, String>{
           'content-type': 'application/json; charset=utf-8',
         },
@@ -101,6 +142,49 @@ void main() {
 
       expect(find.text(_currentGroup.name), findsOneWidget);
       expect(find.text('友達を招待する？'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'arrange copies bundled source into the current group and opens app detail',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 720));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final List<String> requests = <String>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GirlsHomePage(
+            api: _fakeApi(requests: requests),
+            session: const AuthenticatedSession(
+              accessToken: 'test-token',
+              expiresIn: 3600,
+            ),
+            onLogout: () {},
+            currentGroup: _currentGroup,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('girls-home-memo-app')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('girls-builtin-arrange-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(
+        requests,
+        contains(
+          'POST /hosted/groups/${_currentGroup.groupId}/apps/upload',
+        ),
+      );
+      expect(find.text('アプリ詳細'), findsOneWidget);
+      expect(find.text('マイメモ帳 アレンジ'), findsOneWidget);
+      expect(find.text('指定されたビルトインアプリはありません。'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
