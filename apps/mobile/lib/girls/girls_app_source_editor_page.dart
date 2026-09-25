@@ -392,21 +392,6 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .9),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        '編集版を編集中。保存しても公開版は変わりません。',
-                        style: const TextStyle(
-                          color: _lavender,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
                     if (_error != null) ...<Widget>[
                       const SizedBox(height: 8),
                       _EditorError(message: _error!),
