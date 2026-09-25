@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,7 @@ import 'package:http/testing.dart';
 import 'package:minapp_mobile/girls/api.dart';
 import 'package:minapp_mobile/girls/girls_apps_cache.dart';
 import 'package:minapp_mobile/girls/girls_apps_hub_page.dart';
+import 'package:minapp_mobile/girls/girls_source_zip.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
 const _groupId = '11111111111111111111111111111111';
@@ -15,6 +17,7 @@ const _editorId = '22222222222222222222222222222222';
 const _playerId = '33333333333333333333333333333333';
 const _userId = '44444444444444444444444444444444';
 const _publishedAppId = '55555555555555555555555555555555';
+const _blankAppId = '66666666666666666666666666666666';
 const _group = HostedGroup(
     groupId: _groupId, name: 'My group', role: 'owner', status: 'active');
 
@@ -106,6 +109,94 @@ Widget _page(
     ));
 
 void main() {
+
+  testWidgets('blank app creation uploads starter ZIP and opens code editor',
+      (tester) async {
+    Uint8List? uploadedZip;
+    final paths = <String>[];
+    final api = HostedGirlsApi(
+      baseUri: Uri.parse('https://example.test'),
+      client: MockClient((request) async {
+        paths.add('${request.method} ${request.url.path}');
+        if (request.method == 'POST' &&
+            request.url.path == '/hosted/groups/$_groupId/apps/upload') {
+          expect(request.url.queryParameters['title'], '推し活タイマー');
+          expect(request.headers['Content-Type'], 'application/zip');
+          uploadedZip = Uint8List.fromList(request.bodyBytes);
+          final GirlsSourceArchive archive =
+              GirlsSourceArchive.decode(uploadedZip!);
+          expect(archive.paths, contains('index.html'));
+          expect(
+            archive.readText('index.html'),
+            contains('ここから自由にアレンジしてみよう'),
+          );
+          return _json(<String, Object?>{
+            'app_id': _blankAppId,
+            'group_id': _groupId,
+            'owner_user_id': _userId,
+            'title': '推し活タイマー',
+            'source_kind': 'zip',
+            'created_at': '2026-09-25T12:00:00Z',
+            'source_updated_at': '2026-09-25T12:00:00Z',
+            'published_version': null,
+            'editable': true,
+            'source_revision': 1,
+          }, 201);
+        }
+        if (request.method == 'GET' &&
+            request.url.path ==
+                '/hosted/groups/$_groupId/apps/$_blankAppId/source') {
+          final Uint8List bytes = uploadedZip ??
+              (throw StateError('Source requested before starter upload.'));
+          return http.Response.bytes(
+            bytes,
+            200,
+            headers: <String, String>{
+              'content-type': 'application/zip',
+              'x-minapp-source-revision': '1',
+              'x-minapp-source-sha256': '0' * 64,
+            },
+          );
+        }
+        return _response(request);
+      }),
+    );
+
+    await tester.pumpWidget(_page(api, GirlsAppsCache()));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('girls-create-blank-app')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('girls-create-blank-app')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('girls-create-blank-app-dialog')),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('girls-create-blank-app-title')),
+      '推し活タイマー',
+    );
+    await tester.tap(
+      find.byKey(const Key('girls-create-blank-app-confirm')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      paths,
+      contains('POST /hosted/groups/$_groupId/apps/upload'),
+    );
+    expect(find.text('推し活タイマー のコード'), findsOneWidget);
+    expect(
+      find.byKey(const Key('girls-source-editor-code')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('four requests, parallel reads, no sample on list display',
       (tester) async {
     final paths = <String>[];
