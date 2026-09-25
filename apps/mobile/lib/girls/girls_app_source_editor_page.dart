@@ -22,6 +22,7 @@ class GirlsAppSourceEditorPage extends StatefulWidget {
     required this.appId,
     required this.title,
     required this.expectedRevision,
+    this.onSaved,
     super.key,
   });
 
@@ -31,6 +32,7 @@ class GirlsAppSourceEditorPage extends StatefulWidget {
   final String appId;
   final String title;
   final int expectedRevision;
+  final Future<void> Function(int revision)? onSaved;
 
   @override
   State<GirlsAppSourceEditorPage> createState() =>
@@ -49,6 +51,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
   bool _loading = true;
   bool _saving = false;
   bool _archiveDirty = false;
+  late int _currentRevision;
   bool _updatingController = false;
 
   bool get _dirty {
@@ -63,6 +66,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
   @override
   void initState() {
     super.initState();
+    _currentRevision = widget.expectedRevision;
     _controller.addListener(_onTextChanged);
     _load();
   }
@@ -108,10 +112,10 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
         groupId: widget.groupId,
         appId: widget.appId,
       );
-      if (download.revision != widget.expectedRevision) {
+      if (download.revision != _currentRevision) {
         throw StateError(
           'Source revision changed before editor load: '
-          'expected=${widget.expectedRevision}, actual=${download.revision}.',
+          'expected=$_currentRevision, actual=${download.revision}.',
         );
       }
       final GirlsSourceArchive archive =
@@ -408,11 +412,23 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
         accessToken: widget.accessToken,
         groupId: widget.groupId,
         appId: widget.appId,
-        expectedRevision: widget.expectedRevision,
+        expectedRevision: _currentRevision,
         zipBytes: archive.encode(),
       );
       if (!mounted) return;
-      Navigator.of(context).pop<int>(revision);
+      setState(() {
+        _currentRevision = revision;
+        _originalTexts = Map<String, String>.from(_draftTexts);
+        _archiveDirty = false;
+      });
+      final Future<void> Function(int revision)? onSaved = widget.onSaved;
+      if (onSaved != null) {
+        await onSaved(revision);
+        if (!mounted) return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('編集版を保存したよ。引き続き編集できます。')),
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = girlsMessageFor(error));
