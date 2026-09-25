@@ -239,11 +239,34 @@ class HostedCatalogBackendTests(unittest.TestCase):
             self.assertIn(b"game-v1", archive.read("index.html"))
 
         changed = source_zip("<h1>draft-v2</h1>", **{"assets/app.js": "console.log('ok')"})
+        app_id = forked["app_id"]
+        revision_one_key = self.backend._draft_source_key(group["group_id"], app_id, 1)
+        self.assertIn(("uploads", revision_one_key), self.s3.objects)
+
         updated = self.backend.update_editable_source(
-            alice, group["group_id"], forked["app_id"], 1, changed
+            alice, group["group_id"], app_id, 1, changed
         )
         self.assertEqual(updated["revision"], 2)
         self.assertEqual(updated["files"], ["assets/app.js", "index.html"])
+
+        revision_two_key = self.backend._draft_source_key(group["group_id"], app_id, 2)
+        self.assertNotIn(("uploads", revision_one_key), self.s3.objects)
+        self.assertIn(("uploads", revision_two_key), self.s3.objects)
+        source_manifests = self.backend._source_manifests(app_id)
+        self.assertEqual(len(source_manifests), 1)
+        self.assertEqual(source_manifests[0]["source_revision"]["N"], "2")
+
+        changed_again = source_zip("<h1>draft-v3</h1>")
+        updated_again = self.backend.update_editable_source(
+            alice, group["group_id"], app_id, 2, changed_again
+        )
+        self.assertEqual(updated_again["revision"], 3)
+        revision_three_key = self.backend._draft_source_key(group["group_id"], app_id, 3)
+        self.assertNotIn(("uploads", revision_two_key), self.s3.objects)
+        self.assertIn(("uploads", revision_three_key), self.s3.objects)
+        source_manifests = self.backend._source_manifests(app_id)
+        self.assertEqual(len(source_manifests), 1)
+        self.assertEqual(source_manifests[0]["source_revision"]["N"], "3")
 
         with self.assertRaises(ApiProblem) as stale:
             self.backend.update_editable_source(
@@ -256,7 +279,7 @@ class HostedCatalogBackendTests(unittest.TestCase):
                 alice,
                 group["group_id"],
                 forked["app_id"],
-                2,
+                3,
                 source_zip("ok", **{"../escape.js": "bad"}),
             )
         self.assertEqual(invalid.exception.error, "invalid_zip_path")

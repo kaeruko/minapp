@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import logging
 import secrets
 import time
 import uuid
@@ -30,10 +31,12 @@ MAX_APPS_PER_GROUP = 20
 MAX_RUNTIME_KEYS_PER_APP = 64
 MAX_RUNTIME_BYTES_PER_APP = 256 * 1024
 MAX_RUNTIME_REQUESTS_PER_SESSION = 300
-MAX_SOURCE_REVISIONS = 20
+MAX_LEGACY_SOURCE_REVISIONS = 20
 MAX_PUBLISHED_VERSIONS = 20
 HOSTED_CONTENT_SESSION_SECONDS = 10 * 60
 HOSTED_CONTENT_TTL_GRACE_SECONDS = 24 * 60 * 60
+
+logger = logging.getLogger(__name__)
 
 BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = {
     "memo": {
@@ -388,11 +391,19 @@ class HostedCatalogBackend(HostedPlatformBackend):
         if current_revision != expected_revision:
             raise ApiProblem(409, "source_revision_stale", "Source revision is stale; fetch the latest source first.")
         next_revision = current_revision + 1
-        if next_revision > MAX_SOURCE_REVISIONS:
-            raise ApiProblem(
-                409,
-                "source_revision_limit_reached",
-                f"An app may retain at most {MAX_SOURCE_REVISIONS} source revisions.",
+
+        previous_manifests = self._source_manifests(app_id)
+        if len(previous_manifests) > MAX_LEGACY_SOURCE_REVISIONS:
+            raise RuntimeError("Source manifest count exceeds the legacy migration bound")
+        current_matches = [
+            item
+            for item in previous_manifests
+            if _optional_number(item, "source_revision") == current_revision
+            and _item_string(item, "source_key") == _item_string(app, "source_key")
+        ]
+        if len(current_matches) != 1:
+            raise RuntimeError(
+                "Current source metadata does not match exactly one source manifest"
             )
 
         source_key = self._draft_source_key(group_id, app_id, next_revision)
@@ -421,6 +432,15 @@ class HostedCatalogBackend(HostedPlatformBackend):
             files=files,
             created_at=updated_at,
         )
+        previous_manifest_deletes = [
+            {
+                "Delete": {
+                    "TableName": self._table_name,
+                    "Key": {"pk": item["pk"], "sk": item["sk"]},
+                }
+            }
+            for item in previous_manifests
+        ]
         try:
             self._dynamodb.transact_write_items(
                 TransactItems=[
@@ -444,6 +464,7 @@ class HostedCatalogBackend(HostedPlatformBackend):
                         files=files,
                         updated_at=updated_at,
                     ),
+                    *previous_manifest_deletes,
                     {
                         "Put": {
                             "TableName": self._table_name,
@@ -464,6 +485,20 @@ class HostedCatalogBackend(HostedPlatformBackend):
                     "Source revision is stale; fetch the latest source first.",
                 ) from exc
             raise
+
+        for previous in previous_manifests:
+            try:
+                self._s3.delete_object(
+                    Bucket=self._upload_bucket,
+                    Key=_item_string(previous, "source_key"),
+                    VersionId=_item_string(previous, "s3_version_id"),
+                )
+            except Exception:
+                logger.exception(
+                    "Source revision %s saved, but replaced draft cleanup failed for app %s",
+                    next_revision,
+                    app_id,
+                )
 
         return {
             "app_id": app_id,
@@ -681,8 +716,8 @@ class HostedCatalogBackend(HostedPlatformBackend):
         # manifests. Querying afterward makes this exact-key cleanup race-free.
         source_manifests = self._source_manifests(app_id)
         published_manifests = self._published_manifests(app_id)
-        if len(source_manifests) > MAX_SOURCE_REVISIONS:
-            raise RuntimeError("Source revision count exceeds the configured deletion bound")
+        if len(source_manifests) > MAX_LEGACY_SOURCE_REVISIONS:
+            raise RuntimeError("Source manifest count exceeds the legacy deletion bound")
         if len(published_manifests) > MAX_PUBLISHED_VERSIONS:
             raise RuntimeError("Published version count exceeds the configured deletion bound")
 
