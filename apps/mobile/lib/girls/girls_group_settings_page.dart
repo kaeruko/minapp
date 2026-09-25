@@ -12,6 +12,19 @@ const Color _pink = Color(0xFFE79AAF);
 const Color _cream = Color(0xFFFFFAF0);
 const String _patternAsset = 'assets/girls/cutouts/home_pattern.png';
 
+class GirlsGroupSettingsResult {
+  const GirlsGroupSettingsResult.updated(HostedGroup group)
+      : updatedGroup = group,
+        removed = false;
+
+  const GirlsGroupSettingsResult.removed()
+      : updatedGroup = null,
+        removed = true;
+
+  final HostedGroup? updatedGroup;
+  final bool removed;
+}
+
 class GirlsGroupSettingsPage extends StatefulWidget {
   const GirlsGroupSettingsPage({
     required this.api,
@@ -34,6 +47,7 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   bool _saving = false;
+  bool _removing = false;
   bool _loadingGroupId = true;
   String? _groupIdCode;
   String? _error;
@@ -43,7 +57,11 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
     super.initState();
     _nameController = TextEditingController(text: widget.group.name);
     _managementApi = HostedGroupManagementApi(baseUri: widget.api.baseUri);
-    _loadGroupId();
+    if (widget.group.isOwner) {
+      _loadGroupId();
+    } else {
+      _loadingGroupId = false;
+    }
   }
 
   @override
@@ -95,7 +113,9 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
     if (_saving || !(_formKey.currentState?.validate() ?? false)) return;
     final String name = _nameController.text;
     if (name == widget.group.name) {
-      Navigator.of(context).pop<HostedGroup>(widget.group);
+      Navigator.of(context).pop<GirlsGroupSettingsResult>(
+        GirlsGroupSettingsResult.updated(widget.group),
+      );
       return;
     }
 
@@ -111,12 +131,77 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
         name: name,
       );
       if (!mounted) return;
-      Navigator.of(context).pop<HostedGroup>(updated);
+      Navigator.of(context).pop<GirlsGroupSettingsResult>(
+        GirlsGroupSettingsResult.updated(updated),
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _removeGroup() async {
+    if (_removing) return;
+    final bool owner = widget.group.isOwner;
+    final bool confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder: (BuildContext dialogContext) => AlertDialog(
+            key: const Key('girls-group-settings-remove-confirm'),
+            title: Text(owner ? 'グループを削除する？' : 'グループから抜ける？'),
+            content: Text(
+              owner
+                  ? '「${widget.group.name}」を削除します。グループ内のアプリやメンバー情報も削除され、この操作は取り消せません。'
+                  : '「${widget.group.name}」から脱退します。もう一度参加するにはグループIDが必要です。',
+            ),
+            actions: <Widget>[
+              TextButton(
+                key: const Key('girls-group-settings-remove-cancel'),
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('やめる'),
+              ),
+              FilledButton(
+                key: const Key('girls-group-settings-remove-confirm-button'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFB5465C),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(owner ? '削除する' : '脱退する'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) return;
+
+    setState(() {
+      _removing = true;
+      _error = null;
+    });
+    try {
+      if (owner) {
+        await _managementApi.deleteGroup(
+          accessToken: widget.session.accessToken,
+          groupId: widget.group.groupId,
+        );
+      } else {
+        await _managementApi.leaveGroup(
+          accessToken: widget.session.accessToken,
+          groupId: widget.group.groupId,
+        );
+      }
+      if (!mounted) return;
+      Navigator.of(context).pop<GirlsGroupSettingsResult>(
+        const GirlsGroupSettingsResult.removed(),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _removing = false);
     }
   }
 
@@ -149,21 +234,22 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
                 children: <Widget>[
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .9),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFFF0DFE8)),
-                      boxShadow: const <BoxShadow>[
-                        BoxShadow(
-                          color: Color(0x159B6A79),
-                          blurRadius: 12,
-                          offset: Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Form(
+                  if (widget.group.isOwner)
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .9),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0xFFF0DFE8)),
+                        boxShadow: const <BoxShadow>[
+                          BoxShadow(
+                            color: Color(0x159B6A79),
+                            blurRadius: 12,
+                            offset: Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Form(
                       key: _formKey,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -230,9 +316,10 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  Container(
-                    key: const Key('girls-group-settings-group-id'),
+                  if (widget.group.isOwner) ...<Widget>[
+                    const SizedBox(height: 14),
+                    Container(
+                      key: const Key('girls-group-settings-group-id'),
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: .9),
@@ -303,6 +390,7 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
                       ],
                     ),
                   ),
+                  ],
                   if (_error != null) ...<Widget>[
                     const SizedBox(height: 14),
                     Container(
@@ -336,19 +424,89 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
                     ),
                   ],
                   const SizedBox(height: 14),
-                  const Row(
+                  Container(
+                    key: const Key('girls-group-settings-danger-zone'),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF1F3),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFF1C8D0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        Text(
+                          widget.group.isOwner ? 'グループを削除' : 'グループから脱退',
+                          style: const TextStyle(
+                            color: Color(0xFF9E3E52),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          widget.group.isOwner
+                              ? '削除すると、このグループ内のアプリやメンバー情報も削除されます。'
+                              : 'このグループから抜けます。再参加にはグループIDが必要です。',
+                          style: const TextStyle(
+                            color: Color(0xFF75645F),
+                            fontSize: 12,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          key: Key(
+                            widget.group.isOwner
+                                ? 'girls-group-settings-delete'
+                                : 'girls-group-settings-leave',
+                          ),
+                          onPressed: _saving || _removing ? null : _removeGroup,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFB5465C),
+                            side: const BorderSide(color: Color(0xFFE4AAB6)),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                          ),
+                          icon: _removing
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Icon(
+                                  widget.group.isOwner
+                                      ? Icons.delete_forever_rounded
+                                      : Icons.logout_rounded,
+                                ),
+                          label: Text(
+                            _removing
+                                ? (widget.group.isOwner ? '削除中…' : '脱退中…')
+                                : (widget.group.isOwner
+                                      ? 'グループを削除する'
+                                      : 'グループから抜ける'),
+                            style: const TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Icon(
+                      const Icon(
                         Icons.lock_outline_rounded,
                         color: _lavender,
                         size: 19,
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'グループ設定を変更できるのはオーナーだけです。グループIDは固定で、いつでも同じIDを使えます。',
-                          style: TextStyle(
+                          widget.group.isOwner
+                              ? 'グループ名を変更できるのはオーナーだけです。グループIDは固定で、いつでも同じIDを使えます。'
+                              : 'このグループにはメンバーとして参加しています。',
+                          style: const TextStyle(
                             color: Color(0xFF75645F),
                             fontSize: 12,
                             height: 1.55,
