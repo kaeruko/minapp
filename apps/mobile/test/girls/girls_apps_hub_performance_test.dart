@@ -135,7 +135,7 @@ void main() {
             'group_id': _groupId,
             'owner_user_id': _userId,
             'title': '推し活タイマー',
-            'source_kind': 'zip',
+            'source_kind': 'upload',
             'created_at': '2026-09-25T12:00:00Z',
             'source_updated_at': '2026-09-25T12:00:00Z',
             'published_version': null,
