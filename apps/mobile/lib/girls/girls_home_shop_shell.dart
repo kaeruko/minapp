@@ -161,6 +161,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               onLogout: widget.onLogout,
               currentGroup: _currentGroup,
               onCurrentGroupChanged: _setCurrentGroup,
+              currentGroupStore: widget.currentGroupStore,
             ),
           GirlsFooterTab.groups => GirlsGroupsDashboardPage(
               api: widget.api,

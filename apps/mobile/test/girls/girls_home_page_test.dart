@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:minapp_mobile/girls/api.dart';
+import 'package:minapp_mobile/girls/girls_current_group_store.dart';
 import 'package:minapp_mobile/girls/girls_home_page.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
@@ -14,6 +15,25 @@ const HostedGroup _currentGroup = HostedGroup(
   role: 'owner',
   status: 'active',
 );
+
+class _MemoryCurrentGroupStore implements GirlsCurrentGroupStore {
+  _MemoryCurrentGroupStore(this.value);
+
+  String? value;
+
+  @override
+  Future<String?> load() async => value;
+
+  @override
+  Future<void> save(String groupId) async {
+    value = groupId;
+  }
+
+  @override
+  Future<void> clear() async {
+    value = null;
+  }
+}
 
 HostedGirlsApi _fakeApi() {
   return HostedGirlsApi(
@@ -61,6 +81,30 @@ HostedGirlsApi _fakeApi() {
 }
 
 void main() {
+  testWidgets(
+    'Girls home restores the persisted current group when no widget group is supplied',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GirlsHomePage(
+            api: _fakeApi(),
+            session: const AuthenticatedSession(
+              accessToken: 'test-token',
+              expiresIn: 3600,
+            ),
+            onLogout: () {},
+            currentGroupStore: _MemoryCurrentGroupStore(_currentGroup.groupId),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(_currentGroup.name), findsOneWidget);
+      expect(find.text('友達を招待する？'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('Girls home shows the intended four cards and opens group creation', (
     WidgetTester tester,
   ) async {
