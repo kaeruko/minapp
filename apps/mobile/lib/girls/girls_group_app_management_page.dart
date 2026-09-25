@@ -256,8 +256,8 @@ class _GirlsGroupAppManagementPageState
 
   Future<void> _editSource() async {
     final HostedGroupApp app = _requireEditableApp();
-    final int? revision = await Navigator.of(context).push<int>(
-      MaterialPageRoute<int>(
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
         builder: (BuildContext context) => GirlsAppSourceEditorPage(
           api: _managementApi,
           accessToken: widget.session.accessToken,
@@ -265,14 +265,9 @@ class _GirlsGroupAppManagementPageState
           appId: app.appId,
           title: app.title,
           expectedRevision: app.sourceRevision!,
+          onSaved: (int _) => _load(),
         ),
       ),
-    );
-    if (revision == null || !mounted) return;
-    await _load();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('コードを保存しました。編集版を更新しました。')),
     );
   }
 
