@@ -20,18 +20,25 @@ const String _girlsLogo = 'assets/girls/generated/minapp_girls_logo.png';
 class GirlsScaffoldChromeScope extends InheritedWidget {
   const GirlsScaffoldChromeScope({
     required super.child,
+    this.onHome,
     super.key,
   });
 
-  static bool isEmbedded(BuildContext context) {
+  final VoidCallback? onHome;
+
+  static GirlsScaffoldChromeScope? maybeOf(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<
-          GirlsScaffoldChromeScope
-        >() !=
-        null;
+        GirlsScaffoldChromeScope>();
   }
 
+  static bool isEmbedded(BuildContext context) => maybeOf(context) != null;
+
+  static VoidCallback? homeAction(BuildContext context) =>
+      maybeOf(context)?.onHome;
+
   @override
-  bool updateShouldNotify(GirlsScaffoldChromeScope oldWidget) => false;
+  bool updateShouldNotify(GirlsScaffoldChromeScope oldWidget) =>
+      oldWidget.onHome != onHome;
 }
 
 /// Keeps the supplied artwork stationary while each page scrolls its content.
