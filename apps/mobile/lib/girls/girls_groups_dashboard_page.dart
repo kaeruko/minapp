@@ -1109,12 +1109,13 @@ class _OtherGroupTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .78),
+    return Material(
+      color: Colors.white.withValues(alpha: .78),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFEBD9DF)),
+        side: const BorderSide(color: Color(0xFFEBD9DF)),
       ),
+      clipBehavior: Clip.antiAlias,
       child: ListTile(
         onTap: disabled ? null : onOpen,
         leading: const CircleAvatar(
