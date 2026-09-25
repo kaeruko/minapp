@@ -273,6 +273,13 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
         foregroundColor: _ink,
         title: Text('${widget.title} のコード'),
         actions: <Widget>[
+          if (homeAction != null)
+            IconButton(
+              key: const Key('girls-source-editor-home'),
+              tooltip: 'ホーム',
+              onPressed: _saving ? null : () => _goHome(homeAction),
+              icon: const Icon(Icons.home_rounded),
+            ),
           IconButton(
             key: const Key('girls-source-editor-help'),
             tooltip: 'コード編集のヒント',
@@ -325,41 +332,9 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: <Widget>[
-            if (homeAction != null && !keyboardVisible)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 8, 14, 2),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: OutlinedButton.icon(
-                    key: const Key('girls-source-editor-home'),
-                    onPressed: _saving ? null : () => _goHome(homeAction),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _ink,
-                      backgroundColor: const Color(0xFFF2E9FF),
-                      side: const BorderSide(color: Color(0xFFCAB7DF)),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 13,
-                        vertical: 9,
-                      ),
-                      shape: const StadiumBorder(),
-                    ),
-                    icon: const Icon(Icons.home_rounded, size: 20),
-                    label: const Text(
-                      'ホーム',
-                      style: TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                  ),
-                ),
-              ),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _buildEditor(keyboardVisible: keyboardVisible),
-            ),
-          ],
-        ),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _buildEditor(keyboardVisible: keyboardVisible),
       ),
     );
   }
