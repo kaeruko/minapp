@@ -24,6 +24,38 @@ void main() {
     expect(saved.readText('app.js'), 'console.log("ok");');
   });
 
+  test('source archive can add editable and binary files', () {
+    final GirlsSourceArchive source = GirlsSourceArchive.fromEntries(
+      <String, Uint8List>{
+        'index.html': Uint8List.fromList(utf8.encode('<h1>hello</h1>')),
+      },
+    );
+
+    source.addTextFile('styles/main.css', initialText: 'body { color: pink; }');
+    source.addFile(
+      'assets/photo.png',
+      Uint8List.fromList(<int>[1, 2, 3, 4]),
+    );
+
+    final GirlsSourceArchive saved = GirlsSourceArchive.decode(source.encode());
+    expect(saved.textPaths, <String>['index.html', 'styles/main.css']);
+    expect(saved.readText('styles/main.css'), 'body { color: pink; }');
+    expect(saved.paths, contains('assets/photo.png'));
+  });
+
+  test('source archive rejects duplicate added file paths', () {
+    final GirlsSourceArchive source = GirlsSourceArchive.fromEntries(
+      <String, Uint8List>{
+        'index.html': Uint8List.fromList(utf8.encode('<h1>hello</h1>')),
+      },
+    );
+
+    expect(
+      () => source.addTextFile('index.html'),
+      throwsFormatException,
+    );
+  });
+
   test('source archive requires root index.html', () {
     expect(
       () => GirlsSourceArchive.fromEntries(<String, Uint8List>{
