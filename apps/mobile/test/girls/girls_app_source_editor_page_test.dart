@@ -82,7 +82,10 @@ void main() {
         const Key('girls-source-editor-home'),
       );
       expect(home, findsOneWidget);
-      expect(find.text('ホーム'), findsOneWidget);
+      final IconButton homeButton = tester.widget<IconButton>(home);
+      expect(homeButton.tooltip, 'ホーム');
+      expect(homeButton.icon, isA<Icon>());
+      expect((homeButton.icon as Icon).icon, Icons.home_rounded);
 
       final Finder code = find.byKey(
         const Key('girls-source-editor-code'),
