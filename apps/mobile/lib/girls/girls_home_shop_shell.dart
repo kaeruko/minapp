@@ -416,6 +416,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
         ),
       ],
       body: GirlsScaffoldChromeScope(
+        onHome: () => _selectTab(GirlsFooterTab.home),
         child: MediaQuery.removePadding(
           context: context,
           removeTop: true,
