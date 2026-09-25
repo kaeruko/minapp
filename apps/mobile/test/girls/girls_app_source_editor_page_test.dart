@@ -276,7 +276,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(GirlsAppSourceEditorPage), findsOneWidget);
-    expect(find.text('編集版を保存したよ。引き続き編集できます。'), findsOneWidget);
+    expect(find.text('編集版を保存したよ。引き続き編集できます。'), findsNothing);
     expect(updateRevisions, <int>[1]);
     expect(savedCallbacks, <int>[2]);
     expect(tester.widget<FilledButton>(save).onPressed, isNull);
