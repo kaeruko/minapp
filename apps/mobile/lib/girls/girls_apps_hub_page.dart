@@ -305,73 +305,68 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
   }
 
   Future<String?> _askBlankAppTitle() async {
-    final TextEditingController controller = TextEditingController(
-      text: 'わたしのアプリ',
-    );
+    String title = 'わたしのアプリ';
     String? validationError;
-    try {
-      return await showDialog<String>(
-        context: context,
-        builder: (BuildContext dialogContext) => StatefulBuilder(
-          builder: (
-            BuildContext context,
-            void Function(void Function()) setDialogState,
-          ) {
-            void submit() {
-              final String raw = controller.text;
-              if (raw.isEmpty) {
-                setDialogState(() => validationError = 'アプリ名を入力してね。');
-                return;
-              }
-              if (raw != raw.trim()) {
-                setDialogState(() => validationError = '前後の空白を消してね。');
-                return;
-              }
-              if (raw.length > 80) {
-                setDialogState(
-                  () => validationError = 'アプリ名は80文字までだよ。',
-                );
-                return;
-              }
-              Navigator.of(dialogContext).pop(raw);
+    return showDialog<String>(
+      context: context,
+      builder: (BuildContext dialogContext) => StatefulBuilder(
+        builder: (
+          BuildContext context,
+          void Function(void Function()) setDialogState,
+        ) {
+          void submit() {
+            final String raw = title;
+            if (raw.isEmpty) {
+              setDialogState(() => validationError = 'アプリ名を入力してね。');
+              return;
             }
+            if (raw != raw.trim()) {
+              setDialogState(() => validationError = '前後の空白を消してね。');
+              return;
+            }
+            if (raw.length > 80) {
+              setDialogState(
+                () => validationError = 'アプリ名は80文字までだよ。',
+              );
+              return;
+            }
+            Navigator.of(dialogContext).pop(raw);
+          }
 
-            return AlertDialog(
-              key: const Key('girls-create-blank-app-dialog'),
-              title: const Text('新しいアプリをつくる'),
-              content: TextField(
-                key: const Key('girls-create-blank-app-title'),
-                controller: controller,
-                autofocus: true,
-                maxLength: 80,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => submit(),
-                decoration: InputDecoration(
-                  labelText: 'アプリ名',
-                  hintText: '例：推し活タイマー',
-                  errorText: validationError,
-                ),
+          return AlertDialog(
+            key: const Key('girls-create-blank-app-dialog'),
+            title: const Text('新しいアプリをつくる'),
+            content: TextFormField(
+              key: const Key('girls-create-blank-app-title'),
+              initialValue: title,
+              autofocus: true,
+              maxLength: 80,
+              textInputAction: TextInputAction.done,
+              onChanged: (String value) => title = value,
+              onFieldSubmitted: (_) => submit(),
+              decoration: InputDecoration(
+                labelText: 'アプリ名',
+                hintText: '例：推し活タイマー',
+                errorText: validationError,
               ),
-              actions: <Widget>[
-                TextButton(
-                  key: const Key('girls-create-blank-app-cancel'),
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('やめる'),
-                ),
-                FilledButton.icon(
-                  key: const Key('girls-create-blank-app-confirm'),
-                  onPressed: submit,
-                  icon: const Icon(Icons.auto_awesome_rounded),
-                  label: const Text('つくる'),
-                ),
-              ],
-            );
-          },
-        ),
-      );
-    } finally {
-      controller.dispose();
-    }
+            ),
+            actions: <Widget>[
+              TextButton(
+                key: const Key('girls-create-blank-app-cancel'),
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('やめる'),
+              ),
+              FilledButton.icon(
+                key: const Key('girls-create-blank-app-confirm'),
+                onPressed: submit,
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: const Text('つくる'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _createBlankApp() async {
