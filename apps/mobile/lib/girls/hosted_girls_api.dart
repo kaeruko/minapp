@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../api.dart';
@@ -86,32 +87,68 @@ class HostedGirlsApi {
     // Persist only after onboarding succeeds. A group/network failure remains
     // visible to the user and does not silently commit a half-finished login.
     await _sessionStore.writeRefreshToken(result.refreshToken);
+    debugPrint(
+      'Girls session login: refresh token saved; access expires in '
+      '${session.expiresIn}s.',
+    );
     _authenticatedSessions.add(session);
     return session;
   }
 
   Future<AuthenticatedSession?> restoreSession() async {
     final String? refreshToken = await _sessionStore.readRefreshToken();
-    if (refreshToken == null) return null;
+    if (refreshToken == null) {
+      debugPrint(
+        'Girls session restore: no saved refresh token in secure storage.',
+      );
+      return null;
+    }
 
+    debugPrint(
+      'Girls session restore: saved refresh token found; requesting refresh.',
+    );
     try {
       final RefreshableAuthenticatedResult result =
           await _authClient.refresh(refreshToken);
       final AuthenticatedSession session = result.toSession();
+      debugPrint(
+        'Girls session restore: refresh succeeded; access expires in '
+        '${session.expiresIn}s.',
+      );
       await _registrationOnboarding.ensureInitialGroup(session);
+      debugPrint(
+        'Girls session restore: group verification succeeded; session restored.',
+      );
       return session;
     } on ApiException catch (error) {
       if (error.statusCode == 401 && error.code == 'invalid_refresh_token') {
+        debugPrint(
+          'Girls session restore: server rejected refresh token as '
+          'invalid_refresh_token; clearing saved login.',
+        );
         // The server has explicitly declared this credential invalid. This is
         // the only restore failure that automatically removes the saved token.
         await _sessionStore.clearRefreshToken();
         return null;
       }
+      debugPrint(
+        'Girls session restore: API failure preserved saved login '
+        '(HTTP ${error.statusCode}, code=${error.code}).',
+      );
+      rethrow;
+    } catch (error) {
+      debugPrint(
+        'Girls session restore: non-API failure preserved saved login '
+        '(${error.runtimeType}).',
+      );
       rethrow;
     }
   }
 
-  Future<void> logout() => _sessionStore.clearRefreshToken();
+  Future<void> logout() async {
+    debugPrint('Girls session logout: clearing saved refresh token.');
+    await _sessionStore.clearRefreshToken();
+  }
 
   Future<HostedLegalBundle> fetchLegal() => _delegate.fetchLegal();
 
