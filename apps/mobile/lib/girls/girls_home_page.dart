@@ -156,6 +156,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
           appId: app.id,
           title: app.title,
           assetPath: app.assetPath,
+          transparentBackground: app.id == 'memo',
         ),
       ),
     );

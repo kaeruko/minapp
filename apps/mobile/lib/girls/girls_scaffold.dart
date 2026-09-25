@@ -7,6 +7,8 @@ const Color _girlsCream = Color(0xFFFCF4E9);
 const Color _headerCream = Color(0xFFFBF3E8);
 const String _headerBackground =
     'assets/girls/backgrounds/girls_header_bg_top.png';
+const String _headerPanelBackground =
+    'assets/girls/backgrounds/girls_header_bg.jpg';
 const String _bodyBackground = 'assets/girls/backgrounds/girls_body_bg.jpg';
 const String _girlsLogo = 'assets/girls/generated/minapp_girls_logo.png';
 
@@ -398,14 +400,17 @@ class _GirlsBodyBackground extends StatelessWidget {
           builder: (BuildContext context, BoxConstraints constraints) {
             final double imageWidth = math.min(constraints.maxWidth, 600);
             final double imageHeight = imageWidth * 1984 / 1200;
+            final double bodyTop = constraints.maxWidth * (900 - 350) / 1200;
             return ClipRect(
               child: Stack(
+                fit: StackFit.expand,
                 alignment: Alignment.topCenter,
                 children: <Widget>[
-                  OverflowBox(
-                    alignment: Alignment.topCenter,
-                    minHeight: imageHeight,
-                    maxHeight: imageHeight,
+                  Positioned(
+                    top: bodyTop,
+                    left: (constraints.maxWidth - imageWidth) / 2,
+                    width: imageWidth,
+                    height: imageHeight,
                     child: Image.asset(
                       _bodyBackground,
                       key: const Key('girls-body-background'),
@@ -416,9 +421,9 @@ class _GirlsBodyBackground extends StatelessWidget {
                   ),
                   // The source is not a seamless tile. Fade to cream instead of
                   // repeating clouds or exposing a hard edge on tall screens.
-                  if (constraints.maxHeight > imageHeight)
+                  if (constraints.maxHeight > bodyTop + imageHeight)
                     Positioned(
-                      top: math.max(0, imageHeight - 96),
+                      top: math.max(0, bodyTop + imageHeight - 96),
                       width: imageWidth,
                       height: 96,
                       child: const DecoratedBox(
@@ -434,6 +439,21 @@ class _GirlsBodyBackground extends StatelessWidget {
                         ),
                       ),
                     ),
+                  // Continue the original artwork below the header's lace.
+                  // This surface starts at source y=350, aligned with the
+                  // transparent bottom 100 pixels of the 1200 x 450 header.
+                  Positioned(
+                    top: -constraints.maxWidth * 350 / 1200,
+                    left: 0,
+                    right: 0,
+                    child: Image.asset(
+                      _headerPanelBackground,
+                      key: const Key('girls-header-panel-background'),
+                      width: constraints.maxWidth,
+                      height: constraints.maxWidth * 900 / 1200,
+                      fit: BoxFit.fill,
+                    ),
+                  ),
                 ],
               ),
             );

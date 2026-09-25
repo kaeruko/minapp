@@ -389,17 +389,15 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
     }
 
     final ThemeData shellTheme = Theme.of(context);
-    final ThemeData nestedTheme = _novelFlowActive
-        ? shellTheme.copyWith(
-            scaffoldBackgroundColor: Colors.transparent,
-            appBarTheme: shellTheme.appBarTheme.copyWith(
-              backgroundColor: Colors.transparent,
-              surfaceTintColor: Colors.transparent,
-              elevation: 0,
-              scrolledUnderElevation: 0,
-            ),
-          )
-        : shellTheme;
+    final ThemeData nestedTheme = shellTheme.copyWith(
+      scaffoldBackgroundColor: Colors.transparent,
+      appBarTheme: shellTheme.appBarTheme.copyWith(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+      ),
+    );
 
     return GirlsScaffold(
       leading: _BellButton(onTap: _showNotices),
@@ -420,7 +418,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
       body: GirlsScaffoldChromeScope(
         child: MediaQuery.removePadding(
           context: context,
-          removeTop: _novelFlowActive,
+          removeTop: true,
           child: Theme(
             data: nestedTheme,
             child: Navigator(

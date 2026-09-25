@@ -101,12 +101,14 @@ class BuiltInWebViewPage extends StatefulWidget {
     required this.appId,
     required this.title,
     required this.assetPath,
+    this.transparentBackground = false,
     super.key,
   });
 
   final String appId;
   final String title;
   final String assetPath;
+  final bool transparentBackground;
 
   @override
   State<BuiltInWebViewPage> createState() => _BuiltInWebViewPageState();
@@ -192,6 +194,9 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
         },
       );
       await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+      if (widget.transparentBackground) {
+        await controller.setBackgroundColor(Colors.transparent);
+      }
       await controller.addJavaScriptChannel(
         _builtInStateChannelName,
         onMessageReceived: (JavaScriptMessage message) {
@@ -206,17 +211,22 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
             }
           },
           onPageFinished: (String _) async {
-            if (extraJavaScriptApplied || extraJavaScript == null) {
-              return;
-            }
+            if (!mounted) return;
             try {
-              await controller.runJavaScript(extraJavaScript);
-              extraJavaScriptApplied = true;
+              if (widget.transparentBackground) {
+                await controller.runJavaScript(
+                  "document.documentElement.classList.add('minapp-transparent-background');",
+                );
+              }
+              if (!extraJavaScriptApplied && extraJavaScript != null) {
+                await controller.runJavaScript(extraJavaScript);
+                extraJavaScriptApplied = true;
+              }
             } catch (error) {
               if (!mounted) return;
               setState(
                 () => _error =
-                    'ビルトインアプリの追加処理を読み込めませんでした: $error',
+                    'ビルトインアプリの表示を準備できませんでした: $error',
               );
             }
           },
@@ -422,6 +432,7 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: widget.transparentBackground ? Colors.transparent : null,
       appBar: AppBar(title: Text(widget.title)),
       body: SafeArea(
         child: _error != null
