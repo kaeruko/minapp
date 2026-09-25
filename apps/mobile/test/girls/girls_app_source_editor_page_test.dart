@@ -10,6 +10,7 @@ import 'package:minapp_mobile/girls/girls_app_management_api.dart';
 import 'package:minapp_mobile/girls/girls_app_source_editor_page.dart';
 import 'package:minapp_mobile/girls/girls_current_group_store.dart';
 import 'package:minapp_mobile/girls/girls_home_shop_shell.dart';
+import 'package:minapp_mobile/girls/girls_scaffold.dart';
 import 'package:minapp_mobile/girls/girls_source_zip.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
@@ -28,6 +29,93 @@ class _EmptyGroupStore implements GirlsCurrentGroupStore {
 }
 
 void main() {
+  testWidgets(
+    'source editor shows a Home shortcut and confirms unsaved changes',
+    (WidgetTester tester) async {
+      final GirlsSourceArchive archive = GirlsSourceArchive.fromEntries(
+        <String, Uint8List>{
+          'index.html': Uint8List.fromList(
+            utf8.encode('<html>original</html>'),
+          ),
+        },
+      );
+      final GirlsAppManagementApi api = GirlsAppManagementApi(
+        baseUri: Uri.parse('https://example.com'),
+        client: MockClient((http.Request request) async {
+          expect(request.method, 'GET');
+          expect(
+            request.url.path,
+            '/hosted/groups/$_groupId/apps/$_appId/source',
+          );
+          return http.Response.bytes(
+            archive.encode(),
+            200,
+            headers: <String, String>{
+              'content-type': 'application/zip',
+              'x-minapp-source-revision': '1',
+              'x-minapp-source-sha256': '0' * 64,
+            },
+          );
+        }),
+      );
+      addTearDown(api.close);
+      bool wentHome = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GirlsScaffoldChromeScope(
+            onHome: () => wentHome = true,
+            child: GirlsAppSourceEditorPage(
+              api: api,
+              accessToken: 'test-token',
+              groupId: _groupId,
+              appId: _appId,
+              title: 'うさぎのおやつやさん',
+              expectedRevision: 1,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final Finder home = find.byKey(
+        const Key('girls-source-editor-home'),
+      );
+      expect(home, findsOneWidget);
+      expect(find.text('ホーム'), findsOneWidget);
+
+      final Finder code = find.byKey(
+        const Key('girls-source-editor-code'),
+      );
+      await tester.enterText(code, '<html>changed</html>');
+      await tester.pump();
+
+      await tester.tap(home);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('girls-source-editor-home-confirm-dialog')),
+        findsOneWidget,
+      );
+      expect(find.text('まだ保存していない変更は消えます。'), findsOneWidget);
+      expect(wentHome, isFalse);
+
+      await tester.tap(
+        find.byKey(const Key('girls-source-editor-home-cancel')),
+      );
+      await tester.pumpAndSettle();
+      expect(wentHome, isFalse);
+
+      await tester.tap(home);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('girls-source-editor-home-confirm')),
+      );
+      await tester.pumpAndSettle();
+      expect(wentHome, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('source editor inside Girls shell keeps its input connection',
       (WidgetTester tester) async {
     tester.view.devicePixelRatio = 1;

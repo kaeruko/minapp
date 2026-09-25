@@ -201,6 +201,36 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
     );
   }
 
+  Future<void> _goHome(VoidCallback homeAction) async {
+    if (_saving) return;
+    if (_dirty) {
+      final bool leave =
+          await showDialog<bool>(
+            context: context,
+            builder: (BuildContext dialogContext) => AlertDialog(
+              key: const Key('girls-source-editor-home-confirm-dialog'),
+              title: const Text('ホームに戻る？'),
+              content: const Text('まだ保存していない変更は消えます。'),
+              actions: <Widget>[
+                TextButton(
+                  key: const Key('girls-source-editor-home-cancel'),
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('編集を続ける'),
+                ),
+                FilledButton(
+                  key: const Key('girls-source-editor-home-confirm'),
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: const Text('ホームに戻る'),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+      if (!leave || !mounted) return;
+    }
+    homeAction();
+  }
+
   Future<void> _save() async {
     final GirlsSourceArchive? archive = _archive;
     if (archive == null || !_dirty || _saving) return;
@@ -232,6 +262,8 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
   @override
   Widget build(BuildContext context) {
     final bool keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final VoidCallback? homeAction =
+        GirlsScaffoldChromeScope.homeAction(context);
     return Scaffold(
       backgroundColor: _cream,
       // The authenticated shell already subtracts the keyboard height.
@@ -293,9 +325,41 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
         ],
       ),
       body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _buildEditor(keyboardVisible: keyboardVisible),
+        child: Column(
+          children: <Widget>[
+            if (homeAction != null && !keyboardVisible)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 2),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    key: const Key('girls-source-editor-home'),
+                    onPressed: _saving ? null : () => _goHome(homeAction),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _ink,
+                      backgroundColor: const Color(0xFFF2E9FF),
+                      side: const BorderSide(color: Color(0xFFCAB7DF)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 13,
+                        vertical: 9,
+                      ),
+                      shape: const StadiumBorder(),
+                    ),
+                    icon: const Icon(Icons.home_rounded, size: 20),
+                    label: const Text(
+                      'ホーム',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ),
+              ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _buildEditor(keyboardVisible: keyboardVisible),
+            ),
+          ],
+        ),
       ),
     );
   }
