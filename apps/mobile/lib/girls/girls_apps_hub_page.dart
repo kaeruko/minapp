@@ -401,7 +401,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       if (created.groupId != group.groupId ||
           !created.editable ||
           created.sourceRevision != 1 ||
-          created.sourceKind != 'zip') {
+          created.sourceKind != 'upload') {
         throw const FormatException(
           'New app response changed the requested app scope.',
         );
