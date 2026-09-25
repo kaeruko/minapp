@@ -119,6 +119,94 @@ void main() {
     },
   );
 
+  testWidgets('source editor adds a new code file from the plus menu',
+      (WidgetTester tester) async {
+    final GirlsSourceArchive archive = GirlsSourceArchive.fromEntries(
+      <String, Uint8List>{
+        'index.html': Uint8List.fromList(utf8.encode('<html>original</html>')),
+      },
+    );
+    final GirlsAppManagementApi api = GirlsAppManagementApi(
+      baseUri: Uri.parse('https://example.com'),
+      client: MockClient((http.Request request) async {
+        expect(request.method, 'GET');
+        expect(
+          request.url.path,
+          '/hosted/groups/$_groupId/apps/$_appId/source',
+        );
+        return http.Response.bytes(
+          archive.encode(),
+          200,
+          headers: <String, String>{
+            'content-type': 'application/zip',
+            'x-minapp-source-revision': '1',
+            'x-minapp-source-sha256': '0' * 64,
+          },
+        );
+      }),
+    );
+    addTearDown(api.close);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GirlsAppSourceEditorPage(
+          api: api,
+          accessToken: 'test-token',
+          groupId: _groupId,
+          appId: _appId,
+          title: 'わたしのアプリ',
+          expectedRevision: 1,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final Finder addFile = find.byKey(
+      const Key('girls-source-editor-add-file'),
+    );
+    expect(addFile, findsOneWidget);
+    await tester.tap(addFile);
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('girls-source-editor-add-code-file')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('girls-source-editor-add-code-dialog')),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('girls-source-editor-add-code-path')),
+      'scripts/app.js',
+    );
+    await tester.tap(
+      find.byKey(const Key('girls-source-editor-add-code-confirm')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('scripts/app.js'), findsOneWidget);
+    expect(
+      tester
+          .widget<IconButton>(
+            find.byKey(const Key('girls-source-editor-save-appbar')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const Key('girls-source-editor-code')),
+          )
+          .controller!
+          .text,
+      '',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('source editor inside Girls shell keeps its input connection',
       (WidgetTester tester) async {
     tester.view.devicePixelRatio = 1;
