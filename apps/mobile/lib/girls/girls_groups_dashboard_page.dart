@@ -232,8 +232,9 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
   }
 
   Future<void> _openGroupSettings(HostedGroup group) async {
-    final HostedGroup? updated = await Navigator.of(context).push<HostedGroup>(
-      MaterialPageRoute<HostedGroup>(
+    final GirlsGroupSettingsResult? result =
+        await Navigator.of(context).push<GirlsGroupSettingsResult>(
+      MaterialPageRoute<GirlsGroupSettingsResult>(
         builder: (BuildContext context) => GirlsGroupSettingsPage(
           api: widget.api,
           session: widget.session,
@@ -241,8 +242,31 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
         ),
       ),
     );
-    if (updated == null || !mounted) return;
+    if (result == null || !mounted) return;
 
+    if (result.removed) {
+      await widget.currentGroupStore.clear();
+      if (!mounted) return;
+      setState(() => _currentGroup = null);
+      widget.onCurrentGroupChanged(null);
+      await _reload();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            group.isOwner
+                ? '「${group.name}」を削除したよ。'
+                : '「${group.name}」から抜けたよ。',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final HostedGroup? updated = result.updatedGroup;
+    if (updated == null) {
+      throw StateError('Group settings returned no updated group.');
+    }
     final bool renamed = updated.name != group.name;
     setState(() => _currentGroup = updated);
     widget.onCurrentGroupChanged(updated);
@@ -455,8 +479,7 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
                 onLaunchApp: (HostedGroupApp app) =>
                     _launchLatestApp(current, app),
                 onOpen: () => _openGroup(current),
-                onSettings:
-                    current.isOwner ? () => _openGroupSettings(current) : null,
+                onSettings: () => _openGroupSettings(current),
               ),
             if (_error != null) ...<Widget>[
               const SizedBox(height: 12),
