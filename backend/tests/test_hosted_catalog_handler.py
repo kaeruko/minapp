@@ -216,7 +216,9 @@ class HostedCatalogHandlerTests(unittest.TestCase):
             None,
         )
         self.assertEqual(response["statusCode"], 200)
-        self.assertIn("frame-ancestors", response["headers"]["content-security-policy"])
+        csp = response["headers"]["content-security-policy"]
+        self.assertIn("frame-ancestors", csp)
+        self.assertIn("media-src 'self' data: blob:", csp)
         self.assertEqual(base64.b64decode(response["body"]), b"<h1>published</h1>")
 
 
