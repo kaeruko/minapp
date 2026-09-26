@@ -4,5 +4,5 @@
 resource "aws_apigatewayv2_route" "auth_refresh" {
   api_id    = aws_apigatewayv2_api.api.id
   route_key = "POST /auth/refresh"
-  target    = "integrations/${aws_apigatewayv2_integration.api.id}"
+  target    = "integrations/${aws_apigatewayv2_integration.auth_api_live.id}"
 }
