@@ -417,7 +417,6 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
             appId: created.appId,
             title: created.title,
             expectedRevision: created.sourceRevision!,
-            onSaved: (int _) => _load(),
           ),
         ),
       );
