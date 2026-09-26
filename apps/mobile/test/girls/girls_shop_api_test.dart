@@ -123,6 +123,61 @@ void main() {
     );
   });
 
+  test('addToGroup sends the selected group and exact shop version', () async {
+    final String groupId = _repeat('f', 32);
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'POST');
+      expect(
+        request.url,
+        Uri.parse('https://girls-api.example.com/shop/apps/$appId/add'),
+      );
+      expect(
+        jsonDecode(request.body),
+        <String, Object?>{
+          'version': '3',
+          'group_id': groupId,
+        },
+      );
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'app_id': _repeat('b', 32),
+          'group_id': groupId,
+          'title': '作品',
+          'source_kind': 'upload',
+          'created_at': '2026-09-27T00:00:00Z',
+          'owner_user_id': ownerId,
+          'editable': true,
+          'source_revision': 1,
+        }),
+        200,
+        headers: <String, String>{'content-type': 'application/json'},
+      );
+    });
+    final GirlsShopApi api = GirlsShopApi(
+      baseUri: Uri.parse('https://girls-api.example.com'),
+      client: client,
+    );
+    addTearDown(api.close);
+    final GirlsShopApp app = GirlsShopApp(
+      appId: appId,
+      version: '3',
+      title: '作品',
+      ownerUserId: ownerId,
+      ownerDisplayName: 'creator',
+      publishedAt: DateTime.utc(2026, 9, 13),
+      sha256: sha256,
+    );
+
+    final added = await api.addToGroup(
+      accessToken: 'token',
+      app: app,
+      groupId: groupId,
+    );
+    expect(added.groupId, groupId);
+    expect(added.title, '作品');
+    expect(added.sourceKind, 'upload');
+  });
+
   test('setVisibility sends app-level Girls shop state', () async {
     final MockClient client = MockClient((http.Request request) async {
       expect(request.method, 'PUT');
