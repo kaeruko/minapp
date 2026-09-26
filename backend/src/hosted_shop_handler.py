@@ -25,7 +25,7 @@ _LOGGER = logging.getLogger(__name__)
 _BACKEND: HostedGirlsShopBackend | None = None
 _ID_RE = r"([0-9a-f]{32})"
 _GROUP_SETTINGS_RE = re.compile(rf"^/hosted/groups/{_ID_RE}$")
-_SHOP_ACTION_RE = re.compile(rf"^/shop/apps/{_ID_RE}/(launch|download|reports)$")
+_SHOP_ACTION_RE = re.compile(rf"^/shop/apps/{_ID_RE}/(launch|download|add|reports)$")
 _SHOP_VISIBILITY_RE = re.compile(rf"^/apps/{_ID_RE}/shop-visibility$")
 _SHOP_CONTENT_RE = re.compile(r"^/shop/content/([A-Za-z0-9_-]{32,128})/(.+)$")
 
@@ -156,6 +156,24 @@ def _handle_shop_request(event: dict[str, Any]) -> dict[str, Any] | None:
             return _json_response(
                 200,
                 backend.create_shop_download(_auth_subject(event), app_id, version),
+            )
+        if action == "add":
+            _require_fields(payload, required={"version", "group_id"})
+            group_id = _required_string(payload, "group_id", min_length=32, max_length=32)
+            if re.fullmatch(r"[0-9a-f]{32}", group_id) is None:
+                raise ApiProblem(
+                    400,
+                    "invalid_group_id",
+                    "group_id must be a 32-character lowercase hexadecimal ID.",
+                )
+            return _json_response(
+                200,
+                backend.add_shop_app_to_group(
+                    _auth_subject(event),
+                    app_id,
+                    _version(payload),
+                    group_id,
+                ),
             )
         if action == "reports":
             _require_fields(payload, required={"version", "reason"})
