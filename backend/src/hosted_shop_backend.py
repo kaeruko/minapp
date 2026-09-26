@@ -12,6 +12,7 @@ from aws_backend import _item_string, _string_attr
 from errors import ApiProblem
 from hosted_catalog_backend import _item_files, _optional_number, _optional_string
 from hosted_platform_backend import _now_iso, _number_attr
+from hosted_upload import create_uploaded_app
 from hosted_user_state_backend import HostedUserStateBackend
 
 SHOP_CONTENT_SESSION_SECONDS = 10 * 60
@@ -343,6 +344,33 @@ class HostedShopBackend(HostedUserStateBackend):
             "sha256": sha256,
             "expires_in": SHOP_DOWNLOAD_TTL_SECONDS,
         }
+
+    def add_shop_app_to_group(
+        self,
+        auth_subject: str,
+        app_id: str,
+        version: str,
+        group_id: str,
+    ) -> dict[str, Any]:
+        user = self._user_by_auth_subject(auth_subject)
+        self._require_active_membership(user.user_id, group_id)
+        app = self._current_shop_app(app_id)
+        self._assert_version(app, version)
+        expected_files = _item_files(app, "published_files_json")
+        zip_bytes, actual_files, _ = self._read_zip_object(
+            bucket=self._published_bucket,
+            key=_item_string(app, "published_key"),
+            expected_sha256=_item_string(app, "published_sha256"),
+        )
+        if actual_files != expected_files:
+            raise RuntimeError("Shop ZIP manifest does not match published metadata")
+        return create_uploaded_app(
+            self,
+            auth_subject,
+            group_id,
+            _item_string(app, "title"),
+            zip_bytes,
+        )
 
     def create_shop_report(
         self,
