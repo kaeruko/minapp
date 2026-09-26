@@ -146,6 +146,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
       throw StateError('Editable source revision is not available.');
     }
 
+    int latestRevision = sourceRevision;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) => GirlsAppSourceEditorPage(
@@ -155,10 +156,15 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
           appId: app.app.appId,
           title: app.app.title,
           expectedRevision: sourceRevision,
-          onSaved: widget.onSourceSaved,
+          onSaved: (int revision) async {
+            latestRevision = revision;
+          },
         ),
       ),
     );
+    if (mounted && latestRevision != sourceRevision) {
+      await widget.onSourceSaved(latestRevision);
+    }
   }
 
   Future<void> _openSession({
