@@ -7,7 +7,7 @@ import 'girls_hosted_endpoint_source.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final Uri hostedApiBaseUri = await loadGirlsHostedBaseUriFromGoogleDrive();
+  final Uri hostedApiBaseUri = await loadGirlsHostedBaseUri();
 
   runApp(
     GirlsPersistentApp(
