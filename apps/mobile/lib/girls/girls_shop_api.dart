@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../api.dart';
+import '../hosted_api.dart';
 
 final RegExp _hexIdPattern = RegExp(r'^[0-9a-f]{32}$');
 final RegExp _sha256Pattern = RegExp(r'^[0-9a-f]{64}$');
@@ -182,6 +183,36 @@ class GirlsShopApi {
       sha256: sha256,
       expiresIn: _positiveInt(payload, 'expires_in'),
     );
+  }
+
+  Future<HostedGroupApp> addToGroup({
+    required String accessToken,
+    required GirlsShopApp app,
+    required String groupId,
+  }) async {
+    if (!_hexIdPattern.hasMatch(groupId)) {
+      throw ArgumentError.value(
+        groupId,
+        'groupId',
+        'must be a lowercase 32-character hex id',
+      );
+    }
+    final Map<String, Object?> payload = await _jsonRequest(
+      method: 'POST',
+      path: '/shop/apps/${app.appId}/add',
+      accessToken: accessToken,
+      body: <String, Object?>{
+        'version': app.version,
+        'group_id': groupId,
+      },
+    );
+    final HostedGroupApp added = HostedGroupApp.fromJson(payload);
+    if (added.groupId != groupId || added.title != app.title) {
+      throw const FormatException(
+        'Girls shop add response does not match the requested group or title.',
+      );
+    }
+    return added;
   }
 
   Future<void> report({
