@@ -40,9 +40,6 @@ HOSTED_CONTENT_TTL_GRACE_SECONDS = 24 * 60 * 60
 logger = logging.getLogger(__name__)
 
 _ZIP_READ_CACHE_MAX_ENTRIES = 8
-_ZIP_READ_CACHE: OrderedDict[
-    tuple[str, str, str], tuple[bytes, tuple[str, ...], str]
-] = OrderedDict()
 
 BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = {
     "memo": {
@@ -980,11 +977,18 @@ class HostedCatalogBackend(HostedPlatformBackend):
         expected_sha256: str | None = None,
     ) -> tuple[bytes, list[str], str]:
         cache_key: tuple[str, str, str] | None = None
+        cache: OrderedDict[
+            tuple[str, str, str], tuple[bytes, tuple[str, ...], str]
+        ] | None = None
         if expected_sha256 is not None:
             cache_key = (bucket, key, expected_sha256)
-            cached = _ZIP_READ_CACHE.get(cache_key)
+            cache = getattr(self, "_zip_read_cache", None)
+            if cache is None:
+                cache = OrderedDict()
+                self._zip_read_cache = cache
+            cached = cache.get(cache_key)
             if cached is not None:
-                _ZIP_READ_CACHE.move_to_end(cache_key)
+                cache.move_to_end(cache_key)
                 data, cached_files, sha256 = cached
                 return data, list(cached_files), sha256
 
@@ -1000,11 +1004,11 @@ class HostedCatalogBackend(HostedPlatformBackend):
         if expected_sha256 is not None and sha256 != expected_sha256:
             raise RuntimeError("S3 ZIP checksum does not match DynamoDB metadata")
 
-        if cache_key is not None:
-            _ZIP_READ_CACHE[cache_key] = (data, tuple(files), sha256)
-            _ZIP_READ_CACHE.move_to_end(cache_key)
-            while len(_ZIP_READ_CACHE) > _ZIP_READ_CACHE_MAX_ENTRIES:
-                _ZIP_READ_CACHE.popitem(last=False)
+        if cache_key is not None and cache is not None:
+            cache[cache_key] = (data, tuple(files), sha256)
+            cache.move_to_end(cache_key)
+            while len(cache) > _ZIP_READ_CACHE_MAX_ENTRIES:
+                cache.popitem(last=False)
 
         return data, files, sha256
 
