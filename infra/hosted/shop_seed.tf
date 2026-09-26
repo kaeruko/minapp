@@ -1,7 +1,6 @@
 locals {
-  # Girls built-ins are intentionally limited to memo (planned), karaoke,
-  # novel and minappchi. Existing sample apps outside that set live in Shop.
-  # Stable synthetic identities keep official Shop works on the same canonical
+  # Selected Girls built-ins can also be listed in Shop when discoverability
+  # there is useful. Stable synthetic identities keep official Shop works on the same canonical
   # app/listing path as user-published works without creating a login-capable
   # Cognito account or attaching the work to a user's group.
   official_shop_owner_user_id = "4fdc521e5f2642e1afe420ec9f5a931e"
@@ -14,6 +13,7 @@ locals {
       version    = 1
       source_dir = "${local.minapp_apps_source_root}/shiba_donguri"
       files      = ["index.html"]
+      published_at = "2026-09-13T00:00:00Z"
     }
     shiba-goshujin = {
       app_id     = "478cbf2dbf804d65b433468e632f0a17"
@@ -21,6 +21,7 @@ locals {
       version    = 1
       source_dir = "${local.minapp_apps_source_root}/shiba_goshujin"
       files      = ["index.html"]
+      published_at = "2026-09-13T00:00:00Z"
     }
     shopping-town = {
       app_id     = "29f96117bb7148289e07e759226cfd1a"
@@ -28,13 +29,23 @@ locals {
       version    = 1
       source_dir = "${local.minapp_apps_source_root}/shopping_town"
       files      = ["index.html", "rules.js"]
+      published_at = "2026-09-13T00:00:00Z"
     }
     ol-home = {
-      app_id     = "9b3cd1527777483d8177b6792e7783be"
-      title      = "OLさん おうちにかえる"
-      version    = 1
-      source_dir = "${local.minapp_apps_source_root}/ol_home"
-      files      = ["effects.js", "index.html"]
+      app_id       = "9b3cd1527777483d8177b6792e7783be"
+      title        = "OLさん おうちにかえる"
+      version      = 1
+      source_dir   = "${local.minapp_apps_source_root}/ol_home"
+      files        = ["effects.js", "index.html"]
+      published_at = "2026-09-13T00:00:00Z"
+    }
+    sing-along = {
+      app_id       = "9571adacf55c47b4ac772cd48621a08b"
+      title        = "うたってみよう"
+      version      = 1
+      source_dir   = "${local.minapp_apps_source_root}/sing_along"
+      files        = ["index.html"]
+      published_at = "2026-09-26T00:00:00Z"
     }
   }
 }
@@ -56,7 +67,7 @@ locals {
         version      = 1
         source       = "${local.minapp_apps_source_root}/minapp_drawing.zip"
         files        = ["index.html"]
-        published_at = "2026-09-13T00:00:00Z"
+        published_at = app.published_at
       }
     },
     {
@@ -161,10 +172,11 @@ resource "aws_dynamodb_table_item" "official_shop_listing" {
   depends_on = [aws_dynamodb_table_item.official_shop_app]
 }
 
-# Girls built-ins are not duplicated into Shop:
+# Girls built-ins that are not duplicated into Shop:
 # - memo: planned, not implemented yet
-# - sing-along: karaoke
 # - novel-starter: novel
 # - minappchi: minappchi
+# sing-along is intentionally also listed in Shop so users can discover and
+# launch the official karaoke app there.
 # novel_editor is an authoring tool that requires minapp.authoring and is not a
 # standalone Runtime work, so it is not a Shop listing either.
