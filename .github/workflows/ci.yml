@@ -116,7 +116,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: kaeruko/minapp_apps
-          ref: bb3392bf02106f760d31e7d287b8c411a1967359
+          ref: 578169152a05de38bc860f56c3ef42516ac6c262
           path: external/minapp_apps
       - uses: hashicorp/setup-terraform@v4
         with:
