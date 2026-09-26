@@ -207,9 +207,12 @@ class GirlsShopApi {
       },
     );
     final HostedGroupApp added = HostedGroupApp.fromJson(payload);
-    if (added.groupId != groupId || added.title != app.title) {
+    if (added.groupId != groupId ||
+        added.title != app.title ||
+        added.sourceKind != 'upload' ||
+        !added.editable) {
       throw const FormatException(
-        'Girls shop add response does not match the requested group or title.',
+        'Girls shop add response does not match the requested editable group app.',
       );
     }
     return added;
