@@ -212,7 +212,7 @@ void main() {
   });
 
   testWidgets(
-      'saving source returns to app detail and reloads the saved revision',
+      'saving source stays in editor and reloads detail after leaving',
       (tester) async {
     int revision = 1;
     int detailLoads = 0;
@@ -255,12 +255,18 @@ void main() {
     await tester.tap(save);
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('girls-source-editor-code')), findsOneWidget);
+    expect(find.text('アプリ詳細'), findsNothing);
+    expect(detailLoads, 1);
+    expect(revision, 2);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
     expect(find.text('アプリ詳細'), findsOneWidget);
     expect(find.byKey(const Key('girls-source-editor-code')), findsNothing);
     expect(find.byKey(const Key('girls-app-publish-update')), findsOneWidget);
-    expect(find.text('コードを保存しました。編集版を更新しました。'), findsOneWidget);
     expect(detailLoads, 2);
-    expect(revision, 2);
     expect(tester.takeException(), isNull);
   });
 
