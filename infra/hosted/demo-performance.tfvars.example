@@ -1,0 +1,8 @@
+# Temporary performance profile for live demos.
+# Apply this in addition to the normal terraform.tfvars, then run a normal
+# terraform apply without this file after the demo to return to defaults.
+
+hosted_identity_memory_size       = 2048
+hosted_provisioned_concurrency    = 5
+auth_api_memory_size              = 1024
+auth_api_provisioned_concurrency  = 2

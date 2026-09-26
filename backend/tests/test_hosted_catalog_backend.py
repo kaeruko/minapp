@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import sys
 import unittest
@@ -30,6 +31,7 @@ class FakeS3:
     def __init__(self) -> None:
         self.objects: dict[tuple[str, str], bytes] = {}
         self.version_counter = 0
+        self.get_calls = 0
 
     def put_object(self, **request: Any) -> dict[str, Any]:
         key = (request["Bucket"], request["Key"])
@@ -43,6 +45,7 @@ class FakeS3:
         return {"VersionId": f"version-{self.version_counter}"}
 
     def get_object(self, *, Bucket: str, Key: str) -> dict[str, Any]:
+        self.get_calls += 1
         data = self.objects.get((Bucket, Key))
         if data is None:
             raise FakeAwsError("NoSuchKey")
@@ -120,6 +123,26 @@ class HostedCatalogBackendTests(unittest.TestCase):
         )
         self.assertTrue(all(item["version"] == 1 for item in builtins))
         self.assertTrue(all("source_key" not in item for item in builtins))
+
+    def test_verified_zip_reads_reuse_warm_backend_cache(self) -> None:
+        key = "hosted/drafts/group/app/revisions/1/source.zip"
+        data = source_zip("<h1>cached</h1>", **{"assets/app.js": "ok"})
+        sha256 = hashlib.sha256(data).hexdigest()
+        self.s3.objects[("uploads", key)] = data
+
+        first = self.backend._read_zip_object(
+            bucket="uploads",
+            key=key,
+            expected_sha256=sha256,
+        )
+        second = self.backend._read_zip_object(
+            bucket="uploads",
+            key=key,
+            expected_sha256=sha256,
+        )
+
+        self.assertEqual(first, second)
+        self.assertEqual(self.s3.get_calls, 1)
 
     def test_owner_can_install_fork_list_and_delete_builtin(self) -> None:
         alice = self._register("alice")

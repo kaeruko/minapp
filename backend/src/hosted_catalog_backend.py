@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 import hashlib
 import io
 import json
@@ -37,6 +38,8 @@ HOSTED_CONTENT_SESSION_SECONDS = 10 * 60
 HOSTED_CONTENT_TTL_GRACE_SECONDS = 24 * 60 * 60
 
 logger = logging.getLogger(__name__)
+
+_ZIP_READ_CACHE_MAX_ENTRIES = 8
 
 BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = {
     "memo": {
@@ -973,6 +976,22 @@ class HostedCatalogBackend(HostedPlatformBackend):
         key: str,
         expected_sha256: str | None = None,
     ) -> tuple[bytes, list[str], str]:
+        cache_key: tuple[str, str, str] | None = None
+        cache: OrderedDict[
+            tuple[str, str, str], tuple[bytes, tuple[str, ...], str]
+        ] | None = None
+        if expected_sha256 is not None:
+            cache_key = (bucket, key, expected_sha256)
+            cache = getattr(self, "_zip_read_cache", None)
+            if cache is None:
+                cache = OrderedDict()
+                self._zip_read_cache = cache
+            cached = cache.get(cache_key)
+            if cached is not None:
+                cache.move_to_end(cache_key)
+                data, cached_files, sha256 = cached
+                return data, list(cached_files), sha256
+
         response = self._s3.get_object(Bucket=bucket, Key=key)
         body = response.get("Body")
         if body is None or not hasattr(body, "read"):
@@ -984,6 +1003,13 @@ class HostedCatalogBackend(HostedPlatformBackend):
         sha256 = hashlib.sha256(data).hexdigest()
         if expected_sha256 is not None and sha256 != expected_sha256:
             raise RuntimeError("S3 ZIP checksum does not match DynamoDB metadata")
+
+        if cache_key is not None and cache is not None:
+            cache[cache_key] = (data, tuple(files), sha256)
+            cache.move_to_end(cache_key)
+            while len(cache) > _ZIP_READ_CACHE_MAX_ENTRIES:
+                cache.popitem(last=False)
+
         return data, files, sha256
 
     def _put_immutable_zip(

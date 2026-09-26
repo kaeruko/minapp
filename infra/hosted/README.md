@@ -198,6 +198,36 @@ DELETE /hosted/runtime/{token}/state/{key}                 scoped runtime token
 
 Login continues to use the existing `POST /auth/login` endpoint on the same Hosted API Gateway. Hosted clients call `/hosted/me` rather than the dedicated-school `/me` endpoint after login.
 
+## Demo performance mode
+
+For a live demonstration, MinApp can temporarily trade AWS cost for lower latency without changing the normal production defaults.
+
+Copy the example performance profile and apply it together with the normal `terraform.tfvars`:
+
+```powershell
+Copy-Item infra\hosted\demo-performance.tfvars.example infra\hosted\demo-performance.tfvars
+
+terraform -chdir=infra/hosted plan `
+  -var-file=demo-performance.tfvars `
+  -out=tfplan-demo
+
+terraform -chdir=infra/hosted apply tfplan-demo
+```
+
+The demo profile raises the Hosted Lambda to 2048 MiB with five provisioned environments and the login/refresh Lambda to 1024 MiB with two provisioned environments. The normal defaults remain 1024 MiB / zero provisioned environments for Hosted and 128 MiB / zero provisioned environments for auth.
+
+After the demonstration, run the ordinary reviewed plan/apply without `demo-performance.tfvars`. That explicitly returns provisioned concurrency to zero and restores the default memory sizes.
+
+The Girls mobile demo build can also skip the Google Drive endpoint lookup:
+
+```powershell
+flutter run -t lib/main_girls.dart `
+  --dart-define=MINAPP_DEMO_FAST=true `
+  --dart-define=MINAPP_HOSTED_BASE_URI=https://YOUR_CURRENT_HOSTED_API_BASE
+```
+
+`MINAPP_DEMO_FAST=true` is fail-fast: if `MINAPP_HOSTED_BASE_URI` is absent, malformed, or not an allowed public HTTPS base URI, startup stops instead of silently falling back to Google Drive.
+
 ## Deploy safety
 
 The stack requires `expected_account_id`. Terraform fails before creating resources when the active AWS credentials point at a different account.

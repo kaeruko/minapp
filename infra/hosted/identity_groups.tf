@@ -175,7 +175,7 @@ resource "aws_lambda_function" "hosted_identity_api" {
   filename         = var.hosted_identity_package_path != null ? var.hosted_identity_package_path : data.archive_file.api.output_path
   source_code_hash = var.hosted_identity_package_path != null ? filebase64sha256(var.hosted_identity_package_path) : data.archive_file.api.output_base64sha256
 
-  memory_size = 1024
+  memory_size = var.hosted_identity_memory_size
   timeout     = 10
   publish     = true
 
