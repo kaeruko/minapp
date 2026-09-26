@@ -256,6 +256,8 @@ class _GirlsGroupAppManagementPageState
 
   Future<void> _editSource() async {
     final HostedGroupApp app = _requireEditableApp();
+    final int startingRevision = app.sourceRevision!;
+    int latestRevision = startingRevision;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) => GirlsAppSourceEditorPage(
@@ -264,11 +266,16 @@ class _GirlsGroupAppManagementPageState
           groupId: widget.group.groupId,
           appId: app.appId,
           title: app.title,
-          expectedRevision: app.sourceRevision!,
-          onSaved: (int _) => _load(),
+          expectedRevision: startingRevision,
+          onSaved: (int revision) async {
+            latestRevision = revision;
+          },
         ),
       ),
     );
+    if (mounted && latestRevision != startingRevision) {
+      await _load();
+    }
   }
 
   Future<void> _publish() async {
