@@ -159,7 +159,7 @@ def _handle_shop_request(event: dict[str, Any]) -> dict[str, Any] | None:
             )
         if action == "add":
             _require_fields(payload, required={"version", "group_id"})
-            group_id = _required_string(payload, "group_id", min_length=32, max_length=32)
+            group_id = _required_string(payload, "group_id", min_length=1, max_length=64)
             if re.fullmatch(r"[0-9a-f]{32}", group_id) is None:
                 raise ApiProblem(
                     400,
