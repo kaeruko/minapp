@@ -88,7 +88,6 @@ resource "aws_lambda_permission" "hosted_identity_live_gateway" {
   source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
 }
 
-
 resource "aws_lambda_alias" "auth_api_live" {
   name             = "live-auth"
   description      = "Published auth API used by login and refresh routes"
