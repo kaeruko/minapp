@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../hosted_app_webview.dart';
@@ -18,11 +17,13 @@ class GirlsShopPage extends StatefulWidget {
   const GirlsShopPage({
     required this.api,
     required this.session,
+    required this.currentGroup,
     super.key,
   });
 
   final HostedGirlsApi api;
   final AuthenticatedSession session;
+  final HostedGroup? currentGroup;
 
   @override
   State<GirlsShopPage> createState() => _GirlsShopPageState();
@@ -184,6 +185,7 @@ class _GirlsShopPageState extends State<GirlsShopPage> {
                           shopApi: _shopApi,
                           session: widget.session,
                           app: app,
+                          currentGroup: widget.currentGroup,
                           onHideCreator: _hideCreator,
                         ),
                       ),
@@ -274,6 +276,7 @@ class GirlsShopDetailPage extends StatefulWidget {
     required this.shopApi,
     required this.session,
     required this.app,
+    required this.currentGroup,
     required this.onHideCreator,
     super.key,
   });
@@ -282,6 +285,7 @@ class GirlsShopDetailPage extends StatefulWidget {
   final GirlsShopApi shopApi;
   final AuthenticatedSession session;
   final GirlsShopApp app;
+  final HostedGroup? currentGroup;
   final Future<void> Function(GirlsShopApp app) onHideCreator;
 
   @override
@@ -325,19 +329,22 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
         );
       });
 
-  Future<void> _download() => _run(() async {
-        final GirlsShopDownloadGrant grant =
-            await widget.shopApi.createDownload(
+  Future<void> _addToGroup() => _run(() async {
+        final HostedGroup? group = widget.currentGroup;
+        if (group == null) {
+          throw StateError('追加先のグループが選ばれていません。');
+        }
+        await widget.shopApi.addToGroup(
           accessToken: widget.session.accessToken,
           app: widget.app,
+          groupId: group.groupId,
         );
-        final bool opened = await launchUrl(
-          grant.url,
-          mode: LaunchMode.externalApplication,
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('「${widget.app.title}」を「${group.name}」に追加したよ'),
+          ),
         );
-        if (!opened) {
-          throw StateError('ZIP download URL could not be opened.');
-        }
       });
 
   Future<void> _report() async {
@@ -451,13 +458,18 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
               padding: const EdgeInsets.symmetric(vertical: 15),
             ),
             icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('あそんでみる♡'),
+            label: const Text('あそんでみる'),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
-            onPressed: _busy ? null : _download,
-            icon: const Icon(Icons.archive_outlined),
-            label: const Text('ZIPをもらう'),
+            onPressed:
+                _busy || widget.currentGroup == null ? null : _addToGroup,
+            icon: const Icon(Icons.add_to_photos_rounded),
+            label: Text(
+              widget.currentGroup == null
+                  ? '追加するグループを選んでね'
+                  : '「${widget.currentGroup!.name}」に追加',
+            ),
           ),
           const SizedBox(height: 18),
           TextButton.icon(

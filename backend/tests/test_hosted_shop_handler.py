@@ -17,6 +17,7 @@ from hosted_girls_shop_backend import HostedGirlsShopBackend  # noqa: E402
 from hosted_user_state_backend import HostedUserStateBackend  # noqa: E402
 
 APP_ID = "a" * 32
+GROUP_ID = "b" * 32
 USER_ID = "c" * 32
 
 
@@ -63,6 +64,25 @@ class FakeBackend(HostedGirlsShopBackend):
             "filename": f"{app_id}.zip",
             "sha256": "d" * 64,
             "expires_in": 600,
+        }
+
+    def add_shop_app_to_group(
+        self,
+        auth_subject: str,
+        app_id: str,
+        version: str,
+        group_id: str,
+    ) -> dict[str, Any]:
+        self.calls.append(("add", auth_subject, app_id, version, group_id))
+        return {
+            "app_id": "e" * 32,
+            "group_id": group_id,
+            "title": "放課後ねこ",
+            "source_kind": "upload",
+            "created_at": "2026-09-27T00:00:00Z",
+            "owner_user_id": USER_ID,
+            "editable": True,
+            "source_revision": 1,
         }
 
     def create_shop_report(
@@ -183,6 +203,36 @@ class HostedShopHandlerTests(unittest.TestCase):
         )
         self.assertEqual(response["statusCode"], 400)
         self.assertEqual(json.loads(response["body"])["error"], "invalid_shop_version")
+        self.assertEqual(self.backend.calls, [])
+
+    def test_add_copies_shop_app_into_selected_group(self) -> None:
+        response = hosted_shop_handler.lambda_handler(
+            _event(
+                "POST",
+                f"/shop/apps/{APP_ID}/add",
+                body={"version": "3", "group_id": GROUP_ID},
+            ),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 200)
+        payload = json.loads(response["body"])
+        self.assertEqual(payload["group_id"], GROUP_ID)
+        self.assertEqual(
+            self.backend.calls,
+            [("add", "girls-user-subject", APP_ID, "3", GROUP_ID)],
+        )
+
+    def test_add_rejects_invalid_group_id_before_backend_call(self) -> None:
+        response = hosted_shop_handler.lambda_handler(
+            _event(
+                "POST",
+                f"/shop/apps/{APP_ID}/add",
+                body={"version": "3", "group_id": "not-a-group"},
+            ),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 400)
+        self.assertEqual(json.loads(response["body"])["error"], "invalid_group_id")
         self.assertEqual(self.backend.calls, [])
 
     def test_visibility_has_no_group_id_in_route(self) -> None:

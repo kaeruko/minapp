@@ -173,6 +173,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
           GirlsFooterTab.shop => GirlsShopPage(
               api: widget.api,
               session: widget.session,
+              currentGroup: _currentGroup,
             ),
           GirlsFooterTab.apps => GirlsAppsPage(
               cache: _appsCache,

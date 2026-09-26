@@ -49,6 +49,7 @@ locals {
     "GET /shop/apps",
     "POST /shop/apps/{app_id}/launch",
     "POST /shop/apps/{app_id}/download",
+    "POST /shop/apps/{app_id}/add",
     "POST /shop/apps/{app_id}/reports",
     "PUT /apps/{app_id}/shop-visibility",
   ])
