@@ -90,7 +90,7 @@ def _content_response(data: bytes, content_type: str) -> dict[str, Any]:
                 "script-src 'self' 'unsafe-inline'; "
                 "style-src 'self' 'unsafe-inline'; "
                 "img-src 'self' data: blob:; "
-                "media-src 'self'; font-src 'self' data:; "
+                "media-src 'self' data: blob:; font-src 'self' data:; "
                 "connect-src 'none'; object-src 'none'; base-uri 'none'; "
                 "form-action 'none'; frame-src 'none'"
             ),
