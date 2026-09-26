@@ -188,8 +188,9 @@
     let mediaStream = null;
     let recorder = null;
     let recordedBlob = null;
-    let recordedUrl = null;
-    let recordedAudio = null;
+    let recordedBuffer = null;
+    let recordedMimeType = null;
+    let voiceSource = null;
     let timerId = null;
     let startedAt = 0;
 
@@ -206,6 +207,63 @@
       statusBox.textContent = message;
     }
 
+    function requireRecordedMimeType(chunks) {
+      if (!recorder) throw new Error('録音処理が初期化されていません。');
+      const recorderType = typeof recorder.mimeType === 'string' ? recorder.mimeType.trim() : '';
+      const chunkTypes = [...new Set(
+        chunks
+          .map((chunk) => (typeof chunk.type === 'string' ? chunk.type.trim() : ''))
+          .filter((type) => type.length > 0),
+      )];
+      if (chunkTypes.length > 1) {
+        throw new Error(`録音データの形式が途中で変わりました: ${chunkTypes.join(', ')}`);
+      }
+      const chunkType = chunkTypes[0] || '';
+      if (recorderType && chunkType && recorderType.toLowerCase() !== chunkType.toLowerCase()) {
+        throw new Error(`MediaRecorderと録音データの形式が一致しません: recorder=${recorderType}, chunk=${chunkType}`);
+      }
+      const mimeType = recorderType || chunkType;
+      if (!mimeType) {
+        throw new Error('録音データのMIME typeを特定できませんでした。');
+      }
+      return mimeType;
+    }
+
+    function playbackDiagnostics() {
+      return [
+        `mime=${recordedMimeType || 'unknown'}`,
+        `blobBytes=${recordedBlob ? recordedBlob.size : 0}`,
+        `decoded=${recordedBuffer ? 'yes' : 'no'}`,
+        `duration=${recordedBuffer ? recordedBuffer.duration.toFixed(3) : 'unknown'}`,
+        `audioContext=${audioContext ? audioContext.state : 'missing'}`,
+      ].join(', ');
+    }
+
+    function playbackFailure(stage, error) {
+      const original = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      return new Error(`${stage}に失敗しました。${playbackDiagnostics()} / 元のエラー: ${original}`);
+    }
+
+    async function decodeRecordedBlob(blob) {
+      if (!(blob instanceof Blob)) throw new TypeError('録音データがBlobではありません。');
+      if (blob.size <= 0) throw new Error('録音データが空です。');
+
+      const context = await ensureAudioContext();
+      const encoded = await blob.arrayBuffer();
+      if (encoded.byteLength <= 0) throw new Error('録音データをArrayBufferとして読み出せませんでした。');
+
+      try {
+        const decoded = await context.decodeAudioData(encoded);
+        if (!Number.isFinite(decoded.duration) || decoded.duration <= 0) {
+          throw new Error(`デコード後の録音時間が不正です: ${decoded.duration}`);
+        }
+        return decoded;
+      } catch (error) {
+        const original = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        throw new Error(`録音データのデコードに失敗しました。mime=${recordedMimeType || 'unknown'}, bytes=${blob.size} / 元のエラー: ${original}`);
+      }
+    }
+
     function requireCapabilities() {
       if (!window.AudioContext && !window.webkitAudioContext) throw new Error('この端末ではBGM再生機能を使えません。');
       if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') throw new Error('この端末ではマイク録音機能を使えません。');
@@ -219,7 +277,7 @@
     }
 
     function setMode(next) {
-      const busy = next === 'preview' || next === 'recording' || next === 'playback';
+      const busy = next === 'preview' || next === 'recording' || next === 'processing' || next === 'playback';
       trackSelect.disabled = busy || next === 'error';
       previewButton.disabled = busy || next === 'error';
       recordButton.disabled = busy || next === 'error';
@@ -280,11 +338,14 @@
       bgmNodes.push(oscillator, gain);
     }
 
-    async function startBgm() {
+    async function startBgm(scheduledStart = null) {
       const context = await ensureAudioContext();
       const track = currentTrack();
       const beat = 60 / track.bpm;
-      const start = context.currentTime + 0.05;
+      const start = scheduledStart === null ? context.currentTime + 0.05 : scheduledStart;
+      if (!Number.isFinite(start) || start < context.currentTime) {
+        throw new Error(`BGM start time is invalid: start=${start}, current=${context.currentTime}`);
+      }
       const totalBeats = Math.ceil(MAX_SECONDS / beat) + 4;
 
       stopBgm();
@@ -301,6 +362,7 @@
           scheduleTone(context, context.destination, midiToHz(84), when, 0.035, 0.018, 'square');
         }
       }
+      return start;
     }
 
     async function openMicrophone() {
@@ -332,9 +394,11 @@
     function stopEverything() {
       stopTimer();
       stopBgm();
-      if (recordedAudio) {
-        recordedAudio.pause();
-        recordedAudio.currentTime = 0;
+      if (voiceSource) {
+        const source = voiceSource;
+        voiceSource = null;
+        try { source.stop(); } catch (_) {}
+        try { source.disconnect(); } catch (_) {}
       }
       if (recorder && recorder.state === 'recording') recorder.stop();
       stopStream();
@@ -361,18 +425,22 @@
         recorder.addEventListener('dataavailable', (event) => {
           if (event.data && event.data.size > 0) chunks.push(event.data);
         });
-        recorder.addEventListener('stop', () => {
-          if (chunks.length === 0) {
-            fail(new Error('録音データが空でした。'));
-            return;
+        recorder.addEventListener('stop', async () => {
+          try {
+            if (chunks.length === 0) throw new Error('録音データが空でした。');
+            recordedMimeType = requireRecordedMimeType(chunks);
+            recordedBlob = new Blob(chunks, { type: recordedMimeType });
+            if (!recordedBlob.type) throw new Error('録音BlobのMIME typeが空です。');
+            if (recordedBlob.type.toLowerCase() !== recordedMimeType.toLowerCase()) {
+              throw new Error(`録音Blobの形式が変化しました: expected=${recordedMimeType}, actual=${recordedBlob.type}`);
+            }
+            stopStream();
+            recordedBuffer = await decodeRecordedBlob(recordedBlob);
+            setMode('idle');
+            setStatus(`録音できたよ！形式: ${recordedMimeType} / ${recordedBlob.size} bytes / ${recordedBuffer.duration.toFixed(1)}秒。「BGM＋うた」で聞いてみよう。`);
+          } catch (error) {
+            fail(error);
           }
-          recordedBlob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-          if (recordedUrl) URL.revokeObjectURL(recordedUrl);
-          recordedUrl = URL.createObjectURL(recordedBlob);
-          recordedAudio = new Audio(recordedUrl);
-          stopStream();
-          setMode('idle');
-          setStatus('録音できたよ！「BGM＋うた」で聞いてみよう。');
         }, { once: true });
         recorder.start();
         setMode('recording');
@@ -385,15 +453,39 @@
 
     async function playRecording() {
       try {
-        if (!recordedAudio || !recordedBlob) throw new Error('録音データがありません。');
-        recordedAudio.currentTime = 0;
+        if (!recordedBlob || !recordedBuffer || !recordedMimeType) {
+          throw new Error('再生可能な録音データがありません。');
+        }
+        if (voiceSource) throw new Error('録音音声はすでに再生中です。');
+
+        const context = await ensureAudioContext();
+        const source = context.createBufferSource();
+        source.buffer = recordedBuffer;
+        source.connect(context.destination);
+        const startAt = context.currentTime + 0.20;
+
         setMode('playback');
         timer.textContent = '00:00';
-        await startBgm();
-        await recordedAudio.play();
+        voiceSource = source;
+        source.addEventListener('ended', () => {
+          if (voiceSource !== source) return;
+          voiceSource = null;
+          stopByUser();
+        }, { once: true });
+
+        try {
+          await startBgm(startAt);
+        } catch (error) {
+          throw playbackFailure('BGMの再生', error);
+        }
+        try {
+          source.start(startAt);
+        } catch (error) {
+          throw playbackFailure('録音音声の再生', error);
+        }
+
         beginTimer(stopByUser);
-        recordedAudio.addEventListener('ended', stopByUser, { once: true });
-        setStatus('BGMといっしょに再生中です。');
+        setStatus(`BGMといっしょに再生中です。形式: ${recordedMimeType}`);
       } catch (error) { fail(error); }
     }
 
@@ -401,12 +493,15 @@
       const wasRecording = recorder && recorder.state === 'recording';
       stopTimer();
       stopBgm();
-      if (recordedAudio) {
-        recordedAudio.pause();
-        recordedAudio.currentTime = 0;
+      if (voiceSource) {
+        const source = voiceSource;
+        voiceSource = null;
+        try { source.stop(); } catch (_) {}
+        try { source.disconnect(); } catch (_) {}
       }
       if (wasRecording) {
         recorder.stop();
+        setMode('processing');
         setStatus('録音を保存しています…');
         return;
       }
@@ -418,10 +513,9 @@
     function deleteRecording() {
       if (!recordedBlob) throw new Error('削除する録音がありません。');
       stopEverything();
-      if (recordedUrl) URL.revokeObjectURL(recordedUrl);
       recordedBlob = null;
-      recordedUrl = null;
-      recordedAudio = null;
+      recordedBuffer = null;
+      recordedMimeType = null;
       recorder = null;
       timer.textContent = '00:00';
       setMode('idle');
