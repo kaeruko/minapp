@@ -1,6 +1,7 @@
 locals {
   # Selected Girls built-ins can also be listed in Shop when discoverability
-  # there is useful. Stable synthetic identities keep official Shop works on the same canonical
+  # there is useful. Stable synthetic identities keep official Shop works on
+  # the same canonical
   # app/listing path as user-published works without creating a login-capable
   # Cognito account or attaching the work to a user's group.
   official_shop_owner_user_id = "4fdc521e5f2642e1afe420ec9f5a931e"
@@ -8,27 +9,27 @@ locals {
 
   official_shop_directory_sources = {
     shiba-game = {
-      app_id     = "bc54fcb0fdca499ebcab0c4de81776a3"
-      title      = "しば犬どんぐりキャッチ"
-      version    = 1
-      source_dir = "${local.minapp_apps_source_root}/shiba_donguri"
-      files      = ["index.html"]
+      app_id       = "bc54fcb0fdca499ebcab0c4de81776a3"
+      title        = "しば犬どんぐりキャッチ"
+      version      = 1
+      source_dir   = "${local.minapp_apps_source_root}/shiba_donguri"
+      files        = ["index.html"]
       published_at = "2026-09-13T00:00:00Z"
     }
     shiba-goshujin = {
-      app_id     = "478cbf2dbf804d65b433468e632f0a17"
-      title      = "ごしゅじんどこわん"
-      version    = 1
-      source_dir = "${local.minapp_apps_source_root}/shiba_goshujin"
-      files      = ["index.html"]
+      app_id       = "478cbf2dbf804d65b433468e632f0a17"
+      title        = "ごしゅじんどこわん"
+      version      = 1
+      source_dir   = "${local.minapp_apps_source_root}/shiba_goshujin"
+      files        = ["index.html"]
       published_at = "2026-09-13T00:00:00Z"
     }
     shopping-town = {
-      app_id     = "29f96117bb7148289e07e759226cfd1a"
-      title      = "おかいもの いくわよ"
-      version    = 1
-      source_dir = "${local.minapp_apps_source_root}/shopping_town"
-      files      = ["index.html", "rules.js"]
+      app_id       = "29f96117bb7148289e07e759226cfd1a"
+      title        = "おかいもの いくわよ"
+      version      = 1
+      source_dir   = "${local.minapp_apps_source_root}/shopping_town"
+      files        = ["index.html", "rules.js"]
       published_at = "2026-09-13T00:00:00Z"
     }
     ol-home = {
@@ -67,7 +68,7 @@ locals {
         version      = 1
         source       = "${local.minapp_apps_source_root}/minapp_drawing.zip"
         files        = ["index.html"]
-        published_at = app.published_at
+        published_at = "2026-09-13T00:00:00Z"
       }
     },
     {
@@ -77,7 +78,7 @@ locals {
         version      = app.version
         source       = data.archive_file.official_shop_directory_source[key].output_path
         files        = app.files
-        published_at = "2026-09-13T00:00:00Z"
+        published_at = app.published_at
       }
     }
   )
