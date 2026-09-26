@@ -349,8 +349,9 @@ resource "aws_lambda_function" "api" {
   filename         = data.archive_file.api.output_path
   source_code_hash = data.archive_file.api.output_base64sha256
 
-  memory_size = 128
+  memory_size = var.auth_api_memory_size
   timeout     = 10
+  publish     = true
 
   environment {
     variables = {
@@ -421,7 +422,7 @@ resource "aws_apigatewayv2_route" "health" {
 resource "aws_apigatewayv2_route" "auth_login" {
   api_id    = aws_apigatewayv2_api.api.id
   route_key = "POST /auth/login"
-  target    = "integrations/${aws_apigatewayv2_integration.api.id}"
+  target    = "integrations/${aws_apigatewayv2_integration.auth_api_live.id}"
 }
 
 resource "aws_apigatewayv2_route" "auth_change_password" {
