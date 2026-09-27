@@ -129,7 +129,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
     final ManagedGirlsApp app = widget.detail.summary;
     if (app.sourceRevision == null) return;
     await _openSession(
-      create: () => _previewApi.createDraftPreview(
+      create: () => _previewApi.createGroupDraftPreview(
         accessToken: widget.session.accessToken,
         groupId: app.app.groupId,
         appId: app.app.appId,
@@ -187,7 +187,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
               groupId: widget.detail.summary.app.groupId,
               appId: widget.detail.summary.app.appId,
               runtimeToken: launch.runtimeToken,
-              groupScope: false,
+              groupScope: true,
             )
           : widget.api.runtimeClient;
       setState(() => _busy = false);
