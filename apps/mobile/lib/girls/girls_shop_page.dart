@@ -15,8 +15,19 @@ const Color _lavender = Color(0xFF745B9E);
 const Color _pink = Color(0xFFE987A8);
 const Color _cream = Color(0xFFFFFAF0);
 const String _singAlongShopAppId = '9571adacf55c47b4ac772cd48621a08b';
+const String _drawingShopAppId = 'ecb3cb6a08e05305668a952cbdae435b';
 const String _singAlongCardAsset =
     'assets/girls/cutouts/minapp_cards_480/sing_along_card.png';
+const String _drawingCardAsset =
+    'assets/girls/cutouts/minapp_cards_480/drawing_card.png';
+
+String? _shopArtworkAsset(GirlsShopApp app) {
+  return switch (app.appId) {
+    _singAlongShopAppId => _singAlongCardAsset,
+    _drawingShopAppId => _drawingCardAsset,
+    _ => null,
+  };
+}
 
 class GirlsShopPage extends StatefulWidget {
   const GirlsShopPage({
@@ -646,7 +657,7 @@ class _GirlsShopArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isSingAlong = app.appId == _singAlongShopAppId;
+    final String? assetPath = _shopArtworkAsset(app);
     return Container(
       width: size,
       height: size,
@@ -659,16 +670,16 @@ class _GirlsShopArtwork extends StatelessWidget {
           width: borderWidth,
         ),
       ),
-      child: isSingAlong
-          ? Image.asset(
-              _singAlongCardAsset,
-              fit: BoxFit.cover,
-              semanticLabel: 'うたってみよう',
-            )
-          : Icon(
+      child: assetPath == null
+          ? Icon(
               Icons.auto_awesome_rounded,
               color: _lavender,
               size: iconSize,
+            )
+          : Image.asset(
+              assetPath,
+              fit: BoxFit.cover,
+              semanticLabel: app.title,
             ),
     );
   }
