@@ -539,10 +539,13 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
   @override
   Widget build(BuildContext context) {
     final GirlsShopApp app = widget.app;
+    final bool embedded = GirlsScaffoldChromeScope.isEmbedded(context);
+    final Color pageBackground = embedded ? Colors.transparent : _cream;
     return Scaffold(
-      backgroundColor: _cream,
+      backgroundColor: pageBackground,
       appBar: AppBar(
-        backgroundColor: _cream,
+        backgroundColor: pageBackground,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: _ink,
         title: const Text(
           'ショップ♡',
