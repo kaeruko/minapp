@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'api.dart';
+import 'girls_apps_page.dart';
 import 'girls_errors.dart';
-import 'girls_group_app_management_page.dart';
 import 'girls_scaffold.dart';
 import 'hosted_app_webview.dart';
 import 'hosted_girls_api.dart';
@@ -162,17 +162,16 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
         'Group app management requires owner role and editable app.',
       );
     }
-    final bool? changed = await Navigator.of(context).push<bool>(
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (BuildContext context) => GirlsGroupAppManagementPage(
+        builder: (BuildContext context) => GirlsAppDetailPage(
           api: widget.api,
           session: widget.session,
-          group: widget.group,
           appId: app.appId,
         ),
       ),
     );
-    if (changed == true && mounted) await _loadApps();
+    if (mounted) await _loadApps();
   }
 
   @override
