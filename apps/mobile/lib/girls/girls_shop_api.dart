@@ -103,12 +103,16 @@ class GirlsShopDownloadGrant {
 class GirlsShopApi {
   GirlsShopApi({required Uri baseUri, http.Client? client})
       : _baseUri = _validateBaseUri(baseUri),
-        _client = client ?? http.Client();
+        _client = client ?? http.Client(),
+        _ownsClient = client == null;
 
   final Uri _baseUri;
   final http.Client _client;
+  final bool _ownsClient;
 
-  void close() => _client.close();
+  void close() {
+    if (_ownsClient) _client.close();
+  }
 
   Future<List<GirlsShopApp>> listApps(String accessToken) async {
     final Map<String, Object?> payload = await _jsonRequest(
