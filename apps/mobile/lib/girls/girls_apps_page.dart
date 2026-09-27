@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../hosted_app_management_api.dart' show maxHostedZipUploadBytes;
 import '../hosted_app_webview.dart';
 import '../hosted_authoring_editor_action.dart';
 import '../hosted_authoring_projects_api.dart';
@@ -13,6 +14,7 @@ import 'girls_app_detail_content.dart';
 import 'girls_app_test_actions.dart';
 import 'girls_builtin_install_api.dart';
 import 'girls_footer_nav.dart';
+import 'girls_shop_api.dart';
 import 'girls_scaffold.dart';
 import 'hosted_girls_api.dart';
 
@@ -424,8 +426,12 @@ class GirlsAppDetailPage extends StatefulWidget {
 
 class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
   late final GirlsAppManagementApi _managementApi;
+  late final GirlsShopApi _shopApi;
   ManagedGirlsAppDetail? _detail;
   String? _authorLabel;
+  bool? _shopListed;
+  bool _shopBusy = false;
+  String? _shopError;
   bool _busy = false;
   String? _error;
 
@@ -434,12 +440,14 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
     super.initState();
     _managementApi = GirlsAppManagementApi(
         baseUri: widget.api.baseUri, client: widget.api.httpClient);
+    _shopApi = GirlsShopApi(baseUri: widget.api.baseUri);
     _load();
   }
 
   @override
   void dispose() {
     _managementApi.close();
+    _shopApi.close();
     super.dispose();
   }
 
@@ -477,10 +485,33 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
       final String authorLabel = authors.isEmpty
           ? '退出済みユーザー (${detail.summary.app.ownerUserId.substring(0, 8)}…)'
           : authors.single.displayLabel;
+
+      bool? shopListed;
+      String? shopError;
+      if (detail.summary.app.isPublished) {
+        try {
+          final List<GirlsShopApp> shopApps =
+              await _shopApi.listApps(widget.session.accessToken);
+          final int matches = shopApps
+              .where((GirlsShopApp item) => item.appId == detail.summary.app.appId)
+              .length;
+          if (matches > 1) {
+            throw StateError('Girls shop returned duplicate app_id entries.');
+          }
+          shopListed = matches == 1;
+        } catch (error) {
+          shopError = girlsMessageFor(error);
+        }
+      } else {
+        shopListed = false;
+      }
+
       if (mounted) {
         setState(() {
           _detail = detail;
           _authorLabel = authorLabel;
+          _shopListed = shopListed;
+          _shopError = shopError;
         });
       }
     } catch (error) {
@@ -590,6 +621,143 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
     }
   }
 
+  Future<void> _updateZip() async {
+    final ManagedGirlsAppDetail? detail = _detail;
+    final int? revision = detail?.summary.sourceRevision;
+    if (detail == null || revision == null || !detail.summary.app.editable) {
+      setState(() => _error = '更新する編集版を確認できません。');
+      return;
+    }
+
+    final PlatformFile? file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: const <String>['zip'],
+    );
+    if (file == null || !mounted) return;
+    if (file.extension?.toLowerCase() != 'zip') {
+      setState(() => _error = '拡張子 .zip のファイルを選んでください。');
+      return;
+    }
+
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty || bytes.length > maxHostedZipUploadBytes) {
+      setState(() => _error = 'ZIPは1byte以上2MB以下にしてください。');
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final int nextRevision = await _managementApi.updateSource(
+        accessToken: widget.session.accessToken,
+        groupId: detail.summary.app.groupId,
+        appId: detail.summary.app.appId,
+        expectedRevision: revision,
+        zipBytes: bytes,
+      );
+      if (mounted) {
+        await _load(
+          expectedSourceRevision: nextRevision,
+          clearDetailOnError: true,
+        );
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _setShopListed(bool listed) async {
+    final ManagedGirlsAppDetail? detail = _detail;
+    if (detail == null || !detail.summary.app.isPublished) {
+      setState(() => _shopError = 'ショップ掲載には先にアプリを公開してください。');
+      return;
+    }
+    if (_shopBusy) return;
+    setState(() {
+      _shopBusy = true;
+      _shopError = null;
+    });
+    try {
+      await _shopApi.setVisibility(
+        accessToken: widget.session.accessToken,
+        appId: detail.summary.app.appId,
+        listed: listed,
+      );
+      if (!mounted) return;
+      setState(() => _shopListed = listed);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            listed ? 'ショップに掲載したよ。' : 'ショップから取り下げたよ。',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _shopError = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _shopBusy = false);
+    }
+  }
+
+  Widget _advancedSettings(ManagedGirlsAppDetail detail) {
+    final ManagedGirlsApp app = detail.summary;
+    return ExpansionTile(
+      key: const Key('girls-app-advanced-settings'),
+      title: const Text(
+        'その他の設定',
+        style: TextStyle(
+          color: _lavender,
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: const EdgeInsets.only(bottom: 10),
+      children: <Widget>[
+        if (app.app.editable && app.sourceRevision != null)
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              key: const Key('girls-app-update-zip'),
+              onPressed: _busy ? null : _updateZip,
+              icon: const Icon(Icons.folder_zip_rounded),
+              label: const Text('新しいZIPで更新'),
+            ),
+          ),
+        const SizedBox(height: 10),
+        if (!app.app.isPublished)
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'ショップに出すには、先に上の公開スイッチでアプリを公開してね。',
+              style: TextStyle(fontSize: 12, color: _lavender),
+            ),
+          )
+        else if (_shopListed == null && _shopError == null)
+          const LinearProgressIndicator()
+        else if (_shopListed != null)
+          SwitchListTile(
+            key: const Key('girls-app-shop-listing'),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('ショップに掲載'),
+            subtitle: Text(
+              _shopListed! ? 'ショップ掲載中' : 'ショップには出していません',
+            ),
+            value: _shopListed!,
+            onChanged: _busy || _shopBusy ? null : _setShopListed,
+          ),
+        if (_shopError != null) ...<Widget>[
+          const SizedBox(height: 8),
+          _ErrorCard(message: 'ショップ状態を確認できませんでした。$_shopError'),
+        ],
+      ],
+    );
+  }
+
   Future<void> _delete() async {
     final ManagedGirlsAppDetail? detail = _detail;
     if (detail == null) return;
@@ -697,7 +865,9 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
                   disabled: _busy,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+              _advancedSettings(detail),
+              const SizedBox(height: 8),
               ExpansionTile(
                 title: const Text('保存・公開の履歴',
                     style: TextStyle(fontSize: 13, color: _lavender)),
