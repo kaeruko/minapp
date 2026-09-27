@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'girls_errors.dart';
+import 'girls_scaffold.dart';
 import 'hosted_girls_api.dart';
 
 const Color _ink = Color(0xFF604943);
@@ -184,10 +185,15 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final bool embedded = GirlsScaffoldChromeScope.isEmbedded(context);
+    final Color pageBackground = embedded ? Colors.transparent : _cream;
+    final Color appBarBackground =
+        embedded ? Colors.transparent : const Color(0xFFFFF4F7);
     return Scaffold(
-      backgroundColor: _cream,
+      backgroundColor: pageBackground,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFFF4F7),
+        backgroundColor: appBarBackground,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: _ink,
         centerTitle: true,
         title: const Text(
