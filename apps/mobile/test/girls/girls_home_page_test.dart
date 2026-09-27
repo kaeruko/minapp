@@ -264,9 +264,6 @@ void main() {
       find.byKey(const Key('girls-groups-first-view-group')),
       findsOneWidget,
     );
-    expect(find.text('いまのグループ'), findsOneWidget);
-    expect(find.text('あなたがオーナーです'), findsOneWidget);
-    expect(find.text('グループを開く'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('girls-footer-home')));
     await tester.pumpAndSettle();

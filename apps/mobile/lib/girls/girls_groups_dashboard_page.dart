@@ -679,7 +679,7 @@ class _CurrentGroupCard extends StatelessWidget {
               ),
               icon: const Icon(Icons.arrow_forward_rounded),
               label: const Text(
-                'グループを開く',
+                'グループのアプリ一覧',
                 style: TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
