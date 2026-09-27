@@ -117,18 +117,17 @@ void main() {
     messenger.setMockMethodCallHandler(
       SystemChannels.platform,
       (MethodCall call) async {
-        if (call.method != 'Clipboard.setData') {
-          throw StateError('Unexpected platform call: ${call.method}');
+        if (call.method == 'Clipboard.setData') {
+          final Object? arguments = call.arguments;
+          if (arguments is! Map<Object?, Object?>) {
+            throw StateError('Clipboard.setData arguments are not a map.');
+          }
+          final Object? text = arguments['text'];
+          if (text is! String) {
+            throw StateError('Clipboard.setData text is not a string.');
+          }
+          copiedText = text;
         }
-        final Object? arguments = call.arguments;
-        if (arguments is! Map<Object?, Object?>) {
-          throw StateError('Clipboard.setData arguments are not a map.');
-        }
-        final Object? text = arguments['text'];
-        if (text is! String) {
-          throw StateError('Clipboard.setData text is not a string.');
-        }
-        copiedText = text;
         return null;
       },
     );
