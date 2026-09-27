@@ -12,6 +12,9 @@ const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF745B9E);
 const Color _pink = Color(0xFFE987A8);
 const Color _cream = Color(0xFFFFFAF0);
+const String _singAlongShopAppId = '9571adacf55c47b4ac772cd48621a08b';
+const String _singAlongCardAsset =
+    'assets/girls/cutouts/minapp_cards_480/sing_along_card.png';
 
 class GirlsShopPage extends StatefulWidget {
   const GirlsShopPage({
@@ -219,19 +222,11 @@ class _GirlsShopCard extends StatelessWidget {
           padding: const EdgeInsets.all(15),
           child: Row(
             children: <Widget>[
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1E8FA),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFFE2D2F1)),
-                ),
-                child: const Icon(
-                  Icons.auto_awesome_rounded,
-                  color: _lavender,
-                  size: 28,
-                ),
+              _GirlsShopArtwork(
+                app: app,
+                size: 58,
+                radius: 18,
+                iconSize: 28,
               ),
               const SizedBox(width: 13),
               Expanded(
@@ -416,19 +411,12 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
         children: <Widget>[
           Center(
-            child: Container(
-              width: 108,
-              height: 108,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1E8FA),
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: const Color(0xFFE2D2F1), width: 3),
-              ),
-              child: const Icon(
-                Icons.auto_awesome_rounded,
-                color: _lavender,
-                size: 54,
-              ),
+            child: _GirlsShopArtwork(
+              app: app,
+              size: 108,
+              radius: 30,
+              iconSize: 54,
+              borderWidth: 3,
             ),
           ),
           const SizedBox(height: 22),
@@ -488,6 +476,51 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _GirlsShopArtwork extends StatelessWidget {
+  const _GirlsShopArtwork({
+    required this.app,
+    required this.size,
+    required this.radius,
+    required this.iconSize,
+    this.borderWidth = 1,
+  });
+
+  final GirlsShopApp app;
+  final double size;
+  final double radius;
+  final double iconSize;
+  final double borderWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isSingAlong = app.appId == _singAlongShopAppId;
+    return Container(
+      width: size,
+      height: size,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1E8FA),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: const Color(0xFFE2D2F1),
+          width: borderWidth,
+        ),
+      ),
+      child: isSingAlong
+          ? Image.asset(
+              _singAlongCardAsset,
+              fit: BoxFit.cover,
+              semanticLabel: 'うたってみよう',
+            )
+          : Icon(
+              Icons.auto_awesome_rounded,
+              color: _lavender,
+              size: iconSize,
+            ),
     );
   }
 }
