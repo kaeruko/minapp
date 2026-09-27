@@ -36,6 +36,7 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
   bool _busy = false;
   String? _error;
   String? _launchingAppId;
+  String? _inviteCode;
 
   @override
   void initState() {
@@ -49,12 +50,19 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
       _error = null;
     });
     try {
+      final HostedInvite invite = await widget.api.createInvite(
+        accessToken: widget.session.accessToken,
+        groupId: widget.group.groupId,
+      );
       final List<HostedGroupApp> apps = await widget.api.listGroupApps(
         accessToken: widget.session.accessToken,
         groupId: widget.group.groupId,
       );
       if (!mounted) return;
-      setState(() => _apps = apps);
+      setState(() {
+        _inviteCode = invite.code;
+        _apps = apps;
+      });
     } catch (error) {
       if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
@@ -171,7 +179,7 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
   Widget build(BuildContext context) {
     final List<HostedGroupApp>? apps = _apps;
     return GirlsScaffold(
-      title: 'みんアプ Girls',
+      title: _inviteCode == null ? '招待コード 読み込み中…' : '招待コード $_inviteCode',
       pageBackgroundDecoration: const BoxDecoration(
         image: DecorationImage(
           image: AssetImage(_groupHomeBackgroundAsset),
