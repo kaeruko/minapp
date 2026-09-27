@@ -48,4 +48,5 @@ flutter:
     - assets/girls/generated/minapp_girls_logo.png
     - assets/girls/backgrounds/
     - assets/girls/cutouts/
+    - assets/girls/cutouts/minapp_cards_480/
     - assets/girls/home/cards/
