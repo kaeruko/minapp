@@ -5,6 +5,7 @@ import '../hosted_app_management_api.dart';
 import '../hosted_app_webview.dart';
 import '../ugc_safety.dart';
 import 'girls_errors.dart';
+import 'girls_group_home_page.dart';
 import 'girls_scaffold.dart';
 import 'girls_shop_api.dart';
 import 'hosted_girls_api.dart';
@@ -392,9 +393,34 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
         if (!mounted) return;
         setState(() => _installedCopy = added);
         widget.onGroupAppsChanged?.call();
-        ScaffoldMessenger.of(context).showSnackBar(
+        final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+        messenger.showSnackBar(
           SnackBar(
-            content: Text('「${widget.app.title}」を「${group.name}」に追加したよ'),
+            content: InkWell(
+              onTap: () {
+                messenger.hideCurrentSnackBar();
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) => GirlsGroupHomePage(
+                      api: widget.api,
+                      session: widget.session,
+                      group: group,
+                    ),
+                  ),
+                );
+              },
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      '「${widget.app.title}」を「${group.name}」に追加したよ',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.chevron_right_rounded),
+                ],
+              ),
+            ),
           ),
         );
       });
