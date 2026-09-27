@@ -29,6 +29,13 @@ String? _shopArtworkAsset(GirlsShopApp app) {
   };
 }
 
+String _shopDisplayTitle(GirlsShopApp app) {
+  return switch (app.appId) {
+    _drawingShopAppId => 'パステルおえかき',
+    _ => app.title,
+  };
+}
+
 class GirlsShopPage extends StatefulWidget {
   const GirlsShopPage({
     required this.api,
@@ -250,7 +257,7 @@ class _GirlsShopCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      app.title,
+                      _shopDisplayTitle(app),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -548,7 +555,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
         surfaceTintColor: Colors.transparent,
         foregroundColor: _ink,
         title: const Text(
-          'ショップ♡',
+          'ショップ',
           style: TextStyle(fontWeight: FontWeight.w900),
         ),
       ),
@@ -566,7 +573,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
           ),
           const SizedBox(height: 22),
           Text(
-            app.title,
+            _shopDisplayTitle(app),
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: _ink,
@@ -661,6 +668,18 @@ class _GirlsShopArtwork extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String? assetPath = _shopArtworkAsset(app);
+    if (assetPath != null) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: Image.asset(
+          assetPath,
+          fit: BoxFit.contain,
+          semanticLabel: _shopDisplayTitle(app),
+        ),
+      );
+    }
+
     return Container(
       width: size,
       height: size,
@@ -673,17 +692,11 @@ class _GirlsShopArtwork extends StatelessWidget {
           width: borderWidth,
         ),
       ),
-      child: assetPath == null
-          ? Icon(
-              Icons.auto_awesome_rounded,
-              color: _lavender,
-              size: iconSize,
-            )
-          : Image.asset(
-              assetPath,
-              fit: BoxFit.cover,
-              semanticLabel: app.title,
-            ),
+      child: Icon(
+        Icons.auto_awesome_rounded,
+        color: _lavender,
+        size: iconSize,
+      ),
     );
   }
 }
