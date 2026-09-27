@@ -440,7 +440,10 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
     super.initState();
     _managementApi = GirlsAppManagementApi(
         baseUri: widget.api.baseUri, client: widget.api.httpClient);
-    _shopApi = GirlsShopApi(baseUri: widget.api.baseUri);
+    _shopApi = GirlsShopApi(
+      baseUri: widget.api.baseUri,
+      client: widget.api.httpClient,
+    );
     _load();
   }
 
