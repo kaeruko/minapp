@@ -642,14 +642,17 @@ class _CurrentGroupFirstView extends StatelessWidget {
                     ),
                     const SizedBox(height: 7),
                     const Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                        Text(
-                          'グループのアプリ一覧',
-                          style: TextStyle(
-                            color: _lavenderDark,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 12,
+                        Expanded(
+                          child: Text(
+                            'グループのアプリ一覧',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: _lavenderDark,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                         SizedBox(width: 2),
