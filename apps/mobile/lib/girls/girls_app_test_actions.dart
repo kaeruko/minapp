@@ -6,9 +6,9 @@ import '../hosted_authoring_contract_api.dart';
 import '../hosted_authoring_editor_action.dart';
 import 'api.dart';
 import 'girls_errors.dart';
+import 'girls_app_edit_entry_page.dart';
 import 'girls_app_management_api.dart';
 import 'girls_app_preview_api.dart';
-import 'girls_app_source_editor_page.dart';
 import 'girls_builtin_install_api.dart';
 import 'hosted_girls_api.dart';
 
@@ -149,7 +149,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
     int latestRevision = sourceRevision;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (BuildContext context) => GirlsAppSourceEditorPage(
+        builder: (BuildContext context) => GirlsAppEditEntryPage(
           api: _managementApi,
           accessToken: widget.session.accessToken,
           groupId: app.app.groupId,
