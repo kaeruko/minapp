@@ -252,11 +252,18 @@ class FakeDynamoDb:
                 request = operation["Update"]
                 key = (self._s(request["Key"]["pk"]), self._s(request["Key"]["sk"]))
                 replacement = dict(self.items[key])
-                assignments = request["UpdateExpression"].removeprefix("SET ").split(", ")
+                expression = request["UpdateExpression"]
                 values = request["ExpressionAttributeValues"]
+                set_part, separator, remove_part = expression.partition(" REMOVE ")
+                if not set_part.startswith("SET "):
+                    raise AssertionError(f"Unsupported fake UpdateExpression: {expression}")
+                assignments = set_part.removeprefix("SET ").split(", ")
                 for assignment in assignments:
                     field, value_name = assignment.split(" = ", 1)
                     replacement[field] = values[value_name]
+                if separator:
+                    for field in remove_part.split(", "):
+                        replacement.pop(field, None)
                 self.items[key] = replacement
 
 
