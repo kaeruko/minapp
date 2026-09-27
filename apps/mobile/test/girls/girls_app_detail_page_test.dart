@@ -147,8 +147,38 @@ void main() {
     await tester.ensureVisible(preview);
     await tester.tap(preview);
     await tester.pumpAndSettle();
-    expect(paths, contains('/hosted/my/apps/$appId/preview-session'));
+    expect(
+      paths,
+      contains('/hosted/groups/$groupId/apps/$appId/preview-session'),
+    );
     expect(paths.any((path) => path.endsWith('/published-session')), isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('advanced settings contain ZIP update and shop listing', (
+    WidgetTester tester,
+  ) async {
+    await showPage(
+      tester,
+      MockClient((request) async {
+        return jsonResponse(
+          request.url.path == '/hosted/my/apps/$appId'
+              ? fixture()
+              : fallbackResponse(request.url),
+        );
+      }),
+    );
+
+    final Finder advanced =
+        find.byKey(const Key('girls-app-advanced-settings'));
+    await tester.ensureVisible(advanced);
+    await tester.tap(advanced);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('girls-app-update-zip')), findsOneWidget);
+    expect(find.text('新しいZIPで更新'), findsOneWidget);
+    expect(find.byKey(const Key('girls-app-shop-listing')), findsOneWidget);
+    expect(find.text('ショップに掲載'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
