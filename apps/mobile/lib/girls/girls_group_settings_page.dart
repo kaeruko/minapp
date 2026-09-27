@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
 import '../hosted_group_management_api.dart';
 import 'api.dart';
 import 'girls_errors.dart';
@@ -49,10 +47,8 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
   bool _saving = false;
   bool _removing = false;
   bool _memberActionBusy = false;
-  bool _loadingGroupId = true;
   bool _loadingMembers = false;
   List<HostedMember>? _members;
-  String? _groupIdCode;
   String? _error;
 
   @override
@@ -64,10 +60,7 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
       client: widget.api.httpClient,
     );
     if (widget.group.isOwner) {
-      _loadGroupId();
       _loadMembers();
-    } else {
-      _loadingGroupId = false;
     }
   }
 
@@ -76,34 +69,6 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
     _nameController.dispose();
     _managementApi.close();
     super.dispose();
-  }
-
-  Future<void> _loadGroupId() async {
-    try {
-      final HostedInvite invite = await widget.api.createInvite(
-        accessToken: widget.session.accessToken,
-        groupId: widget.group.groupId,
-      );
-      if (!mounted) return;
-      setState(() => _groupIdCode = invite.code);
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _error = girlsMessageFor(error));
-    } finally {
-      if (mounted) setState(() => _loadingGroupId = false);
-    }
-  }
-
-  Future<void> _copyGroupId() async {
-    final String? code = _groupIdCode;
-    if (code == null) {
-      throw StateError('Group ID is not loaded.');
-    }
-    await Clipboard.setData(ClipboardData(text: code));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('グループIDをコピーしたよ。')),
-    );
   }
 
   Future<void> _loadMembers() async {
@@ -639,81 +604,6 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
                   ),
                   if (widget.group.isOwner) ...<Widget>[
                     const SizedBox(height: 14),
-                    Container(
-                      key: const Key('girls-group-settings-group-id'),
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .9),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFFF0DFE8)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        const Row(
-                          children: <Widget>[
-                            CircleAvatar(
-                              backgroundColor: Color(0xFFF3ECFF),
-                              foregroundColor: _lavender,
-                              child: Icon(Icons.key_rounded),
-                            ),
-                            SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                'グループID',
-                                style: TextStyle(
-                                  color: _ink,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        if (_loadingGroupId)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8),
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        else if (_groupIdCode != null) ...<Widget>[
-                          SelectableText(
-                            _groupIdCode!,
-                            key: const Key('girls-group-settings-group-id-code'),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: _lavender,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          OutlinedButton.icon(
-                            key: const Key('girls-group-settings-group-id-copy'),
-                            onPressed: _copyGroupId,
-                            icon: const Icon(Icons.copy_rounded),
-                            label: const Text('グループIDをコピー'),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            '友達はこのIDを「グループを探す」に入力すると参加できます。',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Color(0xFF75645F),
-                              fontSize: 12,
-                              height: 1.45,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  ],
-                  if (widget.group.isOwner) ...<Widget>[
-                    const SizedBox(height: 14),
                     _buildOwnerMembersCard(),
                   ],
                   if (_error != null) ...<Widget>[
@@ -772,7 +662,7 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
                         Text(
                           widget.group.isOwner
                               ? '削除すると、このグループ内のアプリやメンバー情報も削除されます。'
-                              : 'このグループから抜けます。再参加にはグループIDが必要です。',
+                              : 'このグループから抜けます。再参加するには、もう一度招待してもらう必要があります。',
                           style: const TextStyle(
                             color: Color(0xFF75645F),
                             fontSize: 12,
@@ -829,7 +719,7 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
                       Expanded(
                         child: Text(
                           widget.group.isOwner
-                              ? 'グループ名を変更できるのはオーナーだけです。グループIDは固定で、いつでも同じIDを使えます。'
+                              ? 'グループ名を変更できるのはオーナーだけです。'
                               : 'このグループにはメンバーとして参加しています。',
                           style: const TextStyle(
                             color: Color(0xFF75645F),
