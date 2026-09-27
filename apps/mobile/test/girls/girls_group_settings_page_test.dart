@@ -37,19 +37,12 @@ http.Response _json(Object value, [int statusCode = 200]) {
 }
 
 void main() {
-  testWidgets('shows the permanent group ID and copy action', (
+  testWidgets('does not show the invite code in group settings', (
     WidgetTester tester,
   ) async {
+    final List<String> requests = <String>[];
     final MockClient client = MockClient((http.Request request) async {
-      if (request.method == 'POST' &&
-          request.url.path == '/hosted/groups/$_groupId/invite') {
-        return _json(<String, Object?>{
-          'group_id': _groupId,
-          'code': _groupCode,
-          'expires_at': '2099-01-01T00:00:00Z',
-          'valid_for_seconds': 1,
-        });
-      }
+      requests.add('${request.method} ${request.url.path}');
       if (request.method == 'GET' &&
           request.url.path == '/hosted/groups/$_groupId/members') {
         return _json(<String, Object?>{
@@ -92,12 +85,12 @@ void main() {
 
     expect(
       find.byKey(const Key('girls-group-settings-group-id')),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.text(_groupCode), findsOneWidget);
+    expect(find.text(_groupCode), findsNothing);
     expect(
-      find.byKey(const Key('girls-group-settings-group-id-copy')),
-      findsOneWidget,
+      requests.where((String value) => value.endsWith('/invite')),
+      isEmpty,
     );
     expect(tester.takeException(), isNull);
   });
