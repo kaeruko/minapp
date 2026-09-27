@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../hosted_group_management_api.dart';
 import 'api.dart';
 import 'girls_errors.dart';
@@ -440,7 +441,7 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
             content: Text(
               owner
                   ? '「${widget.group.name}」を削除します。グループ内のアプリやメンバー情報も削除され、この操作は取り消せません。'
-                  : '「${widget.group.name}」から脱退します。もう一度参加するにはグループIDが必要です。',
+                  : '「${widget.group.name}」から脱退します。もう一度参加するには、再度招待してもらう必要があります。',
             ),
             actions: <Widget>[
               TextButton(
