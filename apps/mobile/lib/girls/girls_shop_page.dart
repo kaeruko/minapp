@@ -328,6 +328,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
           .where(
             (HostedGroupApp candidate) =>
                 candidate.sourceKind == 'upload' &&
+                candidate.editable &&
                 candidate.title == widget.app.title,
           )
           .toList(growable: false);
