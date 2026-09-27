@@ -275,6 +275,10 @@ void main() {
     await tester.tap(edit);
     await tester.pumpAndSettle();
 
+    expect(find.text('どうやってアレンジする？'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('girls-edit-entry-open-editor')));
+    await tester.pumpAndSettle();
+
     final editor = find.byKey(const Key('girls-source-editor-code'));
     expect(editor, findsOneWidget);
     await tester.enterText(editor, '<html>changed</html>');
@@ -290,6 +294,9 @@ void main() {
     expect(detailLoads, 1);
     expect(revision, 2);
 
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('どうやってアレンジする？'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
@@ -321,7 +328,13 @@ void main() {
     await tester.ensureVisible(edit);
     await tester.tap(edit);
     await tester.pumpAndSettle();
+    expect(find.text('どうやってアレンジする？'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('girls-edit-entry-open-editor')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('girls-source-editor-code')), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('どうやってアレンジする？'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
     final delete = find.byKey(const Key('girls-app-delete'));
