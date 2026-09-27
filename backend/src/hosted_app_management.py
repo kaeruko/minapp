@@ -48,7 +48,7 @@ def _author_editable_app(
     )
 
 
-def _author_detail_app(
+def _managed_detail_app(
     backend: Any,
     auth_subject: str,
     app_id: str,
@@ -57,7 +57,7 @@ def _author_detail_app(
     if app is None:
         raise ApiProblem(404, "app_not_found", "指定されたアプリはありません。")
     group_id = _item_string(app, "group_id")
-    user, app = backend._require_app_author_access(
+    user, app = backend._require_app_management_access(
         auth_subject,
         group_id,
         app_id,
@@ -140,7 +140,7 @@ def _published_history(backend: Any, app_id: str) -> list[dict[str, Any]]:
 
 
 def get_managed_app(backend: Any, auth_subject: str, app_id: str) -> dict[str, Any]:
-    _, app = _author_detail_app(backend, auth_subject, app_id)
+    _, app = _managed_detail_app(backend, auth_subject, app_id)
     payload = _managed_payload(backend, app)
     payload["source_history"] = []
     payload["published_history"] = _published_history(backend, app_id)
@@ -208,7 +208,16 @@ def set_visibility(
     *,
     hidden: bool,
 ) -> dict[str, Any]:
-    _, app = _author_editable_app(backend, auth_subject, app_id)
+    app = backend._get_item(pk=f"APP#{app_id}", sk="META")
+    if app is None:
+        raise ApiProblem(404, "app_not_found", "指定されたアプリはありません。")
+    group_id = _item_string(app, "group_id")
+    _, app = backend._require_app_management_access(
+        auth_subject,
+        group_id,
+        app_id,
+        editable=True,
+    )
     return _set_visibility_authorized(backend, app, hidden=hidden)
 
 
