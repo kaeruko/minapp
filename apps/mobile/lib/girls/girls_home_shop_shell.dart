@@ -174,6 +174,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               api: widget.api,
               session: widget.session,
               currentGroup: _currentGroup,
+              onGroupAppsChanged: _appsCache.clear,
             ),
           GirlsFooterTab.apps => GirlsAppsPage(
               cache: _appsCache,
