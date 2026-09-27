@@ -85,15 +85,22 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('girls-edit-entry-copy')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(sourceReads, 1);
     expect(find.text('AIに貼り付けるコードをコピーしたよ'), findsOneWidget);
+
+    ScaffoldMessenger.of(
+      tester.element(find.byType(GirlsAppEditEntryPage)),
+    ).removeCurrentSnackBar();
+    await tester.pump();
 
     await tester.drag(
       find.byType(Scrollable).first,
       const Offset(0, -420),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('コードを編集！'), findsOneWidget);
     expect(
       find.byKey(const Key('girls-edit-entry-open-editor')),
