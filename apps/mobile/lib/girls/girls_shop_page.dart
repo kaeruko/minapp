@@ -4,8 +4,8 @@ import '../api.dart';
 import '../hosted_app_management_api.dart';
 import '../hosted_app_webview.dart';
 import '../ugc_safety.dart';
+import 'girls_apps_page.dart';
 import 'girls_errors.dart';
-import 'girls_group_home_page.dart';
 import 'girls_scaffold.dart';
 import 'girls_shop_api.dart';
 import 'hosted_girls_api.dart';
@@ -401,10 +401,10 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
                 messenger.hideCurrentSnackBar();
                 Navigator.of(context).push<void>(
                   MaterialPageRoute<void>(
-                    builder: (BuildContext context) => GirlsGroupHomePage(
+                    builder: (BuildContext context) => GirlsAppDetailPage(
                       api: widget.api,
                       session: widget.session,
-                      group: group,
+                      appId: added.appId,
                     ),
                   ),
                 );
@@ -413,7 +413,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
                 children: <Widget>[
                   Expanded(
                     child: Text(
-                      '「${widget.app.title}」を「${group.name}」に追加したよ',
+                      '「${widget.app.title}」をマイアプリに追加したよ',
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -436,9 +436,9 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
     final bool confirmed = await showDialog<bool>(
           context: context,
           builder: (BuildContext dialogContext) => AlertDialog(
-            title: const Text('グループから削除する？'),
+            title: const Text('マイアプリから削除する？'),
             content: Text(
-              '「${widget.app.title}」を「${group.name}」から削除します。'
+              '「${widget.app.title}」をマイアプリから削除します。'
               'この操作は取り消せません。',
             ),
             actions: <Widget>[
@@ -467,7 +467,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
       widget.onGroupAppsChanged?.call();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('「${widget.app.title}」を「${group.name}」から削除したよ'),
+          content: Text('「${widget.app.title}」をマイアプリから削除したよ'),
         ),
       );
     });
@@ -604,8 +604,8 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
                   : _checkingInstallState
                       ? '追加状況を確認中…'
                       : _installedCopy == null
-                          ? '「${widget.currentGroup!.name}」に追加'
-                          : '「${widget.currentGroup!.name}」から削除',
+                          ? 'マイアプリに追加'
+                          : 'マイアプリから削除',
             ),
           ),
           const SizedBox(height: 18),
