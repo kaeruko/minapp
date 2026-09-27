@@ -64,7 +64,7 @@ locals {
     {
       drawing = {
         app_id       = "ecb3cb6a08e05305668a952cbdae435b"
-        title        = "おえかき"
+        title        = "パステルおえかき"
         version      = 1
         source       = "${local.minapp_apps_source_root}/minapp_drawing.zip"
         files        = ["index.html"]
