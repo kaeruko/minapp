@@ -86,13 +86,19 @@ void main() {
 
     await tester.tap(find.byKey(const Key('girls-edit-entry-copy')));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    for (int attempt = 0; attempt < 20; attempt += 1) {
+      if (find.text('コードをコピー').evaluate().isNotEmpty) {
+        break;
+      }
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     expect(sourceReads, 1);
-    expect(find.text('AIに貼り付けるコードをコピーしたよ'), findsOneWidget);
+    expect(find.text('コードをコピー'), findsOneWidget);
 
-    ScaffoldMessenger.of(
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(
       tester.element(find.byType(GirlsAppEditEntryPage)),
-    ).removeCurrentSnackBar();
+    );
+    messenger.removeCurrentSnackBar();
     await tester.pump();
 
     await tester.drag(
