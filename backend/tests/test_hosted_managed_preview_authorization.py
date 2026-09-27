@@ -93,16 +93,20 @@ class HostedManagedPreviewAuthorizationTests(unittest.TestCase):
     def _token(session: dict[str, object]) -> str:
         return str(session["content_path"]).split("/")[3]
 
-    def test_my_apps_and_detail_are_author_only_even_for_group_owner(self) -> None:
+    def test_my_apps_list_is_author_only_but_detail_allows_group_owner(self) -> None:
         alice_apps = list_managed_apps(self.backend, self.alice)
         bob_apps = list_managed_apps(self.backend, self.bob)
         self.assertEqual([app["app_id"] for app in alice_apps], [self.alice_app["app_id"]])
         self.assertEqual([app["app_id"] for app in bob_apps], [self.bob_app["app_id"]])
 
-        detail = get_managed_app(self.backend, self.bob, self.bob_app["app_id"])
-        self.assertEqual(detail["owner_user_id"], self.bob_app["owner_user_id"])
+        author_detail = get_managed_app(self.backend, self.bob, self.bob_app["app_id"])
+        self.assertEqual(author_detail["owner_user_id"], self.bob_app["owner_user_id"])
+
+        owner_detail = get_managed_app(self.backend, self.alice, self.bob_app["app_id"])
+        self.assertEqual(owner_detail["owner_user_id"], self.bob_app["owner_user_id"])
+
         with self.assertRaises(ApiProblem) as caught:
-            get_managed_app(self.backend, self.alice, self.bob_app["app_id"])
+            get_managed_app(self.backend, self.carol, self.bob_app["app_id"])
         self.assertEqual(caught.exception.status_code, 403)
         self.assertEqual(caught.exception.error, "forbidden")
 
@@ -139,14 +143,22 @@ class HostedManagedPreviewAuthorizationTests(unittest.TestCase):
         )
         self.assertEqual(hidden["visibility"], "hidden")
 
+        owner_hidden = set_visibility(
+            self.backend,
+            self.alice,
+            self.bob_app["app_id"],
+            hidden=True,
+        )
+        self.assertEqual(owner_hidden["visibility"], "hidden")
+
         visible = set_group_visibility(
             self.backend,
             self.alice,
             self.group_id,
             self.bob_app["app_id"],
-            hidden=True,
+            hidden=False,
         )
-        self.assertEqual(visible["visibility"], "hidden")
+        self.assertEqual(visible["visibility"], "visible")
         self.assertEqual(visible["owner_user_id"], self.bob_app["owner_user_id"])
 
         with self.assertRaises(ApiProblem) as caught:
