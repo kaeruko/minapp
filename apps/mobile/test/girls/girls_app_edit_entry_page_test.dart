@@ -72,7 +72,6 @@ void main() {
     expect(find.text('背景をピンクにしたい'), findsOneWidget);
     expect(find.text('ボタンをもっとかわいくしたい'), findsOneWidget);
     expect(find.text('犬の画像を追加したい'), findsOneWidget);
-    expect(find.text('コードを編集！'), findsOneWidget);
     expect(sourceReads, 0);
 
     await tester.tap(find.byKey(const Key('girls-edit-entry-help')));
@@ -89,6 +88,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(sourceReads, 1);
     expect(find.text('AIに貼り付けるコードをコピーしたよ'), findsOneWidget);
+
+    await tester.drag(
+      find.byType(Scrollable).first,
+      const Offset(0, -420),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('コードを編集！'), findsOneWidget);
+    expect(
+      find.byKey(const Key('girls-edit-entry-open-editor')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const Key('girls-edit-entry-open-editor')));
     await tester.pumpAndSettle();
