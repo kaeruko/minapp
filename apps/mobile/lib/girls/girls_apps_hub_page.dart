@@ -628,7 +628,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
                 ),
               ),
             const SizedBox(height: 16),
-            const _SectionHeader(title: 'あなたのアプリ'),
+            const _SectionHeader(title: 'マイアプリ'),
             const SizedBox(height: 10),
             if (apps == null)
               const _LoadingCard()

@@ -330,7 +330,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
             ],
             const SizedBox(height: 22),
             const Text(
-              'あなたのアプリ',
+              'マイアプリ',
               style: TextStyle(
                 color: _ink,
                 fontSize: 19,
