@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../hosted_app_management_api.dart';
 import '../hosted_app_webview.dart';
 import '../ugc_safety.dart';
 import 'girls_errors.dart';
+import 'girls_group_home_page.dart';
 import 'girls_scaffold.dart';
 import 'girls_shop_api.dart';
 import 'hosted_girls_api.dart';
@@ -12,18 +14,23 @@ const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF745B9E);
 const Color _pink = Color(0xFFE987A8);
 const Color _cream = Color(0xFFFFFAF0);
+const String _singAlongShopAppId = '9571adacf55c47b4ac772cd48621a08b';
+const String _singAlongCardAsset =
+    'assets/girls/cutouts/minapp_cards_480/sing_along_card.png';
 
 class GirlsShopPage extends StatefulWidget {
   const GirlsShopPage({
     required this.api,
     required this.session,
     required this.currentGroup,
+    this.onGroupAppsChanged,
     super.key,
   });
 
   final HostedGirlsApi api;
   final AuthenticatedSession session;
   final HostedGroup? currentGroup;
+  final VoidCallback? onGroupAppsChanged;
 
   @override
   State<GirlsShopPage> createState() => _GirlsShopPageState();
@@ -186,6 +193,7 @@ class _GirlsShopPageState extends State<GirlsShopPage> {
                           session: widget.session,
                           app: app,
                           currentGroup: widget.currentGroup,
+                          onGroupAppsChanged: widget.onGroupAppsChanged,
                           onHideCreator: _hideCreator,
                         ),
                       ),
@@ -219,19 +227,11 @@ class _GirlsShopCard extends StatelessWidget {
           padding: const EdgeInsets.all(15),
           child: Row(
             children: <Widget>[
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1E8FA),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFFE2D2F1)),
-                ),
-                child: const Icon(
-                  Icons.auto_awesome_rounded,
-                  color: _lavender,
-                  size: 28,
-                ),
+              _GirlsShopArtwork(
+                app: app,
+                size: 58,
+                radius: 18,
+                iconSize: 28,
               ),
               const SizedBox(width: 13),
               Expanded(
@@ -277,6 +277,7 @@ class GirlsShopDetailPage extends StatefulWidget {
     required this.session,
     required this.app,
     required this.currentGroup,
+    this.onGroupAppsChanged,
     required this.onHideCreator,
     super.key,
   });
@@ -286,6 +287,7 @@ class GirlsShopDetailPage extends StatefulWidget {
   final AuthenticatedSession session;
   final GirlsShopApp app;
   final HostedGroup? currentGroup;
+  final VoidCallback? onGroupAppsChanged;
   final Future<void> Function(GirlsShopApp app) onHideCreator;
 
   @override
@@ -293,8 +295,57 @@ class GirlsShopDetailPage extends StatefulWidget {
 }
 
 class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
+  late final HostedAppManagementApi _managementApi;
+  HostedGroupApp? _installedCopy;
+  bool _checkingInstallState = true;
   bool _busy = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _managementApi = HostedAppManagementApi(baseUri: widget.api.baseUri);
+    _loadInstallState();
+  }
+
+  @override
+  void dispose() {
+    _managementApi.close();
+    super.dispose();
+  }
+
+  Future<void> _loadInstallState() async {
+    final HostedGroup? group = widget.currentGroup;
+    if (group == null) {
+      if (mounted) setState(() => _checkingInstallState = false);
+      return;
+    }
+    try {
+      final List<HostedGroupApp> apps = await widget.api.listGroupApps(
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
+      );
+      final List<HostedGroupApp> matches = apps
+          .where(
+            (HostedGroupApp candidate) =>
+                candidate.sourceKind == 'upload' &&
+                candidate.editable &&
+                candidate.title == widget.app.title,
+          )
+          .toList(growable: false);
+      if (matches.length > 1) {
+        throw StateError(
+          '同じ名前のアプリが複数あるため、ショップとの対応を判定できません。',
+        );
+      }
+      if (!mounted) return;
+      setState(() => _installedCopy = matches.isEmpty ? null : matches.single);
+    } catch (error) {
+      if (mounted) setState(() => _error = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _checkingInstallState = false);
+    }
+  }
 
   Future<void> _run(Future<void> Function() action) async {
     if (_busy) return;
@@ -334,18 +385,93 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
         if (group == null) {
           throw StateError('追加先のグループが選ばれていません。');
         }
-        await widget.shopApi.addToGroup(
+        final HostedGroupApp added = await widget.shopApi.addToGroup(
           accessToken: widget.session.accessToken,
           app: widget.app,
           groupId: group.groupId,
         );
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        setState(() => _installedCopy = added);
+        widget.onGroupAppsChanged?.call();
+        final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+        messenger.showSnackBar(
           SnackBar(
-            content: Text('「${widget.app.title}」を「${group.name}」に追加したよ'),
+            content: InkWell(
+              onTap: () {
+                messenger.hideCurrentSnackBar();
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) => GirlsGroupHomePage(
+                      api: widget.api,
+                      session: widget.session,
+                      group: group,
+                    ),
+                  ),
+                );
+              },
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      '「${widget.app.title}」を「${group.name}」に追加したよ',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.chevron_right_rounded),
+                ],
+              ),
+            ),
           ),
         );
       });
+
+  Future<void> _removeFromGroup() async {
+    if (_busy) return;
+    final HostedGroup? group = widget.currentGroup;
+    final HostedGroupApp? installed = _installedCopy;
+    if (group == null || installed == null) {
+      setState(() => _error = '削除するアプリが見つかりません。');
+      return;
+    }
+    final bool confirmed = await showDialog<bool>(
+          context: context,
+          builder: (BuildContext dialogContext) => AlertDialog(
+            title: const Text('グループから削除する？'),
+            content: Text(
+              '「${widget.app.title}」を「${group.name}」から削除します。'
+              'この操作は取り消せません。',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('キャンセル'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('削除'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) return;
+
+    await _run(() async {
+      await _managementApi.deleteApp(
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
+        appId: installed.appId,
+      );
+      if (!mounted) return;
+      setState(() => _installedCopy = null);
+      widget.onGroupAppsChanged?.call();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('「${widget.app.title}」を「${group.name}」から削除したよ'),
+        ),
+      );
+    });
+  }
 
   Future<void> _report() async {
     if (_busy) return;
@@ -416,19 +542,12 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
         children: <Widget>[
           Center(
-            child: Container(
-              width: 108,
-              height: 108,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1E8FA),
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: const Color(0xFFE2D2F1), width: 3),
-              ),
-              child: const Icon(
-                Icons.auto_awesome_rounded,
-                color: _lavender,
-                size: 54,
-              ),
+            child: _GirlsShopArtwork(
+              app: app,
+              size: 108,
+              radius: 30,
+              iconSize: 54,
+              borderWidth: 3,
             ),
           ),
           const SizedBox(height: 22),
@@ -462,13 +581,31 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
-            onPressed:
-                _busy || widget.currentGroup == null ? null : _addToGroup,
-            icon: const Icon(Icons.add_to_photos_rounded),
+            onPressed: _busy ||
+                    _checkingInstallState ||
+                    widget.currentGroup == null
+                ? null
+                : _installedCopy == null
+                    ? _addToGroup
+                    : _removeFromGroup,
+            style: _installedCopy == null
+                ? null
+                : OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
+            icon: Icon(
+              _installedCopy == null
+                  ? Icons.add_to_photos_rounded
+                  : Icons.delete_outline_rounded,
+            ),
             label: Text(
               widget.currentGroup == null
                   ? '追加するグループを選んでね'
-                  : '「${widget.currentGroup!.name}」に追加',
+                  : _checkingInstallState
+                      ? '追加状況を確認中…'
+                      : _installedCopy == null
+                          ? '「${widget.currentGroup!.name}」に追加'
+                          : '「${widget.currentGroup!.name}」から削除',
             ),
           ),
           const SizedBox(height: 18),
@@ -488,6 +625,51 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _GirlsShopArtwork extends StatelessWidget {
+  const _GirlsShopArtwork({
+    required this.app,
+    required this.size,
+    required this.radius,
+    required this.iconSize,
+    this.borderWidth = 1,
+  });
+
+  final GirlsShopApp app;
+  final double size;
+  final double radius;
+  final double iconSize;
+  final double borderWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isSingAlong = app.appId == _singAlongShopAppId;
+    return Container(
+      width: size,
+      height: size,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1E8FA),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: const Color(0xFFE2D2F1),
+          width: borderWidth,
+        ),
+      ),
+      child: isSingAlong
+          ? Image.asset(
+              _singAlongCardAsset,
+              fit: BoxFit.cover,
+              semanticLabel: 'うたってみよう',
+            )
+          : Icon(
+              Icons.auto_awesome_rounded,
+              color: _lavender,
+              size: iconSize,
+            ),
     );
   }
 }
