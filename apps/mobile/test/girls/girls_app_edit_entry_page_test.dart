@@ -9,8 +9,8 @@ import 'package:minapp_mobile/girls/girls_app_edit_entry_page.dart';
 import 'package:minapp_mobile/girls/girls_app_management_api.dart';
 import 'package:minapp_mobile/girls/girls_source_zip.dart';
 
-const String _groupId = '1' * 32;
-const String _appId = '2' * 32;
+const String _groupId = '11111111111111111111111111111111';
+const String _appId = '22222222222222222222222222222222';
 
 void main() {
   testWidgets('AI-first edit entry shows help, copy, examples, and editor path', (
