@@ -2,17 +2,15 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 import 'girls_errors.dart';
 import 'girls_app_management_api.dart';
+import 'girls_code_help.dart';
 import 'girls_scaffold.dart';
 import 'girls_source_zip.dart';
 
 const Color _cream = Color(0xFFFFFAF0);
 const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF745B9E);
-const String _girlsHowToUrl = 'https://cloxs.jp/minapp/girls/howto.html';
 
 class GirlsAppSourceEditorPage extends StatefulWidget {
   const GirlsAppSourceEditorPage({
@@ -316,56 +314,7 @@ class _GirlsAppSourceEditorPageState extends State<GirlsAppSourceEditorPage> {
       setState(() => _error = girlsMessageFor(error));
     }
   }
-  Future<void> _showHelp() async {
-    await showDialog<void>(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        key: const Key('girls-source-editor-help-dialog'),
-        title: const Text('コード編集で迷ったら？'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              'わからないところは、AIに相談しながら進めよう。',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            SizedBox(height: 12),
-            Text(
-              '「背景をピンクにしたい」「ボタンを増やしたい」みたいに、'
-              'やりたいことをそのまま伝えてみよう。',
-            ),
-            SizedBox(height: 12),
-            Text(
-              'みんアプGirlsの使い方ガイドには、AIにアレンジをお願いする流れも載っているよ。',
-            ),
-          ],
-        ),
-        actions: <Widget>[
-          TextButton(
-            key: const Key('girls-source-editor-help-close'),
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('閉じる'),
-          ),
-          FilledButton.icon(
-            key: const Key('girls-source-editor-howto'),
-            onPressed: () async {
-              final Uri uri = Uri.parse(_girlsHowToUrl);
-              final bool opened = await launchUrl(
-                uri,
-                mode: LaunchMode.externalApplication,
-              );
-              if (!opened) {
-                throw StateError('使い方ガイドを開けませんでした: $uri');
-              }
-            },
-            icon: const Icon(Icons.open_in_new_rounded),
-            label: const Text('使い方ガイドを見る'),
-          ),
-        ],
-      ),
-    );
-  }
+  Future<void> _showHelp() => showGirlsCodeHelpDialog(context);
 
   Future<void> _goHome(VoidCallback homeAction) async {
     if (_saving) return;
