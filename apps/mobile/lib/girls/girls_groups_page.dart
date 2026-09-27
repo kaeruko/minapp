@@ -645,7 +645,7 @@ class _CurrentGroupFirstView extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
                         Text(
-                          'グループのアプリ一覧',
+                          'アプリ一覧',
                           style: TextStyle(
                             color: _lavenderDark,
                             fontWeight: FontWeight.w900,
