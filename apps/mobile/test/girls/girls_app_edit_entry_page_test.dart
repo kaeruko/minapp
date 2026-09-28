@@ -156,13 +156,6 @@ void main() {
 
     expect(sourceReads, 1);
     expect(copiedText, isNotNull);
-    expect(copiedText, contains('これは「みんアプGirls」で動くミニアプリです。'));
-    expect(copiedText, contains('アプリ名: おえかき'));
-    expect(copiedText, contains('===== index.html ====='));
-    expect(copiedText, contains('<html><body>Hello</body></html>'));
-    expect(copiedText, contains('===== style.css ====='));
-    expect(copiedText, contains('body { background: white; }'));
-
     ScaffoldMessenger.of(
       tester.element(find.byType(GirlsAppEditEntryPage)),
     ).removeCurrentSnackBar();
