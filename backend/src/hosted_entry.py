@@ -43,6 +43,7 @@ _GROUP_APP_PREVIEW_RUNTIME_SESSION_RE = re.compile(
     rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/preview-runtime-session$"
 )
 _MY_APP_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}$")
+_MY_APP_TITLE_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/title$")
 _MY_APP_VISIBILITY_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/visibility$")
 _MY_APP_THUMBNAIL_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/thumbnail$")
 _MY_APP_PREVIEW_SESSION_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/preview-session$")
@@ -177,6 +178,29 @@ def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
                 backend,
                 auth_subject,
                 app_match.group(1),
+            ),
+        )
+
+    title_match = _MY_APP_TITLE_RE.fullmatch(path)
+    if method == "POST" and title_match is not None:
+        payload = _json_body(event)
+        _require_fields(payload, required={"title"})
+        title = payload["title"]
+        if not isinstance(title, str) or not title or title != title.strip() or len(title) > 80:
+            raise ApiProblem(
+                400,
+                "invalid_request",
+                "title must be a trimmed non-empty string up to 80 characters.",
+            )
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
+        return _json_response(
+            200,
+            hosted_app_management.set_title(
+                backend,
+                auth_subject,
+                title_match.group(1),
+                title=title,
             ),
         )
 
