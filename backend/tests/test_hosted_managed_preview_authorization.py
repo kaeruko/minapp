@@ -16,6 +16,7 @@ from hosted_app_management import (  # noqa: E402
     get_preview_file,
     list_managed_apps,
     set_group_visibility,
+    set_title,
     set_visibility,
 )
 from hosted_legal import PRIVACY_VERSION, TERMS_VERSION  # noqa: E402
@@ -133,6 +134,42 @@ class HostedManagedPreviewAuthorizationTests(unittest.TestCase):
             get_managed_app(self.backend, self.bob, non_editor["app_id"])
         self.assertEqual(caught.exception.status_code, 409)
         self.assertEqual(caught.exception.error, "app_not_editable")
+
+    def test_author_can_rename_own_app_but_other_member_cannot(self) -> None:
+        renamed = set_title(
+            self.backend,
+            self.bob,
+            self.bob_app["app_id"],
+            title="しばちゃんキャッチ",
+        )
+        self.assertEqual(renamed["title"], "しばちゃんキャッチ")
+        detail = get_managed_app(self.backend, self.bob, self.bob_app["app_id"])
+        self.assertEqual(detail["title"], "しばちゃんキャッチ")
+        grouped = self.backend._require_app_in_group(
+            self.bob_app["app_id"],
+            self.group_id,
+        )
+        self.assertEqual(grouped["title"]["S"], "しばちゃんキャッチ")
+
+        with self.assertRaises(ApiProblem) as caught:
+            set_title(
+                self.backend,
+                self.carol,
+                self.bob_app["app_id"],
+                title="勝手な変更",
+            )
+        self.assertEqual(caught.exception.status_code, 403)
+        self.assertEqual(caught.exception.error, "forbidden")
+
+        with self.assertRaises(ApiProblem) as invalid:
+            set_title(
+                self.backend,
+                self.bob,
+                self.bob_app["app_id"],
+                title=" 余白つき",
+            )
+        self.assertEqual(invalid.exception.status_code, 400)
+        self.assertEqual(invalid.exception.error, "invalid_request")
 
     def test_author_and_group_owner_can_change_visibility_but_other_member_cannot(self) -> None:
         hidden = set_visibility(
