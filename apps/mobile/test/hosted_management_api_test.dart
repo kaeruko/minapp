@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -17,10 +18,10 @@ http.Response _json(int statusCode, Object body) => http.Response(
   headers: const <String, String>{'content-type': 'application/json'},
 );
 
-Map<String, Object?> _managedAppJson() => <String, Object?>{
+Map<String, Object?> _managedAppJson({String title = 'テストアプリ'}) => <String, Object?>{
   'app_id': _appId,
   'group_id': _groupId,
-  'title': 'テストアプリ',
+  'title': title,
   'source_kind': 'upload',
   'created_at': '2026-09-07T00:00:00Z',
   'published_version': 2,
@@ -60,6 +61,77 @@ void main() {
     expect(apps.single.app.ownerUserId, _userId);
     expect(apps.single.groupName, 'テストグループ');
     expect(apps.single.stats.totalPlays, 8);
+  });
+
+  test('app title update uses the dedicated authenticated endpoint', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'POST');
+      expect(request.url.path, '/hosted/my/apps/$_appId/title');
+      expect(request.headers['authorization'], 'Bearer $_token');
+      expect(jsonDecode(request.body), <String, Object?>{'title': 'しばちゃんキャッチ'});
+      return _json(200, _managedAppJson(title: 'しばちゃんキャッチ'));
+    });
+    final HostedAppManagementApi api = HostedAppManagementApi(
+      baseUri: Uri.parse('https://hosted.example'),
+      client: client,
+    );
+
+    final ManagedHostedApp updated = await api.setTitle(
+      accessToken: _token,
+      appId: _appId,
+      title: 'しばちゃんキャッチ',
+    );
+
+    expect(updated.app.appId, _appId);
+    expect(updated.app.title, 'しばちゃんキャッチ');
+  });
+
+  test('thumbnail download and upload preserve declared PNG bytes', () async {
+    final Uint8List png = Uint8List.fromList(<int>[
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+    ]);
+    int calls = 0;
+    final MockClient client = MockClient((http.Request request) async {
+      calls += 1;
+      expect(request.url.path, '/hosted/my/apps/$_appId/thumbnail');
+      expect(request.headers['authorization'], 'Bearer $_token');
+      if (request.method == 'GET') {
+        return http.Response.bytes(
+          png,
+          200,
+          headers: const <String, String>{'content-type': 'image/png'},
+        );
+      }
+      expect(request.method, 'POST');
+      expect(request.headers['content-type'], 'image/png');
+      expect(request.bodyBytes, png);
+      return _json(200, <String, Object?>{
+        'app_id': _appId,
+        'content_type': 'image/png',
+        'bytes': png.length,
+        'updated_at': '2026-09-29T00:00:00Z',
+      });
+    });
+    final HostedAppManagementApi api = HostedAppManagementApi(
+      baseUri: Uri.parse('https://hosted.example'),
+      client: client,
+    );
+
+    final HostedThumbnailDownload? loaded = await api.getThumbnail(
+      accessToken: _token,
+      appId: _appId,
+    );
+    expect(loaded, isNotNull);
+    expect(loaded!.contentType, 'image/png');
+    expect(loaded.bytes, png);
+
+    await api.setThumbnail(
+      accessToken: _token,
+      appId: _appId,
+      bytes: png,
+      contentType: 'image/png',
+    );
+    expect(calls, 2);
   });
 
   test('group rename uses PATCH and keeps the requested group scope', () async {
