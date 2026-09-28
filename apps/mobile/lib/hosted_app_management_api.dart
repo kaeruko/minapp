@@ -7,6 +7,12 @@ import 'api.dart';
 import 'hosted_api.dart';
 
 const int maxHostedZipUploadBytes = 2 * 1024 * 1024;
+const int maxHostedThumbnailBytes = 192 * 1024;
+const Set<String> hostedThumbnailContentTypes = <String>{
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+};
 final RegExp _managedIdPattern = RegExp(r'^[0-9a-f]{32}$');
 final RegExp _sha256Pattern = RegExp(r'^[0-9a-f]{64}$');
 
@@ -20,6 +26,16 @@ class HostedSourceDownload {
   final Uint8List bytes;
   final int revision;
   final String sha256;
+}
+
+class HostedThumbnailDownload {
+  const HostedThumbnailDownload({
+    required this.bytes,
+    required this.contentType,
+  });
+
+  final Uint8List bytes;
+  final String contentType;
 }
 
 class HostedAppStats {
@@ -291,6 +307,91 @@ class HostedAppManagementApi {
         accessToken: accessToken,
       ),
     );
+  }
+
+  Future<ManagedHostedApp> setTitle({
+    required String accessToken,
+    required String appId,
+    required String title,
+  }) async {
+    _validateId(appId, 'appId');
+    _validateHostedTitle(title);
+    return ManagedHostedApp.fromJson(
+      await _jsonRequest(
+        method: 'POST',
+        path: '/hosted/my/apps/$appId/title',
+        accessToken: accessToken,
+        body: <String, Object?>{'title': title},
+      ),
+    );
+  }
+
+  Future<HostedThumbnailDownload?> getThumbnail({
+    required String accessToken,
+    required String appId,
+  }) async {
+    _validateToken(accessToken);
+    _validateId(appId, 'appId');
+    final http.Response response = await _client.get(
+      _baseUri.resolve('/hosted/my/apps/$appId/thumbnail'),
+      headers: <String, String>{
+        'Accept': 'image/webp,image/png,image/jpeg',
+        'Authorization': 'Bearer $accessToken',
+      },
+    );
+    if (response.statusCode == 404) {
+      try {
+        _decodeJsonResponse(response);
+      } on ApiException catch (error) {
+        if (error.code == 'thumbnail_not_found') return null;
+        rethrow;
+      }
+      throw StateError('Thumbnail 404 response did not report an error.');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      _decodeJsonResponse(response);
+      throw StateError('Unreachable thumbnail download error path.');
+    }
+    final String contentType = (response.headers['content-type'] ?? '')
+        .split(';')
+        .first
+        .trim()
+        .toLowerCase();
+    final Uint8List bytes = Uint8List.fromList(response.bodyBytes);
+    _validateHostedThumbnail(bytes, contentType);
+    return HostedThumbnailDownload(bytes: bytes, contentType: contentType);
+  }
+
+  Future<void> setThumbnail({
+    required String accessToken,
+    required String appId,
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
+    _validateToken(accessToken);
+    _validateId(appId, 'appId');
+    _validateHostedThumbnail(bytes, contentType);
+    final http.Response response = await _client.post(
+      _baseUri.resolve('/hosted/my/apps/$appId/thumbnail'),
+      headers: <String, String>{
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': contentType,
+      },
+      body: bytes,
+    );
+    final Map<String, Object?> payload = _decodeJsonResponse(response);
+    final Object? returnedAppId = payload['app_id'];
+    final Object? returnedType = payload['content_type'];
+    final Object? returnedBytes = payload['bytes'];
+    final Object? updatedAt = payload['updated_at'];
+    if (returnedAppId != appId ||
+        returnedType != contentType ||
+        returnedBytes != bytes.length ||
+        updatedAt is! String ||
+        updatedAt.isEmpty) {
+      throw const FormatException('Thumbnail update returned invalid metadata.');
+    }
   }
 
   Future<ManagedHostedApp> setHidden({
@@ -565,6 +666,67 @@ Uri _validateBaseUri(Uri uri) {
 void _validateToken(String accessToken) {
   if (accessToken.isEmpty) {
     throw ArgumentError.value(accessToken, 'accessToken', 'must not be empty');
+  }
+}
+
+void _validateHostedTitle(String title) {
+  if (title.isEmpty || title != title.trim() || title.length > 80) {
+    throw ArgumentError.value(
+      title,
+      'title',
+      'must be a trimmed non-empty string up to 80 characters',
+    );
+  }
+}
+
+void _validateHostedThumbnail(Uint8List bytes, String contentType) {
+  if (!hostedThumbnailContentTypes.contains(contentType)) {
+    throw ArgumentError.value(
+      contentType,
+      'contentType',
+      'must be image/jpeg, image/png, or image/webp',
+    );
+  }
+  if (bytes.isEmpty || bytes.length > maxHostedThumbnailBytes) {
+    throw ArgumentError.value(
+      bytes.length,
+      'bytes',
+      'thumbnail must contain 1 to $maxHostedThumbnailBytes bytes',
+    );
+  }
+
+  final bool signatureMatches = switch (contentType) {
+    'image/png' =>
+      bytes.length >= 8 &&
+          bytes[0] == 0x89 &&
+          bytes[1] == 0x50 &&
+          bytes[2] == 0x4E &&
+          bytes[3] == 0x47 &&
+          bytes[4] == 0x0D &&
+          bytes[5] == 0x0A &&
+          bytes[6] == 0x1A &&
+          bytes[7] == 0x0A,
+    'image/jpeg' =>
+      bytes.length >= 3 &&
+          bytes[0] == 0xFF &&
+          bytes[1] == 0xD8 &&
+          bytes[2] == 0xFF,
+    'image/webp' =>
+      bytes.length >= 12 &&
+          bytes[0] == 0x52 &&
+          bytes[1] == 0x49 &&
+          bytes[2] == 0x46 &&
+          bytes[3] == 0x46 &&
+          bytes[8] == 0x57 &&
+          bytes[9] == 0x45 &&
+          bytes[10] == 0x42 &&
+          bytes[11] == 0x50,
+    _ => false,
+  };
+  if (!signatureMatches) {
+    throw const FormatException(
+      'Thumbnail bytes do not match the declared content type.',
+    );
   }
 }
 
