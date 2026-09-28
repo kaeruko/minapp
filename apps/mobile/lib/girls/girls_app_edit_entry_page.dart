@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
 import '../hosted_app_management_api.dart'
-    show maxHostedThumbnailBytes, hostedThumbnailContentTypes;
+    show HostedThumbnailDownload, maxHostedThumbnailBytes, hostedThumbnailContentTypes;
 import 'girls_app_management_api.dart';
 import 'girls_app_source_editor_page.dart';
 import 'girls_code_help.dart';
