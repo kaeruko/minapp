@@ -31,6 +31,16 @@ void main() {
   }) =>
       MockClient((http.Request request) async {
         expect(request.method, 'GET');
+        if (request.url.path == '/hosted/my/apps/$_appId/thumbnail') {
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'error': 'thumbnail_not_found',
+              'message': 'サムネイルは設定されていません。',
+            }),
+            404,
+            headers: const <String, String>{'content-type': 'application/json'},
+          );
+        }
         expect(
           request.url.path,
           '/hosted/groups/$_groupId/apps/$_appId/source',
@@ -79,6 +89,11 @@ void main() {
     expect(find.byKey(const Key('girls-edit-entry-back')), findsOneWidget);
     expect(find.byKey(const Key('girls-edit-entry-help')), findsOneWidget);
     expect(find.byKey(const Key('girls-edit-entry-copy')), findsOneWidget);
+    expect(find.byKey(const Key('girls-edit-entry-metadata')), findsOneWidget);
+    expect(find.byKey(const Key('girls-edit-entry-title')), findsOneWidget);
+    expect(find.byKey(const Key('girls-edit-entry-pick-icon')), findsOneWidget);
+    expect(find.byKey(const Key('girls-edit-entry-save-icon')), findsOneWidget);
+    expect(find.byKey(const Key('girls-edit-entry-save-title')), findsOneWidget);
     expect(find.text('背景をピンクにしたい'), findsOneWidget);
     expect(find.text('ボタンをもっとかわいくしたい'), findsOneWidget);
     expect(find.text('犬の画像を追加したい'), findsOneWidget);
