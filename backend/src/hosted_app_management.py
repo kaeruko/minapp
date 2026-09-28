@@ -201,6 +201,63 @@ def _set_visibility_authorized(
     return _managed_payload(backend, refreshed)
 
 
+def set_title(
+    backend: Any,
+    auth_subject: str,
+    app_id: str,
+    *,
+    title: str,
+) -> dict[str, Any]:
+    if not isinstance(title, str) or not title or title != title.strip() or len(title) > 80:
+        raise ApiProblem(
+            400,
+            "invalid_request",
+            "title must be a trimmed non-empty string up to 80 characters.",
+        )
+
+    _, app = _author_editable_app(backend, auth_subject, app_id)
+    group_id = _item_string(app, "group_id")
+    updated_at = _now_iso()
+    update_expression = "SET title = :title, title_updated_at = :updated_at"
+    values = {
+        ":title": _string_attr(title),
+        ":updated_at": _string_attr(updated_at),
+    }
+
+    backend._dynamodb.transact_write_items(
+        TransactItems=[
+            {
+                "Update": {
+                    "TableName": backend._table_name,
+                    "Key": {
+                        "pk": _string_attr(f"APP#{app_id}"),
+                        "sk": _string_attr("META"),
+                    },
+                    "UpdateExpression": update_expression,
+                    "ConditionExpression": "attribute_exists(pk) AND attribute_not_exists(deletion_state)",
+                    "ExpressionAttributeValues": values,
+                }
+            },
+            {
+                "Update": {
+                    "TableName": backend._table_name,
+                    "Key": {
+                        "pk": _string_attr(f"GROUP#{group_id}"),
+                        "sk": _string_attr(f"APP#{app_id}"),
+                    },
+                    "UpdateExpression": update_expression,
+                    "ConditionExpression": "attribute_exists(pk) AND attribute_not_exists(deletion_state)",
+                    "ExpressionAttributeValues": values,
+                }
+            },
+        ]
+    )
+    refreshed = backend._get_item(pk=f"APP#{app_id}", sk="META")
+    if refreshed is None:
+        raise RuntimeError("Managed app disappeared after title update")
+    return _managed_payload(backend, refreshed)
+
+
 def set_visibility(
     backend: Any,
     auth_subject: str,
