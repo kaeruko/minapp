@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import 'girls/girls_scaffold.dart';
 import 'hosted_authoring_bridge.dart';
 import 'hosted_authoring_launch_client.dart';
 import 'hosted_authoring_preview_bridge.dart';
@@ -571,7 +572,10 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _usesGirlsNovelBackground ? Colors.transparent : null,
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: !GirlsScaffoldChromeScope.isEmbedded(context) ||
+              widget.authoringLaunch != null
+          ? AppBar(title: Text(widget.title))
+          : null,
       body: SafeArea(
         child: _error != null
             ? Center(

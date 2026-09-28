@@ -7,10 +7,19 @@ const Color _girlsCream = Color(0xFFFCF4E9);
 const Color _headerCream = Color(0xFFFBF3E8);
 const String _headerBackground =
     'assets/girls/backgrounds/girls_header_bg_top.png';
-const String _headerPanelBackground =
-    'assets/girls/backgrounds/girls_header_bg.jpg';
 const String _bodyBackground = 'assets/girls/backgrounds/girls_body_bg.jpg';
 const String _girlsLogo = 'assets/girls/generated/minapp_girls_logo.png';
+
+/// Lets a route match the transparent lace to the top of its own background.
+class GirlsPageRouteSettings extends RouteSettings {
+  const GirlsPageRouteSettings({
+    super.name,
+    super.arguments,
+    this.headerLaceBackgroundColor,
+  });
+
+  final Color? headerLaceBackgroundColor;
+}
 
 /// Marks pages that are already hosted inside the authenticated Girls chrome.
 ///
@@ -50,6 +59,7 @@ class GirlsScaffold extends StatelessWidget {
     required this.body,
     required this.bottomNavigationBar,
     this.pageBackgroundDecoration,
+    this.headerLaceBackgroundColor,
     super.key,
   });
 
@@ -59,6 +69,7 @@ class GirlsScaffold extends StatelessWidget {
   final Widget body;
   final Widget bottomNavigationBar;
   final Decoration? pageBackgroundDecoration;
+  final Color? headerLaceBackgroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -101,6 +112,19 @@ class GirlsScaffold extends StatelessWidget {
                   right: 0,
                   bottom: 0,
                   child: const _GirlsBodyBackground(),
+                ),
+                // Every page gets a solid backing under the transparent lace.
+                // A route can match its own color; the shared artwork never
+                // leaks through as a separate gradient strip.
+                Positioned(
+                  top: header.height - header.laceHeight,
+                  left: 0,
+                  right: 0,
+                  height: header.laceHeight,
+                  child: ColoredBox(
+                    key: const Key('girls-header-lace-underlay'),
+                    color: headerLaceBackgroundColor ?? _headerCream,
+                  ),
                 ),
                 Column(
                   children: <Widget>[
@@ -407,14 +431,13 @@ class _GirlsBodyBackground extends StatelessWidget {
           builder: (BuildContext context, BoxConstraints constraints) {
             final double imageWidth = math.min(constraints.maxWidth, 600);
             final double imageHeight = imageWidth * 1984 / 1200;
-            final double bodyTop = constraints.maxWidth * (900 - 350) / 1200;
             return ClipRect(
               child: Stack(
                 fit: StackFit.expand,
                 alignment: Alignment.topCenter,
                 children: <Widget>[
                   Positioned(
-                    top: bodyTop,
+                    top: 0,
                     left: (constraints.maxWidth - imageWidth) / 2,
                     width: imageWidth,
                     height: imageHeight,
@@ -428,9 +451,9 @@ class _GirlsBodyBackground extends StatelessWidget {
                   ),
                   // The source is not a seamless tile. Fade to cream instead of
                   // repeating clouds or exposing a hard edge on tall screens.
-                  if (constraints.maxHeight > bodyTop + imageHeight)
+                  if (constraints.maxHeight > imageHeight)
                     Positioned(
-                      top: math.max(0, bodyTop + imageHeight - 96),
+                      top: math.max(0, imageHeight - 96),
                       width: imageWidth,
                       height: 96,
                       child: const DecoratedBox(
@@ -446,21 +469,6 @@ class _GirlsBodyBackground extends StatelessWidget {
                         ),
                       ),
                     ),
-                  // Continue the original artwork below the header's lace.
-                  // This surface starts at source y=350, aligned with the
-                  // transparent bottom 100 pixels of the 1200 x 450 header.
-                  Positioned(
-                    top: -constraints.maxWidth * 350 / 1200,
-                    left: 0,
-                    right: 0,
-                    child: Image.asset(
-                      _headerPanelBackground,
-                      key: const Key('girls-header-panel-background'),
-                      width: constraints.maxWidth,
-                      height: constraints.maxWidth * 900 / 1200,
-                      fit: BoxFit.fill,
-                    ),
-                  ),
                 ],
               ),
             );

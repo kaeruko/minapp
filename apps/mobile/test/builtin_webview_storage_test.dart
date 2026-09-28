@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:minapp_mobile/app_webview.dart';
 import 'package:minapp_mobile/builtin_webview.dart';
+import 'package:minapp_mobile/girls/girls_scaffold.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
 
@@ -21,17 +22,41 @@ void main() {
   Future<_StorageWebViewController> open(
     WidgetTester tester, {
     String appId = 'memo',
+    bool embedded = false,
+    bool showAppBar = true,
   }) async {
+    final Widget page = BuiltInWebViewPage(
+      appId: appId,
+      title: appId,
+      assetPath: 'assets/builtin/memo_pad/index.html',
+      showAppBar: showAppBar,
+    );
     await tester.pumpWidget(MaterialApp(
-      home: BuiltInWebViewPage(
-        appId: appId,
-        title: appId,
-        assetPath: 'assets/builtin/memo_pad/index.html',
-      ),
+      home: embedded ? GirlsScaffoldChromeScope(child: page) : page,
     ));
     await tester.pumpAndSettle();
     return platform.controllers.last;
   }
+
+  for (final bool embedded in <bool>[false, true]) {
+    testWidgets('built-in title bar follows Girls embedding: $embedded',
+        (WidgetTester tester) async {
+      final _StorageWebViewController controller =
+          await open(tester, embedded: embedded);
+
+      expect(find.byType(AppBar), embedded ? findsNothing : findsOneWidget);
+      expect(controller.assets, <String>['assets/builtin/memo_pad/index.html']);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('standalone built-in respects explicit title bar hiding',
+      (WidgetTester tester) async {
+    await open(tester, showAppBar: false);
+
+    expect(find.byType(AppBar), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   Future<Map<String, Object?>> request(
     WidgetTester tester,

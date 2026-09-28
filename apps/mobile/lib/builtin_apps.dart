@@ -6,6 +6,7 @@ class BuiltInApp {
     required this.id,
     required this.title,
     required this.assetPath,
+    required this.topBackgroundColor,
     required this.searchableText,
     required this.icon,
     required this.cardColor,
@@ -17,6 +18,8 @@ class BuiltInApp {
   final String id;
   final String title;
   final String assetPath;
+  /// Matches the bundled app's background at the top of its viewport.
+  final Color topBackgroundColor;
   final String searchableText;
   final IconData icon;
   final Color cardColor;
@@ -38,6 +41,7 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     id: 'shiba-game',
     title: 'しば犬どんぐりキャッチ',
     assetPath: 'assets/builtin/shiba_donguri/index.html',
+    topBackgroundColor: Color(0xFFBDE8FF),
     searchableText:
         'しば犬どんぐりキャッチ 柴犬 しばちゃん どんぐり ゲーム みんアプ公式 サンプル',
     icon: Icons.pets_rounded,
@@ -50,6 +54,7 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     id: 'shiba-goshujin',
     title: 'ごしゅじんどこわん',
     assetPath: 'assets/builtin/shiba_goshujin/index.html',
+    topBackgroundColor: Color(0xFFBCE8FF),
     searchableText:
         'ごしゅじんどこわん ご主人 しばちゃん ここわん なでなで 柴犬 かくれんぼ ゲーム みんアプ公式 サンプル',
     icon: Icons.favorite_rounded,
@@ -62,6 +67,7 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     id: 'shopping-town',
     title: 'おかいもの いくわよ',
     assetPath: 'assets/builtin/shopping_town/index.html',
+    topBackgroundColor: Color(0xFFBFE9FF),
     searchableText:
         'おかいもの いくわよ お買い物 奥さん 横スクロール ランナー ジャンプ しゃがむ 町 スーパー ゲーム みんアプ公式 サンプル',
     icon: Icons.shopping_bag_rounded,
@@ -74,6 +80,7 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     id: 'ol-home',
     title: 'OLさん おうちにかえる',
     assetPath: 'assets/builtin/ol_home/index.html',
+    topBackgroundColor: Color(0xFF24345D),
     searchableText:
         'OLさん おうちにかえる 帰宅 会社員 マンション 窓 明かり 4つ 同じ色 近道 横スクロール ゲーム みんアプ公式 サンプル',
     icon: Icons.apartment_rounded,
@@ -86,6 +93,7 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     id: 'novel-starter',
     title: 'ひみつの放課後',
     assetPath: 'assets/builtin/novel_starter/index.html',
+    topBackgroundColor: Color(0xFF7770AE),
     searchableText:
         'ひみつの放課後 パステルノベル ノベルゲーム 物語 選択肢 恋愛 Girls 女子向け みんアプ公式 サンプル',
     icon: Icons.auto_stories_rounded,
@@ -98,6 +106,7 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     id: 'sing-along',
     title: 'うたってみよう',
     assetPath: 'assets/builtin/sing_along/index.html',
+    topBackgroundColor: Color(0xFFFFE7F2),
     searchableText:
         'うたってみよう カラオケ 歌 うた 録音 BGM マイク 音楽 Girls 女子向け みんアプ公式 サンプル',
     icon: Icons.mic_rounded,
@@ -110,6 +119,7 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     id: 'minappchi',
     title: 'みんあぷっち',
     assetPath: 'assets/builtin/minappchi/index.html',
+    topBackgroundColor: Color(0xFFFFE8F2),
     searchableText:
         'みんあぷっち みんアプっち 育成 ペット たまご お世話 おやつ Girls 女子向け みんアプ公式 サンプル',
     icon: Icons.pets_rounded,
@@ -122,6 +132,7 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     id: 'memo',
     title: 'マイメモ帳',
     assetPath: 'assets/builtin/memo_pad/index.html',
+    topBackgroundColor: Color(0xFFFFFAF7),
     searchableText:
         'マイメモ帳 メモ メモ帳 ノート 自動保存 Girls 女子向け みんアプ公式',
     icon: Icons.edit_note_rounded,

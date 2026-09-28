@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import 'builtin_state_store.dart';
+import 'girls/girls_scaffold.dart';
 
 export 'builtin_state_store.dart' show builtInStatePreferenceKey;
 
@@ -435,7 +436,10 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: widget.transparentBackground ? Colors.transparent : null,
-      appBar: widget.showAppBar ? AppBar(title: Text(widget.title)) : null,
+      appBar: widget.showAppBar &&
+              !GirlsScaffoldChromeScope.isEmbedded(context)
+          ? AppBar(title: Text(widget.title))
+          : null,
       body: SafeArea(
         child: _error != null
             ? Center(

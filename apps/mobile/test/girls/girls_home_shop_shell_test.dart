@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:minapp_mobile/builtin_webview.dart';
 import 'package:minapp_mobile/girls/api.dart';
 import 'package:minapp_mobile/girls/girls_current_group_store.dart';
 import 'package:minapp_mobile/girls/girls_home_shop_shell.dart';
+import 'package:minapp_mobile/girls/girls_profile_page.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
 class _MemoryCurrentGroupStore implements GirlsCurrentGroupStore {
@@ -121,6 +123,93 @@ void main() {
     expect(find.byKey(const Key('girls-common-header')), findsOneWidget);
     expect(find.byKey(const Key('girls-footer-home')), findsOneWidget);
     expect(find.text('公式アプリ'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('built-in lace follows each app and resets on other pages', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(360, 720));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final HostedGirlsApi api = _fakeApi();
+    const AuthenticatedSession session = AuthenticatedSession(
+      accessToken: 'test-token',
+      expiresIn: 3600,
+    );
+    final Finder underlay = find.byKey(const Key('girls-header-lace-underlay'));
+    const Color defaultLaceColor = Color(0xFFFBF3E8);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GirlsHomeShopShell(
+          api: api,
+          session: session,
+          onLogout: () {},
+          currentGroupStore: _MemoryCurrentGroupStore(),
+        ),
+      ),
+    );
+    await _finishRouteTransition(tester);
+    expect(tester.widget<ColoredBox>(underlay).color, defaultLaceColor);
+
+    for (final (String card, String appId, Color color)
+        in <(String, String, Color)>[
+      ('minappchi', 'minappchi', const Color(0xFFFFE8F2)),
+      ('memo', 'memo', const Color(0xFFFFFAF7)),
+      ('novel', 'novel-starter', const Color(0xFF7770AE)),
+    ]) {
+      await tester.tap(find.byKey(Key('girls-home-$card-app')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<BuiltInWebViewPage>(find.byType(BuiltInWebViewPage))
+            .appId,
+        appId,
+      );
+      expect(find.byType(AppBar), findsNothing);
+      expect(tester.widget<ColoredBox>(underlay).color, color);
+      final Rect header =
+          tester.getRect(find.byKey(const Key('girls-common-header')));
+      final Rect lace = tester.getRect(underlay);
+      expect(lace.bottom, closeTo(header.bottom, .001));
+      expect(lace.left, header.left);
+      expect(lace.width, header.width);
+
+      // Exercise the nested navigator directly: the shell profile button also
+      // returns to the selected footer tab after closing its profile page.
+      final NavigatorState navigator =
+          Navigator.of(tester.element(find.byType(BuiltInWebViewPage)));
+      navigator.push<void>(
+        MaterialPageRoute<void>(
+          builder: (BuildContext context) =>
+              GirlsProfilePage(api: api, session: session),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(GirlsProfilePage), findsOneWidget);
+      expect(tester.widget<ColoredBox>(underlay).color, defaultLaceColor);
+
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(tester.widget<ColoredBox>(underlay).color, color);
+      expect(find.byType(AppBar), findsNothing);
+
+      await tester.tap(find.byKey(const Key('girls-footer-home')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<ColoredBox>(underlay).color, defaultLaceColor);
+      expect(find.text('公式アプリ'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('girls-builtin-arrange-later')));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+
+    await tester.tap(find.byKey(const Key('girls-home-minappchi-app')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<ColoredBox>(underlay).color,
+      const Color(0xFFFFE8F2),
+    );
     expect(tester.takeException(), isNull);
   });
 }

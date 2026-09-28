@@ -4,7 +4,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:minapp_mobile/app_webview.dart';
+import 'package:minapp_mobile/girls/girls_scaffold.dart';
 import 'package:minapp_mobile/hosted_app_webview.dart';
+import 'package:minapp_mobile/hosted_authoring_bridge.dart';
+import 'package:minapp_mobile/hosted_authoring_launch_client.dart';
 import 'package:minapp_mobile/hosted_runtime_bridge.dart';
 import 'package:webview_flutter/webview_flutter.dart' show WebViewWidget;
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
@@ -29,15 +32,17 @@ void main() {
     String path, {
     String runtimeToken = _runtimeToken,
     bool settle = true,
+    bool embedded = false,
   }) async {
+    final Widget page = HostedAppWebViewPage.session(
+      title: 'うたってみよう',
+      contentUri: Uri.parse('$_origin$path'),
+      runtimeToken: runtimeToken,
+      runtimeTransport: transport,
+    );
     await tester.pumpWidget(
       MaterialApp(
-        home: HostedAppWebViewPage.session(
-          title: 'うたってみよう',
-          contentUri: Uri.parse('$_origin$path'),
-          runtimeToken: runtimeToken,
-          runtimeTransport: transport,
-        ),
+        home: embedded ? GirlsScaffoldChromeScope(child: page) : page,
       ),
     );
     if (settle) {
@@ -45,6 +50,54 @@ void main() {
     } else {
       await tester.pump();
     }
+  }
+
+  for (final bool embedded in <bool>[false, true]) {
+    testWidgets('hosted app title bar follows Girls embedding: $embedded',
+        (WidgetTester tester) async {
+      await openSession(
+        tester,
+        '/hosted/content/$_contentToken/index.html',
+        embedded: embedded,
+      );
+
+      expect(find.byType(AppBar), embedded ? findsNothing : findsOneWidget);
+      expect(find.byType(WebViewWidget), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('authoring keeps its title bar with Girls embedding: $embedded',
+        (WidgetTester tester) async {
+      final Widget page = HostedAppWebViewPage.authoring(
+        title: '作品を編集',
+        launch: HostedAuthoringLaunchGrant(
+          contentUri: Uri.parse(
+            '$_origin/hosted/authoring-editor/$_contentToken/index.html',
+          ),
+          contentExpiresIn: 600,
+          runtimeToken: _runtimeToken,
+          runtimeExpiresIn: 600,
+          authoringToken: _otherContentToken,
+          authoringExpiresIn: 600,
+          contentId: '11111111111111111111111111111111',
+          contentFormat: 'example/story@1',
+          editorAppId: '22222222222222222222222222222222',
+          allowedOperations: const <String>['load', 'save_document'],
+        ),
+        runtimeTransport: transport,
+        authoringTransport: _FakeAuthoringTransport(),
+        authoringPreviewHost: (_) async => null,
+      );
+      await tester.pumpWidget(MaterialApp(
+        home: embedded ? GirlsScaffoldChromeScope(child: page) : page,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppBar), findsOneWidget);
+      expect(find.text('作品を編集'), findsOneWidget);
+      expect(find.byType(WebViewWidget), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   for (final String operation in <String>[
@@ -259,6 +312,8 @@ class _FakeRuntimeTransport extends Fake implements HostedRuntimeTransport {
     return 'sparkle';
   }
 }
+
+class _FakeAuthoringTransport extends Fake implements HostedAuthoringTransport {}
 
 class _FakeWebViewPlatform extends WebViewPlatform {
   _FakeWebViewController? controller;

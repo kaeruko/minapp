@@ -170,13 +170,13 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   Future<void> _launchBuiltin(BuiltInApp app) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
+        settings: GirlsPageRouteSettings(
+          headerLaceBackgroundColor: app.topBackgroundColor,
+        ),
         builder: (BuildContext context) => BuiltInWebViewPage(
           appId: app.id,
           title: app.title,
           assetPath: app.assetPath,
-          transparentBackground: app.id == 'memo',
-          showAppBar:
-              app.id != 'minappchi' || !GirlsScaffoldChromeScope.isEmbedded(context),
         ),
       ),
     );

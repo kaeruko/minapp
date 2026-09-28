@@ -59,11 +59,15 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
   bool _novelFlowActive = false;
   int? _novelFlowBaseDepth;
   String? _currentGroupError;
+  Color? _headerLaceBackgroundColor;
 
   @override
   void initState() {
     super.initState();
-    _navigatorObserver = _GirlsShellNavigatorObserver(_syncFooterForRouteDepth);
+    _navigatorObserver = _GirlsShellNavigatorObserver(
+      _syncFooterForRouteDepth,
+      _syncHeaderLaceBackground,
+    );
     _loadCurrentGroup();
   }
 
@@ -148,6 +152,17 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
         _navigatorObserver.depth > baseDepth + 1;
     if (_footerHidden == hidden) return;
     setState(() => _footerHidden = hidden);
+  }
+
+  void _syncHeaderLaceBackground() {
+    // Navigator can notify while building. Read the latest route after the
+    // frame so rapid pushes/pops cannot leave an obsolete color behind.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final Color? color = _navigatorObserver.headerLaceBackgroundColor;
+      if (_headerLaceBackgroundColor == color) return;
+      setState(() => _headerLaceBackgroundColor = color);
+    });
   }
 
   Route<void> _rootRoute(GirlsFooterTab tab) {
@@ -403,6 +418,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
 
     return GirlsScaffold(
       leading: _BellButton(onTap: _showNotices),
+      headerLaceBackgroundColor: _headerLaceBackgroundColor,
       actions: <Widget>[
         _RoundArtButton(
           key: const Key('girls-shell-settings'),
@@ -450,15 +466,26 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
 }
 
 class _GirlsShellNavigatorObserver extends NavigatorObserver {
-  _GirlsShellNavigatorObserver(this.onStackChanged);
+  _GirlsShellNavigatorObserver(this.onStackChanged, this.onTopChanged);
 
   final VoidCallback onStackChanged;
+  final VoidCallback onTopChanged;
+  Color? headerLaceBackgroundColor;
   int _depth = 0;
 
   int get depth => _depth;
 
   void _notify() {
     onStackChanged();
+  }
+
+  @override
+  void didChangeTop(Route<dynamic> topRoute, Route<dynamic>? previousTopRoute) {
+    final RouteSettings settings = topRoute.settings;
+    headerLaceBackgroundColor = settings is GirlsPageRouteSettings
+        ? settings.headerLaceBackgroundColor
+        : null;
+    onTopChanged();
   }
 
   @override
