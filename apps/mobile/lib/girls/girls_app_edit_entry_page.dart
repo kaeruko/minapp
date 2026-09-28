@@ -1,6 +1,11 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
+import '../hosted_app_management_api.dart'
+    show maxHostedThumbnailBytes, hostedThumbnailContentTypes;
 import 'girls_app_management_api.dart';
 import 'girls_app_source_editor_page.dart';
 import 'girls_code_help.dart';
@@ -23,6 +28,7 @@ class GirlsAppEditEntryPage extends StatefulWidget {
     required this.title,
     required this.expectedRevision,
     this.onSaved,
+    this.onMetadataSaved,
     super.key,
   });
 
@@ -33,6 +39,7 @@ class GirlsAppEditEntryPage extends StatefulWidget {
   final String title;
   final int expectedRevision;
   final Future<void> Function(int revision)? onSaved;
+  final Future<void> Function()? onMetadataSaved;
 
   @override
   State<GirlsAppEditEntryPage> createState() => _GirlsAppEditEntryPageState();
@@ -40,6 +47,14 @@ class GirlsAppEditEntryPage extends StatefulWidget {
 
 class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
   late int _currentRevision;
+  late String _currentTitle;
+  late final TextEditingController _titleController;
+  Uint8List? _thumbnailBytes;
+  Uint8List? _pendingThumbnailBytes;
+  String? _pendingThumbnailContentType;
+  bool _thumbnailLoading = false;
+  bool _metadataBusy = false;
+  String? _metadataMessage;
   bool _copying = false;
   String? _error;
 
@@ -47,6 +62,149 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
   void initState() {
     super.initState();
     _currentRevision = widget.expectedRevision;
+    _currentTitle = widget.title;
+    _titleController = TextEditingController(text: widget.title);
+    _loadThumbnail();
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadThumbnail() async {
+    if (_thumbnailLoading) return;
+    setState(() {
+      _thumbnailLoading = true;
+      _metadataMessage = null;
+    });
+    try {
+      final HostedThumbnailDownload? thumbnail = await widget.api.getThumbnail(
+        accessToken: widget.accessToken,
+        appId: widget.appId,
+      );
+      if (!mounted) return;
+      setState(() => _thumbnailBytes = thumbnail?.bytes);
+    } catch (error) {
+      if (mounted) setState(() => _metadataMessage = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _thumbnailLoading = false);
+    }
+  }
+
+  Future<void> _saveTitle() async {
+    if (_metadataBusy) return;
+    final String rawTitle = _titleController.text;
+    if (rawTitle.isEmpty) {
+      setState(() => _metadataMessage = 'アプリ名を入力してください。');
+      return;
+    }
+    if (rawTitle != rawTitle.trim()) {
+      setState(() => _metadataMessage = 'アプリ名の前後に空白を入れないでください。');
+      return;
+    }
+    if (rawTitle.length > 80) {
+      setState(() => _metadataMessage = 'アプリ名は80文字以内にしてください。');
+      return;
+    }
+    if (rawTitle == _currentTitle) {
+      setState(() => _metadataMessage = 'アプリ名は変更されていません。');
+      return;
+    }
+
+    setState(() {
+      _metadataBusy = true;
+      _metadataMessage = null;
+    });
+    try {
+      final ManagedGirlsApp updated = await widget.api.setTitle(
+        accessToken: widget.accessToken,
+        appId: widget.appId,
+        title: rawTitle,
+      );
+      if (updated.app.appId != widget.appId || updated.app.title != rawTitle) {
+        throw const FormatException('アプリ名の保存結果が一致しません。');
+      }
+      _currentTitle = rawTitle;
+      final Future<void> Function()? onMetadataSaved = widget.onMetadataSaved;
+      if (onMetadataSaved != null) await onMetadataSaved();
+      if (!mounted) return;
+      setState(() => _metadataMessage = 'アプリ名を保存しました ♡');
+    } catch (error) {
+      if (mounted) setState(() => _metadataMessage = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _metadataBusy = false);
+    }
+  }
+
+  Future<void> _pickThumbnail() async {
+    if (_metadataBusy) return;
+    final PlatformFile? file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: const <String>['jpg', 'jpeg', 'png', 'webp'],
+    );
+    if (file == null || !mounted) return;
+
+    final String extension = file.extension?.toLowerCase() ?? '';
+    final String? contentType = switch (extension) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      _ => null,
+    };
+    if (contentType == null || !hostedThumbnailContentTypes.contains(contentType)) {
+      setState(() => _metadataMessage = 'JPEG・PNG・WebPの画像を選んでください。');
+      return;
+    }
+
+    final Uint8List bytes = await file.readAsBytes();
+    if (!mounted) return;
+    if (bytes.isEmpty || bytes.length > maxHostedThumbnailBytes) {
+      setState(() => _metadataMessage = 'アイコン画像は1byte以上192KB以下にしてください。');
+      return;
+    }
+    setState(() {
+      _pendingThumbnailBytes = bytes;
+      _pendingThumbnailContentType = contentType;
+      _metadataMessage = '保存前のアイコンです。';
+    });
+  }
+
+  Future<void> _saveThumbnail() async {
+    if (_metadataBusy) return;
+    final Uint8List? bytes = _pendingThumbnailBytes;
+    final String? contentType = _pendingThumbnailContentType;
+    if (bytes == null || contentType == null) {
+      setState(() => _metadataMessage = '先にアイコン画像を選んでください。');
+      return;
+    }
+
+    setState(() {
+      _metadataBusy = true;
+      _metadataMessage = null;
+    });
+    try {
+      await widget.api.setThumbnail(
+        accessToken: widget.accessToken,
+        appId: widget.appId,
+        bytes: bytes,
+        contentType: contentType,
+      );
+      final Future<void> Function()? onMetadataSaved = widget.onMetadataSaved;
+      if (onMetadataSaved != null) await onMetadataSaved();
+      if (!mounted) return;
+      setState(() {
+        _thumbnailBytes = bytes;
+        _pendingThumbnailBytes = null;
+        _pendingThumbnailContentType = null;
+        _metadataMessage = 'アイコンを保存しました ♡';
+      });
+    } catch (error) {
+      if (mounted) setState(() => _metadataMessage = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _metadataBusy = false);
+    }
   }
 
   Future<void> _copyForAi() async {
@@ -69,7 +227,7 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
       }
       final GirlsSourceArchive archive = GirlsSourceArchive.decode(download.bytes);
       final String text = _buildAiClipboardText(
-        title: widget.title,
+        title: _currentTitle,
         archive: archive,
       );
       await Clipboard.setData(ClipboardData(text: text));
@@ -92,7 +250,7 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
           accessToken: widget.accessToken,
           groupId: widget.groupId,
           appId: widget.appId,
-          title: widget.title,
+          title: _currentTitle,
           expectedRevision: _currentRevision,
           onSaved: (int revision) async {
             if (!mounted) return;
@@ -144,6 +302,130 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
                     color: _ink,
                     fontSize: 26,
                     fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  key: const Key('girls-edit-entry-metadata'),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .92),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: const Color(0xFFE1C7D2)),
+                    boxShadow: const <BoxShadow>[
+                      BoxShadow(
+                        color: Color(0x1A604943),
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      const Text(
+                        'アプリの見た目',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _ink,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
+                            child: Container(
+                              key: const Key('girls-edit-entry-icon-preview'),
+                              width: 88,
+                              height: 88,
+                              color: const Color(0xFFF6EAF7),
+                              child: _thumbnailLoading
+                                  ? const Center(
+                                      child: SizedBox.square(
+                                        dimension: 24,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      ),
+                                    )
+                                  : (_pendingThumbnailBytes ?? _thumbnailBytes) == null
+                                      ? const Icon(
+                                          Icons.apps_rounded,
+                                          color: _lavender,
+                                          size: 38,
+                                        )
+                                      : Image.memory(
+                                          _pendingThumbnailBytes ?? _thumbnailBytes!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, Object error, StackTrace? stack) =>
+                                              const Icon(
+                                            Icons.broken_image_outlined,
+                                            color: Color(0xFFA04455),
+                                          ),
+                                        ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: <Widget>[
+                                OutlinedButton.icon(
+                                  key: const Key('girls-edit-entry-pick-icon'),
+                                  onPressed: _metadataBusy ? null : _pickThumbnail,
+                                  icon: const Icon(Icons.image_outlined),
+                                  label: const Text('アイコン画像を選ぶ'),
+                                ),
+                                const SizedBox(height: 8),
+                                FilledButton.tonal(
+                                  key: const Key('girls-edit-entry-save-icon'),
+                                  onPressed: _metadataBusy || _pendingThumbnailBytes == null
+                                      ? null
+                                      : _saveThumbnail,
+                                  child: const Text('アイコンを保存'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        key: const Key('girls-edit-entry-title'),
+                        controller: _titleController,
+                        enabled: !_metadataBusy,
+                        maxLength: 80,
+                        textInputAction: TextInputAction.done,
+                        decoration: const InputDecoration(
+                          labelText: 'アプリ名',
+                          border: OutlineInputBorder(),
+                        ),
+                        onSubmitted: (_) => _saveTitle(),
+                      ),
+                      FilledButton(
+                        key: const Key('girls-edit-entry-save-title'),
+                        onPressed: _metadataBusy ? null : _saveTitle,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _lavender,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('アプリ名を保存'),
+                      ),
+                      if (_metadataMessage != null) ...<Widget>[
+                        const SizedBox(height: 10),
+                        Text(
+                          _metadataMessage!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFF8C7893),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 const SizedBox(height: 22),
