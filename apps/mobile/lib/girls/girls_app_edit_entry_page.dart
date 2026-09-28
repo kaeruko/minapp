@@ -291,14 +291,11 @@ String _buildAiClipboardText({
   }
 
   final StringBuffer buffer = StringBuffer()
-    ..writeln('これは「みんアプGirls」で動くミニアプリです。')
+    ..writeln('「みんアプGirls」で動くミニアプリ')
     ..writeln('アプリ名: $title')
     ..writeln('技術仕様: $girlsTechnicalGuideUrl')
     ..writeln()
-    ..writeln('このアプリの現在のコードを貼ります。')
-    ..writeln('みんアプGirlsで動く形を保ちながら、このあと私が伝えるアレンジ内容について相談に乗ってください。')
-    ..writeln('変更後は、必要なファイルごとに完成したコードを出してください。')
-    ..writeln()
+    ..writeln('改造したい！')
     ..writeln('ファイル一覧:');
 
   for (final String path in archive.paths) {
