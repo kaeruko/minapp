@@ -175,6 +175,8 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
           title: app.title,
           assetPath: app.assetPath,
           transparentBackground: app.id == 'memo',
+          showAppBar:
+              app.id != 'minappchi' || !GirlsScaffoldChromeScope.isEmbedded(context),
         ),
       ),
     );

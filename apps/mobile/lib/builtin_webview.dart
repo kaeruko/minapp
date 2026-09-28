@@ -102,6 +102,7 @@ class BuiltInWebViewPage extends StatefulWidget {
     required this.title,
     required this.assetPath,
     this.transparentBackground = false,
+    this.showAppBar = true,
     super.key,
   });
 
@@ -109,6 +110,7 @@ class BuiltInWebViewPage extends StatefulWidget {
   final String title;
   final String assetPath;
   final bool transparentBackground;
+  final bool showAppBar;
 
   @override
   State<BuiltInWebViewPage> createState() => _BuiltInWebViewPageState();
@@ -433,7 +435,7 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: widget.transparentBackground ? Colors.transparent : null,
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: widget.showAppBar ? AppBar(title: Text(widget.title)) : null,
       body: SafeArea(
         child: _error != null
             ? Center(
