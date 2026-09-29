@@ -26,6 +26,7 @@ _BACKEND: HostedGirlsShopBackend | None = None
 _ID_RE = r"([0-9a-f]{32})"
 _GROUP_SETTINGS_RE = re.compile(rf"^/hosted/groups/{_ID_RE}$")
 _SHOP_ACTION_RE = re.compile(rf"^/shop/apps/{_ID_RE}/(launch|download|add|reports)$")
+_SHOP_THUMBNAIL_RE = re.compile(rf"^/shop/apps/{_ID_RE}/thumbnail$")
 _SHOP_VISIBILITY_RE = re.compile(rf"^/apps/{_ID_RE}/shop-visibility$")
 _SHOP_CONTENT_RE = re.compile(r"^/shop/content/([A-Za-z0-9_-]{32,128})/(.+)$")
 
@@ -115,6 +116,14 @@ def _handle_shop_request(event: dict[str, Any]) -> dict[str, Any] | None:
 
     if method == "GET" and path == "/shop/apps":
         return _json_response(200, {"apps": backend.list_shop_apps(_auth_subject(event))})
+
+    thumbnail_match = _SHOP_THUMBNAIL_RE.fullmatch(path)
+    if method == "GET" and thumbnail_match is not None:
+        data, content_type = backend.get_shop_thumbnail(
+            _auth_subject(event),
+            thumbnail_match.group(1),
+        )
+        return hosted_handler._published_content_response(data, content_type)
 
     visibility_match = _SHOP_VISIBILITY_RE.fullmatch(path)
     if method == "PUT" and visibility_match is not None:
