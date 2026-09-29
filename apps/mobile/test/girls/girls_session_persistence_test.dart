@@ -134,11 +134,11 @@ void main() {
           request.url,
           Uri.parse('https://girls-api.example.com/hosted/groups'),
         );
-        expect(jsonDecode(request.body), <String, Object?>{'name': 'はじめのグループ'});
+        expect(jsonDecode(request.body), <String, Object?>{'name': 'マイグループ'});
         expect(store.writeCount, 0);
         return _jsonResponse(<String, Object?>{
           'group_id': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-          'name': 'はじめのグループ',
+          'name': 'マイグループ',
           'role': 'owner',
           'status': 'active',
         }, statusCode: 201);
