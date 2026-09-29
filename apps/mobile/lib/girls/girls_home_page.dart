@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -269,8 +271,10 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         ),
       ),
     );
+    debugPrint('Girls work copy: arrangement result for ${app.id} = $arrange');
     if (arrange != true || !mounted) return;
     if (isPlayer) {
+      debugPrint('Girls work copy: starting copy flow for ${app.id}');
       await _copyBuiltinWorkAndEdit(app);
     } else {
       await _arrangeBuiltin(app);
@@ -334,6 +338,10 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       _arrangingBuiltin = true;
       _groupError = null;
     });
+    debugPrint('Girls work copy: entered _copyBuiltinWorkAndEdit');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('作品をコピーしています…')),
+    );
     final GirlsBuiltinInstallApi installApi = GirlsBuiltinInstallApi(
       baseUri: widget.api.baseUri,
       client: widget.api.httpClient,
@@ -348,17 +356,27 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     );
     String stage = 'ノベルエディタの準備';
     try {
+      debugPrint('Girls work copy: START $stage');
       final HostedGroupApp editorApp = await installApi.ensureNovelEditor(
         accessToken: widget.session.accessToken,
         groupId: group.groupId,
         includeSample: false,
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw TimeoutException('Timed out during $stage'),
       );
+      debugPrint('Girls work copy: DONE $stage');
       stage = '公式作品の準備';
+      debugPrint('Girls work copy: START $stage');
       final HostedAuthoringProjectSummary source =
           await installApi.ensureNovelSampleProject(
         accessToken: widget.session.accessToken,
         groupId: group.groupId,
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw TimeoutException('Timed out during $stage'),
       );
+      debugPrint('Girls work copy: DONE $stage content_id=${source.contentId}');
       if (source.groupId != group.groupId ||
           source.contentFormat != contentFormat) {
         throw const FormatException(
@@ -367,11 +385,16 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       }
 
       stage = '作品のコピー';
+      debugPrint('Girls work copy: START $stage');
       final HostedAuthoringProjectSummary copied =
           await projectsApi.cloneProject(
         accessToken: widget.session.accessToken,
         contentId: source.contentId,
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw TimeoutException('Timed out during $stage'),
       );
+      debugPrint('Girls work copy: DONE $stage content_id=${copied.contentId}');
       if (copied.groupId != group.groupId ||
           copied.contentFormat != contentFormat ||
           copied.contentId == source.contentId) {
@@ -381,11 +404,16 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       }
 
       stage = 'ノベルエディタの確認';
+      debugPrint('Girls work copy: START $stage');
       final List<HostedAuthoringAppContract> contracts =
           await contractApi.listApps(
         accessToken: widget.session.accessToken,
         groupId: group.groupId,
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw TimeoutException('Timed out during $stage'),
       );
+      debugPrint('Girls work copy: DONE $stage contracts=${contracts.length}');
       final HostedAuthoringAppContract editor =
           HostedAuthoringResolver.requireEditor(
         apps: contracts,
@@ -396,6 +424,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       if (!mounted) return;
       setState(() => _arrangingBuiltin = false);
       stage = 'ノベルエディタを開く処理';
+      debugPrint('Girls work copy: START $stage');
       await openHostedAuthoringProjects(
         context: context,
         baseUri: widget.api.baseUri,
@@ -412,6 +441,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         projectTitle: _novelProjectTitle,
         initialContentId: copied.contentId,
       );
+      debugPrint('Girls work copy: DONE $stage');
       if (mounted) await _loadGroups();
     } catch (error, stackTrace) {
       final String message = girlsMessageFor(error);
