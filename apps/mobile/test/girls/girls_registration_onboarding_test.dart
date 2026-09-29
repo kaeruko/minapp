@@ -10,8 +10,7 @@ void main() {
     expiresIn: 3600,
   );
 
-  test('keeps an existing non-starter group without changing selection',
-      () async {
+  test('replaces a stale selection with the only active group', () async {
     final _FakeHostedApi api = _FakeHostedApi(
       groups: const <HostedGroup>[
         HostedGroup(
@@ -35,9 +34,103 @@ void main() {
     expect(api.lastAccessToken, 'access-token');
     expect(
       currentGroupStore.value,
-      'cccccccccccccccccccccccccccccccc',
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     );
+    expect(currentGroupStore.saveCount, 1);
+  });
+
+  test('keeps a valid selection across multiple memberships', () async {
+    final _FakeHostedApi api = _FakeHostedApi(
+      groups: const <HostedGroup>[
+        HostedGroup(
+          groupId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          name: girlsInitialGroupName,
+          role: 'owner',
+          status: 'active',
+        ),
+        HostedGroup(
+          groupId: 'cccccccccccccccccccccccccccccccc',
+          name: '放課後イラスト部',
+          role: 'member',
+          status: 'active',
+        ),
+      ],
+    );
+    final _MemoryCurrentGroupStore currentGroupStore =
+        _MemoryCurrentGroupStore('cccccccccccccccccccccccccccccccc');
+    final GirlsRegistrationOnboarding onboarding =
+        GirlsRegistrationOnboarding(api, currentGroupStore);
+
+    final HostedGroup group = await onboarding.ensureInitialGroup(session);
+
+    expect(group.groupId, 'cccccccccccccccccccccccccccccccc');
     expect(currentGroupStore.saveCount, 0);
+  });
+
+  test('stale selection prefers My Group across multiple memberships',
+      () async {
+    final _FakeHostedApi api = _FakeHostedApi(
+      groups: const <HostedGroup>[
+        HostedGroup(
+          groupId: 'cccccccccccccccccccccccccccccccc',
+          name: '放課後イラスト部',
+          role: 'member',
+          status: 'active',
+        ),
+        HostedGroup(
+          groupId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          name: girlsInitialGroupName,
+          role: 'owner',
+          status: 'active',
+        ),
+      ],
+    );
+    final _MemoryCurrentGroupStore currentGroupStore =
+        _MemoryCurrentGroupStore('dddddddddddddddddddddddddddddddd');
+    final GirlsRegistrationOnboarding onboarding =
+        GirlsRegistrationOnboarding(api, currentGroupStore);
+
+    final HostedGroup group = await onboarding.ensureInitialGroup(session);
+
+    expect(group.groupId, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    expect(
+      currentGroupStore.value,
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    );
+    expect(currentGroupStore.saveCount, 1);
+  });
+
+  test('stale selection falls back to an active membership when no starter exists',
+      () async {
+    final _FakeHostedApi api = _FakeHostedApi(
+      groups: const <HostedGroup>[
+        HostedGroup(
+          groupId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          name: '写真部',
+          role: 'member',
+          status: 'active',
+        ),
+        HostedGroup(
+          groupId: 'cccccccccccccccccccccccccccccccc',
+          name: '放課後イラスト部',
+          role: 'member',
+          status: 'active',
+        ),
+      ],
+    );
+    final _MemoryCurrentGroupStore currentGroupStore =
+        _MemoryCurrentGroupStore('dddddddddddddddddddddddddddddddd');
+    final GirlsRegistrationOnboarding onboarding =
+        GirlsRegistrationOnboarding(api, currentGroupStore);
+
+    final HostedGroup group = await onboarding.ensureInitialGroup(session);
+
+    expect(group.groupId, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    expect(
+      currentGroupStore.value,
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    );
+    expect(currentGroupStore.saveCount, 1);
   });
 
   test('creates the starter group and selects it when the account has no groups',
