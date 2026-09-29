@@ -155,7 +155,7 @@ class _GirlsShopPageState extends State<GirlsShopPage> {
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'ほかのグループのみんなが公開したアプリを見つけられるよ♡',
+                      'ほかのグループのみんなが公開したアプリを見つけられるよ',
                       style: TextStyle(
                         color: _ink,
                         fontWeight: FontWeight.w800,

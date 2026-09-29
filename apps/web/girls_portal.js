@@ -731,7 +731,7 @@
     }
     try {
       await navigator.clipboard.writeText(aiPrompt.textContent);
-      setMessage(copyResult, "コピーしたよ♡ AIにそのまま貼ってね。");
+      setMessage(copyResult, "コピーしたよ AIにそのまま貼ってね。");
     } catch (error) {
       setMessage(uploadError, `コピーできませんでした: ${errorMessage(error)}`);
     }
@@ -884,7 +884,7 @@
       appTitle.value = "";
       sourceFile.value = "";
       sourceCode.value = "";
-      setMessage(uploadResult, `「${title}」をアップロードして公開したよ♡ Girlsアプリに戻って更新すると表示されます。`);
+      setMessage(uploadResult, `「${title}」をアップロードして公開したよ Girlsアプリに戻って更新すると表示されます。`);
     } catch (error) {
       const prefix = savedAppId === null
         ? ""

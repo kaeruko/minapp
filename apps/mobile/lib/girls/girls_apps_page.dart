@@ -1073,7 +1073,7 @@ class _EmptyApps extends StatelessWidget {
     await Clipboard.setData(ClipboardData(text: prompt));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('AIに貼る文章をコピーしたよ♡')));
+        .showSnackBar(const SnackBar(content: Text('AIに貼る文章をコピーしたよ')));
   }
 
   String _ideaPrompt(String idea) =>
