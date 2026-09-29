@@ -209,6 +209,27 @@ class HostedAuthoringProjectsApi {
     return project;
   }
 
+  Future<HostedAuthoringProjectSummary> cloneProject({
+    required String accessToken,
+    required String contentId,
+  }) async {
+    _validateToken(accessToken);
+    _validateId(contentId, 'contentId');
+    final Map<String, Object?> payload = await _jsonRequest(
+      method: 'POST',
+      path: '/hosted/authoring/projects/$contentId/clone',
+      accessToken: accessToken,
+    );
+    final HostedAuthoringProjectSummary project =
+        HostedAuthoringProjectSummary.fromJson(payload);
+    if (project.contentId == contentId || project.draftRevision != 1) {
+      throw const FormatException(
+        'Cloned Authoring project returned the source ID or a non-initial revision.',
+      );
+    }
+    return project;
+  }
+
   Future<void> deleteProject({
     required String accessToken,
     required String contentId,

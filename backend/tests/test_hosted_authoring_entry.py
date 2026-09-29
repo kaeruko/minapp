@@ -85,6 +85,23 @@ class FakeAuthoringBackend:
             "document": {"version": 1},
         }
 
+    def clone_authoring_project(
+        self,
+        auth_subject: str,
+        content_id: str,
+    ) -> dict[str, Any]:
+        self.calls.append(("clone", auth_subject, content_id))
+        return {
+            "content_id": "6" * 32,
+            "group_id": "2" * 32,
+            "content_format": "minapp/novel@1",
+            "status": "draft",
+            "draft_revision": 1,
+            "assets": [],
+            "created_at": "2026-09-06T09:20:00Z",
+            "updated_at": "2026-09-06T09:20:00Z",
+        }
+
     def save_authoring_document(
         self,
         auth_subject: str,
@@ -227,6 +244,19 @@ class HostedAuthoringEntryTests(unittest.TestCase):
         self.assertEqual(load_response["statusCode"], 200)
         self.assertEqual(json.loads(load_response["body"])["document"], {"version": 1})
         self.assertEqual(self.backend.calls[1], ("load", "sub-owner", self.content_id))
+
+    def test_clone_project_route_uses_authenticated_subject_and_no_body(self) -> None:
+        response = abuse_entry.hosted_lambda_handler(
+            event("POST", f"/hosted/authoring/projects/{self.content_id}/clone"),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 201)
+        payload = json.loads(response["body"])
+        self.assertEqual(payload["content_id"], "6" * 32)
+        self.assertEqual(
+            self.backend.calls,
+            [("clone", "sub-owner", self.content_id)],
+        )
 
     def test_group_authoring_apps_route_uses_authenticated_subject(self) -> None:
         response = abuse_entry.hosted_lambda_handler(

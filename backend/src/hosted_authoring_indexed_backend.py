@@ -10,9 +10,15 @@ from aws_backend import _aws_error_code, _item_string, _string_attr
 from errors import ApiProblem
 from hosted_app_management import _visibility
 from hosted_authoring_backend import (
+    AuthoringCommitCleanupError,
     HostedAuthoringBackend,
+    MAX_AUTHORING_ASSET_BYTES,
+    MAX_AUTHORING_DOCUMENT_BYTES,
+    _asset_manifest_int,
+    _asset_manifest_string,
     _assets_json,
     _document_bytes,
+    _item_assets,
     _validate_content_id,
     validate_content_format,
 )
@@ -128,6 +134,130 @@ class HostedAuthoringIndexedBackend(HostedAuthoringBackend):
             self._cleanup_after_failed_commit(document_key, original_error)
             raise
         return self._public_project(meta)
+
+    def clone_authoring_project(
+        self,
+        auth_subject: str,
+        content_id: str,
+    ) -> dict[str, Any]:
+        user, source = self._owned_content(auth_subject, content_id)
+        group_id = _item_string(source, "group_id")
+        content_format = _item_string(source, "content_format")
+
+        document = self._read_object(
+            key=_item_string(source, "document_key"),
+            expected_sha256=_item_string(source, "document_sha256"),
+            max_bytes=MAX_AUTHORING_DOCUMENT_BYTES,
+        )
+        source_assets = _item_assets(source)
+        asset_payloads: dict[str, tuple[bytes, str, str]] = {}
+        for path, asset in source_assets.items():
+            data = self._read_object(
+                key=_asset_manifest_string(asset, "key"),
+                expected_sha256=_asset_manifest_string(asset, "sha256"),
+                max_bytes=MAX_AUTHORING_ASSET_BYTES,
+            )
+            if len(data) != _asset_manifest_int(asset, "bytes"):
+                raise RuntimeError(
+                    f"Stored Authoring asset size does not match metadata: {path}"
+                )
+            asset_payloads[path] = (
+                data,
+                _asset_manifest_string(asset, "content_type"),
+                _asset_manifest_string(asset, "sha256"),
+            )
+
+        cloned_content_id = uuid.uuid4().hex
+        revision = 1
+        created_at = _now_iso()
+        document_key = self._document_key(group_id, cloned_content_id, revision)
+        document_sha256 = hashlib.sha256(document).hexdigest()
+        written_keys: list[str] = []
+        cloned_assets: dict[str, dict[str, Any]] = {}
+
+        try:
+            self._put_immutable_object(
+                key=document_key,
+                data=document,
+                content_type="application/json; charset=utf-8",
+                sha256=document_sha256,
+            )
+            written_keys.append(document_key)
+
+            for path, (data, content_type, sha256) in asset_payloads.items():
+                object_key = self._asset_key(
+                    group_id,
+                    cloned_content_id,
+                    revision,
+                    path,
+                )
+                self._put_immutable_object(
+                    key=object_key,
+                    data=data,
+                    content_type=content_type,
+                    sha256=sha256,
+                )
+                written_keys.append(object_key)
+                cloned_assets[path] = {
+                    "key": object_key,
+                    "sha256": sha256,
+                    "bytes": len(data),
+                    "content_type": content_type,
+                    "revision": revision,
+                }
+
+            meta = {
+                "pk": _string_attr(f"CONTENT#{cloned_content_id}"),
+                "sk": _string_attr("META"),
+                "entity": _string_attr("authoring_content"),
+                "content_id": _string_attr(cloned_content_id),
+                "group_id": _string_attr(group_id),
+                "owner_user_id": _string_attr(user.user_id),
+                "content_format": _string_attr(content_format),
+                "status": _string_attr("draft"),
+                "draft_revision": _number_attr(revision),
+                "document_key": _string_attr(document_key),
+                "document_sha256": _string_attr(document_sha256),
+                "document_bytes": _number_attr(len(document)),
+                "assets_json": _string_attr(_assets_json(cloned_assets)),
+                "created_at": _string_attr(created_at),
+                "updated_at": _string_attr(created_at),
+            }
+            manifest = self._revision_manifest(
+                meta,
+                revision=revision,
+                created_at=created_at,
+            )
+            index = {
+                "pk": _string_attr(f"GROUP#{group_id}"),
+                "sk": _string_attr(f"CONTENT#{cloned_content_id}"),
+                "entity": _string_attr("authoring_content_index"),
+                "content_id": _string_attr(cloned_content_id),
+                "group_id": _string_attr(group_id),
+                "owner_user_id": _string_attr(user.user_id),
+                "content_format": _string_attr(content_format),
+                "created_at": _string_attr(created_at),
+            }
+            self._transact_put_new([meta, manifest, index])
+        except Exception as original_error:
+            cleanup_errors: list[BaseException] = []
+            for key in reversed(written_keys):
+                try:
+                    self._s3.delete_object(Bucket=self._upload_bucket, Key=key)
+                except Exception as cleanup_error:
+                    cleanup_errors.append(cleanup_error)
+            if cleanup_errors:
+                raise AuthoringCommitCleanupError(
+                    original_error,
+                    ExceptionGroup(
+                        "Failed to clean cloned Authoring objects",
+                        cleanup_errors,
+                    ),
+                ) from cleanup_errors[0]
+            raise
+
+        return self._public_project(meta)
+
 
     def register_authoring_contract(
         self,

@@ -134,7 +134,7 @@ class GirlsBuiltinInstallApi {
     );
   }
 
-  Future<void> ensureNovelSampleProject({
+  Future<HostedAuthoringProjectSummary> ensureNovelSampleProject({
     required String accessToken,
     required String groupId,
   }) async {
@@ -148,8 +148,15 @@ class GirlsBuiltinInstallApi {
       groupId: groupId,
       contentFormat: _novelContentFormat,
     );
+    final List<HostedAuthoringProjectSummary> oldestFirst =
+        List<HostedAuthoringProjectSummary>.of(projects)
+          ..sort(
+            (HostedAuthoringProjectSummary a,
+                    HostedAuthoringProjectSummary b) =>
+                a.createdAt.compareTo(b.createdAt),
+          );
 
-    for (final HostedAuthoringProjectSummary summary in projects) {
+    for (final HostedAuthoringProjectSummary summary in oldestFirst) {
       final HostedAuthoringProject project = await projectsApi.loadProject(
         accessToken: accessToken,
         contentId: summary.contentId,
@@ -161,12 +168,11 @@ class GirlsBuiltinInstallApi {
         );
       }
       if (project.document['title'] == _novelSampleTitle) {
-        await _hydrateNovelSampleProject(
+        return _hydrateNovelSampleProject(
           accessToken: accessToken,
           groupId: groupId,
           contentId: project.summary.contentId,
         );
-        return;
       }
     }
 
@@ -177,14 +183,14 @@ class GirlsBuiltinInstallApi {
       contentFormat: _novelContentFormat,
       document: _novelSampleDocument(),
     );
-    await _hydrateNovelSampleProject(
+    return _hydrateNovelSampleProject(
       accessToken: accessToken,
       groupId: groupId,
       contentId: created.contentId,
     );
   }
 
-  Future<void> _hydrateNovelSampleProject({
+  Future<HostedAuthoringProjectSummary> _hydrateNovelSampleProject({
     required String accessToken,
     required String groupId,
     required String contentId,
@@ -220,6 +226,7 @@ class GirlsBuiltinInstallApi {
         'Novel sample hydration changed the requested project scope.',
       );
     }
+    return hydrated;
   }
 
   Map<String, Object?> _novelSampleDocument() {

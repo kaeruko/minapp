@@ -189,6 +189,47 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Player sample offers to copy the work instead of arranging the Player app',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 720));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GirlsHomePage(
+            api: _fakeApi(),
+            session: const AuthenticatedSession(
+              accessToken: 'test-token',
+              expiresIn: 3600,
+            ),
+            onLogout: () {},
+            currentGroup: _currentGroup,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('girls-home-novel-app')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(find.text('✨ この作品を編集する？'), findsOneWidget);
+      expect(
+        find.text('「ひみつの放課後」をコピーして、自分だけの物語に編集できるよ。'),
+        findsOneWidget,
+      );
+      expect(find.text('コピーして編集する！'), findsOneWidget);
+      expect(find.text('このアプリをアレンジする！'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('girls-builtin-arrange-later')));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('Girls home shows the intended four cards and opens group creation', (
     WidgetTester tester,
   ) async {

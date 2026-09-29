@@ -90,6 +90,43 @@ class HostedAuthoringIndexedBackendTests(unittest.TestCase):
         self.assertEqual(index["entity"], {"S": "authoring_content_index"})
         self.assertEqual(index["content_format"], {"S": "minapp/novel@1"})
 
+    def test_clone_project_copies_current_document_assets_and_group_index(self) -> None:
+        source = self._create("ひみつの放課後")
+        source_id = str(source["content_id"])
+        self.backend.save_authoring_asset(
+            self.subject,
+            source_id,
+            expected_revision=1,
+            path="images/ren.png",
+            data=b"PNG-copy-me",
+        )
+
+        cloned = self.backend.clone_authoring_project(self.subject, source_id)
+        cloned_id = str(cloned["content_id"])
+
+        self.assertNotEqual(cloned_id, source_id)
+        self.assertEqual(cloned["group_id"], self.group["group_id"])
+        self.assertEqual(cloned["content_format"], "minapp/novel@1")
+        self.assertEqual(cloned["draft_revision"], 1)
+        self.assertEqual(
+            [asset["path"] for asset in cloned["assets"]],
+            ["images/ren.png"],
+        )
+        self.assertIn(
+            (f"GROUP#{self.group['group_id']}", f"CONTENT#{cloned_id}"),
+            self.metadata.items,
+        )
+
+        loaded = self.backend.load_authoring_project(self.subject, cloned_id)
+        self.assertEqual(loaded["document"]["title"], "ひみつの放課後")
+        data, content_type = self.backend.get_authoring_asset(
+            self.subject,
+            cloned_id,
+            "images/ren.png",
+        )
+        self.assertEqual(data, b"PNG-copy-me")
+        self.assertEqual(content_type, "image/png")
+
     def test_list_authoring_apps_returns_contracts_not_ordinary_apps(self) -> None:
         group_id = str(self.group["group_id"])
         editor = self.backend.install_builtin(self.subject, group_id, "novel-editor")

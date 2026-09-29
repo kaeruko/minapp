@@ -5,6 +5,7 @@ locals {
     "POST /hosted/authoring/groups/{group_id}/apps/{app_id}/contract",
     "GET /hosted/authoring/groups/{group_id}/projects",
     "GET /hosted/authoring/projects/{content_id}",
+    "POST /hosted/authoring/projects/{content_id}/clone",
     "DELETE /hosted/authoring/projects/{content_id}",
     "POST /hosted/authoring/projects/{content_id}/document",
     "POST /hosted/authoring/projects/{content_id}/samples/novel",

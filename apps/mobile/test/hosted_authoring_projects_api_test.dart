@@ -159,6 +159,35 @@ void main() {
     );
   });
 
+  test('clone creates a new revision-one project without a request body', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'POST');
+      expect(
+        request.url.path,
+        '/hosted/authoring/projects/$_contentId/clone',
+      );
+      expect(request.url.query, isEmpty);
+      expect(request.headers['authorization'], 'Bearer owner-token');
+      expect(request.body, isEmpty);
+      return _json(
+        201,
+        _summary(contentId: _otherContentId, format: _format),
+      );
+    });
+    final HostedAuthoringProjectsApi api = HostedAuthoringProjectsApi(
+      baseUri: Uri.parse('https://hosted.example.test'),
+      client: client,
+    );
+
+    final HostedAuthoringProjectSummary cloned = await api.cloneProject(
+      accessToken: 'owner-token',
+      contentId: _contentId,
+    );
+
+    expect(cloned.contentId, _otherContentId);
+    expect(cloned.draftRevision, 1);
+  });
+
   test('delete sends only authenticated content scope and accepts 204', () async {
     final MockClient client = MockClient((http.Request request) async {
       expect(request.method, 'DELETE');

@@ -36,6 +36,7 @@ _GROUP_APP_CONTRACT_RE = re.compile(
 )
 _GROUP_PROJECTS_RE = re.compile(rf"^/hosted/authoring/groups/{_GROUP_ID_RE}/projects$")
 _PROJECT_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}$")
+_PROJECT_CLONE_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/clone$")
 _DOCUMENT_RE = re.compile(rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/document$")
 _NOVEL_SAMPLE_RE = re.compile(
     rf"^/hosted/authoring/projects/{_CONTENT_ID_RE}/samples/novel$"
@@ -79,6 +80,12 @@ class AuthoringBackend(Protocol):
     ) -> list[dict[str, Any]]: ...
 
     def load_authoring_project(
+        self,
+        auth_subject: str,
+        content_id: str,
+    ) -> dict[str, Any]: ...
+
+    def clone_authoring_project(
         self,
         auth_subject: str,
         content_id: str,
@@ -345,6 +352,20 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any] | None:
                     content_format,
                 )
             },
+        )
+
+    clone_match = _PROJECT_CLONE_RE.fullmatch(path)
+    if clone_match is not None:
+        if method != "POST":
+            return None
+        _require_no_body(event)
+        _require_no_query(event)
+        return _json_response(
+            201,
+            _get_backend().clone_authoring_project(
+                _auth_subject(event),
+                clone_match.group(1),
+            ),
         )
 
     project_match = _PROJECT_RE.fullmatch(path)
