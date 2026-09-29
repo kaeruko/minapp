@@ -13,7 +13,6 @@ locals {
       title        = "しば犬どんぐりキャッチ"
       version      = 1
       source_dir   = "${local.minapp_apps_source_root}/shiba_donguri"
-      icon         = "${local.minapp_apps_source_root}/shiba_donguri/icon.webp"
       files        = ["index.html"]
       published_at = "2026-09-13T00:00:00Z"
     }
@@ -22,7 +21,6 @@ locals {
       title        = "ごしゅじんどこわん"
       version      = 1
       source_dir   = "${local.minapp_apps_source_root}/shiba_goshujin"
-      icon         = "${local.minapp_apps_source_root}/shiba_goshujin/icon.webp"
       files        = ["index.html"]
       published_at = "2026-09-13T00:00:00Z"
     }
@@ -31,7 +29,6 @@ locals {
       title        = "おかいもの いくわよ"
       version      = 1
       source_dir   = "${local.minapp_apps_source_root}/shopping_town"
-      icon         = "${local.minapp_apps_source_root}/shopping_town/icon.webp"
       files        = ["index.html", "rules.js"]
       published_at = "2026-09-13T00:00:00Z"
     }
@@ -40,7 +37,6 @@ locals {
       title        = "OLさん おうちにかえる"
       version      = 1
       source_dir   = "${local.minapp_apps_source_root}/ol_home"
-      icon         = "${local.minapp_apps_source_root}/ol_home/icon.webp"
       files        = ["effects.js", "index.html"]
       published_at = "2026-09-13T00:00:00Z"
     }
@@ -49,10 +45,16 @@ locals {
       title        = "うたってみよう"
       version      = 1
       source_dir   = "${local.minapp_apps_source_root}/sing_along"
-      icon         = null
       files        = ["index.html"]
       published_at = "2026-09-26T00:00:00Z"
     }
+  }
+
+  official_shop_icons = {
+    shiba-game     = "${local.minapp_apps_source_root}/shiba_donguri/icon.webp"
+    shiba-goshujin = "${local.minapp_apps_source_root}/shiba_goshujin/icon.webp"
+    shopping-town  = "${local.minapp_apps_source_root}/shopping_town/icon.webp"
+    ol-home        = "${local.minapp_apps_source_root}/ol_home/icon.webp"
   }
 }
 
@@ -73,7 +75,6 @@ locals {
         title        = "パステルおえかき"
         version      = 1
         source       = "${local.minapp_apps_source_root}/minapp_drawing.zip"
-        icon         = null
         files        = ["index.html"]
         published_at = "2026-09-13T00:00:00Z"
       }
@@ -84,7 +85,6 @@ locals {
         title        = app.title
         version      = app.version
         source       = data.archive_file.official_shop_directory_source[key].output_path
-        icon         = app.icon
         files        = app.files
         published_at = app.published_at
       }
@@ -161,11 +161,14 @@ resource "aws_dynamodb_table_item" "official_shop_app" {
       published_files_json = { S = jsonencode(each.value.files) }
       published_at         = { S = each.value.published_at }
     },
-    each.value.icon == null ? {} : {
-      thumbnail_bytes        = { B = filebase64(each.value.icon) }
-      thumbnail_content_type = { S = "image/webp" }
-      thumbnail_updated_at   = { S = each.value.published_at }
-    },
+    try(
+      {
+        thumbnail_bytes        = { B = filebase64(local.official_shop_icons[each.key]) }
+        thumbnail_content_type = { S = "image/webp" }
+        thumbnail_updated_at   = { S = each.value.published_at }
+      },
+      {},
+    ),
   ))
 }
 
