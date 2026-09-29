@@ -134,7 +134,7 @@ class GirlsBuiltinInstallApi {
     );
   }
 
-  Future<void> ensureNovelSampleProject({
+  Future<HostedAuthoringProjectSummary> ensureNovelSampleProject({
     required String accessToken,
     required String groupId,
   }) async {
@@ -161,12 +161,11 @@ class GirlsBuiltinInstallApi {
         );
       }
       if (project.document['title'] == _novelSampleTitle) {
-        await _hydrateNovelSampleProject(
+        return _hydrateNovelSampleProject(
           accessToken: accessToken,
           groupId: groupId,
           contentId: project.summary.contentId,
         );
-        return;
       }
     }
 
@@ -177,14 +176,14 @@ class GirlsBuiltinInstallApi {
       contentFormat: _novelContentFormat,
       document: _novelSampleDocument(),
     );
-    await _hydrateNovelSampleProject(
+    return _hydrateNovelSampleProject(
       accessToken: accessToken,
       groupId: groupId,
       contentId: created.contentId,
     );
   }
 
-  Future<void> _hydrateNovelSampleProject({
+  Future<HostedAuthoringProjectSummary> _hydrateNovelSampleProject({
     required String accessToken,
     required String groupId,
     required String contentId,
@@ -220,6 +219,7 @@ class GirlsBuiltinInstallApi {
         'Novel sample hydration changed the requested project scope.',
       );
     }
+    return hydrated;
   }
 
   Map<String, Object?> _novelSampleDocument() {
