@@ -18,6 +18,7 @@ class GirlsShopApp {
     required this.ownerDisplayName,
     required this.publishedAt,
     required this.sha256,
+    this.thumbnailPath,
   });
 
   final String appId;
@@ -27,6 +28,7 @@ class GirlsShopApp {
   final String ownerDisplayName;
   final DateTime publishedAt;
   final String sha256;
+  final String? thumbnailPath;
 
   factory GirlsShopApp.fromJson(Map<String, Object?> json) {
     _requireExactFields(
@@ -39,6 +41,7 @@ class GirlsShopApp {
         'owner_display_name',
         'published_at',
         'sha256',
+        'thumbnail_path',
       },
       'Girls shop app',
     );
@@ -58,6 +61,16 @@ class GirlsShopApp {
     if (!_sha256Pattern.hasMatch(sha256)) {
       throw const FormatException('Girls shop sha256 is invalid.');
     }
+    final Object? rawThumbnailPath = json['thumbnail_path'];
+    final String? thumbnailPath;
+    if (rawThumbnailPath == null) {
+      thumbnailPath = null;
+    } else if (rawThumbnailPath is String &&
+        rawThumbnailPath == '/shop/apps/$appId/thumbnail') {
+      thumbnailPath = rawThumbnailPath;
+    } else {
+      throw const FormatException('Girls shop thumbnail_path is invalid.');
+    }
     final String ownerDisplayName = _requiredString(json, 'owner_display_name');
     if (ownerDisplayName != ownerDisplayName.trim() || ownerDisplayName.length > 80) {
       throw const FormatException('Girls shop owner_display_name is invalid.');
@@ -70,6 +83,7 @@ class GirlsShopApp {
       ownerDisplayName: ownerDisplayName,
       publishedAt: DateTime.parse(_requiredString(json, 'published_at')).toUtc(),
       sha256: sha256,
+      thumbnailPath: thumbnailPath,
     );
   }
 }
@@ -112,6 +126,12 @@ class GirlsShopApi {
 
   void close() {
     if (_ownsClient) _client.close();
+  }
+
+  Uri? thumbnailUri(GirlsShopApp app) {
+    final String? path = app.thumbnailPath;
+    if (path == null) return null;
+    return _baseUri.resolve(path);
   }
 
   Future<List<GirlsShopApp>> listApps(String accessToken) async {
