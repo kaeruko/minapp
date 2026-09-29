@@ -36,6 +36,7 @@ class FakeBackend(HostedGirlsShopBackend):
                 "owner_display_name": "creator",
                 "published_at": "2026-09-13T02:00:00Z",
                 "sha256": "d" * 64,
+                "thumbnail_path": f"/shop/apps/{APP_ID}/thumbnail",
             }
         ]
 
@@ -98,6 +99,14 @@ class FakeBackend(HostedGirlsShopBackend):
             "status": "received",
             "created_at": "2026-09-13T02:10:00Z",
         }
+
+    def get_shop_thumbnail(
+        self,
+        auth_subject: str,
+        app_id: str,
+    ) -> tuple[bytes, str]:
+        self.calls.append(("thumbnail", auth_subject, app_id))
+        return b"RIFF\x00\x00\x00\x00WEBPicon", "image/webp"
 
     def get_shop_file(self, token: str, path: str) -> tuple[bytes, str]:
         self.calls.append(("content", token, path))
@@ -166,6 +175,19 @@ class HostedShopHandlerTests(unittest.TestCase):
         self.assertIs(hosted_shop_handler._BACKEND, replacement)
         self.assertEqual(replacement.calls, [("list", "girls-user-subject")])
         factory.assert_called_once_with()
+
+    def test_thumbnail_is_authenticated_and_returns_binary_image(self) -> None:
+        response = hosted_shop_handler.lambda_handler(
+            _event("GET", f"/shop/apps/{APP_ID}/thumbnail"),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(response["headers"]["content-type"], "image/webp")
+        self.assertTrue(response["isBase64Encoded"])
+        self.assertEqual(
+            self.backend.calls,
+            [("thumbnail", "girls-user-subject", APP_ID)],
+        )
 
     def test_launch_returns_content_and_isolated_runtime_token(self) -> None:
         response = hosted_shop_handler.lambda_handler(
