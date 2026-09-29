@@ -13,6 +13,7 @@ locals {
       title        = "しば犬どんぐりキャッチ"
       version      = 1
       source_dir   = "${local.minapp_apps_source_root}/shiba_donguri"
+      icon         = "${local.minapp_apps_source_root}/shiba_donguri/icon.webp"
       files        = ["index.html"]
       published_at = "2026-09-13T00:00:00Z"
     }
@@ -21,6 +22,7 @@ locals {
       title        = "ごしゅじんどこわん"
       version      = 1
       source_dir   = "${local.minapp_apps_source_root}/shiba_goshujin"
+      icon         = "${local.minapp_apps_source_root}/shiba_goshujin/icon.webp"
       files        = ["index.html"]
       published_at = "2026-09-13T00:00:00Z"
     }
@@ -29,6 +31,7 @@ locals {
       title        = "おかいもの いくわよ"
       version      = 1
       source_dir   = "${local.minapp_apps_source_root}/shopping_town"
+      icon         = "${local.minapp_apps_source_root}/shopping_town/icon.webp"
       files        = ["index.html", "rules.js"]
       published_at = "2026-09-13T00:00:00Z"
     }
@@ -37,6 +40,7 @@ locals {
       title        = "OLさん おうちにかえる"
       version      = 1
       source_dir   = "${local.minapp_apps_source_root}/ol_home"
+      icon         = "${local.minapp_apps_source_root}/ol_home/icon.webp"
       files        = ["effects.js", "index.html"]
       published_at = "2026-09-13T00:00:00Z"
     }
@@ -45,6 +49,7 @@ locals {
       title        = "うたってみよう"
       version      = 1
       source_dir   = "${local.minapp_apps_source_root}/sing_along"
+      icon         = null
       files        = ["index.html"]
       published_at = "2026-09-26T00:00:00Z"
     }
@@ -56,6 +61,7 @@ data "archive_file" "official_shop_directory_source" {
 
   type        = "zip"
   source_dir  = each.value.source_dir
+  excludes    = ["icon.webp"]
   output_path = "${path.module}/minapp-hosted-shop-${each.key}-v${each.value.version}.zip"
 }
 
@@ -67,6 +73,7 @@ locals {
         title        = "パステルおえかき"
         version      = 1
         source       = "${local.minapp_apps_source_root}/minapp_drawing.zip"
+        icon         = null
         files        = ["index.html"]
         published_at = "2026-09-13T00:00:00Z"
       }
@@ -77,6 +84,7 @@ locals {
         title        = app.title
         version      = app.version
         source       = data.archive_file.official_shop_directory_source[key].output_path
+        icon         = app.icon
         files        = app.files
         published_at = app.published_at
       }
@@ -133,25 +141,32 @@ resource "aws_dynamodb_table_item" "official_shop_app" {
   hash_key   = aws_dynamodb_table.main.hash_key
   range_key  = aws_dynamodb_table.main.range_key
 
-  item = jsonencode({
-    pk                   = { S = "APP#${each.value.app_id}" }
-    sk                   = { S = "META" }
-    entity               = { S = "app" }
-    app_id               = { S = each.value.app_id }
-    group_id             = { S = local.official_shop_group_id }
-    title                = { S = each.value.title }
-    owner_user_id        = { S = local.official_shop_owner_user_id }
-    source_kind          = { S = "official_shop" }
-    editable             = { BOOL = false }
-    created_at           = { S = each.value.published_at }
-    shop_visibility      = { S = "listed" }
-    shop_listed_at       = { S = each.value.published_at }
-    published_version    = { N = tostring(each.value.version) }
-    published_key        = { S = aws_s3_object.official_shop_app[each.key].key }
-    published_sha256     = { S = filesha256(each.value.source) }
-    published_files_json = { S = jsonencode(each.value.files) }
-    published_at         = { S = each.value.published_at }
-  })
+  item = jsonencode(merge(
+    {
+      pk                   = { S = "APP#${each.value.app_id}" }
+      sk                   = { S = "META" }
+      entity               = { S = "app" }
+      app_id               = { S = each.value.app_id }
+      group_id             = { S = local.official_shop_group_id }
+      title                = { S = each.value.title }
+      owner_user_id        = { S = local.official_shop_owner_user_id }
+      source_kind          = { S = "official_shop" }
+      editable             = { BOOL = false }
+      created_at           = { S = each.value.published_at }
+      shop_visibility      = { S = "listed" }
+      shop_listed_at       = { S = each.value.published_at }
+      published_version    = { N = tostring(each.value.version) }
+      published_key        = { S = aws_s3_object.official_shop_app[each.key].key }
+      published_sha256     = { S = filesha256(each.value.source) }
+      published_files_json = { S = jsonencode(each.value.files) }
+      published_at         = { S = each.value.published_at }
+    },
+    each.value.icon == null ? {} : {
+      thumbnail_bytes        = { B = filebase64(each.value.icon) }
+      thumbnail_content_type = { S = "image/webp" }
+      thumbnail_updated_at   = { S = each.value.published_at }
+    },
+  ))
 }
 
 resource "aws_dynamodb_table_item" "official_shop_listing" {
