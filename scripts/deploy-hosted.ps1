@@ -38,7 +38,7 @@ function Invoke-Terraform {
     if ($Capture) {
         $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
         $startInfo.FileName = 'cmd.exe'
-        $startInfo.WorkingDirectory = $WorkingDirectory
+        $startInfo.WorkingDirectory = $hostedDir
         $startInfo.UseShellExecute = $false
         $startInfo.RedirectStandardOutput = $true
         $startInfo.RedirectStandardError = $true
