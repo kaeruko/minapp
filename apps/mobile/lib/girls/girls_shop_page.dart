@@ -202,6 +202,8 @@ class _GirlsShopPageState extends State<GirlsShopPage> {
               for (final GirlsShopApp app in apps) ...<Widget>[
                 _GirlsShopCard(
                   app: app,
+                  thumbnailUri: _shopApi.thumbnailUri(app),
+                  accessToken: widget.session.accessToken,
                   onTap: () async {
                     await Navigator.of(context).push<void>(
                       MaterialPageRoute<void>(
@@ -228,9 +230,16 @@ class _GirlsShopPageState extends State<GirlsShopPage> {
 }
 
 class _GirlsShopCard extends StatelessWidget {
-  const _GirlsShopCard({required this.app, required this.onTap});
+  const _GirlsShopCard({
+    required this.app,
+    required this.thumbnailUri,
+    required this.accessToken,
+    required this.onTap,
+  });
 
   final GirlsShopApp app;
+  final Uri? thumbnailUri;
+  final String accessToken;
   final VoidCallback onTap;
 
   @override
@@ -247,6 +256,8 @@ class _GirlsShopCard extends StatelessWidget {
             children: <Widget>[
               _GirlsShopArtwork(
                 app: app,
+                thumbnailUri: thumbnailUri,
+                accessToken: accessToken,
                 size: 58,
                 radius: 18,
                 iconSize: 28,
@@ -565,6 +576,8 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
           Center(
             child: _GirlsShopArtwork(
               app: app,
+              thumbnailUri: widget.shopApi.thumbnailUri(app),
+              accessToken: widget.session.accessToken,
               size: 108,
               radius: 30,
               iconSize: 54,
@@ -653,6 +666,8 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
 class _GirlsShopArtwork extends StatelessWidget {
   const _GirlsShopArtwork({
     required this.app,
+    required this.thumbnailUri,
+    required this.accessToken,
     required this.size,
     required this.radius,
     required this.iconSize,
@@ -660,6 +675,8 @@ class _GirlsShopArtwork extends StatelessWidget {
   });
 
   final GirlsShopApp app;
+  final Uri? thumbnailUri;
+  final String accessToken;
   final double size;
   final double radius;
   final double iconSize;
@@ -680,24 +697,51 @@ class _GirlsShopArtwork extends StatelessWidget {
       );
     }
 
-    return Container(
-      width: size,
-      height: size,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1E8FA),
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(
-          color: const Color(0xFFE2D2F1),
-          width: borderWidth,
+    Widget fallback() => Container(
+          width: size,
+          height: size,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1E8FA),
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(
+              color: const Color(0xFFE2D2F1),
+              width: borderWidth,
+            ),
+          ),
+          child: Icon(
+            Icons.auto_awesome_rounded,
+            color: _lavender,
+            size: iconSize,
+          ),
+        );
+
+    final Uri? remoteThumbnail = thumbnailUri;
+    if (remoteThumbnail != null) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(radius),
+          child: Image.network(
+            remoteThumbnail.toString(),
+            headers: <String, String>{
+              'Authorization': 'Bearer $accessToken',
+            },
+            fit: BoxFit.contain,
+            semanticLabel: _shopDisplayTitle(app),
+            errorBuilder: (
+              BuildContext context,
+              Object error,
+              StackTrace? stackTrace,
+            ) =>
+                fallback(),
+          ),
         ),
-      ),
-      child: Icon(
-        Icons.auto_awesome_rounded,
-        color: _lavender,
-        size: iconSize,
-      ),
-    );
+      );
+    }
+
+    return fallback();
   }
 }
 
