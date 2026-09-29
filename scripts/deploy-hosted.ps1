@@ -36,16 +36,56 @@ function Invoke-Terraform {
     $command = "terraform $Arguments"
 
     if ($Capture) {
-        $output = @(& cmd.exe /d /s /c $command 2>&1)
-        $exitCode = $LASTEXITCODE
-        $text = ($output | ForEach-Object { [string]$_ }) -join [Environment]::NewLine
+        $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+        $startInfo.FileName = 'cmd.exe'
+        $startInfo.WorkingDirectory = $WorkingDirectory
+        $startInfo.UseShellExecute = $false
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        [void]$startInfo.ArgumentList.Add('/d')
+        [void]$startInfo.ArgumentList.Add('/s')
+        [void]$startInfo.ArgumentList.Add('/c')
+        [void]$startInfo.ArgumentList.Add($command)
+
+        $process = [System.Diagnostics.Process]::new()
+        $process.StartInfo = $startInfo
+        try {
+            if (-not $process.Start()) {
+                throw "$Context could not start cmd.exe."
+            }
+            $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+            $stderrTask = $process.StandardError.ReadToEndAsync()
+            $process.WaitForExit()
+            $stdout = $stdoutTask.GetAwaiter().GetResult()
+            $stderr = $stderrTask.GetAwaiter().GetResult()
+            $exitCode = $process.ExitCode
+        }
+        finally {
+            $process.Dispose()
+        }
+
         if ($exitCode -ne 0) {
-            throw "$Context failed with exit code $exitCode. Output: $text"
+            $diagnostic = if ([string]::IsNullOrWhiteSpace($stderr)) {
+                '<empty stderr>'
+            }
+            else {
+                $stderr.Trim()
+            }
+            throw "$Context failed with exit code $exitCode. stderr: $diagnostic"
         }
-        if ([string]::IsNullOrWhiteSpace($text)) {
-            throw "$Context returned empty output."
+        if ([string]::IsNullOrWhiteSpace($stdout)) {
+            $diagnostic = if ([string]::IsNullOrWhiteSpace($stderr)) {
+                '<empty stderr>'
+            }
+            else {
+                $stderr.Trim()
+            }
+            throw "$Context returned empty stdout. stderr: $diagnostic"
         }
-        return $text
+        if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+            Write-Warning "$Context stderr: $($stderr.Trim())"
+        }
+        return $stdout
     }
 
     & cmd.exe /d /s /c $command
