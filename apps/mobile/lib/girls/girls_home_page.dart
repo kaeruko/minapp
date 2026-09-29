@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'api.dart';
-import 'builtin_apps.dart';
-import 'builtin_webview.dart';
 import '../hosted_authoring_contract_api.dart';
 import '../hosted_authoring_editor_action.dart';
 import '../hosted_authoring_projects_api.dart';
 import '../hosted_authoring_resolver.dart';
+import 'api.dart';
+import 'builtin_apps.dart';
+import 'builtin_webview.dart';
 import 'girls_errors.dart';
 import 'girls_group_home_page.dart';
 import 'girls_apps_page.dart';
@@ -223,7 +223,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
                     ? '✨ この作品を編集する？'
                     : '✨ このアプリをアレンジする？',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   color: _ink,
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
