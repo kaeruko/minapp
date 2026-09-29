@@ -7,6 +7,7 @@ import '../api.dart';
 import '../hosted_api.dart';
 import '../hosted_runtime_bridge.dart';
 import '../refreshable_auth_client.dart';
+import 'girls_current_group_store.dart';
 import 'girls_registration_onboarding.dart';
 import 'girls_session_store.dart';
 
@@ -21,6 +22,7 @@ class HostedGirlsApi {
     required Uri baseUri,
     http.Client? client,
     GirlsSessionStore? sessionStore,
+    GirlsCurrentGroupStore? currentGroupStore,
   }) {
     final http.Client resolvedClient = client ?? http.Client();
     final HostedApi delegate = HostedApi(
@@ -34,7 +36,10 @@ class HostedGirlsApi {
         baseUri: baseUri,
         client: resolvedClient,
       ),
-      registrationOnboarding: GirlsRegistrationOnboarding(delegate),
+      registrationOnboarding: GirlsRegistrationOnboarding(
+        delegate,
+        currentGroupStore ?? const SharedPreferencesGirlsCurrentGroupStore(),
+      ),
       sessionStore: sessionStore ?? SecureGirlsSessionStore(),
     );
   }
