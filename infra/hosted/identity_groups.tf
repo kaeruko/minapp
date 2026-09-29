@@ -47,6 +47,7 @@ locals {
     "DELETE /hosted/groups/{group_id}/apps/{app_id}",
     "POST /hosted/groups/{group_id}/apps/{app_id}/runtime-session",
     "GET /shop/apps",
+    "GET /shop/apps/{app_id}/thumbnail",
     "POST /shop/apps/{app_id}/launch",
     "POST /shop/apps/{app_id}/download",
     "POST /shop/apps/{app_id}/add",

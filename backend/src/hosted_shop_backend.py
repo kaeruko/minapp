@@ -12,6 +12,7 @@ from aws_backend import _item_string, _string_attr
 from errors import ApiProblem
 from hosted_catalog_backend import _item_files, _optional_number, _optional_string
 from hosted_platform_backend import _now_iso, _number_attr
+from hosted_thumbnail import thumbnail_from_app
 from hosted_upload import create_uploaded_app
 from hosted_user_state_backend import HostedUserStateBackend
 
@@ -122,6 +123,10 @@ class HostedShopBackend(HostedUserStateBackend):
             sha256 = _optional_string(app, "published_sha256")
             if published_version is None or published_at is None or sha256 is None:
                 raise RuntimeError("Listed hosted app lost published metadata")
+            thumbnail_path: str | None = None
+            if app.get("thumbnail_bytes") is not None:
+                thumbnail_from_app(app)
+                thumbnail_path = f"/shop/apps/{app_id}/thumbnail"
             result.append(
                 {
                     "app_id": app_id,
@@ -131,10 +136,20 @@ class HostedShopBackend(HostedUserStateBackend):
                     "owner_display_name": owner.login_id,
                     "published_at": published_at,
                     "sha256": sha256,
+                    "thumbnail_path": thumbnail_path,
                 }
             )
         result.sort(key=lambda app: (app["published_at"], app["app_id"]), reverse=True)
         return result
+
+    def get_shop_thumbnail(
+        self,
+        auth_subject: str,
+        app_id: str,
+    ) -> tuple[bytes, str]:
+        self._user_by_auth_subject(auth_subject)
+        app = self._current_shop_app(app_id)
+        return thumbnail_from_app(app)
 
     def set_shop_visibility(
         self,

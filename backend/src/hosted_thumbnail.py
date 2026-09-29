@@ -93,12 +93,7 @@ def set_thumbnail(
     }
 
 
-def get_thumbnail(
-    backend: Any,
-    auth_subject: str,
-    app_id: str,
-) -> tuple[bytes, str]:
-    _, app = _author_editable_app(backend, auth_subject, app_id)
+def thumbnail_from_app(app: dict[str, Any]) -> tuple[bytes, str]:
     raw = app.get("thumbnail_bytes")
     if raw is None:
         raise ApiProblem(404, "thumbnail_not_found", "サムネイルは設定されていません。")
@@ -117,3 +112,12 @@ def get_thumbnail(
         raise RuntimeError("Stored thumbnail has an invalid content type")
     _validate_thumbnail_bytes(data, content_type)
     return data, content_type
+
+
+def get_thumbnail(
+    backend: Any,
+    auth_subject: str,
+    app_id: str,
+) -> tuple[bytes, str]:
+    _, app = _author_editable_app(backend, auth_subject, app_id)
+    return thumbnail_from_app(app)
