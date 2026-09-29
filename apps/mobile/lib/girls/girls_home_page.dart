@@ -178,17 +178,8 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       if (currentId != null && currentGroup == null) {
         widget.onCurrentGroupChanged?.call(null);
       }
-    } catch (error, stackTrace) {
-      final String message = girlsMessageFor(error);
-      debugPrint(
-        'Girls work copy failed at $stage: $error\n$stackTrace',
-      );
-      if (mounted) {
-        setState(() => _groupError = message);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$stageで失敗しました：$message')),
-        );
-      }
+    } catch (error) {
+      if (mounted) setState(() => _groupError = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _loadingGroups = false);
     }
@@ -422,8 +413,17 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         initialContentId: copied.contentId,
       );
       if (mounted) await _loadGroups();
-    } catch (error) {
-      if (mounted) setState(() => _groupError = girlsMessageFor(error));
+    } catch (error, stackTrace) {
+      final String message = girlsMessageFor(error);
+      debugPrint(
+        'Girls work copy failed at $stage: $error\n$stackTrace',
+      );
+      if (mounted) {
+        setState(() => _groupError = message);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$stageで失敗しました：$message')),
+        );
+      }
     } finally {
       contractApi.close();
       projectsApi.close();
