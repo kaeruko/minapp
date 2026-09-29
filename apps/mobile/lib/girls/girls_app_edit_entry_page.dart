@@ -23,6 +23,7 @@ class GirlsAppEditEntryPage extends StatefulWidget {
     required this.title,
     required this.expectedRevision,
     this.onSaved,
+    this.onRenamed,
     super.key,
   });
 
@@ -33,6 +34,7 @@ class GirlsAppEditEntryPage extends StatefulWidget {
   final String title;
   final int expectedRevision;
   final Future<void> Function(int revision)? onSaved;
+  final Future<void> Function()? onRenamed;
 
   @override
   State<GirlsAppEditEntryPage> createState() => _GirlsAppEditEntryPageState();
@@ -40,17 +42,66 @@ class GirlsAppEditEntryPage extends StatefulWidget {
 
 class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
   late int _currentRevision;
+  late final TextEditingController _titleController;
+  late String _currentTitle;
   bool _copying = false;
+  bool _renaming = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _currentRevision = widget.expectedRevision;
+    _currentTitle = widget.title;
+    _titleController = TextEditingController(text: widget.title);
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _renameApp() async {
+    if (_renaming || _copying) return;
+    final String title = _titleController.text;
+    if (title.isEmpty || title != title.trim() || title.length > 80) {
+      setState(() {
+        _error = 'アプリ名は前後に空白を入れず、1〜80文字で入力してね。';
+      });
+      return;
+    }
+    if (title == _currentTitle) return;
+
+    setState(() {
+      _renaming = true;
+      _error = null;
+    });
+    try {
+      final ManagedGirlsApp renamed = await widget.api.renameApp(
+        accessToken: widget.accessToken,
+        appId: widget.appId,
+        title: title,
+      );
+      if (!mounted) return;
+      setState(() => _currentTitle = renamed.app.title);
+      final Future<void> Function()? onRenamed = widget.onRenamed;
+      if (onRenamed != null) {
+        await onRenamed();
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('アプリ名を変更したよ')),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _renaming = false);
+    }
   }
 
   Future<void> _copyForAi() async {
-    if (_copying) return;
+    if (_copying || _renaming) return;
     setState(() {
       _copying = true;
       _error = null;
@@ -69,7 +120,7 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
       }
       final GirlsSourceArchive archive = GirlsSourceArchive.decode(download.bytes);
       final String text = _buildAiClipboardText(
-        title: widget.title,
+        title: _currentTitle,
         archive: archive,
       );
       await Clipboard.setData(ClipboardData(text: text));
@@ -92,7 +143,7 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
           accessToken: widget.accessToken,
           groupId: widget.groupId,
           appId: widget.appId,
-          title: widget.title,
+          title: _currentTitle,
           expectedRevision: _currentRevision,
           onSaved: (int revision) async {
             if (!mounted) return;
@@ -146,7 +197,60 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .84),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE4C8D2)),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: TextField(
+                          key: const Key('girls-edit-entry-app-title'),
+                          controller: _titleController,
+                          enabled: !_renaming && !_copying,
+                          maxLength: 80,
+                          onChanged: (_) => setState(() {}),
+                          decoration: const InputDecoration(
+                            labelText: 'アプリ名',
+                            counterText: '',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      FilledButton(
+                        key: const Key('girls-edit-entry-save-title'),
+                        onPressed: _renaming ||
+                                _copying ||
+                                _titleController.text == _currentTitle
+                            ? null
+                            : _renameApp,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _lavender,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: _renaming
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                '保存',
+                                style: TextStyle(fontWeight: FontWeight.w900),
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: .92),
@@ -196,7 +300,7 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
                             ),
                             const SizedBox(height: 18),
                             _BigCopyButton(
-                              busy: _copying,
+                              busy: _copying || _renaming,
                               onTap: _copyForAi,
                             ),
                           ],
@@ -244,7 +348,7 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
                 const SizedBox(height: 22),
                 FilledButton(
                   key: const Key('girls-edit-entry-open-editor'),
-                  onPressed: _copying ? null : _openEditor,
+                  onPressed: _copying || _renaming ? null : _openEditor,
                   style: FilledButton.styleFrom(
                     backgroundColor: _mint,
                     foregroundColor: Colors.white,
