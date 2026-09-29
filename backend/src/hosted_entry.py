@@ -179,6 +179,23 @@ def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
                 app_match.group(1),
             ),
         )
+    if method == "PATCH" and app_match is not None:
+        payload = _json_body(event)
+        _require_fields(payload, required={"title"})
+        title = payload["title"]
+        if not isinstance(title, str):
+            raise ApiProblem(400, "invalid_request", "title must be a string.")
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
+        return _json_response(
+            200,
+            hosted_app_management.set_title(
+                backend,
+                auth_subject,
+                app_match.group(1),
+                title=title,
+            ),
+        )
 
     visibility_match = _MY_APP_VISIBILITY_RE.fullmatch(path)
     if method == "POST" and visibility_match is not None:
