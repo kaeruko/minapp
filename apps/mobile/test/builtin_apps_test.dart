@@ -44,6 +44,24 @@ void main() {
     );
   });
 
+  test('novel starter is declared as a Player while ordinary apps stay standalone', () {
+    final BuiltInApp novel = builtInApps.singleWhere(
+      (BuiltInApp app) => app.id == 'novel-starter',
+    );
+    final BuiltInApp memo = builtInApps.singleWhere(
+      (BuiltInApp app) => app.id == 'memo',
+    );
+
+    expect(novel.isPlayer, isTrue);
+    expect(novel.isEditor, isFalse);
+    expect(novel.isStandalone, isFalse);
+    expect(novel.accepts, <String>['minapp/novel@1']);
+
+    expect(memo.isPlayer, isFalse);
+    expect(memo.isEditor, isFalse);
+    expect(memo.isStandalone, isTrue);
+  });
+
   test('built-in app search filters every registered local app', () {
     expect(filterBuiltInApps(''), hasLength(builtInApps.length));
     expect(filterBuiltInApps('しばちゃん'), hasLength(2));
