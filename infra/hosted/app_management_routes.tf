@@ -2,6 +2,7 @@ locals {
   hosted_app_management_routes = toset([
     "GET /hosted/my/apps",
     "GET /hosted/my/apps/{app_id}",
+    "PATCH /hosted/my/apps/{app_id}",
     "GET /hosted/my/apps/{app_id}/thumbnail",
     "POST /hosted/my/apps/{app_id}/preview-session",
     "POST /hosted/my/apps/{app_id}/preview-runtime-session",
