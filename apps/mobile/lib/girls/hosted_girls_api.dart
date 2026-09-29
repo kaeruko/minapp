@@ -25,6 +25,8 @@ class HostedGirlsApi {
     GirlsCurrentGroupStore? currentGroupStore,
   }) {
     final http.Client resolvedClient = client ?? http.Client();
+    final GirlsCurrentGroupStore resolvedCurrentGroupStore =
+        currentGroupStore ?? const SharedPreferencesGirlsCurrentGroupStore();
     final HostedApi delegate = HostedApi(
       baseUri: baseUri,
       client: resolvedClient,
@@ -38,9 +40,10 @@ class HostedGirlsApi {
       ),
       registrationOnboarding: GirlsRegistrationOnboarding(
         delegate,
-        currentGroupStore ?? const SharedPreferencesGirlsCurrentGroupStore(),
+        resolvedCurrentGroupStore,
       ),
       sessionStore: sessionStore ?? SecureGirlsSessionStore(),
+      currentGroupStore: resolvedCurrentGroupStore,
     );
   }
 
@@ -50,10 +53,12 @@ class HostedGirlsApi {
     required RefreshableAuthClient authClient,
     required GirlsRegistrationOnboarding registrationOnboarding,
     required GirlsSessionStore sessionStore,
+    required GirlsCurrentGroupStore currentGroupStore,
   })  : _delegate = delegate,
         _authClient = authClient,
         _registrationOnboarding = registrationOnboarding,
-        _sessionStore = sessionStore;
+        _sessionStore = sessionStore,
+        _currentGroupStore = currentGroupStore;
 
   final HostedApi _delegate;
   // Related screen clients share connections instead of repeating TLS setup.
@@ -62,6 +67,7 @@ class HostedGirlsApi {
   final RefreshableAuthClient _authClient;
   final GirlsRegistrationOnboarding _registrationOnboarding;
   final GirlsSessionStore _sessionStore;
+  final GirlsCurrentGroupStore _currentGroupStore;
   final StreamController<AuthenticatedSession> _authenticatedSessions =
       StreamController<AuthenticatedSession>.broadcast(sync: true);
 
@@ -151,8 +157,11 @@ class HostedGirlsApi {
   }
 
   Future<void> logout() async {
-    debugPrint('Girls session logout: clearing saved refresh token.');
+    debugPrint(
+      'Girls session logout: clearing saved refresh token and current group.',
+    );
     await _sessionStore.clearRefreshToken();
+    await _currentGroupStore.clear();
   }
 
   Future<HostedLegalBundle> fetchLegal() => _delegate.fetchLegal();
