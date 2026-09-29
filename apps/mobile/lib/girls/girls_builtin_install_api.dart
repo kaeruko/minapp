@@ -148,8 +148,15 @@ class GirlsBuiltinInstallApi {
       groupId: groupId,
       contentFormat: _novelContentFormat,
     );
+    final List<HostedAuthoringProjectSummary> oldestFirst =
+        List<HostedAuthoringProjectSummary>.of(projects)
+          ..sort(
+            (HostedAuthoringProjectSummary a,
+                    HostedAuthoringProjectSummary b) =>
+                a.createdAt.compareTo(b.createdAt),
+          );
 
-    for (final HostedAuthoringProjectSummary summary in projects) {
+    for (final HostedAuthoringProjectSummary summary in oldestFirst) {
       final HostedAuthoringProject project = await projectsApi.loadProject(
         accessToken: accessToken,
         contentId: summary.contentId,
