@@ -16,6 +16,7 @@ from hosted_app_management import (  # noqa: E402
     get_preview_file,
     list_managed_apps,
     set_group_visibility,
+    set_title,
     set_visibility,
 )
 from hosted_legal import PRIVACY_VERSION, TERMS_VERSION  # noqa: E402
@@ -133,6 +134,45 @@ class HostedManagedPreviewAuthorizationTests(unittest.TestCase):
             get_managed_app(self.backend, self.bob, non_editor["app_id"])
         self.assertEqual(caught.exception.status_code, 409)
         self.assertEqual(caught.exception.error, "app_not_editable")
+
+    def test_author_can_rename_app_and_mirrored_group_row_changes_atomically(self) -> None:
+        renamed = set_title(
+            self.backend,
+            self.bob,
+            self.bob_app["app_id"],
+            title="放課後しばちゃん",
+        )
+        self.assertEqual(renamed["title"], "放課後しばちゃん")
+
+        detail = get_managed_app(self.backend, self.bob, self.bob_app["app_id"])
+        self.assertEqual(detail["title"], "放課後しばちゃん")
+        group_copy = self.backend._get_item(
+            pk=f"GROUP#{self.group_id}",
+            sk=f"APP#{self.bob_app['app_id']}",
+        )
+        self.assertIsNotNone(group_copy)
+        assert group_copy is not None
+        self.assertEqual(group_copy["title"]["S"], "放課後しばちゃん")
+
+        with self.assertRaises(ApiProblem) as invalid:
+            set_title(
+                self.backend,
+                self.bob,
+                self.bob_app["app_id"],
+                title=" 放課後しばちゃん",
+            )
+        self.assertEqual(invalid.exception.status_code, 400)
+        self.assertEqual(invalid.exception.error, "invalid_app_title")
+
+        with self.assertRaises(ApiProblem) as forbidden:
+            set_title(
+                self.backend,
+                self.carol,
+                self.bob_app["app_id"],
+                title="勝手な名前",
+            )
+        self.assertEqual(forbidden.exception.status_code, 403)
+        self.assertEqual(forbidden.exception.error, "forbidden")
 
     def test_author_and_group_owner_can_change_visibility_but_other_member_cannot(self) -> None:
         hidden = set_visibility(
