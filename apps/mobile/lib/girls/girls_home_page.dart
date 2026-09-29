@@ -138,7 +138,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     });
     try {
       final List<HostedGroup> groups = await widget.api.listGroups(
-        widget.session.accessToken,
+        session.accessToken,
       );
       final String? currentId =
           _currentGroup?.groupId ?? await widget.currentGroupStore.load();
@@ -155,11 +155,11 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       GirlsHomeMascotPrompt? mascotPrompt;
       if (currentGroup != null) {
         final List<HostedMember> members = await widget.api.listMembers(
-          accessToken: widget.session.accessToken,
+          accessToken: session.accessToken,
           groupId: currentGroup.groupId,
         );
         final List<HostedGroupApp> apps = await widget.api.listGroupApps(
-          accessToken: widget.session.accessToken,
+          accessToken: session.accessToken,
           groupId: currentGroup.groupId,
         );
         final int customAppCount = apps
@@ -209,6 +209,11 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       throw StateError('Playable built-in catalog entries must not be Editors.');
     }
     final bool isPlayer = app.isPlayer;
+    final NavigatorState navigator = Navigator.of(context);
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final HostedGroup? group = _currentGroup;
+    final HostedGirlsApi api = widget.api;
+    final AuthenticatedSession session = widget.session;
     final bool? arrange = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: const Color(0xFFFFFBF7),
@@ -271,12 +276,23 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         ),
       ),
     );
-    debugPrint('Girls work copy: arrangement result for ${app.id} = $arrange');
-    if (arrange != true || !mounted) return;
+    debugPrint(
+      'Girls work copy: arrangement result for ${app.id} = $arrange '
+      '(homeMounted=$mounted, navigatorMounted=${navigator.mounted})',
+    );
+    if (arrange != true) return;
     if (isPlayer) {
       debugPrint('Girls work copy: starting copy flow for ${app.id}');
-      await _copyBuiltinWorkAndEdit(app);
+      await _copyBuiltinWorkAndEdit(
+        app,
+        group: group,
+        navigator: navigator,
+        messenger: messenger,
+        api: api,
+        session: session,
+      );
     } else {
+      if (!mounted) return;
       await _arrangeBuiltin(app);
     }
   }
@@ -312,18 +328,26 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     return GirlsSourceArchive.fromEntries(entries).encode();
   }
 
-  Future<void> _copyBuiltinWorkAndEdit(BuiltInApp app) async {
+  Future<void> _copyBuiltinWorkAndEdit(
+    BuiltInApp app, {
+    required HostedGroup? group,
+    required NavigatorState navigator,
+    required ScaffoldMessengerState messenger,
+    required HostedGirlsApi api,
+    required AuthenticatedSession session,
+  }) async {
     if (_arrangingBuiltin) return;
     if (!app.isPlayer || app.accepts.length != 1 || app.edits.isNotEmpty) {
       throw StateError(
         'Built-in work copy requires exactly one accepts format and no edits formats.',
       );
     }
-    final HostedGroup? group = _currentGroup;
     if (group == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('先にグループを選ぶと、作品を編集できるよ。')),
-      );
+      if (messenger.mounted) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('先にグループを選ぶと、作品を編集できるよ。')),
+        );
+      }
       return;
     }
 
@@ -334,31 +358,35 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       );
     }
 
-    setState(() {
-      _arrangingBuiltin = true;
-      _groupError = null;
-    });
+    if (mounted) {
+      setState(() {
+        _arrangingBuiltin = true;
+        _groupError = null;
+      });
+    }
     debugPrint('Girls work copy: entered _copyBuiltinWorkAndEdit');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('作品をコピーしています…')),
-    );
+    if (messenger.mounted) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('作品をコピーしています…')),
+      );
+    }
     final GirlsBuiltinInstallApi installApi = GirlsBuiltinInstallApi(
-      baseUri: widget.api.baseUri,
-      client: widget.api.httpClient,
+      baseUri: api.baseUri,
+      client: api.httpClient,
     );
     final HostedAuthoringProjectsApi projectsApi = HostedAuthoringProjectsApi(
-      baseUri: widget.api.baseUri,
-      client: widget.api.httpClient,
+      baseUri: api.baseUri,
+      client: api.httpClient,
     );
     final HostedAuthoringContractApi contractApi = HostedAuthoringContractApi(
-      baseUri: widget.api.baseUri,
-      client: widget.api.httpClient,
+      baseUri: api.baseUri,
+      client: api.httpClient,
     );
     String stage = 'ノベルエディタの準備';
     try {
       debugPrint('Girls work copy: START $stage');
       final HostedGroupApp editorApp = await installApi.ensureNovelEditor(
-        accessToken: widget.session.accessToken,
+        accessToken: session.accessToken,
         groupId: group.groupId,
         includeSample: false,
       ).timeout(
@@ -370,7 +398,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       debugPrint('Girls work copy: START $stage');
       final HostedAuthoringProjectSummary source =
           await installApi.ensureNovelSampleProject(
-        accessToken: widget.session.accessToken,
+        accessToken: session.accessToken,
         groupId: group.groupId,
       ).timeout(
         const Duration(seconds: 15),
@@ -388,7 +416,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       debugPrint('Girls work copy: START $stage');
       final HostedAuthoringProjectSummary copied =
           await projectsApi.cloneProject(
-        accessToken: widget.session.accessToken,
+        accessToken: session.accessToken,
         contentId: source.contentId,
       ).timeout(
         const Duration(seconds: 15),
@@ -407,7 +435,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       debugPrint('Girls work copy: START $stage');
       final List<HostedAuthoringAppContract> contracts =
           await contractApi.listApps(
-        accessToken: widget.session.accessToken,
+        accessToken: session.accessToken,
         groupId: group.groupId,
       ).timeout(
         const Duration(seconds: 15),
@@ -421,17 +449,22 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         contentFormat: contentFormat,
       );
 
-      if (!mounted) return;
-      setState(() => _arrangingBuiltin = false);
+      if (mounted) {
+        setState(() => _arrangingBuiltin = false);
+      }
+      if (!navigator.mounted || navigator.overlay == null) {
+        throw StateError('Girls navigator was disposed before opening the editor.');
+      }
       stage = 'ノベルエディタを開く処理';
       debugPrint('Girls work copy: START $stage');
+      final BuildContext navigationContext = navigator.overlay!.context;
       await openHostedAuthoringProjects(
-        context: context,
-        baseUri: widget.api.baseUri,
-        accessToken: widget.session.accessToken,
+        context: navigationContext,
+        baseUri: api.baseUri,
+        accessToken: session.accessToken,
         groupId: group.groupId,
         editorAppId: editor.appId,
-        runtimeTransport: widget.api.runtimeClient,
+        runtimeTransport: api.runtimeClient,
         editorFormats: editor.edits,
         errorMessage: girlsMessageFor,
         pageTitle: 'ノベルエディタ',
@@ -450,7 +483,9 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       );
       if (mounted) {
         setState(() => _groupError = message);
-        ScaffoldMessenger.of(context).showSnackBar(
+      }
+      if (messenger.mounted) {
+        messenger.showSnackBar(
           SnackBar(content: Text('$stageで失敗しました：$message')),
         );
       }
@@ -488,7 +523,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     try {
       final Uint8List sourceZip = await _arrangeSourceZip(app);
       final HostedGroupApp arranged = await uploadApi.createFromZip(
-        accessToken: widget.session.accessToken,
+        accessToken: session.accessToken,
         groupId: group.groupId,
         title: '${app.title} アレンジ',
         zipBytes: sourceZip,
@@ -600,7 +635,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   Future<void> _showCurrentGroupId(HostedGroup group) async {
     try {
       final HostedInvite invite = await widget.api.createInvite(
-        accessToken: widget.session.accessToken,
+        accessToken: session.accessToken,
         groupId: group.groupId,
       );
       if (!mounted) return;
@@ -706,7 +741,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     late final HostedGroup createdGroup;
     try {
       createdGroup = await widget.api.createGroup(
-        accessToken: widget.session.accessToken,
+        accessToken: session.accessToken,
         name: name,
       );
     } catch (error) {
@@ -721,11 +756,11 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
 
     try {
       final HostedInvite invite = await widget.api.createInvite(
-        accessToken: widget.session.accessToken,
+        accessToken: session.accessToken,
         groupId: createdGroup.groupId,
       );
       final List<HostedGroup> groups = await widget.api.listGroups(
-        widget.session.accessToken,
+        session.accessToken,
       );
       if (!mounted) return;
       setState(() => _groups = groups);
