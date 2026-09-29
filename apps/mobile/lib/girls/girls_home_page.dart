@@ -4,6 +4,10 @@ import 'package:flutter/services.dart';
 import 'api.dart';
 import 'builtin_apps.dart';
 import 'builtin_webview.dart';
+import '../hosted_authoring_contract_api.dart';
+import '../hosted_authoring_editor_action.dart';
+import '../hosted_authoring_projects_api.dart';
+import '../hosted_authoring_resolver.dart';
 import 'girls_errors.dart';
 import 'girls_group_home_page.dart';
 import 'girls_apps_page.dart';
@@ -12,6 +16,7 @@ import 'girls_email_settings_page.dart';
 import 'girls_footer_nav.dart';
 import 'girls_groups_page.dart';
 import 'girls_home_mascot_prompt.dart';
+import 'girls_builtin_install_api.dart';
 import 'girls_profile_page.dart';
 import 'girls_source_zip.dart';
 import 'hosted_girls_upload_api.dart';
@@ -30,6 +35,7 @@ const String _minappchiCardAsset = 'assets/girls/home/cards/minappchi_card.png';
 const String _novelCardAsset = 'assets/girls/home/cards/novel_card.png';
 const String _groupCreateCardAsset =
     'assets/girls/home/cards/group_create_card.png';
+const String _novelContentFormat = 'minapp/novel@1';
 const GirlsHomeMascotPromptResolver _mascotPromptResolver =
     GirlsHomeMascotPromptResolver();
 
@@ -41,13 +47,25 @@ const Map<String, List<String>> _arrangeBuiltinAssets =
   'minappchi': <String>[
     'assets/builtin/minappchi/index.html',
   ],
-  'novel-starter': <String>[
-    'assets/builtin/novel_starter/index.html',
-    'assets/builtin/novel_starter/player.js',
-    'assets/builtin/novel_starter/story-validator.js',
-    'assets/builtin/novel_starter/face.jpg',
-  ],
 };
+
+String _novelProjectTitle(HostedAuthoringProject project) {
+  if (project.summary.contentFormat != _novelContentFormat) {
+    throw const FormatException(
+      'Novel project has an unexpected content format.',
+    );
+  }
+  final Object? rawTitle = project.document['title'];
+  if (rawTitle is! String ||
+      rawTitle.isEmpty ||
+      rawTitle != rawTitle.trim() ||
+      rawTitle.length > 80) {
+    throw const FormatException(
+      'Novel project document has an invalid title.',
+    );
+  }
+  return rawTitle;
+}
 
 enum _AccountAction { email, refresh, logout }
 
@@ -185,6 +203,10 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   }
 
   Future<void> _offerBuiltinArrangement(BuiltInApp app) async {
+    if (app.isEditor) {
+      throw StateError('Playable built-in catalog entries must not be Editors.');
+    }
+    final bool isPlayer = app.isPlayer;
     final bool? arrange = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: const Color(0xFFFFFBF7),
@@ -196,8 +218,10 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const Text(
-                '✨ このアプリをアレンジする？',
+              Text(
+                isPlayer
+                    ? '✨ この作品を編集する？'
+                    : '✨ このアプリをアレンジする？',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: _ink,
@@ -207,7 +231,9 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
               ),
               const SizedBox(height: 10),
               Text(
-                '「${app.title}」をコピーして、自分好みに変えられるよ。',
+                isPlayer
+                    ? '「${app.title}」をコピーして、自分だけの物語に編集できるよ。'
+                    : '「${app.title}」をコピーして、自分好みに変えられるよ。',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Color(0xFF806B73),
@@ -221,10 +247,14 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
                 onPressed: _arrangingBuiltin
                     ? null
                     : () => Navigator.of(sheetContext).pop(true),
-                icon: const Icon(Icons.auto_fix_high_rounded),
-                label: const Text(
-                  'このアプリをアレンジする！',
-                  style: TextStyle(fontWeight: FontWeight.w900),
+                icon: Icon(
+                  isPlayer ? Icons.edit_note_rounded : Icons.auto_fix_high_rounded,
+                ),
+                label: Text(
+                  isPlayer
+                      ? 'コピーして編集する！'
+                      : 'このアプリをアレンジする！',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
               TextButton(
@@ -240,7 +270,11 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       ),
     );
     if (arrange != true || !mounted) return;
-    await _arrangeBuiltin(app);
+    if (isPlayer) {
+      await _copyBuiltinWorkAndEdit(app);
+    } else {
+      await _arrangeBuiltin(app);
+    }
   }
 
   Future<Uint8List> _arrangeSourceZip(BuiltInApp app) async {
@@ -274,8 +308,123 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     return GirlsSourceArchive.fromEntries(entries).encode();
   }
 
+  Future<void> _copyBuiltinWorkAndEdit(BuiltInApp app) async {
+    if (_arrangingBuiltin) return;
+    if (!app.isPlayer || app.accepts.length != 1 || app.edits.isNotEmpty) {
+      throw StateError(
+        'Built-in work copy requires exactly one accepts format and no edits formats.',
+      );
+    }
+    final HostedGroup? group = _currentGroup;
+    if (group == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('先にグループを選ぶと、作品を編集できるよ。')),
+      );
+      return;
+    }
+
+    final String contentFormat = app.accepts.single;
+    if (contentFormat != _novelContentFormat) {
+      throw StateError(
+        'No built-in starter work is registered for $contentFormat.',
+      );
+    }
+
+    setState(() {
+      _arrangingBuiltin = true;
+      _groupError = null;
+    });
+    final GirlsBuiltinInstallApi installApi = GirlsBuiltinInstallApi(
+      baseUri: widget.api.baseUri,
+      client: widget.api.httpClient,
+    );
+    final HostedAuthoringProjectsApi projectsApi = HostedAuthoringProjectsApi(
+      baseUri: widget.api.baseUri,
+      client: widget.api.httpClient,
+    );
+    final HostedAuthoringContractApi contractApi = HostedAuthoringContractApi(
+      baseUri: widget.api.baseUri,
+      client: widget.api.httpClient,
+    );
+    try {
+      final HostedGroupApp editorApp = await installApi.ensureNovelEditor(
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
+        includeSample: false,
+      );
+      final HostedAuthoringProjectSummary source =
+          await installApi.ensureNovelSampleProject(
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
+      );
+      if (source.groupId != group.groupId ||
+          source.contentFormat != contentFormat) {
+        throw const FormatException(
+          'Built-in starter work changed the requested content scope.',
+        );
+      }
+
+      final HostedAuthoringProjectSummary copied =
+          await projectsApi.cloneProject(
+        accessToken: widget.session.accessToken,
+        contentId: source.contentId,
+      );
+      if (copied.groupId != group.groupId ||
+          copied.contentFormat != contentFormat ||
+          copied.contentId == source.contentId) {
+        throw const FormatException(
+          'Copied work changed the requested content scope.',
+        );
+      }
+
+      final List<HostedAuthoringAppContract> contracts =
+          await contractApi.listApps(
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
+      );
+      final HostedAuthoringAppContract editor =
+          HostedAuthoringResolver.requireEditor(
+        apps: contracts,
+        appId: editorApp.appId,
+        contentFormat: contentFormat,
+      );
+
+      if (!mounted) return;
+      setState(() => _arrangingBuiltin = false);
+      await openHostedAuthoringProjects(
+        context: context,
+        baseUri: widget.api.baseUri,
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
+        editorAppId: editor.appId,
+        runtimeTransport: widget.api.runtimeClient,
+        editorFormats: editor.edits,
+        errorMessage: girlsMessageFor,
+        pageTitle: 'ノベルエディタ',
+        collectionTitle: 'あなたのノベル作品',
+        emptyTitle: 'まだノベル作品がありません',
+        emptyBody: '「新しくつくる」から物語を作ってみよう。',
+        projectTitle: _novelProjectTitle,
+        initialContentId: copied.contentId,
+      );
+      if (mounted) await _loadGroups();
+    } catch (error) {
+      if (mounted) setState(() => _groupError = girlsMessageFor(error));
+    } finally {
+      contractApi.close();
+      projectsApi.close();
+      installApi.close();
+      if (mounted && _arrangingBuiltin) {
+        setState(() => _arrangingBuiltin = false);
+      }
+    }
+  }
+
   Future<void> _arrangeBuiltin(BuiltInApp app) async {
     if (_arrangingBuiltin) return;
+    if (!app.isStandalone) {
+      throw StateError('Only standalone built-in apps can be arranged as apps.');
+    }
     final HostedGroup? group = _currentGroup;
     if (group == null) {
       ScaffoldMessenger.of(context).showSnackBar(
