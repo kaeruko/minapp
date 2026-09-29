@@ -207,17 +207,12 @@ class _GirlsLaceStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return Image.asset(
+      _girlsLoginHeroLaceAsset,
+      key: const Key('girls-login-hero-lace'),
       width: double.infinity,
-      height: 34,
-      child: ClipRect(
-        child: Image.asset(
-          _girlsLoginHeroLaceAsset,
-          width: double.infinity,
-          fit: BoxFit.fitWidth,
-          alignment: Alignment.topCenter,
-        ),
-      ),
+      fit: BoxFit.fitWidth,
+      alignment: Alignment.topCenter,
     );
   }
 }
