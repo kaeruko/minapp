@@ -1,7 +1,7 @@
 import '../api.dart';
 import '../hosted_api.dart';
 
-const String girlsInitialGroupName = 'はじめのグループ';
+const String girlsInitialGroupName = 'マイグループ';
 
 /// Establishes the minimum group state required by Girls after authentication.
 ///
