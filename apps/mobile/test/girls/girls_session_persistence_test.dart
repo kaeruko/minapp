@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:minapp_mobile/api.dart';
+import 'package:minapp_mobile/girls/girls_current_group_store.dart';
 import 'package:minapp_mobile/girls/girls_session_store.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
@@ -105,8 +106,11 @@ void main() {
     expect(requestCount, 2);
   });
 
-  test('empty account creates starter group before login is committed', () async {
+  test('empty account creates and selects starter group before login is committed',
+      () async {
     final _MemoryGirlsSessionStore store = _MemoryGirlsSessionStore();
+    final _MemoryCurrentGroupStore currentGroupStore =
+        _MemoryCurrentGroupStore('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
     int requestCount = 0;
     final MockClient client = MockClient((http.Request request) async {
       requestCount += 1;
@@ -149,11 +153,17 @@ void main() {
       baseUri: baseUri,
       client: client,
       sessionStore: store,
+      currentGroupStore: currentGroupStore,
     );
 
     final AuthResult result = await api.login('honey', 'secret12');
 
     expect(result, isA<AuthenticatedSession>());
+    expect(
+      currentGroupStore.value,
+      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    );
+    expect(currentGroupStore.saveCount, 1);
     expect(store.refreshToken, 'refresh-new');
     expect(store.writeCount, 1);
     expect(requestCount, 3);
@@ -285,6 +295,27 @@ void main() {
     await expectLater(api.login('honey', 'secret12'), throwsFormatException);
     expect(store.writeCount, 0);
   });
+}
+
+class _MemoryCurrentGroupStore implements GirlsCurrentGroupStore {
+  _MemoryCurrentGroupStore(this.value);
+
+  String? value;
+  int saveCount = 0;
+
+  @override
+  Future<String?> load() async => value;
+
+  @override
+  Future<void> save(String groupId) async {
+    saveCount += 1;
+    value = groupId;
+  }
+
+  @override
+  Future<void> clear() async {
+    value = null;
+  }
 }
 
 class _MemoryGirlsSessionStore implements GirlsSessionStore {
