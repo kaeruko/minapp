@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:minapp_mobile/api.dart';
+import 'package:minapp_mobile/girls/girls_current_group_store.dart';
 import 'package:minapp_mobile/girls/girls_registration_onboarding.dart';
 import 'package:minapp_mobile/hosted_api.dart';
 
@@ -9,7 +10,8 @@ void main() {
     expiresIn: 3600,
   );
 
-  test('keeps an existing group without creating another one', () async {
+  test('keeps an existing non-starter group without changing selection',
+      () async {
     final _FakeHostedApi api = _FakeHostedApi(
       groups: const <HostedGroup>[
         HostedGroup(
@@ -20,8 +22,10 @@ void main() {
         ),
       ],
     );
+    final _MemoryCurrentGroupStore currentGroupStore =
+        _MemoryCurrentGroupStore('cccccccccccccccccccccccccccccccc');
     final GirlsRegistrationOnboarding onboarding =
-        GirlsRegistrationOnboarding(api);
+        GirlsRegistrationOnboarding(api, currentGroupStore);
 
     final HostedGroup group = await onboarding.ensureInitialGroup(session);
 
@@ -29,12 +33,20 @@ void main() {
     expect(api.listCalls, 1);
     expect(api.createCalls, 0);
     expect(api.lastAccessToken, 'access-token');
+    expect(
+      currentGroupStore.value,
+      'cccccccccccccccccccccccccccccccc',
+    );
+    expect(currentGroupStore.saveCount, 0);
   });
 
-  test('creates the starter group when the account has no groups', () async {
+  test('creates the starter group and selects it when the account has no groups',
+      () async {
     final _FakeHostedApi api = _FakeHostedApi(groups: const <HostedGroup>[]);
+    final _MemoryCurrentGroupStore currentGroupStore =
+        _MemoryCurrentGroupStore('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
     final GirlsRegistrationOnboarding onboarding =
-        GirlsRegistrationOnboarding(api);
+        GirlsRegistrationOnboarding(api, currentGroupStore);
 
     final HostedGroup group = await onboarding.ensureInitialGroup(session);
 
@@ -44,17 +56,52 @@ void main() {
     expect(api.createCalls, 1);
     expect(api.lastCreatedName, girlsInitialGroupName);
     expect(api.lastAccessToken, 'access-token');
+    expect(
+      currentGroupStore.value,
+      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    );
+    expect(currentGroupStore.saveCount, 1);
   });
 
-  test('propagates group creation failure without trying another route',
+  test('selects a sole legacy starter group without creating another one',
+      () async {
+    final _FakeHostedApi api = _FakeHostedApi(
+      groups: const <HostedGroup>[
+        HostedGroup(
+          groupId: 'dddddddddddddddddddddddddddddddd',
+          name: girlsLegacyInitialGroupName,
+          role: 'owner',
+          status: 'active',
+        ),
+      ],
+    );
+    final _MemoryCurrentGroupStore currentGroupStore =
+        _MemoryCurrentGroupStore('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    final GirlsRegistrationOnboarding onboarding =
+        GirlsRegistrationOnboarding(api, currentGroupStore);
+
+    final HostedGroup group = await onboarding.ensureInitialGroup(session);
+
+    expect(group.groupId, 'dddddddddddddddddddddddddddddddd');
+    expect(api.createCalls, 0);
+    expect(
+      currentGroupStore.value,
+      'dddddddddddddddddddddddddddddddd',
+    );
+    expect(currentGroupStore.saveCount, 1);
+  });
+
+  test('propagates group creation failure without changing selection',
       () async {
     final StateError failure = StateError('create failed');
     final _FakeHostedApi api = _FakeHostedApi(
       groups: const <HostedGroup>[],
       createError: failure,
     );
+    final _MemoryCurrentGroupStore currentGroupStore =
+        _MemoryCurrentGroupStore('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
     final GirlsRegistrationOnboarding onboarding =
-        GirlsRegistrationOnboarding(api);
+        GirlsRegistrationOnboarding(api, currentGroupStore);
 
     await expectLater(
       onboarding.ensureInitialGroup(session),
@@ -63,7 +110,33 @@ void main() {
 
     expect(api.listCalls, 1);
     expect(api.createCalls, 1);
+    expect(
+      currentGroupStore.value,
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    );
+    expect(currentGroupStore.saveCount, 0);
   });
+}
+
+class _MemoryCurrentGroupStore implements GirlsCurrentGroupStore {
+  _MemoryCurrentGroupStore(this.value);
+
+  String? value;
+  int saveCount = 0;
+
+  @override
+  Future<String?> load() async => value;
+
+  @override
+  Future<void> save(String groupId) async {
+    saveCount += 1;
+    value = groupId;
+  }
+
+  @override
+  Future<void> clear() async {
+    value = null;
+  }
 }
 
 class _FakeHostedApi extends HostedApi {
