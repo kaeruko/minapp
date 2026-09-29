@@ -108,7 +108,6 @@ void main() {
     expect(find.byKey(const Key('girls-edit-entry-copy')), findsOneWidget);
     expect(find.text('背景をピンクにしたい'), findsOneWidget);
     expect(find.text('ボタンをもっとかわいくしたい'), findsOneWidget);
-    expect(find.text('犬の画像を追加したい'), findsOneWidget);
     expect(sourceReads, 0);
 
     await tester.tap(find.byKey(const Key('girls-edit-entry-help')));
@@ -126,6 +125,7 @@ void main() {
       const Offset(0, -420),
     );
     await tester.pumpAndSettle();
+    expect(find.text('犬の画像を追加したい'), findsOneWidget);
     expect(find.text('コードを編集！'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('girls-edit-entry-open-editor')));
@@ -176,6 +176,7 @@ void main() {
       find.byKey(const Key('girls-edit-entry-app-title')),
       'しばちゃん時計',
     );
+    await tester.pump();
     await tester.tap(find.byKey(const Key('girls-edit-entry-save-title')));
     await tester.pumpAndSettle();
 
