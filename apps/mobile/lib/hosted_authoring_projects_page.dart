@@ -50,6 +50,7 @@ class HostedAuthoringProjectsPage extends StatefulWidget {
     required this.runtimeTransport,
     required this.definition,
     required this.errorMessage,
+    this.initialContentId,
     super.key,
   });
 
@@ -60,6 +61,7 @@ class HostedAuthoringProjectsPage extends StatefulWidget {
   final HostedRuntimeTransport runtimeTransport;
   final HostedAuthoringProjectDefinition definition;
   final HostedAuthoringErrorMessage errorMessage;
+  final String? initialContentId;
 
   @override
   State<HostedAuthoringProjectsPage> createState() =>
@@ -77,6 +79,7 @@ class _HostedAuthoringProjectsPageState
 
   List<HostedAuthoringProjectSummary>? _projects;
   Map<String, String> _projectTitles = const <String, String>{};
+  bool _initialContentOpened = false;
   bool _busy = false;
   String? _error;
 
@@ -124,6 +127,7 @@ class _HostedAuthoringProjectsPageState
 
   Future<void> _loadProjects() async {
     if (_busy) return;
+    String? initialContentToOpen;
     setState(() {
       _busy = true;
       _error = null;
@@ -169,6 +173,21 @@ class _HostedAuthoringProjectsPageState
         }
       }
       if (mounted) {
+        final String? initialContentId = widget.initialContentId;
+        if (!_initialContentOpened && initialContentId != null) {
+          final int matches = projects
+              .where(
+                (HostedAuthoringProjectSummary project) =>
+                    project.contentId == initialContentId,
+              )
+              .length;
+          if (matches != 1) {
+            throw const FormatException(
+              'Initial Authoring project is not present exactly once in the requested collection.',
+            );
+          }
+          initialContentToOpen = initialContentId;
+        }
         setState(() {
           _projects = projects;
           _projectTitles = Map<String, String>.unmodifiable(titles);
@@ -178,6 +197,10 @@ class _HostedAuthoringProjectsPageState
       if (mounted) setState(() => _error = widget.errorMessage(error));
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+    if (mounted && initialContentToOpen != null) {
+      _initialContentOpened = true;
+      await _openEditor(initialContentToOpen);
     }
   }
 
