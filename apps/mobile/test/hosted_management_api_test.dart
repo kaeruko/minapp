@@ -62,6 +62,51 @@ void main() {
     expect(apps.single.stats.totalPlays, 8);
   });
 
+  test('app rename uses PATCH and keeps the requested app scope', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'PATCH');
+      expect(request.url.path, '/hosted/my/apps/$_appId');
+      expect(request.headers['authorization'], 'Bearer $_token');
+      expect(jsonDecode(request.body), <String, Object?>{'title': 'しばちゃん時計'});
+      return _json(200, <String, Object?>{
+        ..._managedAppJson(),
+        'title': 'しばちゃん時計',
+      });
+    });
+    final HostedAppManagementApi api = HostedAppManagementApi(
+      baseUri: Uri.parse('https://hosted.example'),
+      client: client,
+    );
+
+    final ManagedHostedApp renamed = await api.renameApp(
+      accessToken: _token,
+      appId: _appId,
+      title: 'しばちゃん時計',
+    );
+
+    expect(renamed.app.appId, _appId);
+    expect(renamed.app.title, 'しばちゃん時計');
+  });
+
+  test('app rename rejects untrimmed titles before sending a request', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      fail('request must not be sent for an invalid title');
+    });
+    final HostedAppManagementApi api = HostedAppManagementApi(
+      baseUri: Uri.parse('https://hosted.example'),
+      client: client,
+    );
+
+    expect(
+      () => api.renameApp(
+        accessToken: _token,
+        appId: _appId,
+        title: ' しばちゃん時計',
+      ),
+      throwsArgumentError,
+    );
+  });
+
   test('group rename uses PATCH and keeps the requested group scope', () async {
     final MockClient client = MockClient((http.Request request) async {
       expect(request.method, 'PATCH');
