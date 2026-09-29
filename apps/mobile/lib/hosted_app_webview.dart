@@ -11,6 +11,7 @@ import 'hosted_authoring_bridge.dart';
 import 'hosted_authoring_launch_client.dart';
 import 'hosted_authoring_preview_bridge.dart';
 import 'hosted_runtime_bridge.dart';
+import 'minapp_webview_widget.dart';
 
 final RegExp _previewTokenPattern = RegExp(r'^[A-Za-z0-9_-]{32,128}$');
 final RegExp _authoringEditorTokenPattern = RegExp(r'^[A-Za-z0-9_-]{32,64}$');
@@ -588,7 +589,7 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
                 ? const Center(child: CircularProgressIndicator())
                 : Stack(
                     children: <Widget>[
-                      WebViewWidget(controller: _controller!),
+                      buildMinAppWebViewWidget(_controller!),
                       if (_progress < 100)
                         LinearProgressIndicator(value: _progress / 100),
                     ],
