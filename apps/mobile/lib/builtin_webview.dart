@@ -8,6 +8,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'builtin_state_store.dart';
 import 'girls/girls_scaffold.dart';
+import 'minapp_webview_widget.dart';
 
 export 'builtin_state_store.dart' show builtInStatePreferenceKey;
 
@@ -452,7 +453,7 @@ class _BuiltInWebViewPageState extends State<BuiltInWebViewPage> {
                 ? const Center(child: CircularProgressIndicator())
                 : Stack(
                     children: <Widget>[
-                      WebViewWidget(controller: _controller!),
+                      buildMinAppWebViewWidget(_controller!),
                       if (_progress < 100)
                         LinearProgressIndicator(value: _progress / 100),
                     ],
