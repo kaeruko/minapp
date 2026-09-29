@@ -147,6 +147,80 @@ def get_managed_app(backend: Any, auth_subject: str, app_id: str) -> dict[str, A
     return payload
 
 
+def set_title(
+    backend: Any,
+    auth_subject: str,
+    app_id: str,
+    *,
+    title: str,
+) -> dict[str, Any]:
+    if (
+        not isinstance(title, str)
+        or not title
+        or title != title.strip()
+        or len(title) > 80
+    ):
+        raise ApiProblem(
+            400,
+            "invalid_app_title",
+            "アプリ名は前後に空白を入れず、1〜80文字で入力してください。",
+        )
+
+    app = backend._get_item(pk=f"APP#{app_id}", sk="META")
+    if app is None:
+        raise ApiProblem(404, "app_not_found", "指定されたアプリはありません。")
+    group_id = _item_string(app, "group_id")
+    _, app = backend._require_app_management_access(
+        auth_subject,
+        group_id,
+        app_id,
+        editable=True,
+    )
+    if _item_string(app, "title") == title:
+        return _managed_payload(backend, app)
+
+    values = {":title": _string_attr(title)}
+    backend._dynamodb.transact_write_items(
+        TransactItems=[
+            {
+                "Update": {
+                    "TableName": backend._table_name,
+                    "Key": {
+                        "pk": _string_attr(f"APP#{app_id}"),
+                        "sk": _string_attr("META"),
+                    },
+                    "UpdateExpression": "SET title = :title",
+                    "ConditionExpression": (
+                        "attribute_exists(pk) AND attribute_not_exists(deletion_state)"
+                    ),
+                    "ExpressionAttributeValues": values,
+                }
+            },
+            {
+                "Update": {
+                    "TableName": backend._table_name,
+                    "Key": {
+                        "pk": _string_attr(f"GROUP#{group_id}"),
+                        "sk": _string_attr(f"APP#{app_id}"),
+                    },
+                    "UpdateExpression": "SET title = :title",
+                    "ConditionExpression": (
+                        "attribute_exists(pk) AND attribute_not_exists(deletion_state)"
+                    ),
+                    "ExpressionAttributeValues": values,
+                }
+            },
+        ]
+    )
+    refreshed = backend._get_item(pk=f"APP#{app_id}", sk="META")
+    if refreshed is None:
+        raise RuntimeError("Managed app disappeared after title update")
+    payload = _managed_payload(backend, refreshed)
+    if payload.get("title") != title:
+        raise RuntimeError("Managed app title update was not persisted")
+    return payload
+
+
 def _set_visibility_authorized(
     backend: Any,
     app: dict[str, Any],
