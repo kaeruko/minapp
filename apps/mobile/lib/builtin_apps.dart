@@ -13,6 +13,8 @@ class BuiltInApp {
     required this.iconBackgroundColor,
     required this.iconBorderColor,
     required this.iconColor,
+    this.accepts = const <String>[],
+    this.edits = const <String>[],
   });
 
   final String id;
@@ -26,6 +28,12 @@ class BuiltInApp {
   final Color iconBackgroundColor;
   final Color iconBorderColor;
   final Color iconColor;
+  final List<String> accepts;
+  final List<String> edits;
+
+  bool get isPlayer => accepts.isNotEmpty;
+  bool get isEditor => edits.isNotEmpty;
+  bool get isStandalone => accepts.isEmpty && edits.isEmpty;
 
   String get catalogKey => 'builtin-$id';
 
@@ -101,6 +109,7 @@ const List<BuiltInApp> builtInApps = <BuiltInApp>[
     iconBackgroundColor: Color(0xFFE9D5FF),
     iconBorderColor: Color(0xFFC4B5FD),
     iconColor: Color(0xFF6D4AA5),
+    accepts: <String>['minapp/novel@1'],
   ),
   BuiltInApp(
     id: 'sing-along',
