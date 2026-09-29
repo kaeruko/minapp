@@ -292,8 +292,14 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         session: session,
       );
     } else {
-      if (!mounted) return;
-      await _arrangeBuiltin(app);
+      await _arrangeBuiltin(
+        app,
+        group: group,
+        navigator: navigator,
+        messenger: messenger,
+        api: api,
+        session: session,
+      );
     }
   }
 
@@ -499,31 +505,52 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     }
   }
 
-  Future<void> _arrangeBuiltin(BuiltInApp app) async {
+  Future<void> _arrangeBuiltin(
+    BuiltInApp app, {
+    required HostedGroup? group,
+    required NavigatorState navigator,
+    required ScaffoldMessengerState messenger,
+    required HostedGirlsApi api,
+    required AuthenticatedSession session,
+  }) async {
     if (_arrangingBuiltin) return;
     if (!app.isStandalone) {
       throw StateError('Only standalone built-in apps can be arranged as apps.');
     }
-    final HostedGroup? group = _currentGroup;
     if (group == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('先にグループを選ぶと、アプリをアレンジできるよ。')),
-      );
+      if (messenger.mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('先にグループを選ぶと、アプリをアレンジできるよ。'),
+          ),
+        );
+      }
       return;
     }
 
-    setState(() {
-      _arrangingBuiltin = true;
-      _groupError = null;
-    });
+    if (mounted) {
+      setState(() {
+        _arrangingBuiltin = true;
+        _groupError = null;
+      });
+    }
+    debugPrint(
+      'Girls app arrange: entered for ${app.id} '
+      '(homeMounted=$mounted, navigatorMounted=${navigator.mounted})',
+    );
+    if (messenger.mounted) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('アプリをコピーしています…')),
+      );
+    }
     final HostedGirlsUploadApi uploadApi = HostedGirlsUploadApi(
-      baseUri: widget.api.baseUri,
-      client: widget.api.httpClient,
+      baseUri: api.baseUri,
+      client: api.httpClient,
     );
     try {
       final Uint8List sourceZip = await _arrangeSourceZip(app);
       final HostedGroupApp arranged = await uploadApi.createFromZip(
-        accessToken: widget.session.accessToken,
+        accessToken: session.accessToken,
         groupId: group.groupId,
         title: '${app.title} アレンジ',
         zipBytes: sourceZip,
@@ -535,22 +562,35 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
           'Arranged app response changed the requested scope.',
         );
       }
-      if (!mounted) return;
-      await Navigator.of(context).push<void>(
+      if (!navigator.mounted) {
+        throw StateError(
+          'Girls navigator was disposed before opening the arranged app.',
+        );
+      }
+      await navigator.push<void>(
         MaterialPageRoute<void>(
           builder: (BuildContext context) => GirlsAppDetailPage(
-            api: widget.api,
-            session: widget.session,
+            api: api,
+            session: session,
             appId: arranged.appId,
           ),
         ),
       );
       if (mounted) await _loadGroups();
-    } catch (error) {
-      if (mounted) setState(() => _groupError = girlsMessageFor(error));
+    } catch (error, stackTrace) {
+      final String message = girlsMessageFor(error);
+      debugPrint('Girls app arrange failed: $error\n$stackTrace');
+      if (mounted) setState(() => _groupError = message);
+      if (messenger.mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('アプリのアレンジに失敗しました：$message')),
+        );
+      }
     } finally {
       uploadApi.close();
-      if (mounted) setState(() => _arrangingBuiltin = false);
+      if (mounted && _arrangingBuiltin) {
+        setState(() => _arrangingBuiltin = false);
+      }
     }
   }
 
