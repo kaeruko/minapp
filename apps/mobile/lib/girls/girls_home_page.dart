@@ -138,7 +138,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     });
     try {
       final List<HostedGroup> groups = await widget.api.listGroups(
-        session.accessToken,
+        widget.session.accessToken,
       );
       final String? currentId =
           _currentGroup?.groupId ?? await widget.currentGroupStore.load();
@@ -155,11 +155,11 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       GirlsHomeMascotPrompt? mascotPrompt;
       if (currentGroup != null) {
         final List<HostedMember> members = await widget.api.listMembers(
-          accessToken: session.accessToken,
+          accessToken: widget.session.accessToken,
           groupId: currentGroup.groupId,
         );
         final List<HostedGroupApp> apps = await widget.api.listGroupApps(
-          accessToken: session.accessToken,
+          accessToken: widget.session.accessToken,
           groupId: currentGroup.groupId,
         );
         final int customAppCount = apps
@@ -523,7 +523,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     try {
       final Uint8List sourceZip = await _arrangeSourceZip(app);
       final HostedGroupApp arranged = await uploadApi.createFromZip(
-        accessToken: session.accessToken,
+        accessToken: widget.session.accessToken,
         groupId: group.groupId,
         title: '${app.title} アレンジ',
         zipBytes: sourceZip,
@@ -635,7 +635,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   Future<void> _showCurrentGroupId(HostedGroup group) async {
     try {
       final HostedInvite invite = await widget.api.createInvite(
-        accessToken: session.accessToken,
+        accessToken: widget.session.accessToken,
         groupId: group.groupId,
       );
       if (!mounted) return;
@@ -741,7 +741,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     late final HostedGroup createdGroup;
     try {
       createdGroup = await widget.api.createGroup(
-        accessToken: session.accessToken,
+        accessToken: widget.session.accessToken,
         name: name,
       );
     } catch (error) {
@@ -756,11 +756,11 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
 
     try {
       final HostedInvite invite = await widget.api.createInvite(
-        accessToken: session.accessToken,
+        accessToken: widget.session.accessToken,
         groupId: createdGroup.groupId,
       );
       final List<HostedGroup> groups = await widget.api.listGroups(
-        session.accessToken,
+        widget.session.accessToken,
       );
       if (!mounted) return;
       setState(() => _groups = groups);
