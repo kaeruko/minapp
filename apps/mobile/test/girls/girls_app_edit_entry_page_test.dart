@@ -12,6 +12,28 @@ import 'package:minapp_mobile/girls/girls_source_zip.dart';
 
 const String _groupId = '11111111111111111111111111111111';
 const String _appId = '22222222222222222222222222222222';
+const String _userId = '33333333333333333333333333333333';
+
+Map<String, Object?> managedAppJson(String title) => <String, Object?>{
+      'app_id': _appId,
+      'group_id': _groupId,
+      'title': title,
+      'source_kind': 'upload',
+      'created_at': '2026-09-07T00:00:00Z',
+      'published_version': null,
+      'owner_user_id': _userId,
+      'source_revision': 1,
+      'source_updated_at': '2026-09-07T01:00:00Z',
+      'published_at': null,
+      'editable': true,
+      'visibility': 'visible',
+      'group_name': 'テストグループ',
+      'stats': <String, Object?>{
+        'total_plays': 0,
+        'unique_users': 0,
+        'monthly_plays': 0,
+      },
+    };
 
 void main() {
   GirlsSourceArchive archive() => GirlsSourceArchive.fromEntries(
@@ -47,7 +69,11 @@ void main() {
         );
       });
 
-  Widget page(GirlsAppManagementApi api) => MaterialApp(
+  Widget page(
+    GirlsAppManagementApi api, {
+    Future<void> Function()? onRenamed,
+  }) =>
+      MaterialApp(
         home: GirlsAppEditEntryPage(
           api: api,
           accessToken: 'test-token',
@@ -55,6 +81,7 @@ void main() {
           appId: _appId,
           title: 'おえかき',
           expectedRevision: 1,
+          onRenamed: onRenamed,
         ),
       );
 
@@ -105,6 +132,55 @@ void main() {
     await tester.pumpAndSettle();
     expect(sourceReads, 1);
     expect(find.byKey(const Key('girls-source-editor-code')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('app name can be renamed from the arrange entry screen', (
+    WidgetTester tester,
+  ) async {
+    bool renamedCallback = false;
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'PATCH');
+      expect(request.url.path, '/hosted/my/apps/$_appId');
+      expect(request.headers['authorization'], 'Bearer test-token');
+      expect(
+        jsonDecode(request.body),
+        <String, Object?>{'title': 'しばちゃん時計'},
+      );
+      return http.Response(
+        jsonEncode(managedAppJson('しばちゃん時計')),
+        200,
+        headers: const <String, String>{'content-type': 'application/json'},
+      );
+    });
+    addTearDown(client.close);
+    final GirlsAppManagementApi api = GirlsAppManagementApi(
+      baseUri: Uri.parse('https://example.com'),
+      client: client,
+    );
+
+    await tester.pumpWidget(
+      page(
+        api,
+        onRenamed: () async {
+          renamedCallback = true;
+        },
+      ),
+    );
+
+    expect(
+      find.byKey(const Key('girls-edit-entry-app-title')),
+      findsOneWidget,
+    );
+    await tester.enterText(
+      find.byKey(const Key('girls-edit-entry-app-title')),
+      'しばちゃん時計',
+    );
+    await tester.tap(find.byKey(const Key('girls-edit-entry-save-title')));
+    await tester.pumpAndSettle();
+
+    expect(renamedCallback, isTrue);
+    expect(find.text('アプリ名を変更したよ'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
