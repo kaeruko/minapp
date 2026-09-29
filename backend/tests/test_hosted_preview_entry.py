@@ -49,6 +49,37 @@ class HostedPreviewEntryTests(unittest.TestCase):
     def tearDown(self) -> None:
         hosted_entry._BACKEND = None
 
+    def test_app_title_patch_routes_exact_title_to_management_backend(self) -> None:
+        app_id = "3" * 32
+        expected = {
+            "app_id": app_id,
+            "group_id": "2" * 32,
+            "title": "しばちゃん時計",
+        }
+        with patch.object(
+            hosted_entry.hosted_app_management,
+            "set_title",
+            return_value=expected,
+        ) as set_title:
+            response = hosted_entry.lambda_handler(
+                event(
+                    "PATCH",
+                    f"/hosted/my/apps/{app_id}",
+                    body={"title": "しばちゃん時計"},
+                    auth=True,
+                ),
+                None,
+            )
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(json.loads(response["body"]), expected)
+        set_title.assert_called_once_with(
+            self.backend,
+            "sub-owner",
+            app_id,
+            title="しばちゃん時計",
+        )
+
     def test_author_preview_session_requires_empty_body_and_authenticated_subject(self) -> None:
         app_id = "3" * 32
         expected = {
