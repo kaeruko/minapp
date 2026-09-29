@@ -178,8 +178,17 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       if (currentId != null && currentGroup == null) {
         widget.onCurrentGroupChanged?.call(null);
       }
-    } catch (error) {
-      if (mounted) setState(() => _groupError = girlsMessageFor(error));
+    } catch (error, stackTrace) {
+      final String message = girlsMessageFor(error);
+      debugPrint(
+        'Girls work copy failed at $stage: $error\n$stackTrace',
+      );
+      if (mounted) {
+        setState(() => _groupError = message);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$stageで失敗しました：$message')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _loadingGroups = false);
     }
@@ -346,12 +355,14 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       baseUri: widget.api.baseUri,
       client: widget.api.httpClient,
     );
+    String stage = 'ノベルエディタの準備';
     try {
       final HostedGroupApp editorApp = await installApi.ensureNovelEditor(
         accessToken: widget.session.accessToken,
         groupId: group.groupId,
         includeSample: false,
       );
+      stage = '公式作品の準備';
       final HostedAuthoringProjectSummary source =
           await installApi.ensureNovelSampleProject(
         accessToken: widget.session.accessToken,
@@ -364,6 +375,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         );
       }
 
+      stage = '作品のコピー';
       final HostedAuthoringProjectSummary copied =
           await projectsApi.cloneProject(
         accessToken: widget.session.accessToken,
@@ -377,6 +389,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         );
       }
 
+      stage = 'ノベルエディタの確認';
       final List<HostedAuthoringAppContract> contracts =
           await contractApi.listApps(
         accessToken: widget.session.accessToken,
@@ -391,6 +404,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
 
       if (!mounted) return;
       setState(() => _arrangingBuiltin = false);
+      stage = 'ノベルエディタを開く処理';
       await openHostedAuthoringProjects(
         context: context,
         baseUri: widget.api.baseUri,
