@@ -293,6 +293,35 @@ class HostedAppManagementApi {
     );
   }
 
+  Future<ManagedHostedApp> renameApp({
+    required String accessToken,
+    required String appId,
+    required String title,
+  }) async {
+    _validateId(appId, 'appId');
+    if (title.isEmpty || title != title.trim() || title.length > 80) {
+      throw ArgumentError.value(
+        title,
+        'title',
+        'must be a trimmed non-empty string up to 80 characters',
+      );
+    }
+    final ManagedHostedApp renamed = ManagedHostedApp.fromJson(
+      await _jsonRequest(
+        method: 'PATCH',
+        path: '/hosted/my/apps/$appId',
+        accessToken: accessToken,
+        body: <String, Object?>{'title': title},
+      ),
+    );
+    if (renamed.app.appId != appId || renamed.app.title != title) {
+      throw const FormatException(
+        'App rename response changed the requested app or title.',
+      );
+    }
+    return renamed;
+  }
+
   Future<ManagedHostedApp> setHidden({
     required String accessToken,
     required String appId,
@@ -504,6 +533,12 @@ class HostedAppManagementApi {
         response = await _client.get(uri, headers: headers);
       case 'POST':
         response = await _client.post(
+          uri,
+          headers: headers,
+          body: body == null ? null : jsonEncode(body),
+        );
+      case 'PATCH':
+        response = await _client.patch(
           uri,
           headers: headers,
           body: body == null ? null : jsonEncode(body),
