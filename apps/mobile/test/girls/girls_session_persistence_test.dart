@@ -217,6 +217,28 @@ void main() {
     expect(requestCount, 3);
   });
 
+  test('logout clears both saved login and current group selection', () async {
+    final _MemoryGirlsSessionStore store =
+        _MemoryGirlsSessionStore(refreshToken: 'refresh-saved');
+    final _MemoryCurrentGroupStore currentGroupStore =
+        _MemoryCurrentGroupStore('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    final HostedGirlsApi api = HostedGirlsApi(
+      baseUri: baseUri,
+      client: MockClient((http.Request request) async {
+        fail('Logout must not make a network request.');
+      }),
+      sessionStore: store,
+      currentGroupStore: currentGroupStore,
+    );
+
+    await api.logout();
+
+    expect(store.refreshToken, isNull);
+    expect(store.clearCount, 1);
+    expect(currentGroupStore.value, isNull);
+    expect(currentGroupStore.clearCount, 1);
+  });
+
   test('explicit invalid_refresh_token clears saved login', () async {
     final _MemoryGirlsSessionStore store = _MemoryGirlsSessionStore(
       refreshToken: 'refresh-expired',
@@ -302,6 +324,7 @@ class _MemoryCurrentGroupStore implements GirlsCurrentGroupStore {
 
   String? value;
   int saveCount = 0;
+  int clearCount = 0;
 
   @override
   Future<String?> load() async => value;
@@ -314,6 +337,7 @@ class _MemoryCurrentGroupStore implements GirlsCurrentGroupStore {
 
   @override
   Future<void> clear() async {
+    clearCount += 1;
     value = null;
   }
 }
