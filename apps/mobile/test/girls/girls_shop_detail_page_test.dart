@@ -72,7 +72,7 @@ void main() {
               ownerUserId: ownerUserId,
               ownerDisplayName: 'ねこさん',
               publishedAt: DateTime.utc(2026, 9, 30),
-              sha256: 'd' * 64,
+              sha256: 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
             ),
             currentGroup: const HostedGroup(
               groupId: groupId,
