@@ -31,6 +31,23 @@ def _visibility(item: dict[str, Any]) -> str:
     return value
 
 
+def _author_managed_app(
+    backend: Any,
+    auth_subject: str,
+    app_id: str,
+) -> tuple[Any, dict[str, Any]]:
+    app = backend._get_item(pk=f"APP#{app_id}", sk="META")
+    if app is None:
+        raise ApiProblem(404, "app_not_found", "指定されたアプリはありません。")
+    group_id = _item_string(app, "group_id")
+    return backend._require_app_author_access(
+        auth_subject,
+        group_id,
+        app_id,
+        editable=False,
+    )
+
+
 def _author_editable_app(
     backend: Any,
     auth_subject: str,
