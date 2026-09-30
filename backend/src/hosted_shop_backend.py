@@ -361,6 +361,57 @@ class HostedShopBackend(HostedUserStateBackend):
             "expires_in": SHOP_DOWNLOAD_TTL_SECONDS,
         }
 
+    def _link_shop_copy(
+        self,
+        *,
+        group_id: str,
+        target_app_id: str,
+        shop_app_id: str,
+        shop_version: int,
+    ) -> None:
+        values = {
+            ":shop_app_id": _string_attr(shop_app_id),
+            ":shop_version": _number_attr(shop_version),
+        }
+        self._dynamodb.transact_write_items(
+            TransactItems=[
+                {
+                    "Update": {
+                        "TableName": self._table_name,
+                        "Key": {
+                            "pk": _string_attr(f"APP#{target_app_id}"),
+                            "sk": _string_attr("META"),
+                        },
+                        "UpdateExpression": (
+                            "SET shop_source_app_id = :shop_app_id, "
+                            "shop_source_version = :shop_version"
+                        ),
+                        "ConditionExpression": (
+                            "attribute_exists(pk) AND attribute_not_exists(deletion_state)"
+                        ),
+                        "ExpressionAttributeValues": values,
+                    }
+                },
+                {
+                    "Update": {
+                        "TableName": self._table_name,
+                        "Key": {
+                            "pk": _string_attr(f"GROUP#{group_id}"),
+                            "sk": _string_attr(f"APP#{target_app_id}"),
+                        },
+                        "UpdateExpression": (
+                            "SET shop_source_app_id = :shop_app_id, "
+                            "shop_source_version = :shop_version"
+                        ),
+                        "ConditionExpression": (
+                            "attribute_exists(pk) AND attribute_not_exists(deletion_state)"
+                        ),
+                        "ExpressionAttributeValues": values,
+                    }
+                },
+            ]
+        )
+
     def add_shop_app_to_group(
         self,
         auth_subject: str,
@@ -387,16 +438,26 @@ class HostedShopBackend(HostedUserStateBackend):
             _item_string(app, "title"),
             zip_bytes,
         )
+        target_app_id = created["app_id"]
+        self._link_shop_copy(
+            group_id=group_id,
+            target_app_id=target_app_id,
+            shop_app_id=app_id,
+            shop_version=int(version),
+        )
         if app.get("thumbnail_bytes") is not None:
             thumbnail_bytes, thumbnail_content_type = thumbnail_from_app(app)
             set_thumbnail(
                 self,
                 auth_subject,
-                created["app_id"],
+                target_app_id,
                 data=thumbnail_bytes,
                 content_type=thumbnail_content_type,
             )
-        return created
+        refreshed = self._get_item(pk=f"APP#{target_app_id}", sk="META")
+        if refreshed is None:
+            raise RuntimeError("Shop copy disappeared after provenance update")
+        return self._public_hosted_app(refreshed)
 
     def sync_shop_thumbnail_to_group_app(
         self,
@@ -453,17 +514,28 @@ class HostedShopBackend(HostedUserStateBackend):
                 "既存アプリの内容がショップ作品と異なるため、アイコンだけを自動同期できません。",
             )
 
-        thumbnail_bytes, thumbnail_content_type = thumbnail_from_app(shop_app)
-        synced = set_thumbnail(
-            self,
-            auth_subject,
-            target_app_id,
-            data=thumbnail_bytes,
-            content_type=thumbnail_content_type,
+        self._link_shop_copy(
+            group_id=group_id,
+            target_app_id=target_app_id,
+            shop_app_id=app_id,
+            shop_version=int(version),
         )
-        if synced["app_id"] != target_app_id:
-            raise RuntimeError("Thumbnail sync changed the target app scope")
-        return synced
+        if shop_app.get("thumbnail_bytes") is not None:
+            thumbnail_bytes, thumbnail_content_type = thumbnail_from_app(shop_app)
+            synced = set_thumbnail(
+                self,
+                auth_subject,
+                target_app_id,
+                data=thumbnail_bytes,
+                content_type=thumbnail_content_type,
+            )
+            if synced["app_id"] != target_app_id:
+                raise RuntimeError("Thumbnail sync changed the target app scope")
+
+        refreshed = self._get_item(pk=f"APP#{target_app_id}", sk="META")
+        if refreshed is None:
+            raise RuntimeError("Shop copy disappeared after artwork sync")
+        return self._public_hosted_app(refreshed)
 
     def create_shop_report(
         self,
