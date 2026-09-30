@@ -8,6 +8,7 @@
   const PREVIEW_CONTENT_PATH_PATTERN = /^\/hosted\/preview\/[A-Za-z0-9_-]{32,128}\/index\.html$/;
   const VIEW_TITLES = Object.freeze({
     home: "ホーム",
+    groups: "グループ",
     add: "アプリを追加",
     apps: "自分のアプリ",
     settings: "設定",
@@ -147,6 +148,25 @@
       shellGroupName.textContent = "グループなし";
       homeGroupSummary.textContent = "追加できるグループがありません";
       settingsGroups.textContent = "なし";
+      return;
+    }
+
+    const managedGroups = globalThis.MinAppGirlsGroups;
+    const managedCurrent = managedGroups !== undefined &&
+        managedGroups !== null &&
+        typeof managedGroups.currentGroup === "function"
+      ? managedGroups.currentGroup()
+      : undefined;
+    if (managedCurrent !== undefined) {
+      shellGroupName.textContent = managedCurrent === null
+        ? "いまのグループ未選択"
+        : managedCurrent.name;
+      homeGroupSummary.textContent = managedCurrent === null
+        ? "グループ画面で「このグループを使う」を選んでね"
+        : groups.length === 1
+          ? managedCurrent.name
+          : `${managedCurrent.name} ほか${groups.length - 1}グループ`;
+      settingsGroups.textContent = groups.map((group) => group.name).join(" / ");
       return;
     }
 
@@ -520,6 +540,7 @@
   shellMenu.addEventListener("click", toggleNavigation);
   shellScrim.addEventListener("click", closeNavigation);
   uploadGroup.addEventListener("change", syncGroupLabels);
+  globalThis.addEventListener("minapp:girls-current-group-changed", syncGroupLabels);
   settingsLogout.addEventListener("click", () => logoutButton.click());
   appsRefresh.addEventListener("click", () => void loadMyApps());
   previewClose.addEventListener("click", closePreview);
