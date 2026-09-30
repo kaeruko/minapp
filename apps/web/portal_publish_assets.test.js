@@ -16,6 +16,8 @@ test("production portal publisher includes every Web Authoring asset referenced 
     "authoring_host_adapter.js",
     "hosted_authoring_portal.js",
     "girls_authoring_portal.js",
+    "group_management.js",
+    "girls_groups.js",
   ];
 
   for (const asset of assets) {
