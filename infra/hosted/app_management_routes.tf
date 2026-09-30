@@ -8,6 +8,7 @@ locals {
     "POST /hosted/my/apps/{app_id}/preview-runtime-session",
     "POST /hosted/my/apps/{app_id}/thumbnail",
     "POST /hosted/my/apps/{app_id}/visibility",
+    "GET /hosted/groups/{group_id}/apps/{app_id}/thumbnail",
     "POST /hosted/groups/{group_id}/apps/{app_id}/preview-session",
     "POST /hosted/groups/{group_id}/apps/{app_id}/preview-runtime-session",
     "POST /hosted/groups/{group_id}/apps/{app_id}/visibility",
