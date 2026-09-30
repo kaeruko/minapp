@@ -30,7 +30,12 @@
   const listElement = requiredElement("girls-group-list");
   const detailElement = requiredElement("girls-group-detail");
   const detailTitle = requiredElement("girls-group-detail-title");
+  const detailSubtitle = requiredElement("girls-group-detail-subtitle");
   const roleElement = requiredElement("girls-group-role");
+  const currentStatus = requiredElement("girls-group-current-status");
+  const memberCount = requiredElement("girls-group-member-count");
+  const groupIdValue = requiredElement("girls-group-id-value");
+  const groupIdCopy = requiredElement("girls-group-id-copy");
   const membersElement = requiredElement("girls-group-members");
   const ownerTools = requiredElement("girls-group-owner-tools");
   const renameForm = requiredElement("girls-group-rename-form");
@@ -42,6 +47,8 @@
   const iconFile = requiredElement("girls-group-icon-file");
   const iconReset = requiredElement("girls-group-icon-reset");
   const transferOwner = requiredElement("girls-group-transfer-owner");
+  const dangerTitle = requiredElement("girls-group-danger-title");
+  const dangerDescription = requiredElement("girls-group-danger-description");
   const removeGroup = requiredElement("girls-group-remove");
 
   if (!(uploadGroup instanceof HTMLSelectElement)) throw new Error("#girls-upload-group must be a select.");
@@ -52,6 +59,7 @@
   if (!(joinCode instanceof HTMLInputElement)) throw new Error("#girls-group-code must be an input.");
   if (!(renameForm instanceof HTMLFormElement)) throw new Error("#girls-group-rename-form must be a form.");
   if (!(renameInput instanceof HTMLInputElement)) throw new Error("#girls-group-rename must be an input.");
+  if (!(groupIdCopy instanceof HTMLButtonElement)) throw new Error("#girls-group-id-copy must be a button.");
   if (!(iconFile instanceof HTMLInputElement)) throw new Error("#girls-group-icon-file must be an input.");
 
   const selection = MinAppGroupManagement.createSelectionModel({
@@ -152,6 +160,22 @@
     return member.display_name ?? member.login_id;
   }
 
+  function memberInitial(member) {
+    const label = displayLabel(member).trim();
+    return label.length === 0 ? "♡" : [...label][0].toUpperCase();
+  }
+
+  async function copyText(value, successMessage) {
+    if (typeof value !== "string" || value.length === 0) {
+      throw new Error("コピーする文字列がありません。");
+    }
+    if (navigator.clipboard === undefined || typeof navigator.clipboard.writeText !== "function") {
+      throw new Error("このブラウザではクリップボードへコピーできません。");
+    }
+    await navigator.clipboard.writeText(value);
+    statusElement.textContent = successMessage;
+  }
+
   async function ensureIdentity() {
     const loginId = portal.loginId();
     if (typeof loginId !== "string" || loginId.length === 0) {
@@ -213,42 +237,59 @@
       : `${groups.length}個のグループに参加しています。`;
 
     for (const group of groups) {
+      const isCurrent = selection.selectedId === group.group_id;
       const card = document.createElement("article");
       card.className = "girls-group-card";
-      if (selection.selectedId === group.group_id) card.classList.add("girls-group-card-current");
+      if (isCurrent) card.classList.add("girls-group-card-current");
 
-      const heading = document.createElement("div");
-      heading.className = "girls-group-card-heading";
+      const top = document.createElement("div");
+      top.className = "girls-group-card-top";
+
+      const avatar = document.createElement("div");
+      avatar.className = "girls-group-card-avatar";
+      avatar.setAttribute("aria-hidden", "true");
+      avatar.textContent = "♡";
+
+      const copy = document.createElement("div");
+      copy.className = "girls-group-card-copy";
       const title = document.createElement("h3");
       title.textContent = group.name;
+      const sub = document.createElement("p");
+      sub.textContent = group.role === "owner" ? "あなたがオーナーです" : "参加中のグループ";
+      copy.append(title, sub);
+
       const role = document.createElement("span");
       role.className = "girls-group-role";
       role.textContent = group.role === "owner" ? "オーナー" : "メンバー";
-      heading.append(title, role);
+      top.append(avatar, copy, role);
 
-      const current = document.createElement("p");
-      current.className = "girls-muted";
-      current.textContent = selection.selectedId === group.group_id
+      const current = document.createElement("div");
+      current.className = isCurrent
+        ? "girls-group-current-chip girls-group-current-chip-active"
+        : "girls-group-current-chip";
+      current.textContent = isCurrent
         ? "● いまのグループ"
-        : "このグループを開いて確認できます。";
+        : "メンバーや設定を確認できます";
 
       const actions = document.createElement("div");
       actions.className = "girls-group-card-actions";
 
       const selectButton = document.createElement("button");
       selectButton.type = "button";
-      selectButton.className = "girls-secondary";
-      selectButton.textContent = selection.selectedId === group.group_id
-        ? "いま使っています"
-        : "このグループを使う";
-      selectButton.disabled = selection.selectedId === group.group_id || busy;
+      selectButton.className = isCurrent
+        ? "girls-secondary girls-group-current-button"
+        : "girls-primary girls-group-select-button";
+      selectButton.textContent = isCurrent ? "いま使っています" : "このグループを使う";
+      selectButton.disabled = isCurrent || busy;
       selectButton.addEventListener("click", () => {
         try {
           selection.select(group.group_id);
           persistCurrentGroup();
           renderGroups();
+          if (detailGroupId === group.group_id) renderDetail(group);
           updateCurrentGroupChrome();
           setError(null);
+          statusElement.textContent = `「${group.name}」をいまのグループにしました。`;
         } catch (error) {
           handleError(error);
         }
@@ -257,14 +298,14 @@
       const manageButton = document.createElement("button");
       manageButton.type = "button";
       manageButton.className = "girls-secondary";
-      manageButton.textContent = "管理";
+      manageButton.textContent = "グループを見る";
       manageButton.disabled = busy;
       manageButton.addEventListener("click", () => {
         void openGroup(group.group_id);
       });
 
       actions.append(selectButton, manageButton);
-      card.append(heading, current, actions);
+      card.append(top, current, actions);
       listElement.append(card);
     }
   }
@@ -358,13 +399,57 @@
     return [remove];
   }
 
+  async function loadInviteCode(group) {
+    if (group.role !== "owner") return null;
+    const payload = requirePlainObject(
+      await portal.request(`/hosted/groups/${group.group_id}/invite`, {
+        method: "POST",
+        jsonBody: {},
+      }),
+      "Hosted invite response",
+    );
+    const expectedFields = ["code", "expires_at", "group_id", "valid_for_seconds"];
+    const actual = Object.keys(payload).sort();
+    if (actual.length !== expectedFields.length || actual.some((field, index) => field !== expectedFields[index])) {
+      throw new Error("Hosted invite response fields are invalid.");
+    }
+    if (payload.group_id !== group.group_id) throw new Error("Hosted invite group_id mismatch.");
+    const code = MinAppGroupManagement.normalizeInviteCode(
+      requireString(payload.code, "Hosted invite code"),
+    );
+    if (!Number.isInteger(payload.valid_for_seconds) || payload.valid_for_seconds < 1) {
+      throw new Error("Hosted invite valid_for_seconds is invalid.");
+    }
+    if (Number.isNaN(Date.parse(requireString(payload.expires_at, "Hosted invite expires_at")))) {
+      throw new Error("Hosted invite expires_at is invalid.");
+    }
+    inviteCode.textContent = code;
+    inviteCopy.classList.remove("hidden");
+    inviteRevoke.classList.remove("hidden");
+    return code;
+  }
+
   function renderDetail(group) {
     detailElement.classList.remove("hidden");
     detailTitle.textContent = group.name;
+    detailSubtitle.textContent = group.role === "owner"
+      ? "あなたがオーナーです"
+      : "参加中のグループ";
     roleElement.textContent = group.role === "owner" ? "オーナー" : "メンバー";
+    currentStatus.textContent = selection.selectedId === group.group_id
+      ? "いま使っています"
+      : "未選択";
+    memberCount.textContent = `${detailMembers.length}人`;
+    groupIdValue.textContent = group.group_id;
     renameInput.value = group.name;
     ownerTools.classList.toggle("hidden", group.role !== "owner");
-    removeGroup.textContent = group.role === "owner" ? "グループを削除" : "グループから脱退";
+
+    const owner = group.role === "owner";
+    dangerTitle.textContent = owner ? "グループを削除" : "グループから脱退";
+    dangerDescription.textContent = owner
+      ? "削除すると、このグループ内のアプリやメンバー情報も削除されます。この操作は取り消せません。"
+      : "このグループから抜けます。再参加するには、もう一度招待してもらう必要があります。";
+    removeGroup.textContent = owner ? "グループを削除" : "グループから脱退";
 
     MinAppGroupManagement.renderMemberList({
       container: membersElement,
@@ -374,6 +459,18 @@
       rowClass: "girls-group-member-row",
       actionsClass: "girls-group-member-actions",
       createActions: (member) => makeOwnerMemberActions(group, member),
+    });
+
+    const rows = [...membersElement.querySelectorAll(".girls-group-member-row")];
+    if (rows.length !== detailMembers.length) {
+      throw new Error("Rendered Girls member count does not match member data.");
+    }
+    rows.forEach((row, index) => {
+      const avatar = document.createElement("div");
+      avatar.className = "girls-group-member-avatar";
+      avatar.setAttribute("aria-hidden", "true");
+      avatar.textContent = memberInitial(detailMembers[index]);
+      row.prepend(avatar);
     });
 
     const transferable = detailMembers.some((member) => member.role !== "owner");
@@ -388,12 +485,13 @@
     const group = selection.groups.find((candidate) => candidate.group_id === groupId);
     if (group === undefined) throw new Error("Managed group is no longer available.");
     detailGroupId = groupId;
-    inviteCode.textContent = "";
+    inviteCode.textContent = group.role === "owner" ? "読み込み中…" : "オーナーだけ表示できます";
     inviteCopy.classList.add("hidden");
     inviteRevoke.classList.add("hidden");
     setError(null);
     try {
       detailMembers = await loadMembers(group);
+      if (group.role === "owner") await loadInviteCode(group);
       renderDetail(group);
       detailElement.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
@@ -500,42 +598,14 @@
       if (group === null || group.role !== "owner") {
         throw new Error("Only the owner can create an invite.");
       }
-      const payload = requirePlainObject(
-        await portal.request(`/hosted/groups/${group.group_id}/invite`, {
-          method: "POST",
-          jsonBody: {},
-        }),
-        "Hosted invite response",
-      );
-      const expectedFields = ["code", "expires_at", "group_id", "valid_for_seconds"];
-      const actual = Object.keys(payload).sort();
-      if (actual.length !== expectedFields.length || actual.some((field, index) => field !== expectedFields[index])) {
-        throw new Error("Hosted invite response fields are invalid.");
-      }
-      if (payload.group_id !== group.group_id) throw new Error("Hosted invite group_id mismatch.");
-      const code = MinAppGroupManagement.normalizeInviteCode(requireString(payload.code, "Hosted invite code"));
-      if (!Number.isInteger(payload.valid_for_seconds) || payload.valid_for_seconds < 1) {
-        throw new Error("Hosted invite valid_for_seconds is invalid.");
-      }
-      if (Number.isNaN(Date.parse(requireString(payload.expires_at, "Hosted invite expires_at")))) {
-        throw new Error("Hosted invite expires_at is invalid.");
-      }
-      inviteCode.textContent = code;
-      inviteCopy.classList.remove("hidden");
-      inviteRevoke.classList.remove("hidden");
+      await loadInviteCode(group);
+      statusElement.textContent = "招待用のグループIDを表示しました。";
     });
   });
 
   inviteCopy.addEventListener("click", async () => {
-    const code = inviteCode.textContent;
-    if (code === null || code.length === 0) throw new Error("No invite code is available.");
-    if (navigator.clipboard === undefined || typeof navigator.clipboard.writeText !== "function") {
-      setError("このブラウザでは招待コードをコピーできません。");
-      return;
-    }
     try {
-      await navigator.clipboard.writeText(code);
-      statusElement.textContent = "招待コードをコピーしました。";
+      await copyText(inviteCode.textContent ?? "", "招待用のグループIDをコピーしました。");
     } catch (error) {
       handleError(error);
     }
@@ -552,7 +622,7 @@
         method: "DELETE",
         expectEmpty: true,
       });
-      inviteCode.textContent = "";
+      inviteCode.textContent = "無効化しました";
       inviteCopy.classList.add("hidden");
       inviteRevoke.classList.add("hidden");
       statusElement.textContent = "招待コードを無効にしました。";
@@ -699,6 +769,19 @@
         ? `「${group.name}」を削除しました。`
         : `「${group.name}」から脱退しました。`;
     });
+  });
+
+  groupIdCopy.addEventListener("click", async () => {
+    const group = activeDetailGroup();
+    if (group === null) {
+      handleError(new Error("コピーするグループが選ばれていません。"));
+      return;
+    }
+    try {
+      await copyText(group.group_id, "内部IDをコピーしました。");
+    } catch (error) {
+      handleError(error);
+    }
   });
 
   refreshButton.addEventListener("click", () => void reloadGroups());
