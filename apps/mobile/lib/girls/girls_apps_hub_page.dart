@@ -476,9 +476,14 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       _error = null;
     });
     try {
+      String? hiddenNovelSampleId;
       if (isNovel) {
-        await _builtinInstallApi.ensureNovelSampleProject(
-            accessToken: widget.session.accessToken, groupId: group.groupId);
+        final HostedAuthoringProjectSummary sample =
+            await _builtinInstallApi.ensureNovelSampleProject(
+          accessToken: widget.session.accessToken,
+          groupId: group.groupId,
+        );
+        hiddenNovelSampleId = sample.contentId;
         if (!mounted) return;
       }
       await openHostedAuthoringProjects(
@@ -495,6 +500,9 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
         emptyTitle: isNovel ? 'まだノベル作品がありません' : 'まだ作品がありません',
         emptyBody: isNovel ? '「新しくつくる」から物語を作ってみよう。' : '「新しくつくる」からはじめよう。',
         projectTitle: isNovel ? _novelProjectTitle : null,
+        hiddenContentIds: hiddenNovelSampleId == null
+            ? const <String>{}
+            : <String>{hiddenNovelSampleId},
       );
       if (mounted) await _load();
     } catch (error) {
