@@ -229,7 +229,6 @@ class _HostedAuthoringProjectsPageState
       if (!mounted) return;
       setState(() => _busy = false);
       await _openEditor(created.contentId);
-      if (mounted) await _loadProjects();
     } catch (error) {
       if (mounted) setState(() => _error = widget.errorMessage(error));
     } finally {
@@ -274,6 +273,7 @@ class _HostedAuthoringProjectsPageState
           ),
         ),
       );
+      if (mounted) await _loadProjects();
     } catch (error) {
       if (mounted) setState(() => _error = widget.errorMessage(error));
     } finally {
