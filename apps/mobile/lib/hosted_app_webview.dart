@@ -135,6 +135,8 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
   int _progress = 0;
   bool _bridgeFailed = false;
   bool _permissionPromptActive = false;
+  ValueChanged<bool>? _sharedFooterHiddenAction;
+  bool _ownsSharedFooter = false;
 
   late final bool Function(Uri target) _allowsNavigation;
   late final HostedBridgeSession _bridgeSession;
@@ -153,6 +155,33 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
   void initState() {
     super.initState();
     _prepareWebView();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final ValueChanged<bool>? nextAction =
+        GirlsScaffoldChromeScope.sharedFooterHiddenAction(context);
+    if (identical(nextAction, _sharedFooterHiddenAction)) return;
+
+    if (_ownsSharedFooter) {
+      _sharedFooterHiddenAction?.call(false);
+      _ownsSharedFooter = false;
+    }
+    _sharedFooterHiddenAction = nextAction;
+    if (_usesGirlsNovelBackground && nextAction != null) {
+      nextAction(true);
+      _ownsSharedFooter = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_ownsSharedFooter) {
+      _sharedFooterHiddenAction?.call(false);
+      _ownsSharedFooter = false;
+    }
+    super.dispose();
   }
 
   void _initializeSession() {
