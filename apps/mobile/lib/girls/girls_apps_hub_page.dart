@@ -12,6 +12,7 @@ import 'api.dart';
 import 'girls_errors.dart';
 import 'girls_app_management_api.dart';
 import 'girls_app_source_editor_page.dart';
+import 'girls_app_thumbnail.dart';
 import 'girls_apps_cache.dart';
 import 'girls_apps_page.dart' as legacy;
 import 'girls_builtin_install_api.dart';
@@ -644,6 +645,10 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _AppCard(
                     app: app,
+                    thumbnailUri: widget.api.baseUri.resolve(
+                      '/hosted/my/apps/${app.app.appId}/thumbnail',
+                    ),
+                    accessToken: widget.session.accessToken,
                     onTap: _busy ? null : () => _openDetail(app),
                     onPlayPublished:
                         _busy || !app.app.isPublished || app.isHidden
@@ -797,11 +802,15 @@ class _MakerCard extends StatelessWidget {
 class _AppCard extends StatelessWidget {
   const _AppCard({
     required this.app,
+    required this.thumbnailUri,
+    required this.accessToken,
     required this.onTap,
     required this.onPlayPublished,
   });
 
   final ManagedGirlsApp app;
+  final Uri thumbnailUri;
+  final String accessToken;
   final VoidCallback? onTap;
   final VoidCallback? onPlayPublished;
 
@@ -813,7 +822,21 @@ class _AppCard extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
-        leading: const Icon(Icons.apps_rounded, color: _lavender),
+        leading: GirlsAppThumbnail(
+          uri: thumbnailUri,
+          accessToken: accessToken,
+          size: 44,
+          radius: 12,
+          semanticLabel: app.app.title,
+          fallback: Container(
+            decoration: BoxDecoration(
+              color: _pink,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: const Icon(Icons.apps_rounded, color: _lavender),
+          ),
+        ),
         title: Text(app.app.title,
             style: const TextStyle(color: _ink, fontWeight: FontWeight.w800)),
         subtitle: Text(app.isHidden ? '非公開' : '公開中'),
