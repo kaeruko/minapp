@@ -36,6 +36,9 @@ _GROUP_APP_UPLOAD_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/apps/upload$")
 _GROUP_APP_VISIBILITY_RE = re.compile(
     rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/visibility$"
 )
+_GROUP_APP_THUMBNAIL_RE = re.compile(
+    rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/thumbnail$"
+)
 _GROUP_APP_PREVIEW_SESSION_RE = re.compile(
     rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/preview-session$"
 )
@@ -236,6 +239,19 @@ def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
                 hidden=hidden,
             ),
         )
+
+    group_thumbnail_match = _GROUP_APP_THUMBNAIL_RE.fullmatch(path)
+    if method == "GET" and group_thumbnail_match is not None:
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
+        group_id, app_id = group_thumbnail_match.groups()
+        data, content_type = hosted_thumbnail.get_group_thumbnail(
+            backend,
+            auth_subject,
+            group_id,
+            app_id,
+        )
+        return _content_response(data, content_type)
 
     thumbnail_match = _MY_APP_THUMBNAIL_RE.fullmatch(path)
     if thumbnail_match is not None:
