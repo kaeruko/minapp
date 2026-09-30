@@ -51,6 +51,7 @@ class HostedAuthoringProjectsPage extends StatefulWidget {
     required this.definition,
     required this.errorMessage,
     this.initialContentId,
+    this.hiddenContentIds = const <String>{},
     super.key,
   });
 
@@ -62,6 +63,7 @@ class HostedAuthoringProjectsPage extends StatefulWidget {
   final HostedAuthoringProjectDefinition definition;
   final HostedAuthoringErrorMessage errorMessage;
   final String? initialContentId;
+  final Set<String> hiddenContentIds;
 
   @override
   State<HostedAuthoringProjectsPage> createState() =>
@@ -141,12 +143,18 @@ class _HostedAuthoringProjectsPageState
         contentFormat: widget.definition.contentFormat,
       );
 
-      final List<HostedAuthoringProjectSummary> projects =
+      final List<HostedAuthoringProjectSummary> allProjects =
           await _projectsApi.listProjects(
         accessToken: widget.accessToken,
         groupId: widget.groupId,
         contentFormat: widget.definition.contentFormat,
       );
+      final List<HostedAuthoringProjectSummary> projects = allProjects
+          .where(
+            (HostedAuthoringProjectSummary project) =>
+                !widget.hiddenContentIds.contains(project.contentId),
+          )
+          .toList(growable: false);
       final Map<String, String> titles = <String, String>{};
       final HostedAuthoringProjectTitle? projectTitle =
           widget.definition.projectTitle;
