@@ -327,9 +327,6 @@ void main() {
       findsNothing,
     );
 
-    final Finder changeOwner = find.byKey(
-      const Key('girls-group-settings-change-owner'),
-    );
     await tester.ensureVisible(changeOwner);
     await tester.pumpAndSettle();
     await tester.tap(changeOwner);
