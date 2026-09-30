@@ -183,6 +183,30 @@ class HostedUploadIdentityTests(unittest.TestCase):
         self.assertEqual(len(self.backend._group_items), 1)
         self.assertEqual(self.backend.update_calls, [(first["app_id"], 1)])
 
+    def test_reject_existing_does_not_update_matching_app(self) -> None:
+        first = self.upload(
+            "うさぎのおやつやさん",
+            make_zip("<h1>v1</h1>", PACKAGE_A),
+        )
+
+        with self.assertRaises(ApiProblem) as caught:
+            create_uploaded_app(
+                self.backend,
+                "subject",
+                GROUP_ID,
+                "うさぎのおやつやさん",
+                make_zip("<h1>v2</h1>", PACKAGE_A),
+                reject_existing=True,
+            )
+
+        self.assertEqual(caught.exception.error, "existing_upload_conflict")
+        self.assertEqual(self.backend.update_calls, [])
+        self.assertEqual(len(self.backend._group_items), 1)
+        self.assertEqual(
+            int(self.backend._group_items[0]["source_revision"]["N"]),
+            first["source_revision"],
+        )
+
     def test_different_package_identity_creates_new_app(self) -> None:
         first = self.upload("ゲームA", make_zip("<h1>A</h1>", PACKAGE_A))
         second = self.upload("ゲームB", make_zip("<h1>B</h1>", PACKAGE_B))
