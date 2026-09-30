@@ -62,6 +62,8 @@ BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = {
         "title": "しば犬どんぐりキャッチ",
         "asset_path": "assets/builtin/shiba_donguri/index.html",
         "source_key": "hosted/templates/shiba-game/v1/source.zip",
+        "thumbnail_path": "icon.webp",
+        "thumbnail_content_type": "image/webp",
     },
     "shiba-goshujin": {
         "builtin_id": "shiba-goshujin",
@@ -69,6 +71,8 @@ BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = {
         "title": "ごしゅじんどこわん",
         "asset_path": "assets/builtin/shiba_goshujin/index.html",
         "source_key": "hosted/templates/shiba-goshujin/v1/source.zip",
+        "thumbnail_path": "icon.webp",
+        "thumbnail_content_type": "image/webp",
     },
 }
 
@@ -233,6 +237,47 @@ class HostedCatalogBackend(HostedPlatformBackend):
             self._require_editable_app(app)
         return user, app
 
+    def _template_thumbnail(
+        self,
+        template: dict[str, Any],
+    ) -> tuple[bytes, str] | None:
+        path = template.get("thumbnail_path")
+        content_type = template.get("thumbnail_content_type")
+        if path is None and content_type is None:
+            return None
+        if (
+            not isinstance(path, str)
+            or not path
+            or not isinstance(content_type, str)
+            or content_type not in {"image/png", "image/jpeg", "image/webp"}
+        ):
+            raise RuntimeError("Built-in template thumbnail metadata is invalid")
+
+        zip_bytes, files, _ = self._read_zip_object(
+            bucket=self._upload_bucket,
+            key=str(template["source_key"]),
+        )
+        if path not in files:
+            raise RuntimeError(
+                f"Built-in template thumbnail {path!r} is missing from source ZIP"
+            )
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
+            data = archive.read(path)
+
+        if not data or len(data) > 192 * 1024:
+            raise RuntimeError("Built-in template thumbnail size is invalid")
+        if content_type == "image/png" and not data.startswith(b"\x89PNG\r\n\x1a\n"):
+            raise RuntimeError("Built-in template PNG thumbnail signature is invalid")
+        if content_type == "image/jpeg" and not data.startswith(b"\xff\xd8\xff"):
+            raise RuntimeError("Built-in template JPEG thumbnail signature is invalid")
+        if content_type == "image/webp" and not (
+            len(data) >= 12
+            and data[:4] == b"RIFF"
+            and data[8:12] == b"WEBP"
+        ):
+            raise RuntimeError("Built-in template WebP thumbnail signature is invalid")
+        return data, content_type
+
     def install_builtin(
         self,
         auth_subject: str,
@@ -252,6 +297,7 @@ class HostedCatalogBackend(HostedPlatformBackend):
 
         app_id = uuid.uuid4().hex
         created_at = _now_iso()
+        thumbnail = self._template_thumbnail(template)
         common = {
             "entity": _string_attr("app"),
             "app_id": _string_attr(app_id),
@@ -270,6 +316,13 @@ class HostedCatalogBackend(HostedPlatformBackend):
             "sk": _string_attr("META"),
             **common,
         }
+        if thumbnail is not None:
+            thumbnail_bytes, thumbnail_content_type = thumbnail
+            app_meta["thumbnail_bytes"] = {"B": thumbnail_bytes}
+            app_meta["thumbnail_content_type"] = _string_attr(
+                thumbnail_content_type
+            )
+            app_meta["thumbnail_updated_at"] = _string_attr(created_at)
         group_index = {
             "pk": _string_attr(f"GROUP#{group_id}"),
             "sk": _string_attr(f"APP#{app_id}"),
