@@ -60,6 +60,7 @@
   });
 
   let accountUserId = null;
+  let identityLoginId = null;
   let storageKey = null;
   let detailGroupId = null;
   let detailMembers = [];
@@ -152,7 +153,19 @@
   }
 
   async function ensureIdentity() {
-    if (accountUserId !== null) return accountUserId;
+    const loginId = portal.loginId();
+    if (typeof loginId !== "string" || loginId.length === 0) {
+      throw new Error("Girls login identity is unavailable.");
+    }
+    if (accountUserId !== null && identityLoginId === loginId) return accountUserId;
+
+    accountUserId = null;
+    identityLoginId = null;
+    storageKey = null;
+    detailGroupId = null;
+    detailMembers = [];
+    detailElement.classList.add("hidden");
+
     const payload = requirePlainObject(
       await portal.request("/hosted/me"),
       "Hosted me response",
@@ -162,6 +175,10 @@
       user.user_id,
       "Hosted current user_id",
     );
+    if (Object.hasOwn(user, "login_id") && user.login_id !== loginId) {
+      throw new Error("Girls login identity does not match /hosted/me.");
+    }
+    identityLoginId = loginId;
     storageKey = `minapp_girls_current_group_${accountUserId}`;
     return accountUserId;
   }
