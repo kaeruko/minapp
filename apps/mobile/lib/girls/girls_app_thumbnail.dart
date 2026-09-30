@@ -2,15 +2,30 @@ import 'package:flutter/material.dart';
 
 const String _drawingShopAppId = 'ecb3cb6a08e05305668a952cbdae435b';
 const String _singAlongShopAppId = '9571adacf55c47b4ac772cd48621a08b';
+
 const String _drawingAsset =
     'assets/girls/cutouts/minapp_cards_480/drawing_card.png';
 const String _singAlongAsset =
     'assets/girls/cutouts/minapp_cards_480/sing_along_card.png';
+const String _memoAsset = 'assets/girls/home/cards/memo_card.png';
+const String _minappchiAsset = 'assets/girls/home/cards/minappchi_card.png';
+const String _novelAsset = 'assets/girls/home/cards/novel_card.png';
 
-String? girlsBundledAppArtworkAsset(String? shopSourceAppId) {
-  return switch (shopSourceAppId) {
+String? girlsBundledAppArtworkAsset({
+  String? shopSourceAppId,
+  String? builtinId,
+}) {
+  final String? shopAsset = switch (shopSourceAppId) {
     _drawingShopAppId => _drawingAsset,
     _singAlongShopAppId => _singAlongAsset,
+    _ => null,
+  };
+  if (shopAsset != null) return shopAsset;
+
+  return switch (builtinId) {
+    'memo' => _memoAsset,
+    'minappchi' => _minappchiAsset,
+    'novel-editor' || 'novel-starter' => _novelAsset,
     _ => null,
   };
 }
@@ -24,6 +39,7 @@ class GirlsAppThumbnail extends StatelessWidget {
     required this.semanticLabel,
     required this.fallback,
     this.shopSourceAppId,
+    this.builtinId,
     super.key,
   });
 
@@ -34,18 +50,29 @@ class GirlsAppThumbnail extends StatelessWidget {
   final String semanticLabel;
   final Widget fallback;
   final String? shopSourceAppId;
+  final String? builtinId;
 
   @override
   Widget build(BuildContext context) {
-    final String? bundledAsset =
-        girlsBundledAppArtworkAsset(shopSourceAppId);
-    if (bundledAsset != null) {
+    final String? bundledAsset = girlsBundledAppArtworkAsset(
+      shopSourceAppId: shopSourceAppId,
+      builtinId: builtinId,
+    );
+
+    Widget defaultArtwork() {
+      final String? asset = bundledAsset;
+      if (asset == null) {
+        return SizedBox.square(
+          dimension: size,
+          child: fallback,
+        );
+      }
       return SizedBox.square(
         dimension: size,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(radius),
           child: Image.asset(
-            bundledAsset,
+            asset,
             fit: BoxFit.contain,
             semanticLabel: semanticLabel,
           ),
@@ -53,11 +80,8 @@ class GirlsAppThumbnail extends StatelessWidget {
       );
     }
 
-    Widget fallbackBox() => SizedBox.square(
-          dimension: size,
-          child: fallback,
-        );
-
+    // A user-saved thumbnail always wins. Bundled shop/builtin artwork is only
+    // the default when the app has no saved thumbnail (404) or it cannot load.
     return SizedBox.square(
       dimension: size,
       child: ClipRRect(
@@ -74,7 +98,7 @@ class GirlsAppThumbnail extends StatelessWidget {
             Object error,
             StackTrace? stackTrace,
           ) =>
-              fallbackBox(),
+              defaultArtwork(),
           frameBuilder: (
             BuildContext context,
             Widget child,
@@ -83,7 +107,7 @@ class GirlsAppThumbnail extends StatelessWidget {
           ) =>
               wasSynchronouslyLoaded || frame != null
                   ? child
-                  : fallbackBox(),
+                  : defaultArtwork(),
         ),
       ),
     );
