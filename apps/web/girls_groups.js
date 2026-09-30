@@ -34,16 +34,14 @@
   const roleElement = requiredElement("girls-group-role");
   const currentStatus = requiredElement("girls-group-current-status");
   const memberCount = requiredElement("girls-group-member-count");
+  const groupCodeValue = requiredElement("girls-group-code-value");
+  const groupCodeCopy = requiredElement("girls-group-code-copy");
   const groupIdValue = requiredElement("girls-group-id-value");
   const groupIdCopy = requiredElement("girls-group-id-copy");
   const membersElement = requiredElement("girls-group-members");
   const ownerTools = requiredElement("girls-group-owner-tools");
   const renameForm = requiredElement("girls-group-rename-form");
   const renameInput = requiredElement("girls-group-rename");
-  const inviteCreate = requiredElement("girls-group-invite-create");
-  const inviteCode = requiredElement("girls-group-invite-code");
-  const inviteCopy = requiredElement("girls-group-invite-copy");
-  const inviteRevoke = requiredElement("girls-group-invite-revoke");
   const iconFile = requiredElement("girls-group-icon-file");
   const iconReset = requiredElement("girls-group-icon-reset");
   const transferOwner = requiredElement("girls-group-transfer-owner");
@@ -59,6 +57,7 @@
   if (!(joinCode instanceof HTMLInputElement)) throw new Error("#girls-group-code must be an input.");
   if (!(renameForm instanceof HTMLFormElement)) throw new Error("#girls-group-rename-form must be a form.");
   if (!(renameInput instanceof HTMLInputElement)) throw new Error("#girls-group-rename must be an input.");
+  if (!(groupCodeCopy instanceof HTMLButtonElement)) throw new Error("#girls-group-code-copy must be a button.");
   if (!(groupIdCopy instanceof HTMLButtonElement)) throw new Error("#girls-group-id-copy must be a button.");
   if (!(iconFile instanceof HTMLInputElement)) throw new Error("#girls-group-icon-file must be an input.");
 
@@ -72,6 +71,8 @@
   let storageKey = null;
   let detailGroupId = null;
   let detailMembers = [];
+  const groupCodes = new Map();
+  const groupCodeErrors = new Map();
   let busy = false;
   let generation = 0;
 
@@ -176,6 +177,48 @@
     statusElement.textContent = successMessage;
   }
 
+  async function loadGroupCode(group) {
+    const cached = groupCodes.get(group.group_id);
+    if (cached !== undefined) return cached;
+
+    const payload = requirePlainObject(
+      await portal.request(`/hosted/groups/${group.group_id}/invite`, {
+        method: "POST",
+        jsonBody: {},
+      }),
+      "Hosted group ID response",
+    );
+    const expectedFields = ["code", "expires_at", "group_id", "valid_for_seconds"];
+    const actual = Object.keys(payload).sort();
+    if (actual.length !== expectedFields.length || actual.some((field, index) => field !== expectedFields[index])) {
+      throw new Error("Hosted group ID response fields are invalid.");
+    }
+    if (payload.group_id !== group.group_id) {
+      throw new Error("Hosted group ID response returned a different group.");
+    }
+    const code = MinAppGroupManagement.normalizeInviteCode(
+      requireString(payload.code, "Hosted group ID"),
+    );
+    if (!Number.isInteger(payload.valid_for_seconds) || payload.valid_for_seconds < 1) {
+      throw new Error("Hosted group ID valid_for_seconds is invalid.");
+    }
+    if (Number.isNaN(Date.parse(requireString(payload.expires_at, "Hosted group ID expires_at")))) {
+      throw new Error("Hosted group ID expires_at is invalid.");
+    }
+    groupCodes.set(group.group_id, code);
+    groupCodeErrors.delete(group.group_id);
+    return code;
+  }
+
+  async function loadGroupCodeForDisplay(group) {
+    try {
+      return await loadGroupCode(group);
+    } catch (error) {
+      groupCodeErrors.set(group.group_id, errorMessage(error));
+      throw error;
+    }
+  }
+
   async function ensureIdentity() {
     const loginId = portal.loginId();
     if (typeof loginId !== "string" || loginId.length === 0) {
@@ -188,6 +231,8 @@
     storageKey = null;
     detailGroupId = null;
     detailMembers = [];
+    groupCodes.clear();
+    groupCodeErrors.clear();
     detailElement.classList.add("hidden");
 
     const payload = requirePlainObject(
@@ -271,6 +316,34 @@
         ? "● いまのグループ"
         : "メンバーや設定を確認できます";
 
+      if (isCurrent) {
+        const codeBox = document.createElement("div");
+        codeBox.className = "girls-group-card-code";
+        const codeLabel = document.createElement("span");
+        codeLabel.textContent = "グループID";
+        const code = groupCodes.get(group.group_id);
+        const codeError = groupCodeErrors.get(group.group_id);
+        const codeValue = document.createElement("strong");
+        codeValue.textContent = code ?? (codeError === undefined ? "読み込み中…" : "取得できません");
+
+        const copyButton = document.createElement("button");
+        copyButton.type = "button";
+        copyButton.className = "girls-secondary girls-group-card-code-copy";
+        copyButton.textContent = "コピー";
+        copyButton.disabled = code === undefined || busy;
+        copyButton.addEventListener("click", async () => {
+          try {
+            await copyText(code, "グループIDをコピーしました。");
+          } catch (error) {
+            handleError(error);
+          }
+        });
+        codeBox.append(codeLabel, codeValue, copyButton);
+        card.append(top, current, codeBox);
+      } else {
+        card.append(top, current);
+      }
+
       const actions = document.createElement("div");
       actions.className = "girls-group-card-actions";
 
@@ -290,6 +363,12 @@
           updateCurrentGroupChrome();
           setError(null);
           statusElement.textContent = `「${group.name}」をいまのグループにしました。`;
+          void loadGroupCodeForDisplay(group)
+            .then(() => renderGroups())
+            .catch((error) => {
+              renderGroups();
+              handleError(error);
+            });
         } catch (error) {
           handleError(error);
         }
@@ -305,7 +384,7 @@
       });
 
       actions.append(selectButton, manageButton);
-      card.append(top, current, actions);
+      card.append(actions);
       listElement.append(card);
     }
   }
@@ -333,6 +412,14 @@
       detailGroupId = null;
       detailMembers = [];
       detailElement.classList.add("hidden");
+    }
+    const selected = selection.active();
+    if (selected !== null) {
+      try {
+        await loadGroupCodeForDisplay(selected);
+      } catch (error) {
+        setError(errorMessage(error));
+      }
     }
     renderGroups();
     updateCurrentGroupChrome();
@@ -399,36 +486,6 @@
     return [remove];
   }
 
-  async function loadInviteCode(group) {
-    if (group.role !== "owner") return null;
-    const payload = requirePlainObject(
-      await portal.request(`/hosted/groups/${group.group_id}/invite`, {
-        method: "POST",
-        jsonBody: {},
-      }),
-      "Hosted invite response",
-    );
-    const expectedFields = ["code", "expires_at", "group_id", "valid_for_seconds"];
-    const actual = Object.keys(payload).sort();
-    if (actual.length !== expectedFields.length || actual.some((field, index) => field !== expectedFields[index])) {
-      throw new Error("Hosted invite response fields are invalid.");
-    }
-    if (payload.group_id !== group.group_id) throw new Error("Hosted invite group_id mismatch.");
-    const code = MinAppGroupManagement.normalizeInviteCode(
-      requireString(payload.code, "Hosted invite code"),
-    );
-    if (!Number.isInteger(payload.valid_for_seconds) || payload.valid_for_seconds < 1) {
-      throw new Error("Hosted invite valid_for_seconds is invalid.");
-    }
-    if (Number.isNaN(Date.parse(requireString(payload.expires_at, "Hosted invite expires_at")))) {
-      throw new Error("Hosted invite expires_at is invalid.");
-    }
-    inviteCode.textContent = code;
-    inviteCopy.classList.remove("hidden");
-    inviteRevoke.classList.remove("hidden");
-    return code;
-  }
-
   function renderDetail(group) {
     detailElement.classList.remove("hidden");
     detailTitle.textContent = group.name;
@@ -440,6 +497,9 @@
       ? "いま使っています"
       : "未選択";
     memberCount.textContent = `${detailMembers.length}人`;
+    const permanentCode = groupCodes.get(group.group_id);
+    groupCodeValue.textContent = permanentCode ?? "読み込み中…";
+    groupCodeCopy.disabled = permanentCode === undefined || busy;
     groupIdValue.textContent = group.group_id;
     renameInput.value = group.name;
     ownerTools.classList.toggle("hidden", group.role !== "owner");
@@ -475,7 +535,6 @@
 
     const transferable = detailMembers.some((member) => member.role !== "owner");
     transferOwner.disabled = group.role !== "owner" || !transferable || busy;
-    inviteCreate.disabled = group.role !== "owner" || busy;
     iconFile.disabled = group.role !== "owner" || busy;
     iconReset.disabled = group.role !== "owner" || busy;
   }
@@ -485,13 +544,15 @@
     const group = selection.groups.find((candidate) => candidate.group_id === groupId);
     if (group === undefined) throw new Error("Managed group is no longer available.");
     detailGroupId = groupId;
-    inviteCode.textContent = group.role === "owner" ? "読み込み中…" : "オーナーだけ表示できます";
-    inviteCopy.classList.add("hidden");
-    inviteRevoke.classList.add("hidden");
+    groupCodeValue.textContent = "読み込み中…";
+    groupCodeCopy.disabled = true;
     setError(null);
     try {
-      detailMembers = await loadMembers(group);
-      if (group.role === "owner") await loadInviteCode(group);
+      const details = await Promise.all([
+        loadMembers(group),
+        loadGroupCodeForDisplay(group),
+      ]);
+      detailMembers = details[0];
       renderDetail(group);
       detailElement.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
@@ -589,43 +650,6 @@
       const groups = await portal.reloadGroups();
       await applyGroups(groups);
       await openGroup(group.group_id);
-    });
-  });
-
-  inviteCreate.addEventListener("click", () => {
-    void runMutation(async () => {
-      const group = activeDetailGroup();
-      if (group === null || group.role !== "owner") {
-        throw new Error("Only the owner can create an invite.");
-      }
-      await loadInviteCode(group);
-      statusElement.textContent = "招待用のグループIDを表示しました。";
-    });
-  });
-
-  inviteCopy.addEventListener("click", async () => {
-    try {
-      await copyText(inviteCode.textContent ?? "", "招待用のグループIDをコピーしました。");
-    } catch (error) {
-      handleError(error);
-    }
-  });
-
-  inviteRevoke.addEventListener("click", () => {
-    void runMutation(async () => {
-      const group = activeDetailGroup();
-      if (group === null || group.role !== "owner") {
-        throw new Error("Only the owner can revoke an invite.");
-      }
-      if (!window.confirm("現在の招待コードを無効にしますか？")) return;
-      await portal.request(`/hosted/groups/${group.group_id}/invite`, {
-        method: "DELETE",
-        expectEmpty: true,
-      });
-      inviteCode.textContent = "無効化しました";
-      inviteCopy.classList.add("hidden");
-      inviteRevoke.classList.add("hidden");
-      statusElement.textContent = "招待コードを無効にしました。";
     });
   });
 
@@ -769,6 +793,24 @@
         ? `「${group.name}」を削除しました。`
         : `「${group.name}」から脱退しました。`;
     });
+  });
+
+  groupCodeCopy.addEventListener("click", async () => {
+    const group = activeDetailGroup();
+    if (group === null) {
+      handleError(new Error("コピーするグループが選ばれていません。"));
+      return;
+    }
+    const code = groupCodes.get(group.group_id);
+    if (code === undefined) {
+      handleError(new Error("グループIDをまだ取得できていません。"));
+      return;
+    }
+    try {
+      await copyText(code, "グループIDをコピーしました。");
+    } catch (error) {
+      handleError(error);
+    }
   });
 
   groupIdCopy.addEventListener("click", async () => {
