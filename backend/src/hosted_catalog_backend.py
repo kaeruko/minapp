@@ -1266,6 +1266,7 @@ class HostedCatalogBackend(HostedPlatformBackend):
             "builtin_id",
             "builtin_asset_path",
             "parent_app_id",
+            "shop_source_app_id",
             "source_sha256",
             "source_updated_at",
             "published_sha256",
@@ -1278,7 +1279,11 @@ class HostedCatalogBackend(HostedPlatformBackend):
         builtin_version = _optional_number(item, "builtin_version")
         if builtin_version is not None:
             result["builtin_version"] = builtin_version
-        for field in ("source_revision", "published_version"):
+        for field in (
+            "source_revision",
+            "published_version",
+            "shop_source_version",
+        ):
             number = _optional_number(item, field)
             if number is not None:
                 result[field] = number
