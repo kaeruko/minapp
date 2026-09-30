@@ -12,6 +12,7 @@ from errors import ApiProblem  # noqa: E402
 from hosted_catalog_backend import HostedCatalogBackend  # noqa: E402
 from hosted_thumbnail import (  # noqa: E402
     MAX_THUMBNAIL_BYTES,
+    delete_thumbnail,
     get_group_thumbnail,
     get_thumbnail,
     set_thumbnail,
@@ -89,6 +90,34 @@ class HostedThumbnailTests(unittest.TestCase):
         self.assertEqual(item["thumbnail_bytes"], {"B": data})
         self.assertEqual(item["thumbnail_content_type"], {"S": "image/png"})
         self.assertIn("thumbnail_updated_at", item)
+
+    def test_owner_can_reset_thumbnail(self) -> None:
+        data = b"\x89PNG\r\n\x1a\nthumbnail"
+        set_thumbnail(
+            self.backend,
+            self.alice,
+            self.app["app_id"],
+            data=data,
+            content_type="image/png",
+        )
+
+        delete_thumbnail(
+            self.backend,
+            self.alice,
+            self.app["app_id"],
+        )
+
+        with self.assertRaises(ApiProblem) as missing:
+            get_thumbnail(self.backend, self.alice, self.app["app_id"])
+        self.assertEqual(missing.exception.status_code, 404)
+        self.assertEqual(missing.exception.error, "thumbnail_not_found")
+
+        # Reset is idempotent so the UI can safely offer "default" at any time.
+        delete_thumbnail(
+            self.backend,
+            self.alice,
+            self.app["app_id"],
+        )
 
     def test_group_member_can_read_thumbnail_but_outsider_cannot(self) -> None:
         data = b"\x89PNG\r\n\x1a\nmember-thumbnail"
