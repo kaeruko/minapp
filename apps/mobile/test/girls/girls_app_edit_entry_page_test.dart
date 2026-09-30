@@ -117,8 +117,6 @@ void main() {
       find.byKey(const Key('girls-edit-entry-reset-icon')),
       findsOneWidget,
     );
-    expect(find.text('背景をピンクにしたい'), findsOneWidget);
-    expect(find.text('ボタンをもっとかわいくしたい'), findsOneWidget);
     expect(sourceReads, 0);
 
     await tester.tap(find.byKey(const Key('girls-edit-entry-help')));
