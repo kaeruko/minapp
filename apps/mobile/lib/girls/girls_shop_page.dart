@@ -460,13 +460,15 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
         if (group == null || installed == null) {
           throw StateError('アイコンを反映するアプリが見つかりません。');
         }
-        await widget.shopApi.syncThumbnailToGroupCopy(
+        final HostedGroupApp synced =
+            await widget.shopApi.syncThumbnailToGroupCopy(
           accessToken: widget.session.accessToken,
           app: widget.app,
           groupId: group.groupId,
           targetAppId: installed.appId,
         );
         if (!mounted) return;
+        setState(() => _installedCopy = synced);
         widget.onGroupAppsChanged?.call();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('ショップのアイコンを反映したよ。')),
@@ -661,7 +663,9 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
                           : 'マイアプリから削除',
             ),
           ),
-          if (_installedCopy != null && widget.app.thumbnailPath != null) ...<Widget>[
+          if (_installedCopy != null &&
+              (widget.app.thumbnailPath != null ||
+                  _shopArtworkAsset(widget.app) != null)) ...<Widget>[
             const SizedBox(height: 10),
             OutlinedButton.icon(
               key: const Key('girls-shop-sync-thumbnail'),
