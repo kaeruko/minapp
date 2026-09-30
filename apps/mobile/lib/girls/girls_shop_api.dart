@@ -242,6 +242,68 @@ class GirlsShopApi {
     return added;
   }
 
+  Future<void> syncThumbnailToGroupCopy({
+    required String accessToken,
+    required GirlsShopApp app,
+    required String groupId,
+    required String targetAppId,
+  }) async {
+    if (!_hexIdPattern.hasMatch(groupId)) {
+      throw ArgumentError.value(
+        groupId,
+        'groupId',
+        'must be a lowercase 32-character hex id',
+      );
+    }
+    if (!_hexIdPattern.hasMatch(targetAppId)) {
+      throw ArgumentError.value(
+        targetAppId,
+        'targetAppId',
+        'must be a lowercase 32-character hex id',
+      );
+    }
+    final Map<String, Object?> payload = await _jsonRequest(
+      method: 'POST',
+      path: '/shop/apps/${app.appId}/sync-thumbnail',
+      accessToken: accessToken,
+      body: <String, Object?>{
+        'version': app.version,
+        'group_id': groupId,
+        'target_app_id': targetAppId,
+      },
+    );
+    _requireExactFields(
+      payload,
+      const <String>{
+        'app_id',
+        'content_type',
+        'bytes',
+        'updated_at',
+      },
+      'Girls shop thumbnail sync',
+    );
+    if (_requiredString(payload, 'app_id') != targetAppId) {
+      throw const FormatException(
+        'Girls shop thumbnail sync changed the target app.',
+      );
+    }
+    final String contentType = _requiredString(payload, 'content_type');
+    if (contentType != 'image/png' &&
+        contentType != 'image/jpeg' &&
+        contentType != 'image/webp') {
+      throw const FormatException(
+        'Girls shop thumbnail sync returned an invalid content type.',
+      );
+    }
+    final Object? rawBytes = payload['bytes'];
+    if (rawBytes is! int || rawBytes <= 0) {
+      throw const FormatException(
+        'Girls shop thumbnail sync returned an invalid byte count.',
+      );
+    }
+    DateTime.parse(_requiredString(payload, 'updated_at')).toUtc();
+  }
+
   Future<void> report({
     required String accessToken,
     required GirlsShopApp app,
