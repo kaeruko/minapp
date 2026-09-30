@@ -624,6 +624,10 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
                   child: _MakerCard(
                     maker: maker,
                     isDefault: maker.appId == _novelEditorAppId,
+                    thumbnailUri: widget.api.baseUri.resolve(
+                      '/hosted/my/apps/${maker.appId}/thumbnail',
+                    ),
+                    accessToken: widget.session.accessToken,
                     onTap: _busy ? null : () => _openMaker(maker),
                   ),
                 ),
@@ -739,11 +743,15 @@ class _MakerCard extends StatelessWidget {
   const _MakerCard({
     required this.maker,
     required this.isDefault,
+    required this.thumbnailUri,
+    required this.accessToken,
     required this.onTap,
   });
 
   final HostedAuthoringAppContract maker;
   final bool isDefault;
+  final Uri thumbnailUri;
+  final String accessToken;
   final VoidCallback? onTap;
 
   @override
@@ -759,12 +767,23 @@ class _MakerCard extends StatelessWidget {
           padding: const EdgeInsets.all(15),
           child: Row(
             children: <Widget>[
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                    color: _pink, borderRadius: BorderRadius.circular(14)),
-                child: const Icon(Icons.edit_note_rounded, color: _lavender),
+              GirlsAppThumbnail(
+                uri: thumbnailUri,
+                accessToken: accessToken,
+                size: 44,
+                radius: 14,
+                semanticLabel: maker.title,
+                builtinId: isDefault ? 'novel-editor' : null,
+                fallback: Container(
+                  decoration: BoxDecoration(
+                    color: _pink,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.edit_note_rounded,
+                    color: _lavender,
+                  ),
+                ),
               ),
               const SizedBox(width: 13),
               Expanded(
