@@ -56,6 +56,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
   HostedGroup? _currentGroup;
   bool _loadingCurrentGroup = true;
   bool _footerHidden = false;
+  bool _editorFooterReplacementActive = false;
   bool _novelFlowActive = false;
   int? _novelFlowBaseDepth;
   String? _currentGroupError;
@@ -106,6 +107,11 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
   void _setCurrentGroup(HostedGroup? group) {
     if (_currentGroup?.groupId == group?.groupId) return;
     setState(() => _currentGroup = group);
+  }
+
+  void _setEditorFooterReplacementActive(bool active) {
+    if (!mounted || _editorFooterReplacementActive == active) return;
+    setState(() => _editorFooterReplacementActive = active);
   }
 
   void _setNovelFlowActive(bool active) {
@@ -204,6 +210,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
       _novelFlowActive = false;
       _novelFlowBaseDepth = null;
       _footerHidden = false;
+      _editorFooterReplacementActive = false;
     });
     navigator.pushAndRemoveUntil(
         _rootRoute(tab), (Route<dynamic> route) => false);
@@ -220,6 +227,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
       _novelFlowActive = false;
       _novelFlowBaseDepth = null;
       _footerHidden = false;
+      _editorFooterReplacementActive = false;
     });
     await _navigatorKey.currentState?.push<void>(
       MaterialPageRoute<void>(
@@ -302,6 +310,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
           _novelFlowActive = false;
           _novelFlowBaseDepth = null;
           _footerHidden = false;
+          _editorFooterReplacementActive = false;
         });
         await _navigatorKey.currentState?.push<void>(
           MaterialPageRoute<void>(
@@ -319,6 +328,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
           _novelFlowActive = false;
           _novelFlowBaseDepth = null;
           _footerHidden = false;
+          _editorFooterReplacementActive = false;
         });
         final bool? deleted = await _navigatorKey.currentState?.push<bool>(
           MaterialPageRoute<bool>(
@@ -413,6 +423,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
       ],
       body: GirlsScaffoldChromeScope(
         onHome: () => _selectTab(GirlsFooterTab.home),
+        onSharedFooterHiddenChanged: _setEditorFooterReplacementActive,
         child: MediaQuery.removePadding(
           context: context,
           removeTop: true,
@@ -433,9 +444,10 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
           ),
         ),
       ),
-      bottomNavigationBar: _footerHidden
-          ? const SizedBox.shrink()
-          : GirlsFooterNav(
+      bottomNavigationBar:
+          (_footerHidden || _editorFooterReplacementActive)
+              ? const SizedBox.shrink()
+              : GirlsFooterNav(
               selectedTab: _selectedTab,
               onSelected: _selectTab,
             ),
