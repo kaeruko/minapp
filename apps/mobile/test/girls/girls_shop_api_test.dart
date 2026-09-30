@@ -218,6 +218,51 @@ void main() {
     expect(added.shopSourceVersion, 3);
   });
 
+  test('addToGroup rejects a copy linked to a different shop app', () async {
+    final String groupId = _repeat('f', 32);
+    final MockClient client = MockClient((http.Request request) async {
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'app_id': _repeat('b', 32),
+          'group_id': groupId,
+          'title': '作品',
+          'source_kind': 'upload',
+          'created_at': '2026-09-27T00:00:00Z',
+          'owner_user_id': ownerId,
+          'editable': true,
+          'source_revision': 1,
+          'shop_source_app_id': _repeat('e', 32),
+          'shop_source_version': 3,
+        }),
+        200,
+        headers: <String, String>{'content-type': 'application/json'},
+      );
+    });
+    final GirlsShopApi api = GirlsShopApi(
+      baseUri: Uri.parse('https://girls-api.example.com'),
+      client: client,
+    );
+    addTearDown(api.close);
+    final GirlsShopApp app = GirlsShopApp(
+      appId: appId,
+      version: '3',
+      title: '作品',
+      ownerUserId: ownerId,
+      ownerDisplayName: 'creator',
+      publishedAt: DateTime.utc(2026, 9, 13),
+      sha256: sha256,
+    );
+
+    expect(
+      () => api.addToGroup(
+        accessToken: 'token',
+        app: app,
+        groupId: groupId,
+      ),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
   test('setVisibility sends app-level Girls shop state', () async {
     final MockClient client = MockClient((http.Request request) async {
       expect(request.method, 'PUT');
