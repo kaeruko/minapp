@@ -371,6 +371,8 @@ class HostedGroupApp {
     required this.ownerUserId,
     required this.editable,
     required this.sourceRevision,
+    this.shopSourceAppId,
+    this.shopSourceVersion,
   });
 
   final String appId;
@@ -386,6 +388,8 @@ class HostedGroupApp {
   final String ownerUserId;
   final bool editable;
   final int? sourceRevision;
+  final String? shopSourceAppId;
+  final int? shopSourceVersion;
 
   bool get isPublished => publishedVersion != null;
 
@@ -399,6 +403,8 @@ class HostedGroupApp {
       'builtin_id',
       'builtin_asset_path',
       'parent_app_id',
+      'shop_source_app_id',
+      'shop_source_version',
       'source_sha256',
       'source_updated_at',
       'published_sha256',
@@ -440,6 +446,28 @@ class HostedGroupApp {
     if (editable is! bool) {
       throw const FormatException('Hosted group app has invalid editable.');
     }
+    final String? shopSourceAppId = _optionalString(
+      json,
+      'shop_source_app_id',
+    );
+    if (shopSourceAppId != null && !_hexIdPattern.hasMatch(shopSourceAppId)) {
+      throw const FormatException(
+        'Hosted group app has invalid shop_source_app_id.',
+      );
+    }
+    final Object? shopSourceVersion = json['shop_source_version'];
+    if (shopSourceVersion != null &&
+        (shopSourceVersion is! int || shopSourceVersion < 1)) {
+      throw const FormatException(
+        'Hosted group app has invalid shop_source_version.',
+      );
+    }
+    if ((shopSourceAppId == null) != (shopSourceVersion == null)) {
+      throw const FormatException(
+        'Hosted group app has incomplete shop provenance.',
+      );
+    }
+
     final Object? sourceRevision = json['source_revision'];
     if (sourceRevision != null &&
         (sourceRevision is! int || sourceRevision < 1)) {
@@ -476,6 +504,8 @@ class HostedGroupApp {
       ownerUserId: _requireHexId(json, 'owner_user_id'),
       editable: editable,
       sourceRevision: sourceRevision as int?,
+      shopSourceAppId: shopSourceAppId,
+      shopSourceVersion: shopSourceVersion as int?,
     );
   }
 }
