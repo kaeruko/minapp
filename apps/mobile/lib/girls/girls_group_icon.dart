@@ -5,16 +5,16 @@ const String girlsDefaultGroupIconAsset = 'assets/girls/mascot_pair.svg';
 
 class GirlsGroupIcon extends StatelessWidget {
   const GirlsGroupIcon({
-    required this.uri,
-    required this.accessToken,
+    this.uri,
+    this.accessToken,
     required this.size,
     required this.semanticLabel,
     this.radius,
     super.key,
   });
 
-  final Uri uri;
-  final String accessToken;
+  final Uri? uri;
+  final String? accessToken;
   final double size;
   final String semanticLabel;
   final double? radius;
@@ -23,14 +23,21 @@ class GirlsGroupIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget fallback() => _DefaultGroupIcon(size: size);
 
+    final Uri? imageUri = uri;
+    if (imageUri == null) return fallback();
+    final String? token = accessToken;
+    if (token == null || token.isEmpty) {
+      throw StateError('Authenticated group icon requires an access token.');
+    }
+
     return SizedBox.square(
       dimension: size,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(radius ?? size / 2),
         child: Image.network(
-          uri.toString(),
+          imageUri.toString(),
           headers: <String, String>{
-            'Authorization': 'Bearer $accessToken',
+            'Authorization': 'Bearer $token',
           },
           fit: BoxFit.cover,
           semanticLabel: semanticLabel,
@@ -40,25 +47,13 @@ class GirlsGroupIcon extends StatelessWidget {
             StackTrace? stackTrace,
           ) =>
               fallback(),
-          loadingBuilder: (
+          frameBuilder: (
             BuildContext context,
             Widget child,
-            ImageChunkEvent? progress,
-          ) {
-            if (progress == null) return child;
-            return Stack(
-              fit: StackFit.expand,
-              children: <Widget>[
-                fallback(),
-                const Center(
-                  child: SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              ],
-            );
-          },
+            int? frame,
+            bool wasSynchronouslyLoaded,
+          ) =>
+              wasSynchronouslyLoaded || frame != null ? child : fallback(),
         ),
       ),
     );
