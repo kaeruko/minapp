@@ -223,7 +223,7 @@
     const story = requireObject(rawStory, '$');
     requireExactKeys(
       story,
-      ['content_format', 'schema_version', 'content_revision', 'title', 'start_scene', 'assets', 'characters', 'scenes'],
+      ['content_format', 'schema_version', 'content_revision', 'title', 'start_scene', 'scene_order', 'assets', 'characters', 'scenes'],
       ['content_format', 'schema_version', 'content_revision', 'title', 'start_scene', 'assets', 'characters', 'scenes'],
       '$'
     );
@@ -243,9 +243,12 @@
       requireId(sceneId, `$.scenes.${sceneId}`);
       const path = `$.scenes.${sceneId}`;
       const scene = requireObject(rawScene, path);
-      requireExactKeys(scene, ['id', 'events'], ['id', 'events'], path);
+      requireExactKeys(scene, ['id', 'title', 'events'], ['id', 'events'], path);
       requireId(scene.id, `${path}.id`);
       if (scene.id !== sceneId) fail('scene_id_mismatch', `${path}.id`, `scene key ${sceneId} must equal scene.id ${scene.id}`);
+      if (Object.prototype.hasOwnProperty.call(scene, 'title')) {
+        requireString(scene.title, `${path}.title`, { maxLength: 100 });
+      }
       const events = requireArray(scene.events, `${path}.events`);
       if (events.length === 0) fail('invalid_value', `${path}.events`, 'at least one event is required');
       events.forEach((event, index) => validateEvent(event, `${path}.events[${index}]`, context));
@@ -253,6 +256,24 @@
       if (lastType !== 'choice' && lastType !== 'goto' && lastType !== 'end') {
         fail('unterminated_scene', `${path}.events`, 'last event must be choice, goto, or end');
       }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(story, 'scene_order')) {
+      const order = requireArray(story.scene_order, '$.scene_order');
+      if (order.length !== Object.keys(scenes).length) {
+        fail('invalid_scene_order', '$.scene_order', 'must contain every scene exactly once');
+      }
+      const seen = new Set();
+      order.forEach((sceneId, index) => {
+        requireId(sceneId, `$.scene_order[${index}]`);
+        if (seen.has(sceneId)) {
+          fail('invalid_scene_order', `$.scene_order[${index}]`, `scene ${sceneId} is duplicated`);
+        }
+        if (!scenes[sceneId]) {
+          fail('missing_scene', `$.scene_order[${index}]`, `scene ${sceneId} does not exist`);
+        }
+        seen.add(sceneId);
+      });
     }
 
     if (!scenes[story.start_scene]) fail('missing_scene', '$.start_scene', `scene ${story.start_scene} does not exist`);
