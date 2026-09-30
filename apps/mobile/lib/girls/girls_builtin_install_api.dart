@@ -236,6 +236,13 @@ class GirlsBuiltinInstallApi {
       'content_revision': 1,
       'title': _novelSampleTitle,
       'start_scene': 'start',
+      'scene_order': <Object?>[
+        'start',
+        'rooftop',
+        'together',
+        'photo',
+        'leave',
+      ],
       'assets': <String, Object?>{},
       'characters': <String, Object?>{},
       'scenes': <String, Object?>{
