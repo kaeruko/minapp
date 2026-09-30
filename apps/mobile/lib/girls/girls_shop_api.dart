@@ -242,7 +242,7 @@ class GirlsShopApi {
     return added;
   }
 
-  Future<void> syncThumbnailToGroupCopy({
+  Future<HostedGroupApp> syncThumbnailToGroupCopy({
     required String accessToken,
     required GirlsShopApp app,
     required String groupId,
@@ -272,36 +272,16 @@ class GirlsShopApi {
         'target_app_id': targetAppId,
       },
     );
-    _requireExactFields(
-      payload,
-      const <String>{
-        'app_id',
-        'content_type',
-        'bytes',
-        'updated_at',
-      },
-      'Girls shop thumbnail sync',
-    );
-    if (_requiredString(payload, 'app_id') != targetAppId) {
+    final HostedGroupApp synced = HostedGroupApp.fromJson(payload);
+    if (synced.appId != targetAppId ||
+        synced.groupId != groupId ||
+        synced.shopSourceAppId != app.appId ||
+        synced.shopSourceVersion.toString() != app.version) {
       throw const FormatException(
-        'Girls shop thumbnail sync changed the target app.',
+        'Girls shop artwork sync changed the requested app scope.',
       );
     }
-    final String contentType = _requiredString(payload, 'content_type');
-    if (contentType != 'image/png' &&
-        contentType != 'image/jpeg' &&
-        contentType != 'image/webp') {
-      throw const FormatException(
-        'Girls shop thumbnail sync returned an invalid content type.',
-      );
-    }
-    final Object? rawBytes = payload['bytes'];
-    if (rawBytes is! int || rawBytes <= 0) {
-      throw const FormatException(
-        'Girls shop thumbnail sync returned an invalid byte count.',
-      );
-    }
-    DateTime.parse(_requiredString(payload, 'updated_at')).toUtc();
+    return synced;
   }
 
   Future<void> report({
