@@ -311,6 +311,13 @@ def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
                     content_type=content_type,
                 ),
             )
+        if method == "DELETE":
+            hosted_thumbnail.delete_thumbnail(
+                backend,
+                auth_subject,
+                app_id,
+            )
+            return hosted_handler._empty_response()
 
     preview_match = _MY_APP_PREVIEW_SESSION_RE.fullmatch(path)
     if method == "POST" and preview_match is not None:
