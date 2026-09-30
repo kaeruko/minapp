@@ -46,6 +46,9 @@ class HostedManagedPreviewAuthorizationTests(unittest.TestCase):
         self.cognito = FakeCognito()
         self.dynamo = FakeDynamoDb()
         self.s3 = FakeS3()
+        self.s3.objects[
+            ("uploads", "hosted/templates/shiba-game/v1/source.zip")
+        ] = app_zip("shiba-game")
         self.backend = HostedLegalBackend(
             cognito=self.cognito,
             dynamodb=self.dynamo,
