@@ -42,25 +42,15 @@ class GirlsAppThumbnail extends StatelessWidget {
             StackTrace? stackTrace,
           ) =>
               fallbackBox(),
-          loadingBuilder: (
+          frameBuilder: (
             BuildContext context,
             Widget child,
-            ImageChunkEvent? progress,
-          ) {
-            if (progress == null) return child;
-            return Stack(
-              fit: StackFit.expand,
-              children: <Widget>[
-                fallback,
-                const Center(
-                  child: SizedBox.square(
-                    dimension: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              ],
-            );
-          },
+            int? frame,
+            bool wasSynchronouslyLoaded,
+          ) =>
+              wasSynchronouslyLoaded || frame != null
+                  ? child
+                  : fallbackBox(),
         ),
       ),
     );
