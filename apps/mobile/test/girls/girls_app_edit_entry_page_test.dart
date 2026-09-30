@@ -106,6 +106,15 @@ void main() {
     expect(find.byKey(const Key('girls-edit-entry-back')), findsOneWidget);
     expect(find.byKey(const Key('girls-edit-entry-help')), findsOneWidget);
     expect(find.byKey(const Key('girls-edit-entry-copy')), findsOneWidget);
+    expect(find.byKey(const Key('girls-edit-entry-icon-card')), findsOneWidget);
+    expect(
+      find.byKey(const Key('girls-edit-entry-change-icon')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('girls-edit-entry-reset-icon')),
+      findsOneWidget,
+    );
     expect(find.text('背景をピンクにしたい'), findsOneWidget);
     expect(find.text('ボタンをもっとかわいくしたい'), findsOneWidget);
     expect(sourceReads, 0);
@@ -120,15 +129,19 @@ void main() {
     await tester.tap(find.byKey(const Key('girls-source-editor-help-close')));
     await tester.pumpAndSettle();
 
-    await tester.drag(
+    final Finder openEditor = find.byKey(
+      const Key('girls-edit-entry-open-editor'),
+    );
+    await tester.dragUntilVisible(
+      openEditor,
       find.byType(Scrollable).first,
-      const Offset(0, -420),
+      const Offset(0, -260),
     );
     await tester.pumpAndSettle();
     expect(find.text('犬の画像を追加したい'), findsOneWidget);
     expect(find.text('コードを編集！'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('girls-edit-entry-open-editor')));
+    await tester.tap(openEditor);
     await tester.pumpAndSettle();
     expect(sourceReads, 1);
     expect(find.byKey(const Key('girls-source-editor-code')), findsOneWidget);
