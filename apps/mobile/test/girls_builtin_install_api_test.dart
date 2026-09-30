@@ -120,6 +120,10 @@ void main() {
         final Map<String, Object?> document =
             body['document']! as Map<String, Object?>;
         expect(document['title'], _novelSampleTitle);
+        expect(
+          document['scene_order'],
+          <Object?>['start', 'rooftop', 'together', 'photo', 'leave'],
+        );
         return _json(201, _projectSummary());
       }
       if (_isHydrateRequest(request)) {
