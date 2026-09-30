@@ -1,7 +1,11 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
 import 'girls_app_management_api.dart';
+import 'girls_app_thumbnail.dart';
 import 'girls_app_source_editor_page.dart';
 import 'girls_code_help.dart';
 import 'girls_errors.dart';
@@ -22,8 +26,10 @@ class GirlsAppEditEntryPage extends StatefulWidget {
     required this.appId,
     required this.title,
     required this.expectedRevision,
+    this.shopSourceAppId,
     this.onSaved,
     this.onRenamed,
+    this.onIconChanged,
     super.key,
   });
 
@@ -33,8 +39,10 @@ class GirlsAppEditEntryPage extends StatefulWidget {
   final String appId;
   final String title;
   final int expectedRevision;
+  final String? shopSourceAppId;
   final Future<void> Function(int revision)? onSaved;
   final Future<void> Function()? onRenamed;
+  final Future<void> Function()? onIconChanged;
 
   @override
   State<GirlsAppEditEntryPage> createState() => _GirlsAppEditEntryPageState();
@@ -46,6 +54,8 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
   late String _currentTitle;
   bool _copying = false;
   bool _renaming = false;
+  bool _iconBusy = false;
+  int _iconRevision = 0;
   String? _error;
 
   @override
@@ -63,7 +73,7 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
   }
 
   Future<void> _renameApp() async {
-    if (_renaming || _copying) return;
+    if (_renaming || _copying || _iconBusy) return;
     final String title = _titleController.text;
     if (title.isEmpty || title != title.trim() || title.length > 80) {
       setState(() {
@@ -98,6 +108,180 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
     } finally {
       if (mounted) setState(() => _renaming = false);
     }
+  }
+
+  String _iconContentType(PlatformFile file) {
+    return switch (file.extension?.toLowerCase()) {
+      'png' => 'image/png',
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'webp' => 'image/webp',
+      _ => throw const FormatException(
+          'アプリアイコンはPNG・JPEG・WebPから選んでね。',
+        ),
+    };
+  }
+
+  Uri _iconUri() => widget.api.thumbnailUri(widget.appId).replace(
+        queryParameters: <String, String>{
+          'v': _iconRevision.toString(),
+        },
+      );
+
+  Future<void> _changeIcon() async {
+    if (_iconBusy || _renaming || _copying) return;
+    final PlatformFile? file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: const <String>['png', 'jpg', 'jpeg', 'webp'],
+    );
+    if (file == null || !mounted) return;
+
+    setState(() {
+      _iconBusy = true;
+      _error = null;
+    });
+    try {
+      final Uint8List bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        throw const FormatException('空の画像はアプリアイコンにできません。');
+      }
+      if (bytes.length > maxHostedThumbnailBytes) {
+        throw const FormatException('アプリアイコンは192KB以下にしてね。');
+      }
+      await widget.api.setThumbnail(
+        accessToken: widget.accessToken,
+        appId: widget.appId,
+        bytes: bytes,
+        contentType: _iconContentType(file),
+      );
+      if (!mounted) return;
+      setState(() => _iconRevision += 1);
+      final Future<void> Function()? onIconChanged = widget.onIconChanged;
+      if (onIconChanged != null) await onIconChanged();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('アプリアイコンを変更したよ')),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _iconBusy = false);
+    }
+  }
+
+  Future<void> _resetIcon() async {
+    if (_iconBusy || _renaming || _copying) return;
+    setState(() {
+      _iconBusy = true;
+      _error = null;
+    });
+    try {
+      await widget.api.deleteThumbnail(
+        accessToken: widget.accessToken,
+        appId: widget.appId,
+      );
+      if (!mounted) return;
+      setState(() => _iconRevision += 1);
+      final Future<void> Function()? onIconChanged = widget.onIconChanged;
+      if (onIconChanged != null) await onIconChanged();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('アプリアイコンをデフォルトに戻したよ')),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _iconBusy = false);
+    }
+  }
+
+  Widget _buildIconCard() {
+    return Container(
+      key: const Key('girls-edit-entry-icon-card'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .84),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE4C8D2)),
+      ),
+      child: Row(
+        children: <Widget>[
+          GirlsAppThumbnail(
+            uri: _iconUri(),
+            accessToken: widget.accessToken,
+            size: 72,
+            radius: 18,
+            semanticLabel: _currentTitle,
+            shopSourceAppId: widget.shopSourceAppId,
+            fallback: Container(
+              decoration: BoxDecoration(
+                color: _pink,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.apps_rounded,
+                color: _lavender,
+                size: 34,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                const Text(
+                  'アプリアイコン',
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                const Text(
+                  '512×512推奨 / PNG・JPEG・WebP / 192KB以下',
+                  style: TextStyle(
+                    color: Color(0xFF8C7893),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 9),
+                FilledButton.icon(
+                  key: const Key('girls-edit-entry-change-icon'),
+                  onPressed: _iconBusy || _renaming || _copying
+                      ? null
+                      : _changeIcon,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _lavender,
+                    foregroundColor: Colors.white,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  icon: _iconBusy
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.photo_library_rounded, size: 18),
+                  label: Text(_iconBusy ? '保存中…' : '画像を変更'),
+                ),
+                TextButton(
+                  key: const Key('girls-edit-entry-reset-icon'),
+                  onPressed: _iconBusy || _renaming || _copying
+                      ? null
+                      : _resetIcon,
+                  child: const Text('デフォルトに戻す'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _copyForAi() async {
@@ -211,7 +395,7 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
                         child: TextField(
                           key: const Key('girls-edit-entry-app-title'),
                           controller: _titleController,
-                          enabled: !_renaming && !_copying,
+                          enabled: !_renaming && !_copying && !_iconBusy,
                           maxLength: 80,
                           onChanged: (_) => setState(() {}),
                           decoration: const InputDecoration(
@@ -227,6 +411,7 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
                         key: const Key('girls-edit-entry-save-title'),
                         onPressed: _renaming ||
                                 _copying ||
+                                _iconBusy ||
                                 _titleController.text == _currentTitle
                             ? null
                             : _renameApp,
@@ -250,6 +435,8 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 12),
+                _buildIconCard(),
                 const SizedBox(height: 18),
                 Container(
                   decoration: BoxDecoration(
@@ -300,7 +487,7 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
                             ),
                             const SizedBox(height: 18),
                             _BigCopyButton(
-                              busy: _copying || _renaming,
+                              busy: _copying || _renaming || _iconBusy,
                               onTap: _copyForAi,
                             ),
                           ],
@@ -348,7 +535,7 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
                 const SizedBox(height: 22),
                 FilledButton(
                   key: const Key('girls-edit-entry-open-editor'),
-                  onPressed: _copying || _renaming ? null : _openEditor,
+                  onPressed: _copying || _renaming || _iconBusy ? null : _openEditor,
                   style: FilledButton.styleFrom(
                     backgroundColor: _mint,
                     foregroundColor: Colors.white,
