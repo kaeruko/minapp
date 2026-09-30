@@ -303,10 +303,17 @@ void main() {
     await tester.tap(find.byKey(const Key('open-settings')));
     await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const Key('girls-group-settings-change-owner')),
-      findsOneWidget,
+    final Finder changeOwner = find.byKey(
+      const Key('girls-group-settings-change-owner'),
     );
+    await tester.dragUntilVisible(
+      changeOwner,
+      find.byType(ListView),
+      const Offset(0, -260),
+    );
+    await tester.pumpAndSettle();
+
+    expect(changeOwner, findsOneWidget);
     expect(
       find.byKey(
         const ValueKey<String>(
