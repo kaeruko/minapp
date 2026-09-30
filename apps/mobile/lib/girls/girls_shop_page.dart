@@ -327,6 +327,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
   late final HostedAppManagementApi _managementApi;
   HostedGroupApp? _installedCopy;
   bool _checkingInstallState = true;
+  bool _installStateResolved = false;
   bool _busy = false;
   String? _error;
 
@@ -344,9 +345,21 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
   }
 
   Future<void> _loadInstallState() async {
+    if (!_checkingInstallState || _installStateResolved || _error != null) {
+      setState(() {
+        _checkingInstallState = true;
+        _installStateResolved = false;
+        _error = null;
+      });
+    }
     final HostedGroup? group = widget.currentGroup;
     if (group == null) {
-      if (mounted) setState(() => _checkingInstallState = false);
+      if (mounted) {
+        setState(() {
+          _installStateResolved = true;
+          _checkingInstallState = false;
+        });
+      }
       return;
     }
     try {
@@ -399,7 +412,10 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
       }
 
       if (!mounted) return;
-      setState(() => _installedCopy = installed);
+      setState(() {
+        _installedCopy = installed;
+        _installStateResolved = true;
+      });
     } catch (error) {
       if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
@@ -457,10 +473,11 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
         messenger.showSnackBar(
           SnackBar(
             content: InkWell(
-              onTap: () {
+              onTap: () async {
+                if (!mounted) return;
                 messenger.hideCurrentSnackBar();
-                Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
+                await Navigator.of(context).push<bool>(
+                  MaterialPageRoute<bool>(
                     builder: (BuildContext context) => GirlsAppDetailPage(
                       api: widget.api,
                       session: widget.session,
@@ -468,6 +485,9 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
                     ),
                   ),
                 );
+                if (!mounted) return;
+                widget.onGroupAppsChanged?.call();
+                await _loadInstallState();
               },
               child: Row(
                 children: <Widget>[
@@ -648,29 +668,34 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
           OutlinedButton.icon(
             onPressed: _busy ||
                     _checkingInstallState ||
+                    !_installStateResolved ||
                     widget.currentGroup == null
                 ? null
                 : _installedCopy == null
                     ? _addToGroup
                     : _removeFromGroup,
-            style: _installedCopy == null
-                ? null
-                : OutlinedButton.styleFrom(
+            style: _installStateResolved && _installedCopy != null
+                ? OutlinedButton.styleFrom(
                     foregroundColor: Theme.of(context).colorScheme.error,
-                  ),
+                  )
+                : null,
             icon: Icon(
-              _installedCopy == null
-                  ? Icons.add_to_photos_rounded
-                  : Icons.delete_outline_rounded,
+              !_installStateResolved
+                  ? Icons.error_outline_rounded
+                  : _installedCopy == null
+                      ? Icons.add_to_photos_rounded
+                      : Icons.delete_outline_rounded,
             ),
             label: Text(
               widget.currentGroup == null
                   ? '追加するグループを選んでね'
                   : _checkingInstallState
                       ? '追加状況を確認中…'
-                      : _installedCopy == null
-                          ? 'マイアプリに追加'
-                          : 'マイアプリから削除',
+                      : !_installStateResolved
+                          ? '追加状況を確認できません'
+                          : _installedCopy == null
+                              ? 'マイアプリに追加'
+                              : 'マイアプリから削除',
             ),
           ),
           const SizedBox(height: 18),
