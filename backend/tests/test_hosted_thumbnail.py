@@ -12,6 +12,7 @@ from errors import ApiProblem  # noqa: E402
 from hosted_catalog_backend import HostedCatalogBackend  # noqa: E402
 from hosted_thumbnail import (  # noqa: E402
     MAX_THUMBNAIL_BYTES,
+    get_group_thumbnail,
     get_thumbnail,
     set_thumbnail,
 )
@@ -41,15 +42,15 @@ class HostedThumbnailTests(unittest.TestCase):
             published_bucket="published",
         )
         self.alice = self._register("alice")
-        group = self.backend.create_group(self.alice, "サムネ部屋")
+        self.group = self.backend.create_group(self.alice, "サムネ部屋")
         installed = self.backend.install_builtin(
             self.alice,
-            group["group_id"],
+            self.group["group_id"],
             "shiba-game",
         )
         self.app = self.backend.fork_app(
             self.alice,
-            group["group_id"],
+            self.group["group_id"],
             installed["app_id"],
             "サムネアプリ",
         )
@@ -88,6 +89,39 @@ class HostedThumbnailTests(unittest.TestCase):
         self.assertEqual(item["thumbnail_bytes"], {"B": data})
         self.assertEqual(item["thumbnail_content_type"], {"S": "image/png"})
         self.assertIn("thumbnail_updated_at", item)
+
+    def test_group_member_can_read_thumbnail_but_outsider_cannot(self) -> None:
+        data = b"\x89PNG\r\n\x1a\nmember-thumbnail"
+        set_thumbnail(
+            self.backend,
+            self.alice,
+            self.app["app_id"],
+            data=data,
+            content_type="image/png",
+        )
+
+        bob = self._register("bob")
+        invite = self.backend.create_invite(self.alice, self.group["group_id"])
+        self.backend.join_group(bob, invite["code"])
+
+        stored, content_type = get_group_thumbnail(
+            self.backend,
+            bob,
+            self.group["group_id"],
+            self.app["app_id"],
+        )
+        self.assertEqual(stored, data)
+        self.assertEqual(content_type, "image/png")
+
+        charlie = self._register("charlie")
+        with self.assertRaises(ApiProblem) as denied:
+            get_group_thumbnail(
+                self.backend,
+                charlie,
+                self.group["group_id"],
+                self.app["app_id"],
+            )
+        self.assertEqual(denied.exception.status_code, 403)
 
     def test_thumbnail_validation_is_fail_closed(self) -> None:
         with self.assertRaises(ApiProblem) as bad_type:
