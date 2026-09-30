@@ -31,6 +31,7 @@ def legacy_novel_sample_document() -> dict[str, Any]:
         "content_revision": 1,
         "title": NOVEL_SAMPLE_TITLE,
         "start_scene": "start",
+        "scene_order": ["start", "rooftop", "together", "photo", "leave"],
         "assets": {},
         "characters": {},
         "scenes": {
@@ -143,6 +144,7 @@ def novel_sample_document() -> dict[str, Any]:
         "content_revision": 1,
         "title": NOVEL_SAMPLE_TITLE,
         "start_scene": "start",
+        "scene_order": ["start", "rooftop", "together", "photo", "leave"],
         "assets": {
             "bg-classroom": {
                 "kind": "image",
@@ -322,8 +324,19 @@ def hydrate_novel_sample_project(
     if document == final_document:
         return _project_summary(project)
 
+    final_document_without_order = _without_scene_order(final_document)
+    if document == final_document_without_order:
+        revision = _positive_revision(project.get("draft_revision"))
+        return backend.save_authoring_document(
+            auth_subject,
+            content_id,
+            expected_revision=revision,
+            document=final_document,
+        )
+
     legacy_document = legacy_novel_sample_document()
-    if document != legacy_document:
+    legacy_document_without_order = _without_scene_order(legacy_document)
+    if document != legacy_document and document != legacy_document_without_order:
         if document.get("title") == NOVEL_SAMPLE_TITLE:
             return _project_summary(project)
         raise ApiProblem(
@@ -441,6 +454,12 @@ def _project_asset_paths(project: dict[str, Any]) -> set[str]:
 def _project_summary(project: dict[str, Any]) -> dict[str, Any]:
     result = dict(project)
     result.pop("document", None)
+    return result
+
+
+def _without_scene_order(document: dict[str, Any]) -> dict[str, Any]:
+    result = dict(document)
+    result.pop("scene_order", None)
     return result
 
 
