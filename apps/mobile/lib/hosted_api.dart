@@ -637,6 +637,23 @@ class HostedApi implements HostedPlatformApi {
     );
   }
 
+  Future<String> fetchCurrentUserId(String accessToken) async {
+    final Map<String, Object?> payload = await _jsonRequest(
+      method: 'GET',
+      path: '/hosted/me',
+      accessToken: accessToken,
+    );
+    final Map<String, Object?> user = _requiredObject(payload, 'user');
+    final String role = _requiredString(user, 'role');
+    final String status = _requiredString(user, 'status');
+    if (role != 'user' || status != 'active') {
+      throw FormatException(
+        'Hosted /me returned unexpected role/status: $role/$status.',
+      );
+    }
+    return _requireHexId(user, 'user_id');
+  }
+
   @override
   Future<List<HostedGroup>> listGroups(String accessToken) async {
     final Map<String, Object?> payload = await _jsonRequest(

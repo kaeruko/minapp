@@ -5,25 +5,55 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  const String userA = '11111111111111111111111111111111';
+  const String userB = '22222222222222222222222222222222';
+  const String groupA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const String groupB = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
   setUp(() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
   });
 
-  test('current group id survives store instances', () async {
+  test('remembers a different current group for each account', () async {
     const SharedPreferencesGirlsCurrentGroupStore first =
         SharedPreferencesGirlsCurrentGroupStore();
     const SharedPreferencesGirlsCurrentGroupStore second =
         SharedPreferencesGirlsCurrentGroupStore();
-    const String groupId = '0123456789abcdef0123456789abcdef';
 
-    await first.save(groupId);
+    await first.activateAccount(userA);
+    await first.save(groupA);
+    await first.deactivateAccount();
 
-    expect(await second.load(), groupId);
+    await second.activateAccount(userB);
+    await second.save(groupB);
+    expect(await second.load(), groupB);
+
+    await second.activateAccount(userA);
+    expect(await first.load(), groupA);
+
+    await first.activateAccount(userB);
+    expect(await second.load(), groupB);
   });
 
-  test('invalid stored group id fails explicitly', () async {
+  test('deactivation preserves remembered group but removes active scope',
+      () async {
+    const SharedPreferencesGirlsCurrentGroupStore store =
+        SharedPreferencesGirlsCurrentGroupStore();
+
+    await store.activateAccount(userA);
+    await store.save(groupA);
+    await store.deactivateAccount();
+
+    await expectLater(store.load(), throwsStateError);
+
+    await store.activateAccount(userA);
+    expect(await store.load(), groupA);
+  });
+
+  test('invalid stored group id fails explicitly for active account', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{
-      girlsCurrentGroupPreferenceKey: 'not-a-group-id',
+      girlsCurrentGroupAccountPreferenceKey: userA,
+      '$girlsCurrentGroupPreferencePrefix$userA': 'not-a-group-id',
     });
     const SharedPreferencesGirlsCurrentGroupStore store =
         SharedPreferencesGirlsCurrentGroupStore();
@@ -31,14 +61,26 @@ void main() {
     expect(store.load(), throwsFormatException);
   });
 
-  test('clear removes persisted current group', () async {
+  test('clear removes only the active accounts remembered group', () async {
     const SharedPreferencesGirlsCurrentGroupStore store =
         SharedPreferencesGirlsCurrentGroupStore();
-    const String groupId = 'fedcba9876543210fedcba9876543210';
 
-    await store.save(groupId);
+    await store.activateAccount(userA);
+    await store.save(groupA);
+    await store.activateAccount(userB);
+    await store.save(groupB);
+
     await store.clear();
-
     expect(await store.load(), isNull);
+
+    await store.activateAccount(userA);
+    expect(await store.load(), groupA);
+  });
+
+  test('load fails explicitly before an account is activated', () async {
+    const SharedPreferencesGirlsCurrentGroupStore store =
+        SharedPreferencesGirlsCurrentGroupStore();
+
+    await expectLater(store.load(), throwsStateError);
   });
 }

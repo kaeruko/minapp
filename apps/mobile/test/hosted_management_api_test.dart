@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -135,6 +136,54 @@ void main() {
     expect(result.groupId, _groupId);
     expect(result.name, 'しばちゃん部');
     expect(result.isOwner, isTrue);
+  });
+
+  test('group icon upload sends exact bytes and content type', () async {
+    final Uint8List bytes = Uint8List.fromList(
+      <int>[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3],
+    );
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'POST');
+      expect(request.url.path, '/hosted/groups/$_groupId/icon');
+      expect(request.headers['authorization'], 'Bearer $_token');
+      expect(request.headers['content-type'], 'image/png');
+      expect(request.bodyBytes, bytes);
+      return _json(200, <String, Object?>{
+        'group_id': _groupId,
+        'content_type': 'image/png',
+        'bytes': bytes.length,
+        'updated_at': '2026-09-30T00:00:00Z',
+      });
+    });
+    final HostedGroupManagementApi api = HostedGroupManagementApi(
+      baseUri: Uri.parse('https://hosted.example'),
+      client: client,
+    );
+
+    await api.setGroupIcon(
+      accessToken: _token,
+      groupId: _groupId,
+      bytes: bytes,
+      contentType: 'image/png',
+    );
+  });
+
+  test('group icon reset uses authenticated DELETE', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'DELETE');
+      expect(request.url.path, '/hosted/groups/$_groupId/icon');
+      expect(request.headers['authorization'], 'Bearer $_token');
+      return http.Response('', 204);
+    });
+    final HostedGroupManagementApi api = HostedGroupManagementApi(
+      baseUri: Uri.parse('https://hosted.example'),
+      client: client,
+    );
+
+    await api.deleteGroupIcon(
+      accessToken: _token,
+      groupId: _groupId,
+    );
   });
 
   test('ownership transfer keeps the requested group and user scope', () async {

@@ -81,34 +81,12 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
         widget.session.accessToken,
       );
       final String? storedGroupId = await widget.currentGroupStore.load();
-      HostedGroup? currentGroup;
-
-      if (storedGroupId != null) {
-        for (final HostedGroup group in groups) {
-          if (group.groupId == storedGroupId) {
-            currentGroup = group;
-            break;
-          }
-        }
-        // Keep an unavailable stored id intact. It must never turn into an
-        // implicit switch to another membership on a later app restart.
-      } else {
-        if (groups.length == 1) {
-          currentGroup = groups.single;
-        } else {
-          final List<HostedGroup> starterGroups = groups
-              .where(
-                (HostedGroup group) =>
-                    group.isOwner && group.name == girlsInitialGroupName,
-              )
-              .toList(growable: false);
-          if (starterGroups.length == 1) {
-            currentGroup = starterGroups.single;
-          }
-        }
-        if (currentGroup != null) {
-          await widget.currentGroupStore.save(currentGroup.groupId);
-        }
+      final HostedGroup? currentGroup = resolveGirlsCurrentGroup(
+        groups,
+        storedGroupId: storedGroupId,
+      );
+      if (currentGroup != null && storedGroupId != currentGroup.groupId) {
+        await widget.currentGroupStore.save(currentGroup.groupId);
       }
 
       if (!mounted) return;

@@ -17,6 +17,7 @@ import 'girls_current_group_store.dart';
 import 'girls_email_settings_page.dart';
 import 'girls_footer_nav.dart';
 import 'girls_groups_page.dart';
+import 'girls_registration_onboarding.dart';
 import 'girls_home_mascot_prompt.dart';
 import 'girls_builtin_install_api.dart';
 import 'girls_profile_page.dart';
@@ -140,16 +141,18 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       final List<HostedGroup> groups = await widget.api.listGroups(
         widget.session.accessToken,
       );
-      final String? currentId =
-          _currentGroup?.groupId ?? await widget.currentGroupStore.load();
-      HostedGroup? currentGroup;
-      if (currentId != null) {
-        for (final HostedGroup group in groups) {
-          if (group.groupId == currentId) {
-            currentGroup = group;
-            break;
-          }
-        }
+      final String? suppliedGroupId = _currentGroup?.groupId;
+      final String? storedGroupId = suppliedGroupId == null
+          ? await widget.currentGroupStore.load()
+          : null;
+      final HostedGroup? currentGroup = resolveGirlsCurrentGroup(
+        groups,
+        storedGroupId: suppliedGroupId ?? storedGroupId,
+      );
+      if (suppliedGroupId == null &&
+          currentGroup != null &&
+          storedGroupId != currentGroup.groupId) {
+        await widget.currentGroupStore.save(currentGroup.groupId);
       }
 
       GirlsHomeMascotPrompt? mascotPrompt;
@@ -172,13 +175,14 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       }
 
       if (!mounted) return;
+      final String? previousGroupId = _currentGroup?.groupId;
       setState(() {
         _groups = groups;
         _currentGroup = currentGroup;
         _mascotPrompt = mascotPrompt;
       });
-      if (currentId != null && currentGroup == null) {
-        widget.onCurrentGroupChanged?.call(null);
+      if (previousGroupId != currentGroup?.groupId) {
+        widget.onCurrentGroupChanged?.call(currentGroup);
       }
     } catch (error) {
       if (mounted) setState(() => _groupError = girlsMessageFor(error));
