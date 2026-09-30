@@ -282,7 +282,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('どうやってアレンジする？'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('girls-edit-entry-open-editor')));
+    final Finder openEditor = find.byKey(
+      const Key('girls-edit-entry-open-editor'),
+    );
+    await tester.dragUntilVisible(
+      openEditor,
+      find.byType(Scrollable).first,
+      const Offset(0, -260),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(openEditor);
     await tester.pumpAndSettle();
 
     final editor = find.byKey(const Key('girls-source-editor-code'));
@@ -335,7 +344,16 @@ void main() {
     await tester.tap(edit);
     await tester.pumpAndSettle();
     expect(find.text('どうやってアレンジする？'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('girls-edit-entry-open-editor')));
+    final Finder openEditor = find.byKey(
+      const Key('girls-edit-entry-open-editor'),
+    );
+    await tester.dragUntilVisible(
+      openEditor,
+      find.byType(Scrollable).first,
+      const Offset(0, -260),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(openEditor);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('girls-source-editor-code')), findsOneWidget);
     await tester.pageBack();
