@@ -130,7 +130,18 @@ def get_group_thumbnail(
 ) -> tuple[bytes, str]:
     user = backend._user_by_auth_subject(auth_subject)
     backend._require_active_membership(user.user_id, group_id)
-    app = backend._require_app_in_group(app_id, group_id)
+
+    # Authorize against the group index, but read image bytes from the
+    # canonical APP#.../META row. Thumbnail writes intentionally live only on
+    # app metadata so group-index rows do not duplicate binary image data.
+    backend._require_app_in_group(app_id, group_id)
+    app = backend._get_item(pk=f"APP#{app_id}", sk="META")
+    if app is None:
+        raise RuntimeError(f"Group index points to missing app {app_id}")
+    if _optional_string(app, "group_id") != group_id:
+        raise RuntimeError(
+            f"App {app_id} metadata points to a different group than its index"
+        )
     backend._require_not_deleting(app)
     return thumbnail_from_app(app)
 
