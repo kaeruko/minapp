@@ -12,12 +12,12 @@ class RefreshableAuthenticatedResult extends RefreshableAuthResult {
   const RefreshableAuthenticatedResult({
     required this.accessToken,
     required this.expiresIn,
-    required this.refreshToken,
+    this.refreshToken,
   });
 
   final String accessToken;
   final int expiresIn;
-  final String refreshToken;
+  final String? refreshToken;
 
   AuthenticatedSession toSession() => AuthenticatedSession(
         accessToken: accessToken,
@@ -153,20 +153,22 @@ class RefreshableAuthClient {
       );
     }
     if (state == 'authenticated') {
-      _requireExactFields(
+      _requireAllowedFields(
         payload,
-        const <String>{
+        required: const <String>{
           'state',
           'access_token',
           'token_type',
           'expires_in',
-          'refresh_token',
         },
-        'Login response',
+        optional: const <String>{'refresh_token'},
+        context: 'Login response',
       );
       _requireBearer(payload);
-      final String refreshToken = _requiredString(payload, 'refresh_token');
-      _validateRefreshToken(refreshToken);
+      final String? refreshToken = payload.containsKey('refresh_token')
+          ? _requiredString(payload, 'refresh_token')
+          : null;
+      if (refreshToken != null) _validateRefreshToken(refreshToken);
       return RefreshableAuthenticatedResult(
         accessToken: _requiredString(payload, 'access_token'),
         expiresIn: _requiredPositiveInt(payload, 'expires_in'),
@@ -218,6 +220,22 @@ void _requireExactFields(
   if (actual.length != expected.length || !actual.containsAll(expected)) {
     throw FormatException(
       '$context fields mismatch. Expected ${expected.join(', ')}, got ${actual.join(', ')}.',
+    );
+  }
+}
+
+void _requireAllowedFields(
+  Map<String, Object?> payload, {
+  required Set<String> required,
+  required Set<String> optional,
+  required String context,
+}) {
+  final Set<String> actual = payload.keys.toSet();
+  if (!actual.containsAll(required) ||
+      !required.union(optional).containsAll(actual)) {
+    throw FormatException(
+      '$context fields mismatch. Required ${required.join(', ')}, '
+      'optional ${optional.join(', ')}, got ${actual.join(', ')}.',
     );
   }
 }

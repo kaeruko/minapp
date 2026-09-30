@@ -110,9 +110,15 @@ class HostedGirlsApi {
       // preserved; an empty account receives one ordinary starter group.
       await _registrationOnboarding.ensureInitialGroup(session);
 
-      // Persist only after onboarding succeeds. A group/network failure remains
-      // visible to the user and does not silently commit a half-finished login.
-      await _sessionStore.writeRefreshToken(result.refreshToken);
+      // Persist only after onboarding succeeds. Some valid Cognito login
+      // responses omit a refresh token; those sessions last until app restart.
+      // Clear any older account's saved token before entering such a session.
+      final String? refreshToken = result.refreshToken;
+      if (refreshToken == null) {
+        await _sessionStore.clearRefreshToken();
+      } else {
+        await _sessionStore.writeRefreshToken(refreshToken);
+      }
     } catch (error, stackTrace) {
       if (accountActivated) {
         try {
@@ -128,8 +134,9 @@ class HostedGirlsApi {
     }
 
     debugPrint(
-      'Girls session login: refresh token saved; access expires in '
-      '${session.expiresIn}s.',
+      'Girls session login: refresh token '
+      '${result.refreshToken == null ? 'unavailable' : 'saved'}; '
+      'access expires in ${session.expiresIn}s.',
     );
     _authenticatedSessions.add(session);
     return session;

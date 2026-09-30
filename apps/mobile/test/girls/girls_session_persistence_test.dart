@@ -371,17 +371,34 @@ void main() {
     expect(currentGroupStore.activeUserId, isNull);
   });
 
-  test('authenticated login without refresh_token fails closed', () async {
-    final _MemoryGirlsSessionStore sessionStore = _MemoryGirlsSessionStore();
+  test('login without refresh token enters a temporary session', () async {
+    final _MemoryGirlsSessionStore sessionStore =
+        _MemoryGirlsSessionStore(refreshToken: 'previous-account-token');
     final _MemoryCurrentGroupStore currentGroupStore =
         _MemoryCurrentGroupStore();
+    int requestCount = 0;
     final MockClient client = MockClient((http.Request request) async {
-      return _jsonResponse(<String, Object?>{
-        'state': 'authenticated',
-        'access_token': 'access-1',
-        'token_type': 'Bearer',
-        'expires_in': 3600,
-      });
+      requestCount += 1;
+      switch (requestCount) {
+        case 1:
+          expect(request.url.path, '/auth/login');
+          return _jsonResponse(<String, Object?>{
+            'state': 'authenticated',
+            'access_token': 'access-1',
+            'token_type': 'Bearer',
+            'expires_in': 3600,
+          });
+        case 2:
+          expect(request.url.path, '/hosted/me');
+          return _meResponse(userA);
+        case 3:
+          expect(request.url.path, '/hosted/groups');
+          return _groupsResponse(<Map<String, Object?>>[
+            _group(groupA, '放課後イラスト部'),
+          ]);
+        default:
+          fail('Unexpected request #$requestCount: ${request.url}');
+      }
     });
     final HostedGirlsApi api = HostedGirlsApi(
       baseUri: baseUri,
@@ -390,9 +407,37 @@ void main() {
       currentGroupStore: currentGroupStore,
     );
 
+    final AuthResult result = await api.login('honey', 'secret12');
+    expect(result, isA<AuthenticatedSession>());
+    expect((result as AuthenticatedSession).accessToken, 'access-1');
+    expect(sessionStore.writeCount, 0);
+    expect(sessionStore.clearCount, 1);
+    expect(sessionStore.refreshToken, isNull);
+    expect(currentGroupStore.activeUserId, userA);
+    expect(requestCount, 3);
+  });
+
+  test('login still rejects an explicitly invalid refresh token', () async {
+    final _MemoryGirlsSessionStore sessionStore = _MemoryGirlsSessionStore();
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.url.path, '/auth/login');
+      return _jsonResponse(<String, Object?>{
+        'state': 'authenticated',
+        'access_token': 'access-1',
+        'token_type': 'Bearer',
+        'expires_in': 3600,
+        'refresh_token': '',
+      });
+    });
+    final HostedGirlsApi api = HostedGirlsApi(
+      baseUri: baseUri,
+      client: client,
+      sessionStore: sessionStore,
+      currentGroupStore: _MemoryCurrentGroupStore(),
+    );
+
     await expectLater(api.login('honey', 'secret12'), throwsFormatException);
     expect(sessionStore.writeCount, 0);
-    expect(currentGroupStore.activeUserId, isNull);
   });
 }
 
