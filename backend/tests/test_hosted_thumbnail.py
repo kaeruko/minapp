@@ -44,7 +44,7 @@ class HostedThumbnailTests(unittest.TestCase):
         )
         self.alice = self._register("alice")
         self.group = self.backend.create_group(self.alice, "サムネ部屋")
-        installed = self.backend.install_builtin(
+        self.builtin = self.backend.install_builtin(
             self.alice,
             self.group["group_id"],
             "shiba-game",
@@ -52,13 +52,32 @@ class HostedThumbnailTests(unittest.TestCase):
         self.app = self.backend.fork_app(
             self.alice,
             self.group["group_id"],
-            installed["app_id"],
+            self.builtin["app_id"],
             "サムネアプリ",
         )
 
     def _register(self, login_id: str) -> str:
         self.backend.register(login_id, "secret12")
         return self.cognito.users[login_id]["sub"]
+
+    def test_author_can_set_thumbnail_on_non_editable_builtin(self) -> None:
+        data = b"\x89PNG\r\n\x1a\nbuiltin-thumbnail"
+        saved = set_thumbnail(
+            self.backend,
+            self.alice,
+            self.builtin["app_id"],
+            data=data,
+            content_type="image/png",
+        )
+        self.assertEqual(saved["app_id"], self.builtin["app_id"])
+
+        stored, content_type = get_thumbnail(
+            self.backend,
+            self.alice,
+            self.builtin["app_id"],
+        )
+        self.assertEqual(stored, data)
+        self.assertEqual(content_type, "image/png")
 
     def test_owner_can_save_and_read_thumbnail(self) -> None:
         with self.assertRaises(ApiProblem) as missing:
