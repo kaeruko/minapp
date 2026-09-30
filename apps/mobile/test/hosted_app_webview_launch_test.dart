@@ -100,6 +100,100 @@ void main() {
     });
   }
 
+  testWidgets('Novel authoring replaces the shared Girls footer only while open',
+      (WidgetTester tester) async {
+    final List<bool> footerHidden = <bool>[];
+    final Widget page = HostedAppWebViewPage.authoring(
+      title: 'ノベルエディタ',
+      launch: HostedAuthoringLaunchGrant(
+        contentUri: Uri.parse(
+          '$_origin/hosted/authoring-editor/$_contentToken/index.html',
+        ),
+        contentExpiresIn: 600,
+        runtimeToken: _runtimeToken,
+        runtimeExpiresIn: 600,
+        authoringToken: _otherContentToken,
+        authoringExpiresIn: 600,
+        contentId: '11111111111111111111111111111111',
+        contentFormat: 'minapp/novel@1',
+        editorAppId: '22222222222222222222222222222222',
+        allowedOperations: const <String>[
+          'load',
+          'save_document',
+          'preview_request',
+          'publish_request',
+        ],
+      ),
+      runtimeTransport: transport,
+      authoringTransport: _FakeAuthoringTransport(),
+      authoringPreviewHost: (_) async => null,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GirlsScaffoldChromeScope(
+          onSharedFooterHiddenChanged: footerHidden.add,
+          child: page,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(footerHidden, <bool>[true]);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: SizedBox.shrink()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(footerHidden, <bool>[true, false]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('non-Novel authoring leaves the shared Girls footer alone',
+      (WidgetTester tester) async {
+    final List<bool> footerHidden = <bool>[];
+    final Widget page = HostedAppWebViewPage.authoring(
+      title: '作品を編集',
+      launch: HostedAuthoringLaunchGrant(
+        contentUri: Uri.parse(
+          '$_origin/hosted/authoring-editor/$_contentToken/index.html',
+        ),
+        contentExpiresIn: 600,
+        runtimeToken: _runtimeToken,
+        runtimeExpiresIn: 600,
+        authoringToken: _otherContentToken,
+        authoringExpiresIn: 600,
+        contentId: '11111111111111111111111111111111',
+        contentFormat: 'example/story@1',
+        editorAppId: '22222222222222222222222222222222',
+        allowedOperations: const <String>[
+          'load',
+          'save_document',
+          'preview_request',
+          'publish_request',
+        ],
+      ),
+      runtimeTransport: transport,
+      authoringTransport: _FakeAuthoringTransport(),
+      authoringPreviewHost: (_) async => null,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GirlsScaffoldChromeScope(
+          onSharedFooterHiddenChanged: footerHidden.add,
+          child: page,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(footerHidden, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final String operation in <String>[
     'javascript',
     'bridge',
