@@ -234,7 +234,9 @@ class GirlsShopApi {
     if (added.groupId != groupId ||
         added.title != app.title ||
         added.sourceKind != 'upload' ||
-        !added.editable) {
+        !added.editable ||
+        added.shopSourceAppId != app.appId ||
+        added.shopSourceVersion?.toString() != app.version) {
       throw const FormatException(
         'Girls shop add response does not match the requested editable group app.',
       );
