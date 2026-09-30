@@ -51,10 +51,30 @@ locals {
   }
 
   official_shop_icons = {
-    shiba-game     = "${local.minapp_apps_source_root}/shiba_donguri/icon.webp"
-    shiba-goshujin = "${local.minapp_apps_source_root}/shiba_goshujin/icon.webp"
-    shopping-town  = "${local.minapp_apps_source_root}/shopping_town/icon.webp"
-    ol-home        = "${local.minapp_apps_source_root}/ol_home/icon.webp"
+    drawing = {
+      path         = "${path.module}/../../apps/mobile/assets/girls/cutouts/minapp_cards_480/drawing_card.png"
+      content_type = "image/png"
+    }
+    sing-along = {
+      path         = "${path.module}/../../apps/mobile/assets/girls/cutouts/minapp_cards_480/sing_along_card.png"
+      content_type = "image/png"
+    }
+    shiba-game = {
+      path         = "${local.minapp_apps_source_root}/shiba_donguri/icon.webp"
+      content_type = "image/webp"
+    }
+    shiba-goshujin = {
+      path         = "${local.minapp_apps_source_root}/shiba_goshujin/icon.webp"
+      content_type = "image/webp"
+    }
+    shopping-town = {
+      path         = "${local.minapp_apps_source_root}/shopping_town/icon.webp"
+      content_type = "image/webp"
+    }
+    ol-home = {
+      path         = "${local.minapp_apps_source_root}/ol_home/icon.webp"
+      content_type = "image/webp"
+    }
   }
 }
 
@@ -163,8 +183,8 @@ resource "aws_dynamodb_table_item" "official_shop_app" {
     },
     try(
       {
-        thumbnail_bytes        = { B = filebase64(local.official_shop_icons[each.key]) }
-        thumbnail_content_type = { S = "image/webp" }
+        thumbnail_bytes        = { B = filebase64(local.official_shop_icons[each.key].path) }
+        thumbnail_content_type = { S = local.official_shop_icons[each.key].content_type }
         thumbnail_updated_at   = { S = each.value.published_at }
       },
       {},
