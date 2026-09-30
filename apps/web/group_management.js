@@ -64,14 +64,17 @@
       });
     }
 
-    function setGroups(nextGroups, preferredId = selectedId) {
+    function setGroups(nextGroups, preferredId = selectedId, options = {}) {
       groups = validateGroups(nextGroups);
+      const fallbackToFirst = options.fallbackToFirst !== false;
       if (groups.length === 0) {
         selectedId = null;
         return null;
       }
       if (preferredId !== null && groups.some((group) => getId(group) === preferredId)) {
         selectedId = preferredId;
+      } else if (preferredId === null && !fallbackToFirst) {
+        selectedId = null;
       } else {
         selectedId = getId(groups[0]);
       }
