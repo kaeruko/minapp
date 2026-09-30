@@ -21,6 +21,7 @@ Future<void> openHostedAuthoringProjects({
   required String emptyBody,
   HostedAuthoringProjectTitle? projectTitle,
   String? initialContentId,
+  Set<String> hiddenContentIds = const <String>{},
 }) async {
   if (editorFormats.isEmpty) {
     throw StateError('Selected app is not an Authoring Editor.');
@@ -67,6 +68,7 @@ Future<void> openHostedAuthoringProjects({
           ),
           errorMessage: errorMessage,
           initialContentId: initialContentId,
+          hiddenContentIds: hiddenContentIds,
         );
         if (contentFormat != _novelContentFormat) return page;
 
