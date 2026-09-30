@@ -165,12 +165,12 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
     if (identical(nextAction, _sharedFooterHiddenAction)) return;
 
     if (_ownsSharedFooter) {
-      _sharedFooterHiddenAction?.call(false);
+      _notifySharedFooterHidden(_sharedFooterHiddenAction, false);
       _ownsSharedFooter = false;
     }
     _sharedFooterHiddenAction = nextAction;
     if (_usesGirlsNovelBackground && nextAction != null) {
-      nextAction(true);
+      _notifySharedFooterHidden(nextAction, true);
       _ownsSharedFooter = true;
     }
   }
@@ -178,10 +178,18 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
   @override
   void dispose() {
     if (_ownsSharedFooter) {
-      _sharedFooterHiddenAction?.call(false);
+      _notifySharedFooterHidden(_sharedFooterHiddenAction, false);
       _ownsSharedFooter = false;
     }
     super.dispose();
+  }
+
+  void _notifySharedFooterHidden(
+    ValueChanged<bool>? action,
+    bool hidden,
+  ) {
+    if (action == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => action(hidden));
   }
 
   void _initializeSession() {
