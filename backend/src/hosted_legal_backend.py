@@ -38,7 +38,13 @@ class HostedLegalBackend(HostedCatalogBackend):
 
     def list_builtin_templates(self) -> list[dict[str, Any]]:
         templates = self._hosted_builtin_templates()
-        private_fields = {"source_key", "accepts", "edits"}
+        private_fields = {
+            "source_key",
+            "accepts",
+            "edits",
+            "thumbnail_path",
+            "thumbnail_content_type",
+        }
         return [
             {
                 field: value
@@ -74,6 +80,7 @@ class HostedLegalBackend(HostedCatalogBackend):
 
         app_id = uuid.uuid4().hex
         created_at = _now_iso()
+        thumbnail = self._template_thumbnail(template)
         common = {
             "entity": _string_attr("app"),
             "app_id": _string_attr(app_id),
@@ -98,6 +105,13 @@ class HostedLegalBackend(HostedCatalogBackend):
             "sk": _string_attr("META"),
             **common,
         }
+        if thumbnail is not None:
+            thumbnail_bytes, thumbnail_content_type = thumbnail
+            app_meta["thumbnail_bytes"] = {"B": thumbnail_bytes}
+            app_meta["thumbnail_content_type"] = _string_attr(
+                thumbnail_content_type
+            )
+            app_meta["thumbnail_updated_at"] = _string_attr(created_at)
         group_index = {
             "pk": _string_attr(f"GROUP#{group_id}"),
             "sk": _string_attr(f"APP#{app_id}"),
