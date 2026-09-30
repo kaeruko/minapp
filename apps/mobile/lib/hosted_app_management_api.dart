@@ -7,6 +7,7 @@ import 'api.dart';
 import 'hosted_api.dart';
 
 const int maxHostedZipUploadBytes = 2 * 1024 * 1024;
+const int maxHostedThumbnailBytes = 192 * 1024;
 final RegExp _managedIdPattern = RegExp(r'^[0-9a-f]{32}$');
 final RegExp _sha256Pattern = RegExp(r'^[0-9a-f]{64}$');
 
@@ -320,6 +321,99 @@ class HostedAppManagementApi {
       );
     }
     return renamed;
+  }
+
+  Uri thumbnailUri(String appId) {
+    _validateId(appId, 'appId');
+    return _baseUri.resolve('/hosted/my/apps/$appId/thumbnail');
+  }
+
+  Future<void> setThumbnail({
+    required String accessToken,
+    required String appId,
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
+    _validateToken(accessToken);
+    _validateId(appId, 'appId');
+    if (bytes.isEmpty || bytes.length > maxHostedThumbnailBytes) {
+      throw ArgumentError.value(
+        bytes.length,
+        'bytes',
+        'thumbnail must be 1-$maxHostedThumbnailBytes bytes',
+      );
+    }
+    if (contentType != 'image/png' &&
+        contentType != 'image/jpeg' &&
+        contentType != 'image/webp') {
+      throw ArgumentError.value(
+        contentType,
+        'contentType',
+        'must be image/png, image/jpeg, or image/webp',
+      );
+    }
+
+    final http.Response response = await _client.post(
+      thumbnailUri(appId),
+      headers: <String, String>{
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': contentType,
+      },
+      body: bytes,
+    );
+    final Map<String, Object?> payload = _decodeJsonResponse(response);
+    final Set<String> actual = payload.keys.toSet();
+    const Set<String> expected = <String>{
+      'app_id',
+      'content_type',
+      'bytes',
+      'updated_at',
+    };
+    if (actual.length != expected.length || !actual.containsAll(expected)) {
+      throw const FormatException(
+        'App thumbnail response has unexpected fields.',
+      );
+    }
+    if (_requiredString(payload, 'app_id') != appId ||
+        _requiredString(payload, 'content_type') != contentType ||
+        payload['bytes'] != bytes.length) {
+      throw const FormatException(
+        'App thumbnail response changed the requested scope.',
+      );
+    }
+    final Object? updatedAt = payload['updated_at'];
+    if (updatedAt is! String || updatedAt.isEmpty) {
+      throw const FormatException(
+        'App thumbnail response has invalid updated_at.',
+      );
+    }
+    DateTime.parse(updatedAt).toUtc();
+  }
+
+  Future<void> deleteThumbnail({
+    required String accessToken,
+    required String appId,
+  }) async {
+    _validateToken(accessToken);
+    _validateId(appId, 'appId');
+    final http.Response response = await _client.delete(
+      thumbnailUri(appId),
+      headers: <String, String>{
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+    );
+    if (response.statusCode == 204) {
+      if (response.bodyBytes.isNotEmpty) {
+        throw const FormatException(
+          'Thumbnail delete response must have an empty body.',
+        );
+      }
+      return;
+    }
+    _decodeJsonResponse(response);
+    throw StateError('Unreachable thumbnail deletion error path.');
   }
 
   Future<ManagedHostedApp> setHidden({
