@@ -162,6 +162,8 @@ def create_uploaded_app(
     group_id: str,
     title: str,
     zip_bytes: bytes,
+    *,
+    reject_existing: bool = False,
 ) -> dict[str, Any]:
     """Create or update an editable Hosted app from a validated ZIP.
 
@@ -202,6 +204,12 @@ def create_uploaded_app(
         package=package,
     )
     if existing is not None:
+        if reject_existing:
+            raise ApiProblem(
+                409,
+                "existing_upload_conflict",
+                "同じ識別子または内容の既存アプリがあるため、新しいコピーを追加できません。既存アプリは変更していません。",
+            )
         _require_same_authoring_contract(existing, authoring)
         if _item_string(existing, "source_sha256") == sha256:
             return backend._public_hosted_app(existing)
