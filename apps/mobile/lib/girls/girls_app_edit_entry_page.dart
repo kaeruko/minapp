@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
+import '../hosted_app_management_api.dart' show maxHostedThumbnailBytes;
 import 'girls_app_management_api.dart';
 import 'girls_app_thumbnail.dart';
 import 'girls_app_source_editor_page.dart';
