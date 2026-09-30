@@ -375,8 +375,8 @@ class HostedAppManagementApi {
         'App thumbnail response has unexpected fields.',
       );
     }
-    if (_requiredString(payload, 'app_id') != appId ||
-        _requiredString(payload, 'content_type') != contentType ||
+    if (_requiredResponseString(payload, 'app_id') != appId ||
+        _requiredResponseString(payload, 'content_type') != contentType ||
         payload['bytes'] != bytes.length) {
       throw const FormatException(
         'App thumbnail response changed the requested scope.',
@@ -705,4 +705,16 @@ void _validateId(String value, String label) {
       'must be a 32-character lowercase hexadecimal ID',
     );
   }
+}
+
+
+String _requiredResponseString(
+  Map<String, Object?> payload,
+  String key,
+) {
+  final Object? value = payload[key];
+  if (value is! String || value.isEmpty) {
+    throw FormatException('API field $key must be a non-empty string.');
+  }
+  return value;
 }
