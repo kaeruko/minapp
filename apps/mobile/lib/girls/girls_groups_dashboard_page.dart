@@ -937,13 +937,13 @@ class _MemberRow extends StatelessWidget {
 
 class _GroupPicture extends StatelessWidget {
   const _GroupPicture({
-    required this.uri,
-    required this.accessToken,
-    required this.semanticLabel,
+    this.uri,
+    this.accessToken,
+    this.semanticLabel = 'グループのデフォルト画像',
   });
 
-  final Uri uri;
-  final String accessToken;
+  final Uri? uri;
+  final String? accessToken;
   final String semanticLabel;
 
   @override
