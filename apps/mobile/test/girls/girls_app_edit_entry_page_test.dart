@@ -72,6 +72,7 @@ void main() {
   Widget page(
     GirlsAppManagementApi api, {
     Future<void> Function()? onRenamed,
+    Future<void> Function()? onIconChanged,
   }) =>
       MaterialApp(
         home: GirlsAppEditEntryPage(
@@ -82,6 +83,7 @@ void main() {
           title: 'おえかき',
           expectedRevision: 1,
           onRenamed: onRenamed,
+          onIconChanged: onIconChanged,
         ),
       );
 
@@ -195,6 +197,41 @@ void main() {
 
     expect(renamedCallback, isTrue);
     expect(find.text('アプリ名を変更したよ'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('app icon can be reset from the arrange entry screen', (
+    WidgetTester tester,
+  ) async {
+    bool iconChanged = false;
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'DELETE');
+      expect(request.url.path, '/hosted/my/apps/$_appId/thumbnail');
+      expect(request.headers['authorization'], 'Bearer test-token');
+      return http.Response('', 204);
+    });
+    addTearDown(client.close);
+    final GirlsAppManagementApi api = GirlsAppManagementApi(
+      baseUri: Uri.parse('https://example.com'),
+      client: client,
+    );
+
+    await tester.pumpWidget(
+      page(
+        api,
+        onIconChanged: () async {
+          iconChanged = true;
+        },
+      ),
+    );
+
+    await tester.tap(
+      find.byKey(const Key('girls-edit-entry-reset-icon')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(iconChanged, isTrue);
+    expect(find.text('アプリアイコンをデフォルトに戻したよ'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
