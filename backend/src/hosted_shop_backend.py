@@ -437,6 +437,7 @@ class HostedShopBackend(HostedUserStateBackend):
             group_id,
             _item_string(app, "title"),
             zip_bytes,
+            reject_existing=True,
         )
         target_app_id = created["app_id"]
         self._link_shop_copy(
