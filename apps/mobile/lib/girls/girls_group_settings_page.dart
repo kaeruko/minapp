@@ -1,8 +1,12 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../hosted_group_management_api.dart';
 import 'api.dart';
 import 'girls_errors.dart';
+import 'girls_group_icon.dart';
 import 'hosted_girls_api.dart';
 
 const Color _ink = Color(0xFF604943);
@@ -29,12 +33,14 @@ class GirlsGroupSettingsPage extends StatefulWidget {
     required this.api,
     required this.session,
     required this.group,
+    this.onIconChanged,
     super.key,
   });
 
   final HostedGirlsApi api;
   final AuthenticatedSession session;
   final HostedGroup group;
+  final VoidCallback? onIconChanged;
 
   @override
   State<GirlsGroupSettingsPage> createState() => _GirlsGroupSettingsPageState();
@@ -46,6 +52,8 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   bool _saving = false;
+  bool _iconBusy = false;
+  int _iconRevision = 0;
   bool _removing = false;
   bool _memberActionBusy = false;
   bool _loadingMembers = false;
@@ -98,6 +106,200 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
     } finally {
       if (mounted) setState(() => _loadingMembers = false);
     }
+  }
+
+  Uri _groupIconUri() => _managementApi
+      .groupIconUri(widget.group.groupId)
+      .replace(
+        queryParameters: <String, String>{
+          'v': _iconRevision.toString(),
+        },
+      );
+
+  String _iconContentType(PlatformFile file) {
+    final String? extension = file.extension?.toLowerCase();
+    return switch (extension) {
+      'png' => 'image/png',
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'webp' => 'image/webp',
+      _ => throw const FormatException(
+          'グループアイコンはPNG・JPEG・WebPから選んでね。',
+        ),
+    };
+  }
+
+  Future<void> _changeIcon() async {
+    if (!widget.group.isOwner || _iconBusy) return;
+    final PlatformFile? file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: const <String>['png', 'jpg', 'jpeg', 'webp'],
+    );
+    if (file == null || !mounted) return;
+
+    setState(() {
+      _iconBusy = true;
+      _error = null;
+    });
+    try {
+      final Uint8List bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        throw const FormatException('空の画像はグループアイコンにできません。');
+      }
+      if (bytes.length > maxHostedGroupIconBytes) {
+        throw const FormatException('グループアイコンは192KB以下にしてね。');
+      }
+      final String contentType = _iconContentType(file);
+      await _managementApi.setGroupIcon(
+        accessToken: widget.session.accessToken,
+        groupId: widget.group.groupId,
+        bytes: bytes,
+        contentType: contentType,
+      );
+      if (!mounted) return;
+      setState(() => _iconRevision += 1);
+      widget.onIconChanged?.call();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('グループアイコンを変更したよ。')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _iconBusy = false);
+    }
+  }
+
+  Future<void> _resetIcon() async {
+    if (!widget.group.isOwner || _iconBusy) return;
+    setState(() {
+      _iconBusy = true;
+      _error = null;
+    });
+    try {
+      await _managementApi.deleteGroupIcon(
+        accessToken: widget.session.accessToken,
+        groupId: widget.group.groupId,
+      );
+      if (!mounted) return;
+      setState(() => _iconRevision += 1);
+      widget.onIconChanged?.call();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('グループアイコンをデフォルトに戻したよ。')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _iconBusy = false);
+    }
+  }
+
+  Widget _buildGroupIconCard() {
+    return Container(
+      key: const Key('girls-group-settings-icon-card'),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .9),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFF0DFE8)),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x159B6A79),
+            blurRadius: 12,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const Row(
+            children: <Widget>[
+              CircleAvatar(
+                backgroundColor: Color(0xFFFFEDF3),
+                foregroundColor: _pink,
+                child: Icon(Icons.image_rounded),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'グループアイコン',
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: Container(
+              width: 104,
+              height: 104,
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7EAF0),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 4),
+                boxShadow: const <BoxShadow>[
+                  BoxShadow(
+                    color: Color(0x22956A80),
+                    blurRadius: 8,
+                    offset: Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: GirlsGroupIcon(
+                uri: _groupIconUri(),
+                accessToken: widget.session.accessToken,
+                size: 86,
+                semanticLabel: '${widget.group.name}のグループアイコン',
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            key: const Key('girls-group-settings-change-icon'),
+            onPressed: _iconBusy ? null : _changeIcon,
+            style: FilledButton.styleFrom(
+              backgroundColor: _lavender,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+            ),
+            icon: _iconBusy
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.photo_library_rounded),
+            label: Text(
+              _iconBusy ? '保存中…' : '画像を変更',
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            key: const Key('girls-group-settings-reset-icon'),
+            onPressed: _iconBusy ? null : _resetIcon,
+            icon: const Icon(Icons.restart_alt_rounded),
+            label: const Text('デフォルトに戻す'),
+          ),
+          const Text(
+            'PNG・JPEG・WebP / 192KB以下',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF8C7893),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<bool> _confirmMemberAction({
@@ -521,6 +723,10 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
                 children: <Widget>[
+                  if (widget.group.isOwner) ...<Widget>[
+                    _buildGroupIconCard(),
+                    const SizedBox(height: 14),
+                  ],
                   if (widget.group.isOwner)
                     Container(
                       padding: const EdgeInsets.all(18),
@@ -720,7 +926,7 @@ class _GirlsGroupSettingsPageState extends State<GirlsGroupSettingsPage> {
                       Expanded(
                         child: Text(
                           widget.group.isOwner
-                              ? 'グループ名を変更できるのはオーナーだけです。'
+                              ? 'グループ名とアイコンを変更できるのはオーナーだけです。'
                               : 'このグループにはメンバーとして参加しています。',
                           style: const TextStyle(
                             color: Color(0xFF75645F),
