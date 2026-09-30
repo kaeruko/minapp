@@ -3,6 +3,9 @@
 if (typeof apiRequest !== "function" || typeof loadDashboard !== "function" || typeof teacherGroups !== "function") {
   throw new Error("Teacher dashboard requires app.js to load first.");
 }
+if (typeof MinAppGroupManagement !== "object" || MinAppGroupManagement === null) {
+  throw new Error("Teacher dashboard requires group_management.js.");
+}
 if (typeof phase2ValidateApp !== "function") {
   throw new Error("Teacher dashboard requires phase2.js to load first.");
 }
@@ -255,6 +258,11 @@ const teacherPortalState = {
   previewCanApprove: false,
 };
 
+const teacherGroupSelection = MinAppGroupManagement.createSelectionModel({
+  getId: (group) => group.group_id,
+  getName: (group) => group.name,
+});
+
 function teacherPortalSetError(element, message) {
   if (message === null) {
     element.textContent = "";
@@ -276,10 +284,7 @@ function teacherPortalHandleError(error, element = teacherPortalGlobalError) {
 }
 
 function teacherPortalActiveGroup() {
-  if (teacherPortalState.selectedGroupId === null) return null;
-  const group = teacherGroups().find((item) => item.group_id === teacherPortalState.selectedGroupId);
-  if (group === undefined) throw new Error("Selected teacher group is no longer available.");
-  return group;
+  return teacherGroupSelection.active();
 }
 
 function teacherPortalFormatDate(value, includeTime = false) {
@@ -325,23 +330,12 @@ function teacherPortalValidateMember(member) {
 }
 
 function teacherPortalSetGroups() {
-  const groups = teacherGroups();
-  const previous = teacherPortalState.selectedGroupId;
-  teacherPortalClassSelect.replaceChildren();
-  for (const group of groups) {
-    const option = document.createElement("option");
-    option.value = group.group_id;
-    option.textContent = group.name;
-    teacherPortalClassSelect.append(option);
-  }
-  teacherPortalClassSelect.disabled = groups.length === 0;
-  if (groups.length === 0) {
-    teacherPortalState.selectedGroupId = null;
-    return;
-  }
-  const selected = groups.some((group) => group.group_id === previous) ? previous : groups[0].group_id;
-  teacherPortalState.selectedGroupId = selected;
-  teacherPortalClassSelect.value = selected;
+  teacherGroupSelection.setGroups(
+    teacherGroups(),
+    teacherPortalState.selectedGroupId,
+  );
+  teacherGroupSelection.populateSelect(teacherPortalClassSelect);
+  teacherPortalState.selectedGroupId = teacherGroupSelection.selectedId;
 }
 
 function teacherPortalUpdateIdentity() {
@@ -479,26 +473,22 @@ function teacherPortalRenderPublishedApps() {
 }
 
 function teacherPortalRenderMembers() {
-  teacherPortalMembersList.replaceChildren();
   if (teacherPortalState.members.length === 0) {
+    teacherPortalMembersList.replaceChildren();
     show(teacherPortalMembersEmpty);
     return;
   }
   hide(teacherPortalMembersEmpty);
-  for (const member of teacherPortalState.members) {
-    const row = document.createElement("article");
-    row.className = "teacher-member-row";
-    const identity = document.createElement("div");
-    const name = document.createElement("strong");
-    name.textContent = member.login_id;
-    const role = document.createElement("span");
-    role.textContent = member.role === "teacher" ? "先生" : "生徒";
-    identity.append(name, role);
-    row.append(identity);
+  MinAppGroupManagement.renderMemberList({
+    container: teacherPortalMembersList,
+    members: teacherPortalState.members,
+    getLabel: (member) => member.login_id,
+    getRoleLabel: (member) => member.role === "teacher" ? "先生" : "生徒",
+    rowClass: "teacher-member-row",
+    actionsClass: "teacher-member-actions",
+    createActions: (member) => {
+      if (member.role !== "student") return [];
 
-    if (member.role === "student") {
-      const actions = document.createElement("div");
-      actions.className = "teacher-member-actions";
       const reset = document.createElement("button");
       reset.type = "button";
       reset.className = "teacher-secondary-button teacher-small-button";
@@ -507,7 +497,11 @@ function teacherPortalRenderMembers() {
         teacherPortalSetError(teacherPortalGlobalError, null);
         reset.disabled = true;
         try {
-          const payload = await apiRequest(`/users/${member.user_id}/reset-password`, { method: "POST", authenticated: true, body: {} });
+          const payload = await apiRequest(`/users/${member.user_id}/reset-password`, {
+            method: "POST",
+            authenticated: true,
+            body: {},
+          });
           teacherPortalShowCredentials(payload.login_id, payload.temporary_password);
         } catch (error) {
           teacherPortalHandleError(error);
@@ -515,6 +509,7 @@ function teacherPortalRenderMembers() {
           reset.disabled = false;
         }
       });
+
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "teacher-danger-button teacher-small-button";
@@ -525,7 +520,10 @@ function teacherPortalRenderMembers() {
         if (!window.confirm(`${member.login_id} を ${group.name} から外しますか？`)) return;
         remove.disabled = true;
         try {
-          await apiRequest(`/groups/${group.group_id}/members/${member.user_id}`, { method: "DELETE", authenticated: true });
+          await apiRequest(`/groups/${group.group_id}/members/${member.user_id}`, {
+            method: "DELETE",
+            authenticated: true,
+          });
           await teacherPortalRefreshGroupData();
         } catch (error) {
           teacherPortalHandleError(error);
@@ -533,13 +531,10 @@ function teacherPortalRenderMembers() {
           remove.disabled = false;
         }
       });
-      actions.append(reset, remove);
-      row.append(actions);
-    }
-    teacherPortalMembersList.append(row);
-  }
+      return [reset, remove];
+    },
+  });
 }
-
 function teacherPortalShowCredentials(loginId, temporaryPassword) {
   if (typeof loginId !== "string" || loginId.length === 0 || typeof temporaryPassword !== "string" || temporaryPassword.length === 0) {
     throw new Error("Credential response is missing ID or temporary password.");
@@ -697,7 +692,8 @@ for (const navItem of teacherPortalRoot.querySelectorAll("[data-teacher-view]"))
 }
 
 teacherPortalClassSelect.addEventListener("change", async () => {
-  teacherPortalState.selectedGroupId = teacherPortalClassSelect.value;
+  teacherGroupSelection.select(teacherPortalClassSelect.value);
+  teacherPortalState.selectedGroupId = teacherGroupSelection.selectedId;
   hide(teacherPortalIssuedCredentials);
   try {
     await teacherPortalRefreshGroupData();
@@ -718,9 +714,14 @@ teacherPortalMobileMenu.addEventListener("click", () => {
 teacherPortalCreateGroupForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   teacherPortalSetError(teacherPortalCreateGroupError, null);
-  const name = teacherPortalGroupName.value;
-  if (name !== name.trim() || name.length < 1 || name.length > 60) {
-    teacherPortalSetError(teacherPortalCreateGroupError, "クラス名は前後に空白を入れず、1〜60文字で入力してください。");
+  let name;
+  try {
+    name = MinAppGroupManagement.validateGroupName(teacherPortalGroupName.value, 60);
+  } catch (error) {
+    teacherPortalSetError(
+      teacherPortalCreateGroupError,
+      error instanceof Error ? error.message.replace("グループ名", "クラス名") : String(error),
+    );
     return;
   }
   const button = teacherPortalCreateGroupForm.querySelector("button[type='submit']");
