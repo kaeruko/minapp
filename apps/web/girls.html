@@ -12,8 +12,10 @@
     <script src="/single_html_zip.js" defer></script>
     <script src="/authoring_host_adapter.js" defer></script>
     <script src="/hosted_authoring_portal.js" defer></script>
+    <script src="/group_management.js" defer></script>
     <script src="/girls_portal.js" defer></script>
     <script src="/girls_portal_shell.js" defer></script>
+    <script src="/girls_groups.js" defer></script>
     <script src="/girls_authoring_portal.js" defer></script>
     <script src="/girls_footer.js" defer></script>
   </head>
@@ -110,6 +112,9 @@
           <button class="portal-shell-nav-item portal-shell-nav-item-active" type="button" data-girls-view="home" aria-current="page">
             <span class="portal-shell-nav-icon" aria-hidden="true">⌂</span><span>ホーム</span>
           </button>
+          <button class="portal-shell-nav-item" type="button" data-girls-view="groups">
+            <span class="portal-shell-nav-icon" aria-hidden="true">♟</span><span>グループ</span>
+          </button>
           <button class="portal-shell-nav-item" type="button" data-girls-view="add">
             <span class="portal-shell-nav-icon" aria-hidden="true">＋</span><span>アプリを追加</span>
           </button>
@@ -186,6 +191,67 @@
               <div class="girls-group-summary">
                 <span>追加先</span>
                 <strong id="girls-home-group-summary">グループを確認中…</strong>
+              </div>
+            </section>
+          </section>
+
+          <section id="girls-view-groups" class="girls-view-panel girls-view-hidden" data-girls-panel="groups">
+            <section class="girls-dashboard-card">
+              <div class="girls-section-heading girls-apps-heading">
+                <div><p class="girls-step">GROUPS</p><h2>グループ</h2></div>
+                <button id="girls-groups-refresh" class="girls-secondary" type="button">更新</button>
+              </div>
+              <p class="girls-muted">アプリ版と同じグループをここでも管理できます。作成・参加しても「いまのグループ」は自動では変わりません。</p>
+              <div class="girls-group-actions">
+                <form id="girls-group-create-form" class="girls-group-action-card">
+                  <h3>グループを作る</h3>
+                  <label>グループ名<input id="girls-group-name" maxlength="60" placeholder="例：女子会アプリ開発部" required /></label>
+                  <button class="girls-primary" type="submit">作る</button>
+                </form>
+                <form id="girls-group-join-form" class="girls-group-action-card">
+                  <h3>グループに参加</h3>
+                  <label>グループID<input id="girls-group-code" maxlength="20" placeholder="XXXX-XXXX-XXXX" autocomplete="off" required /></label>
+                  <button class="girls-primary" type="submit">参加する</button>
+                </form>
+              </div>
+              <p id="girls-groups-error" class="girls-message girls-message-error hidden" role="alert"></p>
+              <p id="girls-groups-status" class="girls-muted" role="status">グループを読み込み中…</p>
+              <div id="girls-group-list" class="girls-group-list" aria-live="polite"></div>
+            </section>
+
+            <section id="girls-group-detail" class="girls-dashboard-card hidden" aria-labelledby="girls-group-detail-title">
+              <div class="girls-section-heading girls-apps-heading">
+                <div><p class="girls-step">GROUP DETAIL</p><h2 id="girls-group-detail-title"></h2></div>
+                <span id="girls-group-role" class="girls-group-role"></span>
+              </div>
+              <div class="girls-group-detail-grid">
+                <section class="girls-group-detail-section">
+                  <h3>メンバー</h3>
+                  <div id="girls-group-members" class="girls-group-members"></div>
+                </section>
+                <section id="girls-group-owner-tools" class="girls-group-detail-section hidden">
+                  <h3>オーナー管理</h3>
+                  <form id="girls-group-rename-form" class="girls-form">
+                    <label>グループ名<input id="girls-group-rename" maxlength="60" required /></label>
+                    <button class="girls-secondary" type="submit">名前を変更</button>
+                  </form>
+                  <div class="girls-group-invite">
+                    <button id="girls-group-invite-create" class="girls-secondary" type="button">招待コードを表示</button>
+                    <strong id="girls-group-invite-code"></strong>
+                    <button id="girls-group-invite-copy" class="girls-secondary hidden" type="button">コピー</button>
+                    <button id="girls-group-invite-revoke" class="girls-secondary hidden" type="button">招待コードを無効化</button>
+                  </div>
+                  <label class="girls-group-icon-field">グループアイコン
+                    <input id="girls-group-icon-file" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" />
+                  </label>
+                  <div class="girls-group-inline-actions">
+                    <button id="girls-group-icon-reset" class="girls-secondary" type="button">アイコンをデフォルトに戻す</button>
+                    <button id="girls-group-transfer-owner" class="girls-secondary" type="button">オーナーを変更</button>
+                  </div>
+                </section>
+              </div>
+              <div class="girls-group-danger">
+                <button id="girls-group-remove" class="girls-danger" type="button"></button>
               </div>
             </section>
           </section>
@@ -299,7 +365,7 @@
                 <div class="girls-settings-row"><span>ID</span><strong id="girls-settings-login-id"></strong></div>
                 <div class="girls-settings-row"><span>追加できるグループ</span><strong id="girls-settings-groups">確認中…</strong></div>
               </div>
-              <p class="girls-note">グループの作成・参加やプロフィールの変更は、みんアプ Girlsアプリからできます。</p>
+              <p class="girls-note">グループの作成・参加・メンバー管理は、このWebポータルの「グループ」からもできます。</p>
               <button id="girls-settings-logout" class="girls-secondary girls-settings-logout" type="button">ログアウト</button>
             </section>
           </section>
