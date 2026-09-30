@@ -141,13 +141,17 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       final List<HostedGroup> groups = await widget.api.listGroups(
         widget.session.accessToken,
       );
-      final String? storedGroupId = await widget.currentGroupStore.load();
-      final String? preferredGroupId = _currentGroup?.groupId ?? storedGroupId;
+      final String? suppliedGroupId = _currentGroup?.groupId;
+      final String? storedGroupId = suppliedGroupId == null
+          ? await widget.currentGroupStore.load()
+          : null;
       final HostedGroup? currentGroup = resolveGirlsCurrentGroup(
         groups,
-        storedGroupId: preferredGroupId,
+        storedGroupId: suppliedGroupId ?? storedGroupId,
       );
-      if (currentGroup != null && storedGroupId != currentGroup.groupId) {
+      if (suppliedGroupId == null &&
+          currentGroup != null &&
+          storedGroupId != currentGroup.groupId) {
         await widget.currentGroupStore.save(currentGroup.groupId);
       }
 
@@ -171,12 +175,13 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       }
 
       if (!mounted) return;
+      final String? previousGroupId = _currentGroup?.groupId;
       setState(() {
         _groups = groups;
         _currentGroup = currentGroup;
         _mascotPrompt = mascotPrompt;
       });
-      if (_currentGroup?.groupId != currentGroup?.groupId) {
+      if (previousGroupId != currentGroup?.groupId) {
         widget.onCurrentGroupChanged?.call(currentGroup);
       }
     } catch (error) {
