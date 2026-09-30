@@ -51,6 +51,7 @@ locals {
     "POST /shop/apps/{app_id}/launch",
     "POST /shop/apps/{app_id}/download",
     "POST /shop/apps/{app_id}/add",
+    "POST /shop/apps/{app_id}/sync-thumbnail",
     "POST /shop/apps/{app_id}/reports",
     "PUT /apps/{app_id}/shop-visibility",
   ])
