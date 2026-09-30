@@ -708,3 +708,163 @@ button:disabled {
     font-size: 0.68rem;
   }
 }
+
+
+/* Shared group-management feature skin */
+.girls-group-actions,
+.girls-group-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.girls-group-action-card,
+.girls-group-detail-section,
+.girls-group-card {
+  padding: 18px;
+  border: 1px solid #ead9e8;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.girls-group-action-card {
+  display: grid;
+  gap: 12px;
+}
+
+.girls-group-action-card label,
+.girls-group-icon-field {
+  display: grid;
+  gap: 7px;
+  color: #6f5954;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.girls-group-action-card input,
+#girls-group-rename,
+.girls-group-icon-field input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #d9c6d5;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.girls-group-list,
+.girls-group-members {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.girls-group-card-current {
+  border-color: #b99acb;
+  box-shadow: inset 4px 0 0 #9b72b7;
+}
+
+.girls-group-card-heading,
+.girls-group-card-actions,
+.girls-group-inline-actions,
+.girls-group-member-row,
+.girls-group-member-actions,
+.girls-group-invite {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.girls-group-card-heading,
+.girls-group-member-row {
+  justify-content: space-between;
+}
+
+.girls-group-card-heading h3,
+.girls-group-detail-section h3 {
+  margin: 0;
+}
+
+.girls-group-card-actions,
+.girls-group-inline-actions,
+.girls-group-invite {
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.girls-group-role {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f3e9f8;
+  color: #76558d;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.girls-group-member-row {
+  padding: 12px 14px;
+  border: 1px solid #eee0e8;
+  border-radius: 15px;
+  background: #fffbfd;
+}
+
+.girls-group-member-row > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.girls-group-member-row span {
+  color: #90777f;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.girls-group-small-action {
+  min-height: 34px;
+  padding: 6px 11px;
+}
+
+.girls-group-danger {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #efd3da;
+}
+
+.girls-danger {
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid #e4aab6;
+  border-radius: 12px;
+  background: #fff4f6;
+  color: #a43f54;
+  font: inherit;
+  font-weight: 900;
+}
+
+#girls-group-invite-code {
+  color: #684d73;
+  letter-spacing: 0.08em;
+}
+
+@media (max-width: 720px) {
+  .girls-group-actions,
+  .girls-group-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .girls-group-card-actions,
+  .girls-group-inline-actions,
+  .girls-group-invite {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .girls-group-card-actions > button,
+  .girls-group-inline-actions > button,
+  .girls-group-invite > button {
+    width: 100%;
+  }
+}
