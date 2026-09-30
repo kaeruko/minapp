@@ -12,7 +12,7 @@ from aws_backend import _item_string, _string_attr
 from errors import ApiProblem
 from hosted_catalog_backend import _item_files, _optional_number, _optional_string
 from hosted_platform_backend import _now_iso, _number_attr
-from hosted_thumbnail import thumbnail_from_app
+from hosted_thumbnail import set_thumbnail, thumbnail_from_app
 from hosted_upload import create_uploaded_app
 from hosted_user_state_backend import HostedUserStateBackend
 
@@ -379,13 +379,23 @@ class HostedShopBackend(HostedUserStateBackend):
         )
         if actual_files != expected_files:
             raise RuntimeError("Shop ZIP manifest does not match published metadata")
-        return create_uploaded_app(
+        created = create_uploaded_app(
             self,
             auth_subject,
             group_id,
             _item_string(app, "title"),
             zip_bytes,
         )
+        if app.get("thumbnail_bytes") is not None:
+            thumbnail_bytes, thumbnail_content_type = thumbnail_from_app(app)
+            set_thumbnail(
+                self,
+                auth_subject,
+                created["app_id"],
+                data=thumbnail_bytes,
+                content_type=thumbnail_content_type,
+            )
+        return created
 
     def create_shop_report(
         self,
