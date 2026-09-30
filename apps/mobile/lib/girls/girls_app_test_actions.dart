@@ -147,7 +147,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
     }
 
     int latestRevision = sourceRevision;
-    bool renamed = false;
+    bool metadataChanged = false;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) => GirlsAppEditEntryPage(
@@ -157,16 +157,20 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
           appId: app.app.appId,
           title: app.app.title,
           expectedRevision: sourceRevision,
+          shopSourceAppId: app.app.shopSourceAppId,
           onSaved: (int revision) async {
             latestRevision = revision;
           },
           onRenamed: () async {
-            renamed = true;
+            metadataChanged = true;
+          },
+          onIconChanged: () async {
+            metadataChanged = true;
           },
         ),
       ),
     );
-    if (mounted && (latestRevision != sourceRevision || renamed)) {
+    if (mounted && (latestRevision != sourceRevision || metadataChanged)) {
       await widget.onSourceSaved(latestRevision);
     }
   }
