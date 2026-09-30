@@ -362,7 +362,16 @@ class HostedAppManagementApi {
       },
       body: bytes,
     );
-    final Map<String, Object?> payload = _decodeJsonResponse(response);
+    Map<String, Object?> payload;
+    try {
+      payload = _decodeJsonResponse(response);
+    } catch (error) {
+      throw FormatException(
+        'App thumbnail upload returned an invalid response '
+        '(HTTP ${response.statusCode}, body=${response.body}). '
+        'Original error: $error',
+      );
+    }
     final Set<String> actual = payload.keys.toSet();
     const Set<String> expected = <String>{
       'app_id',
