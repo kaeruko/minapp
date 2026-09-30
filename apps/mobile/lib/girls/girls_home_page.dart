@@ -483,6 +483,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         emptyBody: '「新しくつくる」から物語を作ってみよう。',
         projectTitle: _novelProjectTitle,
         initialContentId: copied.contentId,
+        hiddenContentIds: <String>{source.contentId},
       );
       debugPrint('Girls work copy: DONE $stage');
       if (mounted) await _loadGroups();
