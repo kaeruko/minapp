@@ -21,7 +21,10 @@ test("production portal publisher includes every Web Authoring asset referenced 
   ];
 
   for (const asset of assets) {
-    assert.match(html, new RegExp(`(?:href|src)=\"/${asset.replaceAll(".", "\\.")}\"`));
+    assert.match(
+      html,
+      new RegExp(`(?:href|src)=\"/${asset.replaceAll(".", "\\.")}(?:\\?[^\"]+)?\"`),
+    );
     assert.match(publisher, new RegExp(`\"${asset.replaceAll(".", "\\.")}\"`));
   }
 
