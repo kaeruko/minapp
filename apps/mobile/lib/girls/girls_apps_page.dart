@@ -258,6 +258,12 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
       final HostedGroupApp editor = await _builtinInstallApi.ensureNovelEditor(
         accessToken: widget.session.accessToken,
         groupId: group.groupId,
+        includeSample: false,
+      );
+      final HostedAuthoringProjectSummary sample =
+          await _builtinInstallApi.ensureNovelSampleProject(
+        accessToken: widget.session.accessToken,
+        groupId: group.groupId,
       );
       if (!mounted) return;
       setState(() => _busy = false);
@@ -275,6 +281,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
         emptyTitle: 'まだノベル作品がありません',
         emptyBody: '「新しくつくる」から物語を作ってみよう。',
         projectTitle: _novelProjectTitle,
+        hiddenContentIds: <String>{sample.contentId},
       );
       if (mounted) await _load();
     } catch (error) {
