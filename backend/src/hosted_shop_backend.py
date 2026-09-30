@@ -15,6 +15,7 @@ from hosted_platform_backend import _now_iso, _number_attr
 from hosted_thumbnail import set_thumbnail, thumbnail_from_app
 from hosted_upload import create_uploaded_app
 from hosted_user_state_backend import HostedUserStateBackend
+from zip_upload_normalization import normalize_uploaded_zip
 
 SHOP_CONTENT_SESSION_SECONDS = 10 * 60
 SHOP_CONTENT_TTL_GRACE_SECONDS = 24 * 60 * 60
@@ -396,6 +397,73 @@ class HostedShopBackend(HostedUserStateBackend):
                 content_type=thumbnail_content_type,
             )
         return created
+
+    def sync_shop_thumbnail_to_group_app(
+        self,
+        auth_subject: str,
+        app_id: str,
+        version: str,
+        group_id: str,
+        target_app_id: str,
+    ) -> dict[str, Any]:
+        user = self._user_by_auth_subject(auth_subject)
+        self._require_active_membership(user.user_id, group_id)
+
+        shop_app = self._current_shop_app(app_id)
+        self._assert_version(shop_app, version)
+        target = self._require_app_in_group(target_app_id, group_id)
+        self._require_not_deleting(target)
+
+        if _optional_string(target, "source_kind") != "upload":
+            raise ApiProblem(
+                409,
+                "shop_copy_not_editable_upload",
+                "このアプリはショップから追加した編集可能コピーとして確認できません。",
+            )
+        if target.get("editable", {}).get("BOOL") is not True:
+            raise ApiProblem(
+                409,
+                "shop_copy_not_editable_upload",
+                "このアプリはショップから追加した編集可能コピーとして確認できません。",
+            )
+        if _item_string(target, "owner_user_id") != user.user_id:
+            raise ApiProblem(403, "forbidden", "このアプリのアイコンを変更する権限がありません。")
+        if _item_string(target, "title") != _item_string(shop_app, "title"):
+            raise ApiProblem(
+                409,
+                "shop_copy_title_changed",
+                "ショップ作品と既存アプリの名前が一致しないため、アイコン同期を中止しました。",
+            )
+
+        expected_files = _item_files(shop_app, "published_files_json")
+        zip_bytes, actual_files, _ = self._read_zip_object(
+            bucket=self._published_bucket,
+            key=_item_string(shop_app, "published_key"),
+            expected_sha256=_item_string(shop_app, "published_sha256"),
+        )
+        if actual_files != expected_files:
+            raise RuntimeError("Shop ZIP manifest does not match published metadata")
+        normalized_zip, _ = normalize_uploaded_zip(zip_bytes)
+        shop_source_sha256 = hashlib.sha256(normalized_zip).hexdigest()
+        target_source_sha256 = _optional_string(target, "source_sha256")
+        if target_source_sha256 != shop_source_sha256:
+            raise ApiProblem(
+                409,
+                "shop_copy_source_changed",
+                "既存アプリの内容がショップ作品と異なるため、アイコンだけを自動同期できません。",
+            )
+
+        thumbnail_bytes, thumbnail_content_type = thumbnail_from_app(shop_app)
+        synced = set_thumbnail(
+            self,
+            auth_subject,
+            target_app_id,
+            data=thumbnail_bytes,
+            content_type=thumbnail_content_type,
+        )
+        if synced["app_id"] != target_app_id:
+            raise RuntimeError("Thumbnail sync changed the target app scope")
+        return synced
 
     def create_shop_report(
         self,
