@@ -158,6 +158,7 @@ class _GirlsAppTestActionsState extends State<GirlsAppTestActions> {
           title: app.app.title,
           expectedRevision: sourceRevision,
           shopSourceAppId: app.app.shopSourceAppId,
+          builtinId: app.app.builtinId,
           onSaved: (int revision) async {
             latestRevision = revision;
           },
