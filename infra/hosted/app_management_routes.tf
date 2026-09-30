@@ -3,6 +3,7 @@ locals {
     "GET /hosted/my/apps",
     "GET /hosted/my/apps/{app_id}",
     "PATCH /hosted/my/apps/{app_id}",
+    "DELETE /hosted/my/apps/{app_id}/thumbnail",
     "GET /hosted/my/apps/{app_id}/thumbnail",
     "POST /hosted/my/apps/{app_id}/preview-session",
     "POST /hosted/my/apps/{app_id}/preview-runtime-session",
