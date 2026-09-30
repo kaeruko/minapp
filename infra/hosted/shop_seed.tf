@@ -48,6 +48,49 @@ locals {
       files        = ["index.html"]
       published_at = "2026-09-26T00:00:00Z"
     }
+    omiai-nekosan = {
+      app_id     = "b869eb90c85d8e7c007c0b118a0eaa68"
+      title      = "おみあい ねこさん"
+      version    = 1
+      source_dir = "${local.minapp_apps_source_root}/omiai_nekosan"
+      files = [
+        "accessories.png",
+        "accessories/back_bat_wings_purple.png",
+        "accessories/back_butterfly_lavender.png",
+        "accessories/back_wings_white.png",
+        "accessories/face_glasses_round_pink.png",
+        "accessories/head_beret_pink.png",
+        "accessories/head_cat_ear_headband_white.png",
+        "accessories/head_crown_gold.png",
+        "accessories/head_flower_sakura.png",
+        "accessories/head_flower_white.png",
+        "accessories/head_moon_star.png",
+        "accessories/head_party_hat_pink.png",
+        "accessories/head_ribbon_cat_pink.png",
+        "accessories/head_ribbon_lavender.png",
+        "accessories/head_ribbon_pink.png",
+        "accessories/head_ribbon_star_lavender.png",
+        "accessories/item_fish_blue.png",
+        "accessories/neck_bow_bell_pink.png",
+        "accessories/neck_collar_bell_pink.png",
+        "accessories/neck_collar_heart_lavender.png",
+        "accessories/neck_collar_lace_pink.png",
+        "characters/partner_bear.png",
+        "characters/partner_fawn.png",
+        "characters/partner_rabbit.png",
+        "characters/partner_squirrel.png",
+        "index.html",
+        "walk_01.png",
+        "walk_02.png",
+        "walk_03.png",
+        "walk_04.png",
+        "walk_05.png",
+        "walk_06.png",
+        "walk_07.png",
+        "walk_08.png",
+      ]
+      published_at = "2026-09-30T10:58:00Z"
+    }
   }
 
   official_shop_icons = {
