@@ -25,7 +25,9 @@ _LOGGER = logging.getLogger(__name__)
 _BACKEND: HostedGirlsShopBackend | None = None
 _ID_RE = r"([0-9a-f]{32})"
 _GROUP_SETTINGS_RE = re.compile(rf"^/hosted/groups/{_ID_RE}$")
-_SHOP_ACTION_RE = re.compile(rf"^/shop/apps/{_ID_RE}/(launch|download|add|reports)$")
+_SHOP_ACTION_RE = re.compile(
+    rf"^/shop/apps/{_ID_RE}/(launch|download|add|sync-thumbnail|reports)$"
+)
 _SHOP_THUMBNAIL_RE = re.compile(rf"^/shop/apps/{_ID_RE}/thumbnail$")
 _SHOP_VISIBILITY_RE = re.compile(rf"^/apps/{_ID_RE}/shop-visibility$")
 _SHOP_CONTENT_RE = re.compile(r"^/shop/content/([A-Za-z0-9_-]{32,128})/(.+)$")
@@ -182,6 +184,40 @@ def _handle_shop_request(event: dict[str, Any]) -> dict[str, Any] | None:
                     app_id,
                     _version(payload),
                     group_id,
+                ),
+            )
+        if action == "sync-thumbnail":
+            _require_fields(
+                payload,
+                required={"version", "group_id", "target_app_id"},
+            )
+            group_id = _required_string(payload, "group_id", min_length=1, max_length=64)
+            target_app_id = _required_string(
+                payload,
+                "target_app_id",
+                min_length=1,
+                max_length=64,
+            )
+            if re.fullmatch(r"[0-9a-f]{32}", group_id) is None:
+                raise ApiProblem(
+                    400,
+                    "invalid_group_id",
+                    "group_id must be a 32-character lowercase hexadecimal ID.",
+                )
+            if re.fullmatch(r"[0-9a-f]{32}", target_app_id) is None:
+                raise ApiProblem(
+                    400,
+                    "invalid_app_id",
+                    "target_app_id must be a 32-character lowercase hexadecimal ID.",
+                )
+            return _json_response(
+                200,
+                backend.sync_shop_thumbnail_to_group_app(
+                    _auth_subject(event),
+                    app_id,
+                    _version(payload),
+                    group_id,
+                    target_app_id,
                 ),
             )
         if action == "reports":
