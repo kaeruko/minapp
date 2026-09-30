@@ -29,6 +29,20 @@ test("selection model preserves a still-valid selection", () => {
   assert.equal(model.active().name, "B2");
 });
 
+test("selection model can preserve no current group without falling back", () => {
+  const model = createSelectionModel({
+    getId: (group) => group.id,
+    getName: (group) => group.name,
+  });
+  model.setGroups([{ id: "a", name: "A" }], null, { fallbackToFirst: false });
+  assert.equal(model.selectedId, null);
+  assert.equal(model.active(), null);
+
+  model.select("a");
+  model.setGroups([{ id: "b", name: "B" }], "a", { fallbackToFirst: false });
+  assert.equal(model.selectedId, null);
+});
+
 test("selection model fails instead of accepting an unknown selection", () => {
   const model = createSelectionModel({
     getId: (group) => group.id,
