@@ -129,6 +129,56 @@
     });
   }
 
+  function renderMemberList({
+    container,
+    members,
+    getLabel,
+    getRoleLabel,
+    rowClass,
+    actionsClass,
+    createActions,
+  }) {
+    if (container === null || typeof container !== "object" || typeof container.replaceChildren !== "function") {
+      throw new TypeError("container must support replaceChildren.");
+    }
+    if (!Array.isArray(members)) throw new TypeError("members must be an array.");
+    requireFunction(getLabel, "getLabel");
+    requireFunction(getRoleLabel, "getRoleLabel");
+    requireFunction(createActions, "createActions");
+    if (typeof rowClass !== "string" || rowClass.length === 0) throw new TypeError("rowClass must be a non-empty string.");
+    if (typeof actionsClass !== "string" || actionsClass.length === 0) throw new TypeError("actionsClass must be a non-empty string.");
+
+    container.replaceChildren();
+    for (const member of members) {
+      const row = document.createElement("article");
+      row.className = rowClass;
+      const identity = document.createElement("div");
+      const name = document.createElement("strong");
+      const label = getLabel(member);
+      const roleLabel = getRoleLabel(member);
+      if (typeof label !== "string" || label.length === 0) throw new Error("Member label must be a non-empty string.");
+      if (typeof roleLabel !== "string" || roleLabel.length === 0) throw new Error("Member role label must be a non-empty string.");
+      name.textContent = label;
+      const role = document.createElement("span");
+      role.textContent = roleLabel;
+      identity.append(name, role);
+      row.append(identity);
+
+      const actionNodes = createActions(member);
+      if (!Array.isArray(actionNodes)) throw new TypeError("createActions must return an array.");
+      if (actionNodes.length > 0) {
+        const actions = document.createElement("div");
+        actions.className = actionsClass;
+        for (const node of actionNodes) {
+          if (!(node instanceof Node)) throw new TypeError("Member action must be a DOM Node.");
+          actions.append(node);
+        }
+        row.append(actions);
+      }
+      container.append(row);
+    }
+  }
+
   return Object.freeze({
     HOSTED_ID_PATTERN,
     INVITE_CODE_PATTERN,
@@ -136,5 +186,6 @@
     validateHostedId,
     normalizeInviteCode,
     createSelectionModel,
+    renderMemberList,
   });
 });
