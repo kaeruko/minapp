@@ -121,3 +121,16 @@ def get_thumbnail(
 ) -> tuple[bytes, str]:
     _, app = _author_editable_app(backend, auth_subject, app_id)
     return thumbnail_from_app(app)
+
+def get_group_thumbnail(
+    backend: Any,
+    auth_subject: str,
+    group_id: str,
+    app_id: str,
+) -> tuple[bytes, str]:
+    user = backend._user_by_auth_subject(auth_subject)
+    backend._require_active_membership(user.user_id, group_id)
+    app = backend._require_app_in_group(app_id, group_id)
+    backend._require_not_deleting(app)
+    return thumbnail_from_app(app)
+
