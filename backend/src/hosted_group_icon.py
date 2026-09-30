@@ -104,18 +104,17 @@ def delete_group_icon(
     group_id: str,
 ) -> None:
     owner = backend._user_by_auth_subject(auth_subject)
-    backend._require_owner_group(owner.user_id, group_id)
+    group = backend._require_owner_group(owner.user_id, group_id)
+    replacement = dict(group)
+    for field in _GROUP_ICON_FIELDS:
+        replacement.pop(field, None)
     backend._dynamodb.transact_write_items(
         TransactItems=[
             {
-                "Update": {
+                "Put": {
                     "TableName": backend._table_name,
-                    "Key": {
-                        "pk": _string_attr(f"GROUP#{group_id}"),
-                        "sk": _string_attr("META"),
-                    },
-                    "UpdateExpression": "REMOVE " + ", ".join(_GROUP_ICON_FIELDS),
-                    "ConditionExpression": "attribute_exists(pk) AND attribute_exists(sk)",
+                    "Item": replacement,
+                    "ConditionExpression": "attribute_exists(pk)",
                 }
             }
         ]
