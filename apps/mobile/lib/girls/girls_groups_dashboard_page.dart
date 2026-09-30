@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'api.dart';
 import 'girls_errors.dart';
 import 'girls_group_home_page.dart';
+import 'girls_app_thumbnail.dart';
 import 'girls_builtin_install_api.dart';
 import 'girls_current_group_store.dart';
 import 'girls_group_settings_page.dart';
@@ -474,6 +475,8 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
                 group: current,
                 members: _members,
                 latestApps: _latestApps,
+                apiBaseUri: widget.api.baseUri,
+                accessToken: widget.session.accessToken,
                 loading: _busy,
                 launchingAppId: _launchingAppId,
                 onLaunchApp: (HostedGroupApp app) =>
@@ -538,6 +541,8 @@ class _CurrentGroupCard extends StatelessWidget {
     required this.group,
     required this.members,
     required this.latestApps,
+    required this.apiBaseUri,
+    required this.accessToken,
     required this.loading,
     required this.launchingAppId,
     required this.onLaunchApp,
@@ -548,6 +553,8 @@ class _CurrentGroupCard extends StatelessWidget {
   final HostedGroup group;
   final List<HostedMember>? members;
   final List<HostedGroupApp>? latestApps;
+  final Uri apiBaseUri;
+  final String accessToken;
   final bool loading;
   final String? launchingAppId;
   final ValueChanged<HostedGroupApp> onLaunchApp;
@@ -629,6 +636,10 @@ class _CurrentGroupCard extends StatelessWidget {
                           (HostedGroupApp app) => Expanded(
                             child: _LatestAppItem(
                               app: app,
+                              thumbnailUri: apiBaseUri.resolve(
+                                '/hosted/groups/${group.groupId}/apps/${app.appId}/thumbnail',
+                              ),
+                              accessToken: accessToken,
                               loading: launchingAppId == app.appId,
                               onTap: () => onLaunchApp(app),
                             ),
@@ -940,11 +951,15 @@ class _GroupPicture extends StatelessWidget {
 class _LatestAppItem extends StatelessWidget {
   const _LatestAppItem({
     required this.app,
+    required this.thumbnailUri,
+    required this.accessToken,
     required this.loading,
     required this.onTap,
   });
 
   final HostedGroupApp app;
+  final Uri thumbnailUri;
+  final String accessToken;
   final bool loading;
   final VoidCallback onTap;
 
@@ -971,7 +986,14 @@ class _LatestAppItem extends StatelessWidget {
                     ),
                   )
                 else
-                  _AppPicture(app: app),
+                  GirlsAppThumbnail(
+                    uri: thumbnailUri,
+                    accessToken: accessToken,
+                    size: 64,
+                    radius: 16,
+                    semanticLabel: app.title,
+                    fallback: _AppPicture(app: app),
+                  ),
                 const SizedBox(height: 5),
                 Text(
                   app.title,
