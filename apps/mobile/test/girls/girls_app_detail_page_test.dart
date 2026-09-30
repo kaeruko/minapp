@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:minapp_mobile/girls/api.dart';
 import 'package:minapp_mobile/girls/girls_apps_page.dart';
+import 'package:minapp_mobile/girls/girls_app_edit_entry_page.dart';
 import 'package:minapp_mobile/girls/girls_source_zip.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
@@ -311,7 +312,7 @@ void main() {
 
     await tester.pageBack();
     await tester.pumpAndSettle();
-    expect(find.text('どうやってアレンジする？'), findsOneWidget);
+    expect(find.byType(GirlsAppEditEntryPage), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
@@ -358,7 +359,7 @@ void main() {
     expect(find.byKey(const Key('girls-source-editor-code')), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    expect(find.text('どうやってアレンジする？'), findsOneWidget);
+    expect(find.byType(GirlsAppEditEntryPage), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
     final delete = find.byKey(const Key('girls-app-delete'));
