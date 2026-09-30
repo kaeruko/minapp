@@ -354,21 +354,52 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
         accessToken: widget.session.accessToken,
         groupId: group.groupId,
       );
-      final List<HostedGroupApp> matches = apps
+      final List<HostedGroupApp> editableUploads = apps
           .where(
             (HostedGroupApp candidate) =>
-                candidate.sourceKind == 'upload' &&
-                candidate.editable &&
-                candidate.title == widget.app.title,
+                candidate.sourceKind == 'upload' && candidate.editable,
           )
           .toList(growable: false);
-      if (matches.length > 1) {
+
+      final List<HostedGroupApp> linked = editableUploads
+          .where(
+            (HostedGroupApp candidate) =>
+                candidate.shopSourceAppId == widget.app.appId,
+          )
+          .toList(growable: false);
+      if (linked.length > 1) {
         throw StateError(
-          '同じ名前のアプリが複数あるため、ショップとの対応を判定できません。',
+          '同じショップ作品に紐づくアプリが複数あります。',
         );
       }
+
+      HostedGroupApp? installed = linked.isEmpty ? null : linked.single;
+      if (installed == null) {
+        final List<HostedGroupApp> legacy = editableUploads
+            .where(
+              (HostedGroupApp candidate) =>
+                  candidate.shopSourceAppId == null &&
+                  candidate.title == widget.app.title,
+            )
+            .toList(growable: false);
+        if (legacy.length > 1) {
+          throw StateError(
+            '同じ名前の旧形式アプリが複数あるため、自動移行できません。',
+          );
+        }
+        if (legacy.length == 1) {
+          installed = await widget.shopApi.syncThumbnailToGroupCopy(
+            accessToken: widget.session.accessToken,
+            app: widget.app,
+            groupId: group.groupId,
+            targetAppId: legacy.single.appId,
+          );
+          widget.onGroupAppsChanged?.call();
+        }
+      }
+
       if (!mounted) return;
-      setState(() => _installedCopy = matches.isEmpty ? null : matches.single);
+      setState(() => _installedCopy = installed);
     } catch (error) {
       if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
@@ -451,27 +482,6 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
               ),
             ),
           ),
-        );
-      });
-
-  Future<void> _syncThumbnail() => _run(() async {
-        final HostedGroup? group = widget.currentGroup;
-        final HostedGroupApp? installed = _installedCopy;
-        if (group == null || installed == null) {
-          throw StateError('アイコンを反映するアプリが見つかりません。');
-        }
-        final HostedGroupApp synced =
-            await widget.shopApi.syncThumbnailToGroupCopy(
-          accessToken: widget.session.accessToken,
-          app: widget.app,
-          groupId: group.groupId,
-          targetAppId: installed.appId,
-        );
-        if (!mounted) return;
-        setState(() => _installedCopy = synced);
-        widget.onGroupAppsChanged?.call();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ショップのアイコンを反映したよ。')),
         );
       });
 
@@ -663,17 +673,6 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
                           : 'マイアプリから削除',
             ),
           ),
-          if (_installedCopy != null &&
-              (widget.app.thumbnailPath != null ||
-                  _shopArtworkAsset(widget.app) != null)) ...<Widget>[
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              key: const Key('girls-shop-sync-thumbnail'),
-              onPressed: _busy ? null : _syncThumbnail,
-              icon: const Icon(Icons.image_rounded),
-              label: const Text('ショップのアイコンを反映'),
-            ),
-          ],
           const SizedBox(height: 18),
           TextButton.icon(
             onPressed: _busy ? null : _report,
