@@ -27,6 +27,7 @@ class GirlsAppEditEntryPage extends StatefulWidget {
     required this.title,
     required this.expectedRevision,
     this.shopSourceAppId,
+    this.builtinId,
     this.onSaved,
     this.onRenamed,
     this.onIconChanged,
@@ -40,6 +41,7 @@ class GirlsAppEditEntryPage extends StatefulWidget {
   final String title;
   final int expectedRevision;
   final String? shopSourceAppId;
+  final String? builtinId;
   final Future<void> Function(int revision)? onSaved;
   final Future<void> Function()? onRenamed;
   final Future<void> Function()? onIconChanged;
@@ -212,6 +214,7 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
             radius: 18,
             semanticLabel: _currentTitle,
             shopSourceAppId: widget.shopSourceAppId,
+            builtinId: widget.builtinId,
             fallback: Container(
               decoration: BoxDecoration(
                 color: _pink,
