@@ -73,7 +73,7 @@
       }
       if (preferredId !== null && groups.some((group) => getId(group) === preferredId)) {
         selectedId = preferredId;
-      } else if (preferredId === null && !fallbackToFirst) {
+      } else if (!fallbackToFirst) {
         selectedId = null;
       } else {
         selectedId = getId(groups[0]);
