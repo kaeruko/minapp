@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-
 import 'api.dart';
 import 'girls_errors.dart';
 import 'girls_group_home_page.dart';
+import 'girls_group_icon.dart';
 import 'girls_app_thumbnail.dart';
 import 'girls_builtin_install_api.dart';
 import 'girls_current_group_store.dart';
@@ -17,7 +16,6 @@ const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF8B6BB2);
 const Color _panelPink = Color(0xFFF8DCDD);
 const Color _softCream = Color(0xFFFFFBF6);
-const String _mascotPairAsset = 'assets/girls/mascot_pair.svg';
 const String _groupDashboardBackgroundAsset =
     'assets/girls/backgrounds/group_home_background.jpg';
 const int _inlineMemberLimit = 4;
@@ -66,6 +64,7 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
   List<HostedGroupApp>? _latestApps;
   bool _busy = false;
   String? _launchingAppId;
+  int _groupIconRevision = 0;
   String? _error;
 
   @override
@@ -240,6 +239,10 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
           api: widget.api,
           session: widget.session,
           group: group,
+          onIconChanged: () {
+            if (!mounted) return;
+            setState(() => _groupIconRevision += 1);
+          },
         ),
       ),
     );
@@ -477,6 +480,7 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
                 latestApps: _latestApps,
                 apiBaseUri: widget.api.baseUri,
                 accessToken: widget.session.accessToken,
+                groupIconRevision: _groupIconRevision,
                 loading: _busy,
                 launchingAppId: _launchingAppId,
                 onLaunchApp: (HostedGroupApp app) =>
@@ -543,6 +547,7 @@ class _CurrentGroupCard extends StatelessWidget {
     required this.latestApps,
     required this.apiBaseUri,
     required this.accessToken,
+    required this.groupIconRevision,
     required this.loading,
     required this.launchingAppId,
     required this.onLaunchApp,
@@ -555,6 +560,7 @@ class _CurrentGroupCard extends StatelessWidget {
   final List<HostedGroupApp>? latestApps;
   final Uri apiBaseUri;
   final String accessToken;
+  final int groupIconRevision;
   final bool loading;
   final String? launchingAppId;
   final ValueChanged<HostedGroupApp> onLaunchApp;
@@ -581,7 +587,17 @@ class _CurrentGroupCard extends StatelessWidget {
       ),
       child: Column(
         children: <Widget>[
-          const _GroupPicture(),
+          _GroupPicture(
+            uri: apiBaseUri
+                .resolve('/hosted/groups/${group.groupId}/icon')
+                .replace(
+                  queryParameters: <String, String>{
+                    'v': groupIconRevision.toString(),
+                  },
+                ),
+            accessToken: accessToken,
+            semanticLabel: '${group.name}のグループアイコン',
+          ),
           const SizedBox(height: 12),
           Text(
             group.name,
@@ -920,29 +936,40 @@ class _MemberRow extends StatelessWidget {
 }
 
 class _GroupPicture extends StatelessWidget {
-  const _GroupPicture();
+  const _GroupPicture({
+    required this.uri,
+    required this.accessToken,
+    required this.semanticLabel,
+  });
+
+  final Uri uri;
+  final String accessToken;
+  final String semanticLabel;
 
   @override
   Widget build(BuildContext context) {
-    // Hosted groups do not expose custom image metadata yet. Keep this explicit
-    // visual slot stable so a future group image URL can replace only its body.
     return Container(
       key: const Key('girls-current-group-picture'),
       width: 92,
       height: 92,
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: const Color(0xFFF7EAF0),
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 4),
         boxShadow: const <BoxShadow>[
-          BoxShadow(color: Color(0x22956A80), blurRadius: 8, offset: Offset(0, 3)),
+          BoxShadow(
+            color: Color(0x22956A80),
+            blurRadius: 8,
+            offset: Offset(0, 3),
+          ),
         ],
       ),
-      child: SvgPicture.asset(
-        _mascotPairAsset,
-        fit: BoxFit.contain,
-        semanticsLabel: 'グループのデフォルト画像',
+      child: GirlsGroupIcon(
+        uri: uri,
+        accessToken: accessToken,
+        size: 76,
+        semanticLabel: semanticLabel,
       ),
     );
   }
