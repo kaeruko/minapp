@@ -123,12 +123,12 @@ void main() {
       expect(find.text('公開中のアプリを試す'), findsNothing);
       expect(find.text('📦'), findsOneWidget);
       expect(tester.getSize(find.text('📦')).width, lessThan(35));
-      final Finder iconSettings =
-          find.byKey(const Key('girls-app-icon-settings'));
-      await tester.ensureVisible(iconSettings);
-      expect(iconSettings, findsOneWidget);
-      expect(find.byKey(const Key('girls-app-change-icon')), findsOneWidget);
-      expect(find.byKey(const Key('girls-app-reset-icon')), findsOneWidget);
+      expect(
+        find.byKey(const Key('girls-app-icon-settings')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('girls-app-change-icon')), findsNothing);
+      expect(find.byKey(const Key('girls-app-reset-icon')), findsNothing);
       await tester.ensureVisible(find.byKey(const Key('girls-app-edit-code')));
       expect(find.text('アプリを編集'), findsOneWidget);
       expect(find.text('編集版をプレビュー'), findsNothing);
