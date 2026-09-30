@@ -454,6 +454,25 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
         );
       });
 
+  Future<void> _syncThumbnail() => _run(() async {
+        final HostedGroup? group = widget.currentGroup;
+        final HostedGroupApp? installed = _installedCopy;
+        if (group == null || installed == null) {
+          throw StateError('アイコンを反映するアプリが見つかりません。');
+        }
+        await widget.shopApi.syncThumbnailToGroupCopy(
+          accessToken: widget.session.accessToken,
+          app: widget.app,
+          groupId: group.groupId,
+          targetAppId: installed.appId,
+        );
+        if (!mounted) return;
+        widget.onGroupAppsChanged?.call();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ショップのアイコンを反映したよ。')),
+        );
+      });
+
   Future<void> _removeFromGroup() async {
     if (_busy) return;
     final HostedGroup? group = widget.currentGroup;
@@ -642,6 +661,15 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
                           : 'マイアプリから削除',
             ),
           ),
+          if (_installedCopy != null && widget.app.thumbnailPath != null) ...<Widget>[
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              key: const Key('girls-shop-sync-thumbnail'),
+              onPressed: _busy ? null : _syncThumbnail,
+              icon: const Icon(Icons.image_rounded),
+              label: const Text('ショップのアイコンを反映'),
+            ),
+          ],
           const SizedBox(height: 18),
           TextButton.icon(
             onPressed: _busy ? null : _report,
