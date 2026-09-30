@@ -62,8 +62,6 @@ BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = {
         "title": "しば犬どんぐりキャッチ",
         "asset_path": "assets/builtin/shiba_donguri/index.html",
         "source_key": "hosted/templates/shiba-game/v1/source.zip",
-        "thumbnail_path": "icon.webp",
-        "thumbnail_content_type": "image/webp",
     },
     "shiba-goshujin": {
         "builtin_id": "shiba-goshujin",
@@ -71,8 +69,6 @@ BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = {
         "title": "ごしゅじんどこわん",
         "asset_path": "assets/builtin/shiba_goshujin/index.html",
         "source_key": "hosted/templates/shiba-goshujin/v1/source.zip",
-        "thumbnail_path": "icon.webp",
-        "thumbnail_content_type": "image/webp",
     },
 }
 
@@ -241,26 +237,29 @@ class HostedCatalogBackend(HostedPlatformBackend):
         self,
         template: dict[str, Any],
     ) -> tuple[bytes, str] | None:
-        path = template.get("thumbnail_path")
-        content_type = template.get("thumbnail_content_type")
-        if path is None and content_type is None:
+        # Older core built-ins did not define thumbnail metadata. The two
+        # shiba templates already ship a root icon.webp in their source ZIP, so
+        # adopt it automatically without changing the public built-in contract.
+        if template.get("builtin_id") not in {"shiba-game", "shiba-goshujin"}:
             return None
-        if (
-            not isinstance(path, str)
-            or not path
-            or not isinstance(content_type, str)
-            or content_type not in {"image/png", "image/jpeg", "image/webp"}
-        ):
-            raise RuntimeError("Built-in template thumbnail metadata is invalid")
 
         zip_bytes, files, _ = self._read_zip_object(
             bucket=self._upload_bucket,
             key=str(template["source_key"]),
         )
-        if path not in files:
-            raise RuntimeError(
-                f"Built-in template thumbnail {path!r} is missing from source ZIP"
-            )
+        candidates = (
+            ("icon.webp", "image/webp"),
+            ("icon.png", "image/png"),
+            ("icon.jpg", "image/jpeg"),
+            ("icon.jpeg", "image/jpeg"),
+        )
+        selected = next(
+            ((path, content_type) for path, content_type in candidates if path in files),
+            None,
+        )
+        if selected is None:
+            return None
+        path, content_type = selected
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
             data = archive.read(path)
 
