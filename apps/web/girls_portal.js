@@ -327,6 +327,7 @@
   let apiBaseUrl = null;
   let pendingPasswordChallenge = null;
   let currentLoginId = null;
+  let activeGroups = [];
 
   function hide(element) {
     element.classList.add("hidden");
@@ -481,7 +482,9 @@
     }
 
     const method = options.method ?? "GET";
-    if (!["GET", "POST"].includes(method)) throw new TypeError(`Unsupported Girls API method: ${method}`);
+    if (!["GET", "POST", "PATCH", "DELETE"].includes(method)) {
+      throw new TypeError(`Unsupported Girls API method: ${method}`);
+    }
     if (options.body !== undefined && options.jsonBody !== undefined) {
       throw new TypeError("Girls API request cannot contain both body and jsonBody.");
     }
@@ -523,6 +526,12 @@
     }
 
     try {
+      if (options.expectEmpty === true) {
+        if (response.status !== 204) {
+          return await decodeJsonResponse(response, "Girls API");
+        }
+        return null;
+      }
       return await decodeJsonResponse(response, "Girls API");
     } catch (error) {
       if (error instanceof GirlsApiError && error.status === 401) clearAuthentication();
@@ -616,7 +625,17 @@
     } else {
       setMessage(uploadError, null);
     }
+    activeGroups = groups.map((group) => ({ ...group }));
+    globalThis.dispatchEvent(new CustomEvent("minapp:girls-groups-changed"));
+    return activeGroups.map((group) => ({ ...group }));
   }
+
+  globalThis.MinAppGirlsPortal = Object.freeze({
+    request: (path, options = {}) => apiRequest(path, { ...options, authenticated: true }),
+    reloadGroups: () => loadActiveGroups(),
+    groups: () => activeGroups.map((group) => ({ ...group })),
+    loginId: () => currentLoginId,
+  });
 
   async function enterWorkspace(token, authenticatedLoginId) {
     storeAuthentication(token, authenticatedLoginId);
