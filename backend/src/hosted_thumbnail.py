@@ -145,3 +145,32 @@ def get_group_thumbnail(
     backend._require_not_deleting(app)
     return thumbnail_from_app(app)
 
+
+
+def delete_thumbnail(
+    backend: Any,
+    auth_subject: str,
+    app_id: str,
+) -> None:
+    _author_editable_app(backend, auth_subject, app_id)
+    app = backend._get_item(pk=f"APP#{app_id}", sk="META")
+    if app is None:
+        raise RuntimeError(f"Editable app disappeared before thumbnail delete: {app_id}")
+
+    replacement = dict(app)
+    replacement.pop("thumbnail_bytes", None)
+    replacement.pop("thumbnail_content_type", None)
+    replacement.pop("thumbnail_updated_at", None)
+    backend._dynamodb.transact_write_items(
+        TransactItems=[
+            {
+                "Put": {
+                    "TableName": backend._table_name,
+                    "Item": replacement,
+                    "ConditionExpression": (
+                        "attribute_exists(pk) AND attribute_not_exists(deletion_state)"
+                    ),
+                }
+            }
+        ]
+    )
