@@ -450,7 +450,7 @@ class HostedGroupApp {
       json,
       'shop_source_app_id',
     );
-    if (shopSourceAppId != null && !_hexIdPattern.hasMatch(shopSourceAppId)) {
+    if (shopSourceAppId != null && !_hostedHexIdPattern.hasMatch(shopSourceAppId)) {
       throw const FormatException(
         'Hosted group app has invalid shop_source_app_id.',
       );
