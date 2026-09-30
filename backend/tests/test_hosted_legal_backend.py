@@ -26,6 +26,9 @@ class HostedLegalBackendTests(unittest.TestCase):
         self.s3.objects[
             ("uploads", "hosted/templates/novel-starter/v4/source.zip")
         ] = source_zip("<!doctype html><h1>novel-v4</h1>")
+        self.s3.objects[
+            ("uploads", "hosted/templates/shiba-game/v1/source.zip")
+        ] = source_zip("<!doctype html><h1>shiba-game</h1>")
         self.backend = HostedLegalBackend(
             cognito=self.cognito,
             dynamodb=self.dynamo,
