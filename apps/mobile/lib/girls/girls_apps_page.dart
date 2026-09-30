@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:url_launcher/url_launcher.dart';
 
-import '../hosted_app_management_api.dart' show maxHostedZipUploadBytes;
+import '../hosted_app_management_api.dart'
+    show maxHostedThumbnailBytes, maxHostedZipUploadBytes;
 import '../hosted_app_webview.dart';
 import '../hosted_authoring_editor_action.dart';
 import '../hosted_authoring_projects_api.dart';
@@ -12,6 +13,7 @@ import 'girls_errors.dart';
 import 'girls_app_management_api.dart';
 import 'girls_app_detail_content.dart';
 import 'girls_app_test_actions.dart';
+import 'girls_app_thumbnail.dart';
 import 'girls_builtin_install_api.dart';
 import 'girls_footer_nav.dart';
 import 'girls_shop_api.dart';
@@ -432,6 +434,8 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
   bool? _shopListed;
   bool _shopBusy = false;
   String? _shopError;
+  bool _iconBusy = false;
+  int _iconRevision = 0;
   bool _busy = false;
   String? _error;
 
@@ -673,6 +677,177 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
     }
   }
 
+  String _iconContentType(PlatformFile file) {
+    return switch (file.extension?.toLowerCase()) {
+      'png' => 'image/png',
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'webp' => 'image/webp',
+      _ => throw const FormatException(
+          'アプリアイコンはPNG・JPEG・WebPから選んでね。',
+        ),
+    };
+  }
+
+  Uri _iconUri(ManagedGirlsAppDetail detail) =>
+      _managementApi.thumbnailUri(detail.summary.app.appId).replace(
+        queryParameters: <String, String>{
+          'v': _iconRevision.toString(),
+        },
+      );
+
+  Future<void> _changeIcon(ManagedGirlsAppDetail detail) async {
+    if (_iconBusy || _busy) return;
+    final PlatformFile? file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: const <String>['png', 'jpg', 'jpeg', 'webp'],
+    );
+    if (file == null || !mounted) return;
+
+    setState(() {
+      _iconBusy = true;
+      _error = null;
+    });
+    try {
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        throw const FormatException('空の画像はアプリアイコンにできません。');
+      }
+      if (bytes.length > maxHostedThumbnailBytes) {
+        throw const FormatException('アプリアイコンは192KB以下にしてね。');
+      }
+      await _managementApi.setThumbnail(
+        accessToken: widget.session.accessToken,
+        appId: detail.summary.app.appId,
+        bytes: bytes,
+        contentType: _iconContentType(file),
+      );
+      if (!mounted) return;
+      setState(() => _iconRevision += 1);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('アプリアイコンを変更したよ')),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _iconBusy = false);
+    }
+  }
+
+  Future<void> _resetIcon(ManagedGirlsAppDetail detail) async {
+    if (_iconBusy || _busy) return;
+    setState(() {
+      _iconBusy = true;
+      _error = null;
+    });
+    try {
+      await _managementApi.deleteThumbnail(
+        accessToken: widget.session.accessToken,
+        appId: detail.summary.app.appId,
+      );
+      if (!mounted) return;
+      setState(() => _iconRevision += 1);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('アプリアイコンをデフォルトに戻したよ')),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = girlsMessageFor(error));
+    } finally {
+      if (mounted) setState(() => _iconBusy = false);
+    }
+  }
+
+  Widget _iconSettingsCard(ManagedGirlsAppDetail detail) {
+    final HostedGroupApp app = detail.summary.app;
+    return Container(
+      key: const Key('girls-app-icon-settings'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .82),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFEADDEB)),
+      ),
+      child: Row(
+        children: <Widget>[
+          GirlsAppThumbnail(
+            uri: _iconUri(detail),
+            accessToken: widget.session.accessToken,
+            size: 72,
+            radius: 18,
+            semanticLabel: app.title,
+            shopSourceAppId: app.shopSourceAppId,
+            builtinId: app.builtinId,
+            fallback: Container(
+              decoration: BoxDecoration(
+                color: _pink,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.apps_rounded,
+                color: _lavender,
+                size: 34,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                const Text(
+                  'アプリアイコン',
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                const Text(
+                  '512×512推奨 / PNG・JPEG・WebP / 192KB以下',
+                  style: TextStyle(
+                    color: Color(0xFF8C7893),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 9),
+                FilledButton.icon(
+                  key: const Key('girls-app-change-icon'),
+                  onPressed: _iconBusy || _busy
+                      ? null
+                      : () => _changeIcon(detail),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _lavender,
+                    foregroundColor: Colors.white,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  icon: _iconBusy
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.photo_library_rounded, size: 18),
+                  label: Text(_iconBusy ? '保存中…' : '画像を変更'),
+                ),
+                TextButton(
+                  key: const Key('girls-app-reset-icon'),
+                  onPressed: _iconBusy || _busy
+                      ? null
+                      : () => _resetIcon(detail),
+                  child: const Text('デフォルトに戻す'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _setShopListed(bool listed) async {
     final ManagedGirlsAppDetail? detail = _detail;
     if (detail == null || !detail.summary.app.isPublished) {
@@ -868,6 +1043,8 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
                   disabled: _busy,
                 ),
               ),
+              const SizedBox(height: 12),
+              _iconSettingsCard(detail),
               const SizedBox(height: 12),
               _advancedSettings(detail),
               const SizedBox(height: 8),
