@@ -22,6 +22,7 @@ from handler import (
 )
 import hosted_app_management
 import hosted_handler
+import hosted_group_icon
 import hosted_preview_session
 import hosted_thumbnail
 from hosted_upload import create_uploaded_app
@@ -45,6 +46,7 @@ _GROUP_APP_PREVIEW_SESSION_RE = re.compile(
 _GROUP_APP_PREVIEW_RUNTIME_SESSION_RE = re.compile(
     rf"^/hosted/groups/{_ID_RE}/apps/{_ID_RE}/preview-runtime-session$"
 )
+_GROUP_ICON_RE = re.compile(rf"^/hosted/groups/{_ID_RE}/icon$")
 _MY_APP_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}$")
 _MY_APP_VISIBILITY_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/visibility$")
 _MY_APP_THUMBNAIL_RE = re.compile(rf"^/hosted/my/apps/{_ID_RE}/thumbnail$")
@@ -218,6 +220,38 @@ def _handle_management_request(event: dict[str, Any]) -> dict[str, Any] | None:
                 hidden=hidden,
             ),
         )
+
+    group_icon_match = _GROUP_ICON_RE.fullmatch(path)
+    if group_icon_match is not None:
+        auth_subject = _auth_subject(event)
+        backend = _get_backend()
+        group_id = group_icon_match.group(1)
+        if method == "GET":
+            data, content_type = hosted_group_icon.get_group_icon(
+                backend,
+                auth_subject,
+                group_id,
+            )
+            return _content_response(data, content_type)
+        if method == "POST":
+            data, content_type = _image_body(event)
+            return _json_response(
+                200,
+                hosted_group_icon.set_group_icon(
+                    backend,
+                    auth_subject,
+                    group_id,
+                    data=data,
+                    content_type=content_type,
+                ),
+            )
+        if method == "DELETE":
+            hosted_group_icon.delete_group_icon(
+                backend,
+                auth_subject,
+                group_id,
+            )
+            return hosted_handler._empty_response()
 
     group_visibility_match = _GROUP_APP_VISIBILITY_RE.fullmatch(path)
     if method == "POST" and group_visibility_match is not None:
