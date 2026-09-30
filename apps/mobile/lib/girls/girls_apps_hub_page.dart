@@ -829,6 +829,7 @@ class _AppCard extends StatelessWidget {
           radius: 12,
           semanticLabel: app.app.title,
           shopSourceAppId: app.app.shopSourceAppId,
+          builtinId: app.app.builtinId,
           fallback: Container(
             decoration: BoxDecoration(
               color: _pink,
