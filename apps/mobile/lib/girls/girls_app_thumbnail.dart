@@ -1,5 +1,20 @@
 import 'package:flutter/material.dart';
 
+const String _drawingTitle = 'パステルおえかき';
+const String _singAlongTitle = 'うたってみよう';
+const String _drawingAsset =
+    'assets/girls/cutouts/minapp_cards_480/drawing_card.png';
+const String _singAlongAsset =
+    'assets/girls/cutouts/minapp_cards_480/sing_along_card.png';
+
+String? girlsBundledAppArtworkAsset(String title) {
+  return switch (title) {
+    _drawingTitle => _drawingAsset,
+    _singAlongTitle => _singAlongAsset,
+    _ => null,
+  };
+}
+
 class GirlsAppThumbnail extends StatelessWidget {
   const GirlsAppThumbnail({
     required this.uri,
@@ -20,6 +35,21 @@ class GirlsAppThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String? bundledAsset = girlsBundledAppArtworkAsset(semanticLabel);
+    if (bundledAsset != null) {
+      return SizedBox.square(
+        dimension: size,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(radius),
+          child: Image.asset(
+            bundledAsset,
+            fit: BoxFit.contain,
+            semanticLabel: semanticLabel,
+          ),
+        ),
+      );
+    }
+
     Widget fallbackBox() => SizedBox.square(
           dimension: size,
           child: fallback,
