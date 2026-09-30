@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
-const String _drawingTitle = 'パステルおえかき';
-const String _singAlongTitle = 'うたってみよう';
+const String _drawingShopAppId = 'ecb3cb6a08e05305668a952cbdae435b';
+const String _singAlongShopAppId = '9571adacf55c47b4ac772cd48621a08b';
 const String _drawingAsset =
     'assets/girls/cutouts/minapp_cards_480/drawing_card.png';
 const String _singAlongAsset =
     'assets/girls/cutouts/minapp_cards_480/sing_along_card.png';
 
-String? girlsBundledAppArtworkAsset(String title) {
-  return switch (title) {
-    _drawingTitle => _drawingAsset,
-    _singAlongTitle => _singAlongAsset,
+String? girlsBundledAppArtworkAsset(String? shopSourceAppId) {
+  return switch (shopSourceAppId) {
+    _drawingShopAppId => _drawingAsset,
+    _singAlongShopAppId => _singAlongAsset,
     _ => null,
   };
 }
@@ -23,6 +23,7 @@ class GirlsAppThumbnail extends StatelessWidget {
     required this.radius,
     required this.semanticLabel,
     required this.fallback,
+    this.shopSourceAppId,
     super.key,
   });
 
@@ -32,10 +33,12 @@ class GirlsAppThumbnail extends StatelessWidget {
   final double radius;
   final String semanticLabel;
   final Widget fallback;
+  final String? shopSourceAppId;
 
   @override
   Widget build(BuildContext context) {
-    final String? bundledAsset = girlsBundledAppArtworkAsset(semanticLabel);
+    final String? bundledAsset =
+        girlsBundledAppArtworkAsset(shopSourceAppId);
     if (bundledAsset != null) {
       return SizedBox.square(
         dimension: size,
