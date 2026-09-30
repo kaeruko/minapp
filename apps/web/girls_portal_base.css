@@ -994,6 +994,39 @@ button:disabled {
   color: #7a5b91;
 }
 
+.girls-group-card-code {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e6d6ef;
+  border-radius: 14px;
+  background: #f6effb;
+}
+
+.girls-group-card-code > span {
+  color: #967aa2;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.girls-group-card-code > strong,
+#girls-group-code-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #73568c;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+}
+
+.girls-group-card-code-copy {
+  min-height: 32px;
+  padding: 5px 9px;
+}
+
 .girls-group-card-actions,
 .girls-group-inline-actions {
   gap: 9px;
@@ -1109,6 +1142,7 @@ button:disabled {
   color: #604943;
 }
 
+.girls-group-code-row,
 .girls-group-id-row {
   grid-template-columns: 120px minmax(0, 1fr) auto;
 }
@@ -1310,7 +1344,9 @@ button:disabled {
   }
 
   .girls-group-info-row,
-  .girls-group-id-row {
+  .girls-group-code-row,
+  .girls-group-id-row,
+  .girls-group-card-code {
     grid-template-columns: 1fr;
     gap: 4px;
   }
