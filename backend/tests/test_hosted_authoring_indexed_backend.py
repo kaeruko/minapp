@@ -25,6 +25,9 @@ class HostedAuthoringIndexedBackendTests(unittest.TestCase):
         self.metadata = AuthoringFakeDynamoDb()
         self.runtime = AuthoringFakeDynamoDb()
         self.s3 = FakeS3()
+        self.s3.objects[
+            ("uploads", "hosted/templates/shiba-game/v1/source.zip")
+        ] = source_zip("<h1>shiba-game</h1>")
         self.backend = HostedAuthoringIndexedBackend(
             cognito=self.cognito,
             dynamodb=self.metadata,
