@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
 import 'api.dart';
 import 'hosted_api.dart';
 
+const int maxHostedGroupIconBytes = 192 * 1024;
 final RegExp _hostedGroupIdPattern = RegExp(r'^[0-9a-f]{32}$');
 
 class HostedOwnershipTransferResult {
@@ -78,6 +80,83 @@ class HostedGroupManagementApi {
       );
     }
     return group;
+  }
+
+  Uri groupIconUri(String groupId) {
+    _validateId(groupId, 'groupId');
+    return _baseUri.resolve('/hosted/groups/$groupId/icon');
+  }
+
+  Future<void> setGroupIcon({
+    required String accessToken,
+    required String groupId,
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
+    _validateToken(accessToken);
+    _validateId(groupId, 'groupId');
+    if (bytes.isEmpty || bytes.length > maxHostedGroupIconBytes) {
+      throw ArgumentError.value(
+        bytes.length,
+        'bytes',
+        'group icon must be 1-$maxHostedGroupIconBytes bytes',
+      );
+    }
+    if (contentType != 'image/png' &&
+        contentType != 'image/jpeg' &&
+        contentType != 'image/webp') {
+      throw ArgumentError.value(
+        contentType,
+        'contentType',
+        'must be image/png, image/jpeg, or image/webp',
+      );
+    }
+
+    final http.Response response = await _client.post(
+      groupIconUri(groupId),
+      headers: <String, String>{
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': contentType,
+      },
+      body: bytes,
+    );
+    final Map<String, Object?> payload = _decodeJsonResponse(response);
+    final Set<String> actual = payload.keys.toSet();
+    const Set<String> expected = <String>{
+      'group_id',
+      'content_type',
+      'bytes',
+      'updated_at',
+    };
+    if (actual.length != expected.length || !actual.containsAll(expected)) {
+      throw const FormatException(
+        'Group icon response has unexpected fields.',
+      );
+    }
+    if (_requiredId(payload, 'group_id') != groupId ||
+        payload['content_type'] != contentType ||
+        payload['bytes'] != bytes.length) {
+      throw const FormatException(
+        'Group icon response changed the requested scope.',
+      );
+    }
+    final Object? updatedAt = payload['updated_at'];
+    if (updatedAt is! String || updatedAt.isEmpty) {
+      throw const FormatException('Group icon response has invalid updated_at.');
+    }
+  }
+
+  Future<void> deleteGroupIcon({
+    required String accessToken,
+    required String groupId,
+  }) {
+    _validateToken(accessToken);
+    _validateId(groupId, 'groupId');
+    return _delete(
+      path: '/hosted/groups/$groupId/icon',
+      accessToken: accessToken,
+    );
   }
 
   Future<void> deleteGroup({
