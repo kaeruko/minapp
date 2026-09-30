@@ -1019,6 +1019,7 @@ class _LatestAppItem extends StatelessWidget {
                     size: 64,
                     radius: 16,
                     semanticLabel: app.title,
+                    shopSourceAppId: app.shopSourceAppId,
                     fallback: _AppPicture(app: app),
                   ),
                 const SizedBox(height: 5),
