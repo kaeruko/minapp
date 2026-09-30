@@ -184,6 +184,8 @@ void main() {
           'owner_user_id': ownerId,
           'editable': true,
           'source_revision': 1,
+          'shop_source_app_id': appId,
+          'shop_source_version': 3,
         }),
         200,
         headers: <String, String>{'content-type': 'application/json'},
@@ -212,6 +214,8 @@ void main() {
     expect(added.groupId, groupId);
     expect(added.title, '作品');
     expect(added.sourceKind, 'upload');
+    expect(added.shopSourceAppId, appId);
+    expect(added.shopSourceVersion, 3);
   });
 
   test('setVisibility sends app-level Girls shop state', () async {
