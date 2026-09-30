@@ -33,7 +33,7 @@ class HostedGirlsApi {
       );
     }
     final GirlsCurrentGroupAccountScope currentGroupAccountScope =
-        resolvedCurrentGroupStore;
+        resolvedCurrentGroupStore as GirlsCurrentGroupAccountScope;
     final HostedApi delegate = HostedApi(
       baseUri: baseUri,
       client: resolvedClient,
