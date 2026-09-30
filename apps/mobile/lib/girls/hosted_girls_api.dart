@@ -27,6 +27,13 @@ class HostedGirlsApi {
     final http.Client resolvedClient = client ?? http.Client();
     final GirlsCurrentGroupStore resolvedCurrentGroupStore =
         currentGroupStore ?? const SharedPreferencesGirlsCurrentGroupStore();
+    if (resolvedCurrentGroupStore is! GirlsCurrentGroupAccountScope) {
+      throw ArgumentError(
+        'Girls current group store must support account scoping.',
+      );
+    }
+    final GirlsCurrentGroupAccountScope currentGroupAccountScope =
+        resolvedCurrentGroupStore;
     final HostedApi delegate = HostedApi(
       baseUri: baseUri,
       client: resolvedClient,
@@ -43,7 +50,7 @@ class HostedGirlsApi {
         resolvedCurrentGroupStore,
       ),
       sessionStore: sessionStore ?? SecureGirlsSessionStore(),
-      currentGroupStore: resolvedCurrentGroupStore,
+      currentGroupAccountScope: currentGroupAccountScope,
     );
   }
 
@@ -53,12 +60,12 @@ class HostedGirlsApi {
     required RefreshableAuthClient authClient,
     required GirlsRegistrationOnboarding registrationOnboarding,
     required GirlsSessionStore sessionStore,
-    required GirlsCurrentGroupStore currentGroupStore,
+    required GirlsCurrentGroupAccountScope currentGroupAccountScope,
   })  : _delegate = delegate,
         _authClient = authClient,
         _registrationOnboarding = registrationOnboarding,
         _sessionStore = sessionStore,
-        _currentGroupStore = currentGroupStore;
+        _currentGroupAccountScope = currentGroupAccountScope;
 
   final HostedApi _delegate;
   // Related screen clients share connections instead of repeating TLS setup.
@@ -67,7 +74,7 @@ class HostedGirlsApi {
   final RefreshableAuthClient _authClient;
   final GirlsRegistrationOnboarding _registrationOnboarding;
   final GirlsSessionStore _sessionStore;
-  final GirlsCurrentGroupStore _currentGroupStore;
+  final GirlsCurrentGroupAccountScope _currentGroupAccountScope;
   final StreamController<AuthenticatedSession> _authenticatedSessions =
       StreamController<AuthenticatedSession>.broadcast(sync: true);
 
@@ -77,6 +84,8 @@ class HostedGirlsApi {
       _authenticatedSessions.stream;
 
   Future<AuthResult> login(String loginId, String password) async {
+    await _currentGroupAccountScope.deactivateAccount();
+
     final RefreshableAuthResult result = await _authClient.login(
       loginId,
       password,
@@ -89,15 +98,35 @@ class HostedGirlsApi {
     }
 
     final AuthenticatedSession session = result.toSession();
+    bool accountActivated = false;
+    try {
+      final String userId =
+          await _delegate.fetchCurrentUserId(session.accessToken);
+      await _currentGroupAccountScope.activateAccount(userId);
+      accountActivated = true;
 
-    // Girls accounts always need at least one group so app creation has a
-    // destination immediately after registration. Existing memberships are
-    // preserved; an empty account receives one ordinary starter group.
-    await _registrationOnboarding.ensureInitialGroup(session);
+      // Girls accounts always need at least one group so app creation has a
+      // destination immediately after registration. Existing memberships are
+      // preserved; an empty account receives one ordinary starter group.
+      await _registrationOnboarding.ensureInitialGroup(session);
 
-    // Persist only after onboarding succeeds. A group/network failure remains
-    // visible to the user and does not silently commit a half-finished login.
-    await _sessionStore.writeRefreshToken(result.refreshToken);
+      // Persist only after onboarding succeeds. A group/network failure remains
+      // visible to the user and does not silently commit a half-finished login.
+      await _sessionStore.writeRefreshToken(result.refreshToken);
+    } catch (error, stackTrace) {
+      if (accountActivated) {
+        try {
+          await _currentGroupAccountScope.deactivateAccount();
+        } catch (cleanupError, cleanupStackTrace) {
+          debugPrint(
+            'Girls session login: failed to deactivate account after '
+            'login setup error: $cleanupError\n$cleanupStackTrace',
+          );
+        }
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+
     debugPrint(
       'Girls session login: refresh token saved; access expires in '
       '${session.expiresIn}s.',
@@ -107,6 +136,8 @@ class HostedGirlsApi {
   }
 
   Future<AuthenticatedSession?> restoreSession() async {
+    await _currentGroupAccountScope.deactivateAccount();
+
     final String? refreshToken = await _sessionStore.readRefreshToken();
     if (refreshToken == null) {
       debugPrint(
@@ -118,6 +149,7 @@ class HostedGirlsApi {
     debugPrint(
       'Girls session restore: saved refresh token found; requesting refresh.',
     );
+    bool accountActivated = false;
     try {
       final RefreshableAuthenticatedResult result =
           await _authClient.refresh(refreshToken);
@@ -126,12 +158,19 @@ class HostedGirlsApi {
         'Girls session restore: refresh succeeded; access expires in '
         '${session.expiresIn}s.',
       );
+      final String userId =
+          await _delegate.fetchCurrentUserId(session.accessToken);
+      await _currentGroupAccountScope.activateAccount(userId);
+      accountActivated = true;
       await _registrationOnboarding.ensureInitialGroup(session);
       debugPrint(
         'Girls session restore: group verification succeeded; session restored.',
       );
       return session;
     } on ApiException catch (error) {
+      if (accountActivated) {
+        await _deactivateAfterFailedSessionSetup('restore API failure');
+      }
       if (error.statusCode == 401 && error.code == 'invalid_refresh_token') {
         debugPrint(
           'Girls session restore: server rejected refresh token as '
@@ -147,21 +186,36 @@ class HostedGirlsApi {
         '(HTTP ${error.statusCode}, code=${error.code}).',
       );
       rethrow;
-    } catch (error) {
+    } catch (error, stackTrace) {
+      if (accountActivated) {
+        await _deactivateAfterFailedSessionSetup('restore setup failure');
+      }
       debugPrint(
         'Girls session restore: non-API failure preserved saved login '
         '(${error.runtimeType}).',
       );
-      rethrow;
+      Error.throwWithStackTrace(error, stackTrace);
     }
   }
 
   Future<void> logout() async {
     debugPrint(
-      'Girls session logout: clearing saved refresh token and current group.',
+      'Girls session logout: clearing saved refresh token and deactivating '
+      'the account while preserving its remembered group.',
     );
     await _sessionStore.clearRefreshToken();
-    await _currentGroupStore.clear();
+    await _currentGroupAccountScope.deactivateAccount();
+  }
+
+  Future<void> _deactivateAfterFailedSessionSetup(String context) async {
+    try {
+      await _currentGroupAccountScope.deactivateAccount();
+    } catch (cleanupError, cleanupStackTrace) {
+      debugPrint(
+        'Girls session $context: failed to deactivate account: '
+        '$cleanupError\n$cleanupStackTrace',
+      );
+    }
   }
 
   Future<HostedLegalBundle> fetchLegal() => _delegate.fetchLegal();
