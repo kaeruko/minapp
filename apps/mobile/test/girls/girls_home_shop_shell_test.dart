@@ -66,6 +66,27 @@ Future<void> _finishRouteTransition(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 600));
 }
 
+void _expectHeaderOrder(WidgetTester tester, String pageName) {
+  final Finder headerFinder = find.byKey(const Key('girls-common-header'));
+  final Finder titleFinder = find.byKey(const Key('girls-page-title'));
+  expect(headerFinder, findsOneWidget);
+  expect(find.byKey(const Key('girls-header-logo')), findsOneWidget);
+  expect(titleFinder, findsOneWidget);
+  expect(tester.widget<Text>(titleFinder).data, pageName);
+
+  final Rect header = tester.getRect(headerFinder);
+  final Rect lace = tester.getRect(find.byKey(const Key('girls-header-lace')));
+  final Rect logo = tester.getRect(find.byKey(const Key('girls-header-logo')));
+  final Rect title = tester.getRect(titleFinder);
+  expect(lace.top, 0);
+  expect(logo.top, greaterThanOrEqualTo(lace.bottom));
+  expect(logo.top - lace.bottom, lessThanOrEqualTo(4));
+  expect(logo.center.dx, closeTo(header.center.dx, .001));
+  expect(title.center.dx, closeTo(logo.center.dx, .001));
+  expect(title.top, greaterThanOrEqualTo(header.bottom));
+  expect(title.top - header.bottom, lessThanOrEqualTo(12));
+}
+
 void main() {
   testWidgets('authenticated Girls routes keep one common header and footer', (
     WidgetTester tester,
@@ -95,6 +116,7 @@ void main() {
     expect(find.byKey(const Key('girls-footer-home')), findsOneWidget);
     expect(find.byKey(const Key('girls-footer-shop')), findsOneWidget);
     expect(find.text('公式アプリ'), findsOneWidget);
+    _expectHeaderOrder(tester, 'ホーム');
 
     await tester.tap(find.byKey(const Key('girls-shell-settings')));
     await tester.pumpAndSettle();
@@ -115,6 +137,7 @@ void main() {
     expect(find.byKey(const Key('girls-header-logo')), findsOneWidget);
     expect(find.byKey(const Key('girls-footer-shop')), findsOneWidget);
     expect(find.text('みんアプGirls ショップ'), findsOneWidget);
+    _expectHeaderOrder(tester, 'みんアプGirls ショップ');
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byKey(const Key('girls-footer-home')));
@@ -123,6 +146,7 @@ void main() {
     expect(find.byKey(const Key('girls-common-header')), findsOneWidget);
     expect(find.byKey(const Key('girls-footer-home')), findsOneWidget);
     expect(find.text('公式アプリ'), findsOneWidget);
+    _expectHeaderOrder(tester, 'ホーム');
     expect(tester.takeException(), isNull);
   });
 
@@ -137,7 +161,7 @@ void main() {
       expiresIn: 3600,
     );
     final Finder underlay = find.byKey(const Key('girls-header-lace-underlay'));
-    const Color defaultLaceColor = Color(0xFFFBF3E8);
+    const Color defaultLaceColor = Colors.transparent;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -171,9 +195,15 @@ void main() {
       final Rect header =
           tester.getRect(find.byKey(const Key('girls-common-header')));
       final Rect lace = tester.getRect(underlay);
+      final Rect visibleLace =
+          tester.getRect(find.byKey(const Key('girls-header-lace')));
+      final Rect logo =
+          tester.getRect(find.byKey(const Key('girls-header-logo')));
       expect(lace.bottom, closeTo(header.bottom, .001));
       expect(lace.left, header.left);
       expect(lace.width, header.width);
+      expect(lace.top, lessThan(visibleLace.bottom));
+      expect(lace.contains(logo.center), isTrue);
 
       // Exercise the nested navigator directly: the shell profile button also
       // returns to the selected footer tab after closing its profile page.

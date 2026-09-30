@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'api.dart';
 import 'girls_errors.dart';
 import 'girls_home_page.dart';
+import 'girls_scaffold.dart';
 import 'hosted_girls_api.dart';
 
 
@@ -16,7 +17,6 @@ const String _girlsLoginHeroPatternAsset =
     'assets/girls/generated/bg_pastel_pattern.png';
 const String _girlsLoginHeroLaceAsset =
     'assets/girls/generated/border_lace_heart.png';
-const String _girlsLogoAsset = 'assets/girls/generated/minapp_girls_logo.png';
 
 class GirlsApp extends StatelessWidget {
   const GirlsApp({required this.api, super.key});
@@ -101,7 +101,7 @@ class _GirlsBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
+    return Material(
       color: const Color(0xFFFDF9EE),
       child: child,
     );
@@ -109,81 +109,76 @@ class _GirlsBackground extends StatelessWidget {
 }
 
 class _GirlsPngHero extends StatelessWidget {
-  const _GirlsPngHero();
+  const _GirlsPngHero({required this.title});
+
+  final String title;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 300,
-      child: Stack(
-        fit: StackFit.expand,
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFE9F1),
+        image: DecorationImage(
+          image: AssetImage(_girlsLoginHeroPatternAsset),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          const ColoredBox(color: Color(0xFFFFE9F1)),
-          Image.asset(
-            _girlsLoginHeroPatternAsset,
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-          ),
-          const Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: _GirlsLaceStrip(),
-          ),
-          const Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: TransformFlipLace(),
-          ),
-          const Positioned(
-            top: 52,
-            left: 20,
-            right: 20,
-            child: Center(child: _GirlsLogo()),
-          ),
-          const Positioned(
-            left: 20,
-            right: 20,
-            bottom: 38,
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: _GirlsLoginCharacter(),
-            ),
-          ),
-          Positioned(
-            right: 22,
-            bottom: 108,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 125),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: .92),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: const Color(0xFFE7B5C8),
-                  width: 1.3,
-                ),
-                boxShadow: const <BoxShadow>[
-                  BoxShadow(
-                    color: Color(0x22A36B8A),
-                    blurRadius: 8,
-                    offset: Offset(0, 3),
+          const GirlsCommonHeader(),
+          GirlsPageTitle(title: title),
+          const SizedBox(height: 4),
+          Stack(
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 22, 98),
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 125),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .92),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFFE7B5C8),
+                        width: 1.3,
+                      ),
+                      boxShadow: const <BoxShadow>[
+                        BoxShadow(
+                          color: Color(0x22A36B8A),
+                          blurRadius: 8,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Text(
+                      'みんなでアプリを\nつくろう！',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: _lavenderDark,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
-                ],
-              ),
-              child: const Text(
-                'みんなでアプリを\nつくろう！',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: _lavenderDark,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
                 ),
               ),
-            ),
+              const Positioned(
+                left: 20,
+                right: 20,
+                bottom: 0,
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: _GirlsLoginCharacter(),
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 10),
+          const TransformFlipLace(),
         ],
       ),
     );
@@ -228,21 +223,6 @@ class _GirlsLoginCharacter extends StatelessWidget {
       height: 118,
       fit: BoxFit.contain,
       semanticLabel: 'みんアプ Girls のキャラクター',
-    );
-  }
-}
-
-class _GirlsLogo extends StatelessWidget {
-  const _GirlsLogo();
-
-  @override
-  Widget build(BuildContext context) {
-    return Image.asset(
-      _girlsLogoAsset,
-      width: 150,
-      height: 86,
-      fit: BoxFit.contain,
-      semanticLabel: 'みんアプ Girls',
     );
   }
 }
@@ -449,32 +429,27 @@ class _GirlsAuthPageState extends State<_GirlsAuthPage> {
     return Scaffold(
       body: _GirlsBackground(
         child: SafeArea(
+          top: false,
+          left: false,
+          right: false,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.only(top: 28, bottom: 36),
+            padding: const EdgeInsets.only(bottom: 36),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                const _GirlsPngHero(),
+                _GirlsPngHero(title: _creating ? '新規登録' : 'ログイン'),
                 const SizedBox(height: 20),
                 Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 520),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 36),
+                    child: SafeArea(
+                      top: false,
+                      bottom: false,
+                      minimum: const EdgeInsets.symmetric(horizontal: 36),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
                           if (_creating) ...<Widget>[
-                            const Text(
-                              '新規登録',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: _lavenderDark,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
                             const Text(
                               'メールアドレスや電話番号はいらないよ。',
                               textAlign: TextAlign.center,

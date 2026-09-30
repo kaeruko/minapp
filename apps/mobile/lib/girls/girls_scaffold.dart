@@ -104,26 +104,24 @@ class GirlsScaffold extends StatelessWidget {
             return Stack(
               fit: StackFit.expand,
               children: <Widget>[
-                // Start behind the transparent scallops, so the body artwork
-                // shows through the lace instead of a rectangular header fill.
+                // The page starts behind the lace, above the logo row.
                 Positioned(
-                  top: header.height - header.laceHeight,
+                  top: header.laceTop,
                   left: 0,
                   right: 0,
                   bottom: 0,
                   child: const _GirlsBodyBackground(),
                 ),
-                // Every page gets a solid backing under the transparent lace.
-                // A route can match its own color; the shared artwork never
-                // leaks through as a separate gradient strip.
+                // Continue custom page colors behind the scallops and logo.
+                // Otherwise keep the shared artwork continuous below the lace.
                 Positioned(
-                  top: header.height - header.laceHeight,
+                  top: header.laceTop,
                   left: 0,
                   right: 0,
-                  height: header.laceHeight,
+                  height: header.height - header.laceTop,
                   child: ColoredBox(
                     key: const Key('girls-header-lace-underlay'),
-                    color: headerLaceBackgroundColor ?? _headerCream,
+                    color: headerLaceBackgroundColor ?? Colors.transparent,
                   ),
                 ),
                 Column(
@@ -205,29 +203,7 @@ class _GirlsPageContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: <Widget>[
-        if (title != null)
-          SafeArea(
-            top: false,
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Semantics(
-                  header: true,
-                  child: Text(
-                    title!,
-                    key: const Key('girls-page-title'),
-                    style: const TextStyle(
-                      color: Color(0xFF745B9E),
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+        if (title != null) GirlsPageTitle(title: title!),
         Expanded(
           child: ClipRect(
             child: SafeArea(
@@ -241,12 +217,46 @@ class _GirlsPageContent extends StatelessWidget {
   }
 }
 
+/// A page name centered immediately beneath the shared logo.
+class GirlsPageTitle extends StatelessWidget {
+  const GirlsPageTitle({required this.title, super.key});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+        child: Center(
+          child: Semantics(
+            header: true,
+            child: Text(
+              title,
+              key: const Key('girls-page-title'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFF745B9E),
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// The PNG is 1200 x 450; its bottom 100 pixels contain the scalloped lace.
 class _HeaderLayout {
   const _HeaderLayout({
     required this.artHeight,
     required this.height,
-    required this.laceHeight,
+    required this.laceTop,
+    required this.laceBottom,
     required this.rowTop,
     required this.rowHeight,
     required this.logoWidth,
@@ -268,19 +278,17 @@ class _HeaderLayout {
         math.max(48, math.min(64, logoWidth * 1504 / 2808));
     final double artHeight = width * 450 / 1200;
     final double laceHeight = width * 100 / 1200;
-    final double safeTop = media.padding.top + 4;
-    final double minimumHeight = safeTop + rowHeight + 4 + laceHeight;
-    // Wide screens crop only the empty upper cream area. The lace always spans
-    // the real screen width and keeps the PNG's proportions.
-    final double preferredHeight =
-        math.min(artHeight, media.size.height < 500 ? 144 : 180);
-    final double height = math.max(preferredHeight, minimumHeight);
-    final double rowTop =
-        safeTop + (height - laceHeight - 4 - safeTop - rowHeight) / 2;
+    // Let the decorative lace meet the status bar, while keeping controls
+    // below both the safe inset and the scallops.
+    final double laceTop = math.max(0, media.padding.top - 10);
+    final double laceBottom = math.max(media.padding.top, laceTop + laceHeight);
+    final double rowTop = laceBottom + 2;
+    final double height = rowTop + rowHeight + 2;
     return _HeaderLayout(
       artHeight: artHeight,
       height: height,
-      laceHeight: laceHeight,
+      laceTop: laceTop,
+      laceBottom: laceBottom,
       rowTop: rowTop,
       rowHeight: rowHeight,
       logoWidth: logoWidth,
@@ -289,13 +297,14 @@ class _HeaderLayout {
 
   final double artHeight;
   final double height;
-  final double laceHeight;
+  final double laceTop;
+  final double laceBottom;
   final double rowTop;
   final double rowHeight;
   final double logoWidth;
 }
 
-/// Places the logo and live controls in one row above the transparent lace.
+/// Places compact lace at the top, then the logo and live controls beneath it.
 class GirlsCommonHeader extends StatelessWidget {
   const GirlsCommonHeader({
     this.leading,
@@ -324,26 +333,39 @@ class GirlsCommonHeader extends StatelessWidget {
           child: ClipRect(
             child: Stack(
               children: <Widget>[
-                // Extra notch clearance is plain cream, not a scaled-up image.
-                if (layout.height > layout.artHeight)
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: layout.height - layout.artHeight + 1,
-                    child: const ColoredBox(color: _headerCream),
-                  ),
                 Positioned(
-                  bottom: 0,
+                  top: 0,
                   left: 0,
                   right: 0,
-                  child: Image.asset(
-                    _headerBackground,
-                    key: const Key('girls-header-background'),
-                    width: constraints.maxWidth,
-                    height: layout.artHeight,
-                    fit: BoxFit.fitWidth,
-                    excludeFromSemantics: true,
+                  height: layout.laceBottom,
+                  child: ClipRect(
+                    key: const Key('girls-header-lace'),
+                    child: Stack(
+                      children: <Widget>[
+                        if (layout.laceBottom > layout.artHeight)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: layout.laceBottom - layout.artHeight + 1,
+                            child: const ColoredBox(color: _headerCream),
+                          ),
+                        // Only crop the unused cream above the original lace.
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: Image.asset(
+                            _headerBackground,
+                            key: const Key('girls-header-background'),
+                            width: constraints.maxWidth,
+                            height: layout.artHeight,
+                            fit: BoxFit.fitWidth,
+                            excludeFromSemantics: true,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 Positioned(

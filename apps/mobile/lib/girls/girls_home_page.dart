@@ -892,6 +892,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     final List<HostedGroup>? groups = _groups;
     final GirlsHomeMascotPrompt? mascotPrompt = _mascotPrompt;
     return GirlsScaffold(
+      title: 'ホーム',
       leading: _BellButton(onTap: _showNotices),
       actions: <Widget>[
         _RoundArtButton(

@@ -121,7 +121,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('uses full-width transparent art and moves the title below it',
+  testWidgets('compact lace sits above the centered logo and page name',
       (WidgetTester tester) async {
     await showShell(tester);
     final Finder headerFinder = find.byKey(const Key('girls-common-header'));
@@ -130,6 +130,12 @@ void main() {
         find.byKey(const Key('girls-header-background'));
     final Rect background = tester.getRect(backgroundFinder);
     final Image backgroundImage = tester.widget<Image>(backgroundFinder);
+    final Rect lace =
+        tester.getRect(find.byKey(const Key('girls-header-lace')));
+    final Rect logo =
+        tester.getRect(find.byKey(const Key('girls-header-logo')));
+    final Rect title =
+        tester.getRect(find.byKey(const Key('girls-page-title')));
 
     expect(
       (backgroundImage.image as AssetImage).assetName,
@@ -139,7 +145,16 @@ void main() {
     expect(header.width, 390);
     expect(background.left, 0);
     expect(background.width, 390);
-    expect(header.height, inInclusiveRange(140, 170));
+    expect(lace.top, 0);
+    expect(lace.width, header.width);
+    expect(lace.bottom, inInclusiveRange(44, 80));
+    expect(logo.top, greaterThanOrEqualTo(lace.bottom));
+    expect(logo.top - lace.bottom, lessThanOrEqualTo(4));
+    expect(logo.center.dx, closeTo(header.center.dx, .001));
+    expect(header.height, lessThanOrEqualTo(144));
+    expect(title.center.dx, closeTo(logo.center.dx, .001));
+    expect(title.top, greaterThanOrEqualTo(header.bottom));
+    expect(title.top - header.bottom, lessThanOrEqualTo(12));
     expect(
       find.descendant(of: headerFinder, matching: find.text('グループ')),
       findsNothing,
@@ -171,6 +186,8 @@ void main() {
           tester.getRect(find.byKey(const Key('girls-header-actions-tray')));
       final Rect logo =
           tester.getRect(find.byKey(const Key('girls-header-logo')));
+      final Rect lace =
+          tester.getRect(find.byKey(const Key('girls-header-lace')));
       final Rect background =
           tester.getRect(find.byKey(const Key('girls-header-background')));
       final Rect footer =
@@ -178,6 +195,9 @@ void main() {
       expect(action.top, greaterThanOrEqualTo(44));
       expect(leading.top, greaterThanOrEqualTo(44));
       expect(logo.top, greaterThanOrEqualTo(44));
+      expect(lace.top, 0);
+      expect(logo.top, greaterThanOrEqualTo(lace.bottom));
+      expect(logo.top - lace.bottom, lessThanOrEqualTo(4));
       expect(logo.center.dy, closeTo(leading.center.dy, .5));
       expect(logo.center.dy, closeTo(action.center.dy, .5));
       expect(logo.left, greaterThanOrEqualTo(leadingTray.right));
@@ -185,7 +205,7 @@ void main() {
       expect(header.width, width);
       expect(background.left, 0);
       expect(background.width, width);
-      expect(header.height, lessThanOrEqualTo(170));
+      expect(header.height, lessThanOrEqualTo(144));
       expect(footer.bottom, lessThanOrEqualTo(844 - 34));
       expect(tester.takeException(), isNull);
     });
@@ -200,6 +220,8 @@ void main() {
     );
     final Rect header =
         tester.getRect(find.byKey(const Key('girls-common-header')));
+    final Rect lace =
+        tester.getRect(find.byKey(const Key('girls-header-lace')));
     for (final String key in <String>[
       'header-leading',
       'header-action',
@@ -207,9 +229,11 @@ void main() {
     ]) {
       final Rect control = tester.getRect(find.byKey(Key(key)));
       expect(control.top, greaterThanOrEqualTo(59));
+      expect(control.top, greaterThanOrEqualTo(lace.bottom));
       expect(control.bottom, lessThan(header.bottom));
     }
-    expect(header.height, lessThanOrEqualTo(185));
+    expect(lace.top, 0);
+    expect(header.height, lessThanOrEqualTo(159));
     expect(find.text('グループ'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -230,10 +254,16 @@ void main() {
         tester.getRect(find.byKey(const Key('scrolling-content')));
     final Rect background =
         tester.getRect(find.byKey(const Key('girls-header-background')));
+    final Rect lace =
+        tester.getRect(find.byKey(const Key('girls-header-lace')));
+    final Rect logo =
+        tester.getRect(find.byKey(const Key('girls-header-logo')));
     expect(leading.left, greaterThanOrEqualTo(44));
     expect(action.right, lessThanOrEqualTo(844 - 44));
     expect(background.left, 0);
     expect(background.width, 844);
+    expect(lace.top, 0);
+    expect(logo.top, greaterThanOrEqualTo(lace.bottom));
     expect(body.height, greaterThan(60));
     expect(tester.takeException(), isNull);
   });
