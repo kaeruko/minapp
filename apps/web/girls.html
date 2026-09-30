@@ -12,10 +12,10 @@
     <script src="/single_html_zip.js" defer></script>
     <script src="/authoring_host_adapter.js" defer></script>
     <script src="/hosted_authoring_portal.js" defer></script>
-    <script src="/group_management.js?v=20260930-groups-2" defer></script>
-    <script src="/girls_portal.js?v=20260930-groups-2" defer></script>
-    <script src="/girls_portal_shell.js?v=20260930-groups-2" defer></script>
-    <script src="/girls_groups.js?v=20260930-groups-2" defer></script>
+    <script src="/group_management.js?v=20260930-groups-3" defer></script>
+    <script src="/girls_portal.js?v=20260930-groups-3" defer></script>
+    <script src="/girls_portal_shell.js?v=20260930-groups-3" defer></script>
+    <script src="/girls_groups.js?v=20260930-groups-3" defer></script>
     <script src="/girls_authoring_portal.js" defer></script>
     <script src="/girls_footer.js" defer></script>
   </head>
@@ -113,7 +113,7 @@
             <span class="portal-shell-nav-icon" aria-hidden="true">⌂</span><span>ホーム</span>
           </button>
           <button class="portal-shell-nav-item" type="button" data-girls-view="groups">
-            <span class="portal-shell-nav-icon" aria-hidden="true">♟</span><span>グループ</span>
+            <span class="portal-shell-nav-icon" aria-hidden="true">♡</span><span>グループ</span>
           </button>
           <button class="portal-shell-nav-item" type="button" data-girls-view="add">
             <span class="portal-shell-nav-icon" aria-hidden="true">＋</span><span>アプリを追加</span>
@@ -196,62 +196,143 @@
           </section>
 
           <section id="girls-view-groups" class="girls-view-panel girls-view-hidden" data-girls-panel="groups">
-            <section class="girls-dashboard-card">
-              <div class="girls-section-heading girls-apps-heading">
-                <div><p class="girls-step">GROUPS</p><h2>グループ</h2></div>
-                <button id="girls-groups-refresh" class="girls-secondary" type="button">更新</button>
+            <section class="girls-groups-hero">
+              <div class="girls-groups-hero-icon" aria-hidden="true">♡</div>
+              <div>
+                <p class="girls-dashboard-kicker">MY GROUPS ♡</p>
+                <h2>グループ</h2>
+                <p>友達とアプリを共有する場所だよ。作ったり参加しただけでは、いま使うグループは変わりません。</p>
               </div>
-              <p class="girls-muted">アプリ版と同じグループをここでも管理できます。作成・参加しても「いまのグループ」は自動では変わりません。</p>
+              <button id="girls-groups-refresh" class="girls-secondary" type="button">↻ 更新</button>
+            </section>
+
+            <section class="girls-dashboard-card girls-group-start-card">
               <div class="girls-group-actions">
                 <form id="girls-group-create-form" class="girls-group-action-card">
-                  <h3>グループを作る</h3>
-                  <label>グループ名<input id="girls-group-name" maxlength="60" placeholder="例：女子会アプリ開発部" required /></label>
-                  <button class="girls-primary" type="submit">作る</button>
+                  <div class="girls-group-action-heading">
+                    <span class="girls-group-action-icon" aria-hidden="true">＋</span>
+                    <div><p>NEW GROUP</p><h3>グループを作る</h3></div>
+                  </div>
+                  <label>グループ名
+                    <input id="girls-group-name" maxlength="60" placeholder="例：女子会アプリ開発部" required />
+                  </label>
+                  <button class="girls-primary" type="submit">グループを作る</button>
                 </form>
                 <form id="girls-group-join-form" class="girls-group-action-card">
-                  <h3>グループに参加</h3>
-                  <label>グループID<input id="girls-group-code" maxlength="20" placeholder="XXXX-XXXX-XXXX" autocomplete="off" required /></label>
+                  <div class="girls-group-action-heading">
+                    <span class="girls-group-action-icon" aria-hidden="true">♡</span>
+                    <div><p>JOIN GROUP</p><h3>グループに参加</h3></div>
+                  </div>
+                  <label>招待コード（グループID）
+                    <input id="girls-group-code" maxlength="20" placeholder="XXXX-XXXX-XXXX" autocomplete="off" required />
+                  </label>
                   <button class="girls-primary" type="submit">参加する</button>
                 </form>
               </div>
               <p id="girls-groups-error" class="girls-message girls-message-error hidden" role="alert"></p>
-              <p id="girls-groups-status" class="girls-muted" role="status">グループを読み込み中…</p>
+              <div class="girls-group-list-heading">
+                <div><p class="girls-step">YOUR GROUPS</p><h3>参加しているグループ</h3></div>
+                <p id="girls-groups-status" class="girls-muted" role="status">グループを読み込み中…</p>
+              </div>
               <div id="girls-group-list" class="girls-group-list" aria-live="polite"></div>
             </section>
 
-            <section id="girls-group-detail" class="girls-dashboard-card hidden" aria-labelledby="girls-group-detail-title">
-              <div class="girls-section-heading girls-apps-heading">
-                <div><p class="girls-step">GROUP DETAIL</p><h2 id="girls-group-detail-title"></h2></div>
+            <section id="girls-group-detail" class="girls-group-detail-shell hidden" aria-labelledby="girls-group-detail-title">
+              <section class="girls-group-detail-hero">
+                <div class="girls-group-detail-avatar" aria-hidden="true">♡</div>
+                <div class="girls-group-detail-hero-copy">
+                  <p class="girls-step">GROUP DETAIL</p>
+                  <h2 id="girls-group-detail-title"></h2>
+                  <p id="girls-group-detail-subtitle"></p>
+                </div>
                 <span id="girls-group-role" class="girls-group-role"></span>
-              </div>
-              <div class="girls-group-detail-grid">
-                <section class="girls-group-detail-section">
-                  <h3>メンバー</h3>
-                  <div id="girls-group-members" class="girls-group-members"></div>
-                </section>
-                <section id="girls-group-owner-tools" class="girls-group-detail-section hidden">
-                  <h3>オーナー管理</h3>
-                  <form id="girls-group-rename-form" class="girls-form">
-                    <label>グループ名<input id="girls-group-rename" maxlength="60" required /></label>
-                    <button class="girls-secondary" type="submit">名前を変更</button>
-                  </form>
-                  <div class="girls-group-invite">
-                    <button id="girls-group-invite-create" class="girls-secondary" type="button">招待コードを表示</button>
-                    <strong id="girls-group-invite-code"></strong>
-                    <button id="girls-group-invite-copy" class="girls-secondary hidden" type="button">コピー</button>
-                    <button id="girls-group-invite-revoke" class="girls-secondary hidden" type="button">招待コードを無効化</button>
-                  </div>
-                  <label class="girls-group-icon-field">グループアイコン
-                    <input id="girls-group-icon-file" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" />
-                  </label>
-                  <div class="girls-group-inline-actions">
-                    <button id="girls-group-icon-reset" class="girls-secondary" type="button">アイコンをデフォルトに戻す</button>
-                    <button id="girls-group-transfer-owner" class="girls-secondary" type="button">オーナーを変更</button>
-                  </div>
-                </section>
-              </div>
-              <div class="girls-group-danger">
-                <button id="girls-group-remove" class="girls-danger" type="button"></button>
+              </section>
+
+              <div class="girls-group-detail-layout">
+                <div class="girls-group-detail-main">
+                  <section class="girls-dashboard-card girls-group-info-card">
+                    <div class="girls-group-card-title">
+                      <span class="girls-group-section-icon" aria-hidden="true">i</span>
+                      <div><p class="girls-step">INFO</p><h3>グループ情報</h3></div>
+                    </div>
+                    <div class="girls-group-info-list">
+                      <div class="girls-group-info-row">
+                        <span>状態</span>
+                        <strong id="girls-group-current-status"></strong>
+                      </div>
+                      <div class="girls-group-info-row">
+                        <span>参加人数</span>
+                        <strong id="girls-group-member-count"></strong>
+                      </div>
+                      <div class="girls-group-info-row girls-group-id-row">
+                        <span>内部ID</span>
+                        <code id="girls-group-id-value"></code>
+                        <button id="girls-group-id-copy" class="girls-secondary girls-group-copy-button" type="button">コピー</button>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section class="girls-dashboard-card girls-group-members-card">
+                    <div class="girls-group-card-title">
+                      <span class="girls-group-section-icon" aria-hidden="true">♟</span>
+                      <div><p class="girls-step">MEMBERS</p><h3>メンバー</h3></div>
+                    </div>
+                    <div id="girls-group-members" class="girls-group-members"></div>
+                  </section>
+                </div>
+
+                <div class="girls-group-detail-side">
+                  <section id="girls-group-owner-tools" class="girls-dashboard-card girls-group-owner-card hidden">
+                    <div class="girls-group-card-title">
+                      <span class="girls-group-section-icon" aria-hidden="true">♛</span>
+                      <div><p class="girls-step">OWNER</p><h3>オーナー管理</h3></div>
+                    </div>
+
+                    <div class="girls-group-owner-block">
+                      <h4>グループ名</h4>
+                      <form id="girls-group-rename-form" class="girls-form girls-group-rename-form">
+                        <input id="girls-group-rename" maxlength="60" aria-label="グループ名" required />
+                        <button class="girls-secondary" type="submit">変更を保存</button>
+                      </form>
+                    </div>
+
+                    <div class="girls-group-owner-block">
+                      <h4>招待コード（グループID）</h4>
+                      <p class="girls-muted">友達はこのコードを入力して参加できます。</p>
+                      <div class="girls-group-code-box">
+                        <strong id="girls-group-invite-code">まだ表示していません</strong>
+                      </div>
+                      <div class="girls-group-inline-actions">
+                        <button id="girls-group-invite-create" class="girls-secondary" type="button">グループIDを表示</button>
+                        <button id="girls-group-invite-copy" class="girls-secondary hidden" type="button">コピー</button>
+                        <button id="girls-group-invite-revoke" class="girls-secondary hidden" type="button">無効化</button>
+                      </div>
+                    </div>
+
+                    <div class="girls-group-owner-block">
+                      <h4>グループアイコン</h4>
+                      <label class="girls-group-icon-field">
+                        <span>PNG・JPEG・WebP / 192KB以下</span>
+                        <input id="girls-group-icon-file" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" />
+                      </label>
+                      <button id="girls-group-icon-reset" class="girls-secondary" type="button">デフォルトに戻す</button>
+                    </div>
+
+                    <div class="girls-group-owner-block">
+                      <h4>オーナー</h4>
+                      <button id="girls-group-transfer-owner" class="girls-secondary" type="button">オーナーを変更</button>
+                    </div>
+                  </section>
+
+                  <section class="girls-dashboard-card girls-group-danger-card">
+                    <div class="girls-group-card-title">
+                      <span class="girls-group-section-icon girls-group-section-icon-danger" aria-hidden="true">!</span>
+                      <div><p class="girls-step">DANGER</p><h3 id="girls-group-danger-title">グループから脱退</h3></div>
+                    </div>
+                    <p id="girls-group-danger-description" class="girls-muted"></p>
+                    <button id="girls-group-remove" class="girls-danger" type="button"></button>
+                  </section>
+                </div>
               </div>
             </section>
           </section>
