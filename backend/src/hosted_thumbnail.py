@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from errors import ApiProblem
-from hosted_app_management import _author_editable_app
+from hosted_app_management import _author_managed_app
 from hosted_catalog_backend import _optional_string
 from hosted_platform_backend import _now_iso
 from aws_backend import _string_attr
@@ -56,7 +56,7 @@ def set_thumbnail(
     content_type: str,
 ) -> dict[str, Any]:
     _validate_thumbnail_bytes(data, content_type)
-    _, app = _author_editable_app(backend, auth_subject, app_id)
+    _, app = _author_managed_app(backend, auth_subject, app_id)
     updated_at = _now_iso()
 
     backend._dynamodb.transact_write_items(
@@ -119,7 +119,7 @@ def get_thumbnail(
     auth_subject: str,
     app_id: str,
 ) -> tuple[bytes, str]:
-    _, app = _author_editable_app(backend, auth_subject, app_id)
+    _, app = _author_managed_app(backend, auth_subject, app_id)
     return thumbnail_from_app(app)
 
 def get_group_thumbnail(
@@ -152,7 +152,7 @@ def delete_thumbnail(
     auth_subject: str,
     app_id: str,
 ) -> None:
-    _author_editable_app(backend, auth_subject, app_id)
+    _author_managed_app(backend, auth_subject, app_id)
     app = backend._get_item(pk=f"APP#{app_id}", sk="META")
     if app is None:
         raise RuntimeError(f"Editable app disappeared before thumbnail delete: {app_id}")
