@@ -108,6 +108,54 @@ void main() {
     );
   });
 
+  test('app thumbnail upload sends exact bytes and content type', () async {
+    final Uint8List bytes = Uint8List.fromList(
+      <int>[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3],
+    );
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'POST');
+      expect(request.url.path, '/hosted/my/apps/$_appId/thumbnail');
+      expect(request.headers['authorization'], 'Bearer $_token');
+      expect(request.headers['content-type'], 'image/png');
+      expect(request.bodyBytes, bytes);
+      return _json(200, <String, Object?>{
+        'app_id': _appId,
+        'content_type': 'image/png',
+        'bytes': bytes.length,
+        'updated_at': '2026-09-30T00:00:00Z',
+      });
+    });
+    final HostedAppManagementApi api = HostedAppManagementApi(
+      baseUri: Uri.parse('https://hosted.example'),
+      client: client,
+    );
+
+    await api.setThumbnail(
+      accessToken: _token,
+      appId: _appId,
+      bytes: bytes,
+      contentType: 'image/png',
+    );
+  });
+
+  test('app thumbnail reset uses authenticated DELETE', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'DELETE');
+      expect(request.url.path, '/hosted/my/apps/$_appId/thumbnail');
+      expect(request.headers['authorization'], 'Bearer $_token');
+      return http.Response('', 204);
+    });
+    final HostedAppManagementApi api = HostedAppManagementApi(
+      baseUri: Uri.parse('https://hosted.example'),
+      client: client,
+    );
+
+    await api.deleteThumbnail(
+      accessToken: _token,
+      appId: _appId,
+    );
+  });
+
   test('group rename uses PATCH and keeps the requested group scope', () async {
     final MockClient client = MockClient((http.Request request) async {
       expect(request.method, 'PATCH');
