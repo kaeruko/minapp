@@ -30,10 +30,12 @@ class GirlsScaffoldChromeScope extends InheritedWidget {
   const GirlsScaffoldChromeScope({
     required super.child,
     this.onHome,
+    this.onSharedFooterHiddenChanged,
     super.key,
   });
 
   final VoidCallback? onHome;
+  final ValueChanged<bool>? onSharedFooterHiddenChanged;
 
   static GirlsScaffoldChromeScope? maybeOf(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<
@@ -45,9 +47,13 @@ class GirlsScaffoldChromeScope extends InheritedWidget {
   static VoidCallback? homeAction(BuildContext context) =>
       maybeOf(context)?.onHome;
 
+  static ValueChanged<bool>? sharedFooterHiddenAction(BuildContext context) =>
+      maybeOf(context)?.onSharedFooterHiddenChanged;
+
   @override
   bool updateShouldNotify(GirlsScaffoldChromeScope oldWidget) =>
-      oldWidget.onHome != onHome;
+      oldWidget.onHome != onHome ||
+      oldWidget.onSharedFooterHiddenChanged != onSharedFooterHiddenChanged;
 }
 
 /// Keeps the supplied artwork stationary while each page scrolls its content.
