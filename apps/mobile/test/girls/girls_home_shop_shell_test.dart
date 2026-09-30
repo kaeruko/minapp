@@ -9,6 +9,7 @@ import 'package:minapp_mobile/girls/api.dart';
 import 'package:minapp_mobile/girls/girls_current_group_store.dart';
 import 'package:minapp_mobile/girls/girls_home_shop_shell.dart';
 import 'package:minapp_mobile/girls/girls_profile_page.dart';
+import 'package:minapp_mobile/girls/girls_scaffold.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
 class _MemoryCurrentGroupStore implements GirlsCurrentGroupStore {
@@ -87,6 +88,46 @@ void _expectHeaderOrder(WidgetTester tester, String pageName) {
   expect(title.top - header.bottom, lessThanOrEqualTo(12));
 }
 
+class _SharedFooterReplacementProbe extends StatefulWidget {
+  const _SharedFooterReplacementProbe();
+
+  @override
+  State<_SharedFooterReplacementProbe> createState() =>
+      _SharedFooterReplacementProbeState();
+}
+
+class _SharedFooterReplacementProbeState
+    extends State<_SharedFooterReplacementProbe> {
+  ValueChanged<bool>? _action;
+  bool _active = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final ValueChanged<bool>? action =
+        GirlsScaffoldChromeScope.sharedFooterHiddenAction(context);
+    if (action == null || _active) return;
+    _action = action;
+    _active = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) => action(true));
+  }
+
+  @override
+  void dispose() {
+    if (_active) {
+      final ValueChanged<bool>? action = _action;
+      if (action != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => action(false));
+      }
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      const Scaffold(body: Center(child: Text('editor footer probe')));
+}
+
 void main() {
   testWidgets('authenticated Girls routes keep one common header and footer', (
     WidgetTester tester,
@@ -147,6 +188,53 @@ void main() {
     expect(find.byKey(const Key('girls-footer-home')), findsOneWidget);
     expect(find.text('公式アプリ'), findsOneWidget);
     _expectHeaderOrder(tester, 'ホーム');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('hosted editor can replace and restore the shared footer', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(360, 720));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GirlsHomeShopShell(
+          api: _fakeApi(),
+          session: const AuthenticatedSession(
+            accessToken: 'test-token',
+            expiresIn: 3600,
+          ),
+          onLogout: () {},
+          currentGroupStore: _MemoryCurrentGroupStore(),
+        ),
+      ),
+    );
+    await _finishRouteTransition(tester);
+    expect(find.byKey(const Key('girls-footer-home')), findsOneWidget);
+
+    final NavigatorState navigator = tester.state<NavigatorState>(
+      find.descendant(
+        of: find.byType(GirlsHomeShopShell),
+        matching: find.byType(Navigator),
+      ).last,
+    );
+    navigator.push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) =>
+            const _SharedFooterReplacementProbe(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('editor footer probe'), findsOneWidget);
+    expect(find.byKey(const Key('girls-footer-home')), findsNothing);
+
+    navigator.pop();
+    await tester.pumpAndSettle();
+
+    expect(find.text('editor footer probe'), findsNothing);
+    expect(find.byKey(const Key('girls-footer-home')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
