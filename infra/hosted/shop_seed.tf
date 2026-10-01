@@ -91,6 +91,14 @@ locals {
       ]
       published_at = "2026-09-30T10:58:00Z"
     }
+    coordinate-book = {
+      app_id       = "d3ec03fcdea27d6f88ae0c783d16f77e"
+      title        = "わたしのコーデ帳"
+      version      = 1
+      source_dir   = "${local.minapp_apps_source_root}/coordinate_book"
+      files        = ["index.html"]
+      published_at = "2026-10-01T22:03:35Z"
+    }
   }
 
   official_shop_icons = {
