@@ -197,30 +197,54 @@
     }
 
     .creature.preview-fluffy {
-      width: 164px;
-      height: 138px;
+      width: 170px;
+      height: 142px;
+      border-radius: 48% 52% 46% 54% / 54% 52% 48% 46%;
+    }
+
+    .creature.preview-fluffy .ear {
+      top: -19px;
+      transform-origin: bottom center;
+    }
+
+    .creature.preview-fluffy .ear.left {
+      left: 21px;
+      transform: rotate(-18deg) scale(.82);
+    }
+
+    .creature.preview-fluffy .ear.right {
+      right: 21px;
+      transform: rotate(18deg) scale(.82);
     }
 
     .creature.preview-fluffy .eye,
     .creature.preview-fluffy .mouth {
-      z-index: 2;
+      z-index: 3;
     }
 
     .fluff {
       position: absolute;
-      z-index: 0;
-      width: 48px;
-      height: 48px;
+      z-index: 1;
+      width: 30px;
+      height: 30px;
       border: 4px solid #fff;
       border-radius: 50%;
       background: #fffdfb;
+      box-shadow: 0 4px 7px #7b65751a;
     }
 
-    .fluff.one { left: -20px; top: 17px; }
-    .fluff.two { right: -20px; top: 17px; }
-    .fluff.three { left: -15px; bottom: 12px; }
-    .fluff.four { right: -15px; bottom: 12px; }
-    .fluff.five { left: 54px; bottom: -20px; }
+    .fluff.one   { left: -13px; top: 20px; }
+    .fluff.two   { left: 5px; top: -10px; }
+    .fluff.three { left: 39px; top: -18px; }
+    .fluff.four  { right: 39px; top: -18px; }
+    .fluff.five  { right: 5px; top: -10px; }
+    .fluff.six   { right: -13px; top: 20px; }
+    .fluff.seven { right: -15px; top: 58px; }
+    .fluff.eight { right: 2px; bottom: -7px; }
+    .fluff.nine  { right: 39px; bottom: -17px; }
+    .fluff.ten   { left: 39px; bottom: -17px; }
+    .fluff.eleven { left: 2px; bottom: -7px; }
+    .fluff.twelve { left: -15px; top: 58px; }
 
     .speech {
       min-height: 24px;
@@ -708,6 +732,13 @@
           <div class="fluff three"></div>
           <div class="fluff four"></div>
           <div class="fluff five"></div>
+          <div class="fluff six"></div>
+          <div class="fluff seven"></div>
+          <div class="fluff eight"></div>
+          <div class="fluff nine"></div>
+          <div class="fluff ten"></div>
+          <div class="fluff eleven"></div>
+          <div class="fluff twelve"></div>
         `
         : '';
       creature.innerHTML = `
