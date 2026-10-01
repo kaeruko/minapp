@@ -196,55 +196,26 @@
       filter: drop-shadow(0 4px 3px #755b7424);
     }
 
-    .creature.preview-fluffy {
-      width: 170px;
-      height: 142px;
-      border-radius: 48% 52% 46% 54% / 54% 52% 48% 46%;
-    }
-
-    .creature.preview-fluffy .ear {
-      top: -19px;
-      transform-origin: bottom center;
-    }
-
-    .creature.preview-fluffy .ear.left {
-      left: 21px;
-      transform: rotate(-18deg) scale(.82);
-    }
-
-    .creature.preview-fluffy .ear.right {
-      right: 21px;
-      transform: rotate(18deg) scale(.82);
-    }
-
-    .creature.preview-fluffy .eye,
-    .creature.preview-fluffy .mouth {
-      z-index: 3;
-    }
-
-    .fluff {
-      position: absolute;
-      z-index: 1;
-      width: 30px;
-      height: 30px;
-      border: 4px solid #fff;
-      border-radius: 50%;
+    .creature.preview-droopy .ear {
+      top: 12px;
+      width: 50px;
+      height: 82px;
+      z-index: -1;
       background: #fffdfb;
-      box-shadow: 0 4px 7px #7b65751a;
+      transform-origin: top center;
     }
 
-    .fluff.one   { left: -13px; top: 20px; }
-    .fluff.two   { left: 5px; top: -10px; }
-    .fluff.three { left: 39px; top: -18px; }
-    .fluff.four  { right: 39px; top: -18px; }
-    .fluff.five  { right: 5px; top: -10px; }
-    .fluff.six   { right: -13px; top: 20px; }
-    .fluff.seven { right: -15px; top: 58px; }
-    .fluff.eight { right: 2px; bottom: -7px; }
-    .fluff.nine  { right: 39px; bottom: -17px; }
-    .fluff.ten   { left: 39px; bottom: -17px; }
-    .fluff.eleven { left: 2px; bottom: -7px; }
-    .fluff.twelve { left: -15px; top: 58px; }
+    .creature.preview-droopy .ear.left {
+      left: -25px;
+      border-radius: 70% 35% 65% 45%;
+      transform: rotate(18deg);
+    }
+
+    .creature.preview-droopy .ear.right {
+      right: -25px;
+      border-radius: 35% 70% 45% 65%;
+      transform: rotate(-18deg);
+    }
 
     .speech {
       min-height: 24px;
@@ -402,7 +373,7 @@
       'sleepy',
       'round',
       'fashion',
-      'fluffy',
+      'droopy',
     ]);
     const previewVariant = new URLSearchParams(window.location.search).get('preview');
     if (previewVariant !== null && !PREVIEW_VARIANTS.has(previewVariant)) {
@@ -700,10 +671,10 @@
           speech: 'おしゃれしたよ',
           message: 'リボンをつけて おめかししたよ。',
         },
-        fluffy: {
-          className: 'preview-fluffy',
-          speech: 'もふもふだよ',
-          message: 'ふわふわ もふもふに なったよ。',
+        droopy: {
+          className: 'preview-droopy',
+          speech: 'おみみ たれたよ',
+          message: 'おみみが ふわんと たれたよ。',
         },
       }[variant];
 
@@ -725,24 +696,7 @@
 
       const creature = document.createElement('div');
       creature.className = `creature${preview.className ? ` ${preview.className}` : ''}`;
-      const fluff = variant === 'fluffy'
-        ? `
-          <div class="fluff one"></div>
-          <div class="fluff two"></div>
-          <div class="fluff three"></div>
-          <div class="fluff four"></div>
-          <div class="fluff five"></div>
-          <div class="fluff six"></div>
-          <div class="fluff seven"></div>
-          <div class="fluff eight"></div>
-          <div class="fluff nine"></div>
-          <div class="fluff ten"></div>
-          <div class="fluff eleven"></div>
-          <div class="fluff twelve"></div>
-        `
-        : '';
       creature.innerHTML = `
-        ${fluff}
         <div class="ear left"></div>
         <div class="ear right"></div>
         <div class="eye left"></div>
