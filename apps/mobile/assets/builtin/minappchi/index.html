@@ -159,6 +159,69 @@
       border-radius: 50% 50% 0 0;
     }
 
+    .creature.preview-sleepy .eye {
+      top: 56px;
+      height: 5px;
+      border-radius: 999px;
+    }
+
+    .creature.preview-sleepy::after {
+      content: "Z z";
+      position: absolute;
+      right: -30px;
+      top: -26px;
+      color: #8a75a0;
+      font-size: 24px;
+      font-weight: 900;
+      transform: rotate(-10deg);
+    }
+
+    .creature.preview-round {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+    }
+
+    .creature.preview-round .ear {
+      top: -20px;
+    }
+
+    .creature.preview-fashion::after {
+      content: "🎀";
+      position: absolute;
+      right: -13px;
+      top: -43px;
+      font-size: 43px;
+      transform: rotate(8deg);
+      filter: drop-shadow(0 4px 3px #755b7424);
+    }
+
+    .creature.preview-fluffy {
+      width: 164px;
+      height: 138px;
+    }
+
+    .creature.preview-fluffy .eye,
+    .creature.preview-fluffy .mouth {
+      z-index: 2;
+    }
+
+    .fluff {
+      position: absolute;
+      z-index: 0;
+      width: 48px;
+      height: 48px;
+      border: 4px solid #fff;
+      border-radius: 50%;
+      background: #fffdfb;
+    }
+
+    .fluff.one { left: -20px; top: 17px; }
+    .fluff.two { right: -20px; top: 17px; }
+    .fluff.three { left: -15px; bottom: 12px; }
+    .fluff.four { right: -15px; bottom: 12px; }
+    .fluff.five { left: 54px; bottom: -20px; }
+
     .speech {
       min-height: 24px;
       margin-top: 19px;
@@ -309,6 +372,18 @@
     const MAX_FULLNESS = 5;
     const MAX_HEALTH = 3;
     const MAX_POOP = 3;
+
+    const PREVIEW_VARIANTS = new Set([
+      'basic',
+      'sleepy',
+      'round',
+      'fashion',
+      'fluffy',
+    ]);
+    const previewVariant = new URLSearchParams(window.location.search).get('preview');
+    if (previewVariant !== null && !PREVIEW_VARIANTS.has(previewVariant)) {
+      throw new Error(`Unknown preview variant: ${previewVariant}`);
+    }
 
     const stage = document.getElementById('pet-stage');
     const poops = document.getElementById('poops');
@@ -579,6 +654,78 @@
       return 'きょうも いっしょだよ';
     }
 
+    function renderPreview(variant) {
+      const preview = {
+        basic: {
+          className: '',
+          speech: 'きょうも いっしょだよ',
+          message: 'ちいさないきものが うまれたよ。',
+        },
+        sleepy: {
+          className: 'preview-sleepy',
+          speech: 'ねむねむ…',
+          message: 'きょうは ちょっと ねむたいみたい。',
+        },
+        round: {
+          className: 'preview-round',
+          speech: 'ころん。',
+          message: 'まるっとした すがたに なったよ。',
+        },
+        fashion: {
+          className: 'preview-fashion',
+          speech: 'おしゃれしたよ',
+          message: 'リボンをつけて おめかししたよ。',
+        },
+        fluffy: {
+          className: 'preview-fluffy',
+          speech: 'もふもふだよ',
+          message: 'ふわふわ もふもふに なったよ。',
+        },
+      }[variant];
+
+      if (!preview) {
+        throw new Error(`Unknown preview variant: ${variant}`);
+      }
+
+      stage.replaceChildren();
+      poops.replaceChildren();
+      fullnessText.textContent = '●●●○○';
+      healthText.textContent = '♥♥♥';
+      ageText.textContent = '第1代 ・ 0にち 3じかん';
+      snackButton.disabled = false;
+      flushButton.disabled = false;
+      nextEggButton.hidden = true;
+      nextEggButton.disabled = true;
+      setMessage(preview.message);
+      setSaveStatus(`撮影プレビュー: ${variant}`);
+
+      const creature = document.createElement('div');
+      creature.className = `creature${preview.className ? ` ${preview.className}` : ''}`;
+      const fluff = variant === 'fluffy'
+        ? `
+          <div class="fluff one"></div>
+          <div class="fluff two"></div>
+          <div class="fluff three"></div>
+          <div class="fluff four"></div>
+          <div class="fluff five"></div>
+        `
+        : '';
+      creature.innerHTML = `
+        ${fluff}
+        <div class="ear left"></div>
+        <div class="ear right"></div>
+        <div class="eye left"></div>
+        <div class="eye right"></div>
+        <div class="mouth"></div>
+      `;
+      stage.appendChild(creature);
+
+      const speech = document.createElement('div');
+      speech.className = 'speech';
+      speech.textContent = preview.speech;
+      stage.appendChild(speech);
+    }
+
     function render() {
       if (!state) return;
       const now = Date.now();
@@ -788,7 +935,9 @@
 
     window.addEventListener('minappready', handleMinAppReady);
 
-    if (hasBuiltInStateBridge()) {
+    if (previewVariant !== null) {
+      renderPreview(previewVariant);
+    } else if (hasBuiltInStateBridge()) {
       startBoot(bootBuiltInState);
     } else if (hasMinAppState()) {
       handleMinAppReady();
