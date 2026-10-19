@@ -480,7 +480,7 @@ class _GirlsAppEditEntryPageState extends State<GirlsAppEditEntryPage> {
                         child: Column(
                           children: <Widget>[
                             const Text(
-                              'コードをコピーして、ChatGPTなど\nお手持ちのAIに貼り付けよう',
+                              'コードをコピーしてAIに貼り付けたら\nどこを変えたいか伝えてね',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: _ink,
@@ -586,11 +586,27 @@ String _buildAiClipboardText({
   }
 
   final StringBuffer buffer = StringBuffer()
-    ..writeln('「みんアプGirls」で動くミニアプリ')
-    ..writeln('アプリ名: $title')
-    ..writeln('技術仕様: $girlsTechnicalGuideUrl')
+    ..writeln('あなたはHTML/CSS/JavaScriptのコード編集を手伝うAIです。')
+    ..writeln('以下は「みんアプGirls」で動くミニアプリのソースコードです。')
+    ..writeln('アプリや端末を直接操作する必要はありません。')
+    ..writeln('このチャットでコードを編集し、私がGirlsのエディタに貼り付けます。')
+    ..writeln(
+      '変更したい内容をまだ伝えていなければ、'
+      '先に「どこをどう変えたい？」と聞いてください。',
+    )
+    ..writeln(
+      '内容を伝えたら、既存の機能とファイル名を維持して'
+      '必要な部分だけ修正してください。',
+    )
+    ..writeln(
+      '修正したファイルごとに、ファイル名とコード全文を'
+      'コードブロックで返してください。',
+    )
+    ..writeln('出力が長すぎる場合は途中で省略せず、その旨を伝えてください。')
+    ..writeln('コードから分からないことは推測で補わず確認してください。')
     ..writeln()
-    ..writeln('改造したい！')
+    ..writeln('アプリ名: $title')
+    ..writeln('技術仕様（必要な場合のみ参照）: $girlsTechnicalGuideUrl')
     ..writeln('ファイル一覧:');
 
   for (final String path in archive.paths) {

@@ -281,6 +281,15 @@ void main() {
 
     expect(sourceReads, 1);
     expect(copiedText, isNotNull);
+    expect(copiedText, contains('アプリや端末を直接操作する必要はありません。'));
+    expect(copiedText, contains('どこをどう変えたい？'));
+    expect(copiedText, contains('修正したファイルごとに、ファイル名とコード全文'));
+    expect(copiedText, contains('アプリ名: おえかき'));
+    expect(copiedText, contains('===== index.html ====='));
+    expect(copiedText, contains('<html><body>Hello</body></html>'));
+    expect(copiedText, contains('===== style.css ====='));
+    expect(copiedText, contains('body { background: white; }'));
+    expect(copiedText, isNot(contains('改造したい！')));
     ScaffoldMessenger.of(
       tester.element(find.byType(GirlsAppEditEntryPage)),
     ).removeCurrentSnackBar();
