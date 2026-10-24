@@ -7,6 +7,7 @@ const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const { URLSearchParams } = require('node:url');
 
 const MEMO_KEY = 'minapp_memo_pad_v1';
 const PET_KEY = 'minappchi_pet_v1';
@@ -110,6 +111,7 @@ function launch(app, options = {}) {
     HTMLElement: Element,
     HTMLTextAreaElement: TextArea,
     HTMLButtonElement: Button,
+    URLSearchParams,
     Date: class extends Date { static now() { return now; } },
   });
   const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
