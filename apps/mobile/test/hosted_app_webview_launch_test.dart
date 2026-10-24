@@ -466,8 +466,14 @@ class _FakeWebViewController extends PlatformWebViewController {
       <String, JavaScriptChannelParams>{};
   _FakeNavigationDelegate? navigation;
   JavaScriptMode? javaScriptMode;
+  Color? backgroundColor;
   int localStorageClears = 0;
   int cacheClears = 0;
+
+  @override
+  Future<void> setBackgroundColor(Color color) async {
+    backgroundColor = color;
+  }
 
   @override
   Future<void> clearCache() async {
