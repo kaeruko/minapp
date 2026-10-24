@@ -1075,7 +1075,7 @@ class _EmptyApps extends StatelessWidget {
   static const String _technicalGuideUrl =
       'https://cloxs.jp/minapp/ai/index.html';
   static const String _basePrompt =
-      'みんアプ技術資料 $_technicalGuideUrl を見て、○○のアプリを作って。HTML・CSS・JavaScriptは1つのindex.htmlにまとめて、完成したHTMLコードをそのまま出して。';
+      'みんアプ技術資料 $_technicalGuideUrl を見て、○○のアプリを作って。HTML・CSS・JavaScriptは1つのindex.htmlにまとめてください。ZIP・添付・ダウンロード用ファイルは作らず、完成したindex.htmlの全文を省略せず、1つのhtmlコードブロックでそのまま表示してください。「変更箇所だけ」や「...」で省略しないでください。';
 
   Future<void> _copyPrompt(BuildContext context, String prompt) async {
     await Clipboard.setData(ClipboardData(text: prompt));
@@ -1085,7 +1085,7 @@ class _EmptyApps extends StatelessWidget {
   }
 
   String _ideaPrompt(String idea) =>
-      'みんアプ技術資料 $_technicalGuideUrl を見て、$ideaのアプリを作って。HTML・CSS・JavaScriptは1つのindex.htmlにまとめて、完成したHTMLコードをそのまま出して。';
+      'みんアプ技術資料 $_technicalGuideUrl を見て、$ideaのアプリを作って。HTML・CSS・JavaScriptは1つのindex.htmlにまとめてください。ZIP・添付・ダウンロード用ファイルは作らず、完成したindex.htmlの全文を省略せず、1つのhtmlコードブロックでそのまま表示してください。「変更箇所だけ」や「...」で省略しないでください。';
 
   @override
   Widget build(BuildContext context) {
