@@ -170,13 +170,6 @@ class _GirlsShopPageState extends State<GirlsShopPage> {
               ),
             ),
             const SizedBox(height: 14),
-            if (widget.session == null) ...<Widget>[
-              const Text(
-                '登録なしで作品を見られるよ。遊んだり追加するには登録・ログインしてね。',
-                style: TextStyle(color: _ink, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 12),
-            ],
             TextField(
               controller: _searchController,
               onChanged: (_) => setState(() {}),
