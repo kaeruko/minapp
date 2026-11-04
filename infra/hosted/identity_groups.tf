@@ -57,6 +57,19 @@ locals {
   ])
 }
 
+# Keep the existing API Gateway route IDs when moving the public shop catalog
+# from the authenticated route collection. Only the JWT requirement changes.
+# Do not delete/recreate these routes: the deploy guard rejects destructive plans.
+moved {
+  from = aws_apigatewayv2_route.hosted_protected["GET /shop/apps"]
+  to   = aws_apigatewayv2_route.hosted_public["GET /shop/apps"]
+}
+
+moved {
+  from = aws_apigatewayv2_route.hosted_protected["GET /shop/apps/{app_id}/thumbnail"]
+  to   = aws_apigatewayv2_route.hosted_public["GET /shop/apps/{app_id}/thumbnail"]
+}
+
 resource "aws_iam_role" "hosted_identity_api" {
   name = "${local.name_prefix}-identity-api"
 
