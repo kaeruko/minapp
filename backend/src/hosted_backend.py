@@ -19,6 +19,8 @@ from errors import ApiProblem
 
 MAX_GROUPS_PER_USER = 20
 MAX_MEMBERS_PER_GROUP = 20
+HOSTED_COMMUNITY_GROUP_ID = "00000000000000000000000000000001"
+HOSTED_COMMUNITY_GROUP_NAME = "みんなの広場"
 INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
 PERMANENT_GROUP_ID_EXPIRES_AT_EPOCH = 253402300799
 _INVITE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
@@ -100,6 +102,37 @@ class HostedAwsBackend(AwsBackend):
     rows with role ``owner`` or ``member``. This is deliberately separate from
     the dedicated-school ``teacher``/``student`` model.
     """
+
+    @staticmethod
+    def _community_group() -> dict[str, str]:
+        return {
+            "group_id": HOSTED_COMMUNITY_GROUP_ID,
+            "name": HOSTED_COMMUNITY_GROUP_NAME,
+            "role": "member",
+            "status": "active",
+        }
+
+    @staticmethod
+    def _community_membership(user_id: str) -> dict[str, Any]:
+        if not isinstance(user_id, str) or not user_id:
+            raise ValueError("community membership requires a user id")
+        return {
+            "entity": _string_attr("community_membership"),
+            "group_id": _string_attr(HOSTED_COMMUNITY_GROUP_ID),
+            "group_name": _string_attr(HOSTED_COMMUNITY_GROUP_NAME),
+            "user_id": _string_attr(user_id),
+            "role": _string_attr("member"),
+            "status": _string_attr("active"),
+        }
+
+    def _list_groups_for_user(self, user_id: str) -> list[dict[str, Any]]:
+        private_groups = super()._list_groups_for_user(user_id)
+        if any(
+            group.get("group_id") == HOSTED_COMMUNITY_GROUP_ID
+            for group in private_groups
+        ):
+            raise RuntimeError("Community space must not have membership rows")
+        return [self._community_group(), *private_groups]
 
     def _user_from_item(self, item: dict[str, Any]) -> _User:
         user = _User(
@@ -238,6 +271,12 @@ class HostedAwsBackend(AwsBackend):
 
     def list_members(self, auth_subject: str, group_id: str) -> list[dict[str, str]]:
         user = self._user_by_auth_subject(auth_subject)
+        if group_id == HOSTED_COMMUNITY_GROUP_ID:
+            raise ApiProblem(
+                400,
+                "community_has_no_member_list",
+                "みんなの広場にはメンバー一覧がありません。",
+            )
         self._require_active_membership(user.user_id, group_id)
         members = []
         for item in self._membership_items_for_group(group_id):
@@ -256,6 +295,12 @@ class HostedAwsBackend(AwsBackend):
 
     def create_invite(self, auth_subject: str, group_id: str) -> dict[str, Any]:
         user = self._user_by_auth_subject(auth_subject)
+        if group_id == HOSTED_COMMUNITY_GROUP_ID:
+            raise ApiProblem(
+                400,
+                "community_has_no_invite",
+                "みんなの広場には招待コードがありません。",
+            )
         self._require_active_membership(user.user_id, group_id)
         group_item = self._get_item(pk=f"GROUP#{group_id}", sk="META")
         if group_item is None:
@@ -403,6 +448,12 @@ class HostedAwsBackend(AwsBackend):
 
     def leave_group(self, auth_subject: str, group_id: str) -> None:
         user = self._user_by_auth_subject(auth_subject)
+        if group_id == HOSTED_COMMUNITY_GROUP_ID:
+            raise ApiProblem(
+                400,
+                "community_membership_is_implicit",
+                "みんなの広場から脱退することはできません。",
+            )
         membership = self._require_active_membership(user.user_id, group_id)
         role = _item_string(membership, "role")
         if role == "owner":
@@ -454,6 +505,8 @@ class HostedAwsBackend(AwsBackend):
         )
 
     def _require_active_membership(self, user_id: str, group_id: str) -> dict[str, Any]:
+        if group_id == HOSTED_COMMUNITY_GROUP_ID:
+            return self._community_membership(user_id)
         item = self._get_item(pk=f"GROUP#{group_id}", sk=f"MEMBER#{user_id}")
         if item is None or _item_string(item, "status") != "active":
             raise ApiProblem(403, "forbidden", "このグループのメンバーではありません。")

@@ -47,7 +47,6 @@ class HostedGirlsApi {
       ),
       registrationOnboarding: GirlsRegistrationOnboarding(
         delegate,
-        resolvedCurrentGroupStore,
       ),
       sessionStore: sessionStore ?? SecureGirlsSessionStore(),
       currentGroupAccountScope: currentGroupAccountScope,
@@ -105,10 +104,7 @@ class HostedGirlsApi {
       await _currentGroupAccountScope.activateAccount(userId);
       accountActivated = true;
 
-      // Girls accounts always need at least one group so app creation has a
-      // destination immediately after registration. Existing memberships are
-      // preserved; an empty account receives one ordinary starter group.
-      await _registrationOnboarding.ensureInitialGroup(session);
+      await _registrationOnboarding.ensureCommunity(session);
 
       // Persist only after onboarding succeeds. Some valid Cognito login
       // responses omit a refresh token; those sessions last until app restart.
@@ -169,7 +165,7 @@ class HostedGirlsApi {
           await _delegate.fetchCurrentUserId(session.accessToken);
       await _currentGroupAccountScope.activateAccount(userId);
       accountActivated = true;
-      await _registrationOnboarding.ensureInitialGroup(session);
+      await _registrationOnboarding.ensureCommunity(session);
       debugPrint(
         'Girls session restore: group verification succeeded; session restored.',
       );

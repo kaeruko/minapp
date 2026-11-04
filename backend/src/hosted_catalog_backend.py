@@ -19,6 +19,7 @@ from app_zip import (
 )
 from aws_backend import _aws_error_code, _item_string, _required_env, _string_attr
 from errors import ApiProblem
+from hosted_backend import HOSTED_COMMUNITY_GROUP_ID
 from hosted_platform_backend import (
     HostedPlatformBackend,
     MAX_RUNTIME_VALUE_BYTES,
@@ -176,7 +177,16 @@ class HostedCatalogBackend(HostedPlatformBackend):
     def list_group_apps(self, auth_subject: str, group_id: str) -> list[dict[str, Any]]:
         user = self._user_by_auth_subject(auth_subject)
         self._require_active_membership(user.user_id, group_id)
-        apps = [self._public_hosted_app(item) for item in self._group_app_items(group_id)]
+        items = self._group_app_items(group_id)
+        if group_id == HOSTED_COMMUNITY_GROUP_ID:
+            items = [
+                item
+                for item in items
+                if _optional_number(item, "published_version") is not None
+                and _optional_string(item, "visibility_state") != "hidden"
+                and _optional_string(item, "deletion_state") is None
+            ]
+        apps = [self._public_hosted_app(item) for item in items]
         apps.sort(key=lambda app: (app["title"], app["app_id"]))
         return apps
 
@@ -1278,6 +1288,8 @@ class HostedCatalogBackend(HostedPlatformBackend):
         }
 
     def _require_app_capacity(self, group_id: str) -> None:
+        if group_id == HOSTED_COMMUNITY_GROUP_ID:
+            return
         if len(self._group_app_items(group_id)) >= MAX_APPS_PER_GROUP:
             raise ApiProblem(
                 409,

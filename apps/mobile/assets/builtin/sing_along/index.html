@@ -136,6 +136,11 @@
 
     const MAX_SECONDS = 60;
     const BGM_MASTER_GAIN = 3.0;
+    const BGM_OUTPUT_GAIN = 1.35;
+    const TONE_FLOOR_GAIN = 0.0001;
+    const TONE_SUSTAIN_RATIO = 0.72;
+    const TONE_ATTACK_SECONDS = 0.015;
+    const TONE_RELEASE_SECONDS = 0.055;
     // Holst, The Planets (1921 score), Jupiter, Andante maestoso:
     // first seven complete bars after the G3/Bb3 pickup (printed p.91).
     // Each pair is [MIDI note, quarter-note beats]; tied notes are combined.
@@ -479,13 +484,39 @@
       const gain = context.createGain();
       oscillator.type = wave;
       oscillator.frequency.setValueAtTime(frequency, start);
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(gainValue * BGM_MASTER_GAIN, start + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      scheduleGainEnvelope(gain.gain, start, duration, gainValue * BGM_MASTER_GAIN);
       oscillator.connect(gain).connect(destination);
       oscillator.start(start);
       oscillator.stop(start + duration + 0.03);
       bgmNodes.push(oscillator, gain);
+    }
+
+    function scheduleGainEnvelope(gain, start, duration, peak) {
+      if (!Number.isFinite(start) || !Number.isFinite(duration) || duration <= 0 ||
+          !Number.isFinite(peak) || peak <= TONE_FLOOR_GAIN) {
+        throw new Error(`Invalid gain envelope: start=${start}, duration=${duration}, peak=${peak}`);
+      }
+      const attack = Math.min(TONE_ATTACK_SECONDS, duration / 4);
+      const release = Math.min(TONE_RELEASE_SECONDS, duration / 3);
+      const releaseStart = Math.max(start + attack, start + duration - release);
+      gain.setValueAtTime(TONE_FLOOR_GAIN, start);
+      gain.exponentialRampToValueAtTime(peak, start + attack);
+      gain.exponentialRampToValueAtTime(peak * TONE_SUSTAIN_RATIO, releaseStart);
+      gain.exponentialRampToValueAtTime(TONE_FLOOR_GAIN, start + duration);
+    }
+
+    function createBgmOutput(context) {
+      const master = context.createGain();
+      const compressor = context.createDynamicsCompressor();
+      master.gain.setValueAtTime(BGM_OUTPUT_GAIN, context.currentTime);
+      compressor.threshold.setValueAtTime(-12, context.currentTime);
+      compressor.knee.setValueAtTime(18, context.currentTime);
+      compressor.ratio.setValueAtTime(4, context.currentTime);
+      compressor.attack.setValueAtTime(0.003, context.currentTime);
+      compressor.release.setValueAtTime(0.18, context.currentTime);
+      master.connect(compressor).connect(context.destination);
+      bgmNodes.push(master, compressor);
+      return master;
     }
 
     function scoreToneEvents(track) {
@@ -531,15 +562,12 @@
         const oscillator = context.createOscillator();
         const gain = context.createGain();
         oscillator.type = events[0].wave;
-        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.setValueAtTime(TONE_FLOOR_GAIN, start);
         for (const event of events) {
           const when = start + event.offsetBeats * beat;
           const duration = event.fixedDurationSeconds ?? event.durationBeats * beat * event.durationFactor;
-          const attack = Math.min(0.02, duration / 2);
           oscillator.frequency.setValueAtTime(midiToHz(event.note), when);
-          gain.gain.setValueAtTime(0.0001, when);
-          gain.gain.exponentialRampToValueAtTime(event.gainValue * BGM_MASTER_GAIN, when + attack);
-          gain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+          scheduleGainEnvelope(gain.gain, when, duration, event.gainValue * BGM_MASTER_GAIN);
         }
         oscillator.connect(gain).connect(destination);
         oscillator.start(start);
@@ -560,8 +588,9 @@
       const totalBeats = Math.ceil(MAX_SECONDS / beat) + 4;
 
       stopBgm();
+      const destination = createBgmOutput(context);
       if (track.kind === 'score') {
-        scheduleScore(context, context.destination, track, start);
+        scheduleScore(context, destination, track, start);
         return start;
       }
       for (let beatIndex = 0; beatIndex < totalBeats; beatIndex += 1) {
@@ -569,12 +598,12 @@
         const when = start + beatIndex * beat;
         if (beatIndex % 4 === 0) {
           for (const offset of chord) {
-            scheduleTone(context, context.destination, midiToHz(track.root + offset), when, beat * 3.8, 0.035, track.wave);
+            scheduleTone(context, destination, midiToHz(track.root + offset), when, beat * 3.8, 0.035, track.wave);
           }
         }
-        scheduleTone(context, context.destination, midiToHz(track.root - 12 + chord[0]), when, beat * 0.8, 0.045, 'sine');
+        scheduleTone(context, destination, midiToHz(track.root - 12 + chord[0]), when, beat * 0.8, 0.045, 'sine');
         if (beatIndex % 2 === 0) {
-          scheduleTone(context, context.destination, midiToHz(84), when, 0.035, 0.018, 'square');
+          scheduleTone(context, destination, midiToHz(84), when, 0.035, 0.018, 'square');
         }
       }
       return start;

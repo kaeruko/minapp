@@ -528,16 +528,33 @@ class HostedPlatformBackend(HostedAwsBackend):
         self._dynamodb.transact_write_items(TransactItems=operations)
 
     def _group_app_items(self, group_id: str) -> list[dict[str, Any]]:
-        response = self._dynamodb.query(
-            TableName=self._table_name,
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :app_prefix)",
-            ExpressionAttributeValues={
-                ":pk": _string_attr(f"GROUP#{group_id}"),
-                ":app_prefix": _string_attr("APP#"),
-            },
-            ConsistentRead=True,
-        )
-        return self._query_items(response)
+        items: list[dict[str, Any]] = []
+        last_key: dict[str, Any] | None = None
+        while True:
+            arguments: dict[str, Any] = {
+                "TableName": self._table_name,
+                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :app_prefix)",
+                "ExpressionAttributeValues": {
+                    ":pk": _string_attr(f"GROUP#{group_id}"),
+                    ":app_prefix": _string_attr("APP#"),
+                },
+                "ConsistentRead": True,
+            }
+            if last_key is not None:
+                arguments["ExclusiveStartKey"] = last_key
+            response = self._dynamodb.query(**arguments)
+            page = response.get("Items")
+            if not isinstance(page, list) or any(
+                not isinstance(item, dict) for item in page
+            ):
+                raise RuntimeError("DynamoDB Query response has invalid Items")
+            items.extend(page)
+            raw_last_key = response.get("LastEvaluatedKey")
+            if raw_last_key is None:
+                return items
+            if not isinstance(raw_last_key, dict) or not raw_last_key:
+                raise RuntimeError("DynamoDB Query returned invalid LastEvaluatedKey")
+            last_key = raw_last_key
 
     def delete_account(self, auth_subject: str) -> None:
         user = self._user_by_auth_subject(auth_subject)
