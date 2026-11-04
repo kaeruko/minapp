@@ -123,7 +123,10 @@ void main() {
     final String html = await rootBundle.loadString(karaoke.assetPath);
 
     expect(html, contains('const BGM_MASTER_GAIN = 3.0;'));
-    expect(html, contains('<option value="jupiter">'));
+    expect(html, contains('<option value="jupiter">木星（ホルスト）</option>'));
+    expect(html, contains('<option value="mozart-25">交響曲第25番（モーツァルト）</option>'));
+    expect(html, contains('<option value="clair-de-lune">月の光（ドビュッシー）</option>'));
+    expect(html, isNot(contains('ラララ')));
     expect(html, contains('const JUPITER_THEME = Object.freeze(['));
     expect(html, contains("kind: 'score'"));
     expect(html, contains('trackDurationSeconds()'));
