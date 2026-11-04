@@ -10,7 +10,11 @@ if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
 
 from errors import ApiProblem  # noqa: E402
-from hosted_backend import HostedAwsBackend  # noqa: E402
+from hosted_backend import (  # noqa: E402
+    HOSTED_COMMUNITY_GROUP_ID,
+    HOSTED_COMMUNITY_GROUP_NAME,
+    HostedAwsBackend,
+)
 
 
 class FakeAwsError(Exception):
@@ -283,15 +287,47 @@ class HostedBackendTests(unittest.TestCase):
         self.backend.register(login_id, "secret12")
         return self.cognito.users[login_id]["sub"]
 
+    def _community(self) -> dict[str, str]:
+        return {
+            "group_id": HOSTED_COMMUNITY_GROUP_ID,
+            "name": HOSTED_COMMUNITY_GROUP_NAME,
+            "role": "member",
+            "status": "active",
+        }
+
     def test_register_creates_permanent_hosted_user(self) -> None:
         subject = self._register("alice")
         self.assertFalse(self.cognito.users["alice"]["temporary"])
         me = self.backend.me(subject)
         self.assertEqual(me["user"]["login_id"], "alice")
         self.assertEqual(me["user"]["role"], "user")
-        self.assertEqual(me["groups"], [])
+        self.assertEqual(me["groups"], [self._community()])
         logged_in = self.backend.login("alice", "secret12")
         self.assertEqual(logged_in["state"], "authenticated")
+
+    def test_community_membership_is_implicit_and_cannot_be_managed(self) -> None:
+        alice = self._register("alice")
+
+        self.assertEqual(self.backend.list_groups(alice), [self._community()])
+        self.assertFalse(
+            any(
+                HOSTED_COMMUNITY_GROUP_ID in key_part
+                for key in self.dynamo.items
+                for key_part in key
+            )
+        )
+
+        operations = (
+            ("community_has_no_member_list", self.backend.list_members),
+            ("community_has_no_invite", self.backend.create_invite),
+            ("community_membership_is_implicit", self.backend.leave_group),
+        )
+        for expected_error, operation in operations:
+            with self.subTest(operation=operation.__name__):
+                with self.assertRaises(ApiProblem) as caught:
+                    operation(alice, HOSTED_COMMUNITY_GROUP_ID)
+                self.assertEqual(caught.exception.status_code, 400)
+                self.assertEqual(caught.exception.error, expected_error)
 
     def test_duplicate_login_id_is_rejected(self) -> None:
         self._register("alice")
@@ -315,7 +351,7 @@ class HostedBackendTests(unittest.TestCase):
         self.backend.leave_group(bob, group["group_id"])
         self.assertEqual(
             self.backend.list_groups(bob),
-            [],
+            [self._community()],
         )
 
     def test_group_id_is_stable_across_reads(self) -> None:
@@ -372,7 +408,7 @@ class HostedBackendTests(unittest.TestCase):
 
         bob_id = self.backend.me(bob)["user"]["user_id"]
         self.backend.remove_member(alice, group["group_id"], bob_id)
-        self.assertEqual(self.backend.list_groups(bob), [])
+        self.assertEqual(self.backend.list_groups(bob), [self._community()])
 
         alice_id = self.backend.me(alice)["user"]["user_id"]
         with self.assertRaises(ApiProblem) as caught:

@@ -1,4 +1,4 @@
-enum GirlsHomeMascotDestination { invite, currentGroup, apps }
+enum GirlsHomeMascotDestination { currentGroup, apps }
 
 class GirlsHomeMascotPrompt {
   const GirlsHomeMascotPrompt({
@@ -13,26 +13,12 @@ class GirlsHomeMascotPrompt {
 class GirlsHomeMascotPromptResolver {
   const GirlsHomeMascotPromptResolver();
 
-  GirlsHomeMascotPrompt? resolve({
-    required int memberCount,
-    required int customAppCount,
-  }) {
-    if (memberCount < 1) {
-      throw StateError('Current group must contain at least one member.');
-    }
+  GirlsHomeMascotPrompt resolve({required int customAppCount}) {
     if (customAppCount < 0) {
       throw RangeError.value(
         customAppCount,
         'customAppCount',
         'must not be negative',
-      );
-    }
-
-    // The social onboarding hint takes precedence when both conditions match.
-    if (memberCount == 1) {
-      return const GirlsHomeMascotPrompt(
-        message: '友達を招待する？',
-        destination: GirlsHomeMascotDestination.invite,
       );
     }
     if (customAppCount == 0) {

@@ -445,7 +445,8 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
 
     final List<HostedGroup> orderedGroups = <HostedGroup>[
       group,
-      ...groups.where((HostedGroup candidate) => candidate.groupId != group.groupId),
+      ...groups
+          .where((HostedGroup candidate) => candidate.groupId != group.groupId),
     ];
     setState(() => _error = null);
     final bool? uploaded = await Navigator.of(context).push<bool>(
@@ -578,7 +579,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
           children: <Widget>[
-            _CurrentGroupCard(group: _currentGroup, onChange: widget.onGroups),
+            _CurrentGroupCard(group: _currentGroup),
             const SizedBox(height: 12),
             FilledButton.icon(
               key: const Key('girls-create-blank-app'),
@@ -620,7 +621,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
             if (makers == null)
               const _LoadingCard()
             else if (_currentGroup == null)
-              _SelectGroupCard(onSelect: widget.onGroups)
+              const _MissingCommunityCard()
             else if (_error != null && makers.isEmpty)
               const SizedBox.shrink()
             else if (makers.isEmpty)
@@ -646,7 +647,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
             if (apps == null)
               const _LoadingCard()
             else if (_currentGroup == null)
-              _SelectGroupCard(onSelect: widget.onGroups)
+              const _MissingCommunityCard()
             else if (_error != null && apps.isEmpty)
               const SizedBox.shrink()
             else if (apps.isEmpty)
@@ -715,10 +716,9 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _CurrentGroupCard extends StatelessWidget {
-  const _CurrentGroupCard({required this.group, required this.onChange});
+  const _CurrentGroupCard({required this.group});
 
   final HostedGroup? group;
-  final VoidCallback? onChange;
 
   @override
   Widget build(BuildContext context) {
@@ -734,13 +734,23 @@ class _CurrentGroupCard extends StatelessWidget {
           const Icon(Icons.group_rounded, color: _lavender),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              group == null ? 'グループを選んでね' : group!.name,
-              style: const TextStyle(color: _ink, fontWeight: FontWeight.w800),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  '作る場所',
+                  style: TextStyle(color: Color(0xFF8F7A74), fontSize: 11),
+                ),
+                Text(
+                  group?.name ?? '確認できません',
+                  style: const TextStyle(
+                    color: _ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
           ),
-          if (onChange != null)
-            TextButton(onPressed: onChange, child: const Text('変更')),
         ],
       ),
     );
@@ -899,15 +909,13 @@ class _LoadingCard extends StatelessWidget {
       );
 }
 
-class _SelectGroupCard extends StatelessWidget {
-  const _SelectGroupCard({required this.onSelect});
-  final VoidCallback? onSelect;
+class _MissingCommunityCard extends StatelessWidget {
+  const _MissingCommunityCard();
 
   @override
-  Widget build(BuildContext context) => OutlinedButton.icon(
-        onPressed: onSelect,
-        icon: const Icon(Icons.group_rounded),
-        label: const Text('使うグループを選ぶ'),
+  Widget build(BuildContext context) => const Text(
+        'みんなの広場を確認できませんでした。',
+        style: TextStyle(color: Color(0xFFA04455)),
       );
 }
 

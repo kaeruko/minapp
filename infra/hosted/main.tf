@@ -1,6 +1,7 @@
 locals {
   project_name         = "minapp"
-  name_prefix          = "${local.project_name}-hosted-${var.environment}"
+  name_prefix          = var.edition == "girls" ? "${local.project_name}-hosted-${var.environment}" : "${local.project_name}-${var.edition}-hosted-${var.environment}"
+  edition_display_name = var.edition == "girls" ? "みんアプ Girls" : "みんアプ工房"
   api_protocol_version = 1
   portal_origin        = "https://minapp.cloxs.jp"
   cors_allowed_origins = concat([local.portal_origin], var.local_development_cors_origins)
@@ -40,6 +41,7 @@ provider "aws" {
       Environment = var.environment
       TenantId    = var.hosted_tenant_id
       HostingMode = "shared"
+      Edition     = var.edition
       ManagedBy   = "terraform"
     }
   }
@@ -91,8 +93,8 @@ resource "aws_cognito_user_pool" "main" {
 
   verification_message_template {
     default_email_option = "CONFIRM_WITH_CODE"
-    email_subject        = "みんアプ Girls メールアドレス確認コード"
-    email_message        = "みんアプ Girls の確認コードは {####} です。アプリの設定画面に入力してください。"
+    email_subject        = "${local.edition_display_name} メールアドレス確認コード"
+    email_message        = "${local.edition_display_name} の確認コードは {####} です。アプリの設定画面に入力してください。"
   }
 
   password_policy {
@@ -356,6 +358,7 @@ resource "aws_lambda_function" "api" {
   environment {
     variables = {
       ENVIRONMENT          = var.environment
+      HOSTED_EDITION_ID    = var.edition
       TENANT_ID            = var.hosted_tenant_id
       API_PROTOCOL_VERSION = tostring(local.api_protocol_version)
       DATA_TABLE_NAME      = aws_dynamodb_table.main.name

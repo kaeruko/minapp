@@ -6,30 +6,10 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:minapp_mobile/girls/api.dart';
 import 'package:minapp_mobile/girls/girls_account_deletion_page.dart';
-import 'package:minapp_mobile/girls/girls_current_group_store.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
 const String _ownerGroupId = '11111111111111111111111111111111';
 const String _memberGroupId = '22222222222222222222222222222222';
-
-class _MemoryCurrentGroupStore implements GirlsCurrentGroupStore {
-  String? value = _ownerGroupId;
-  bool cleared = false;
-
-  @override
-  Future<String?> load() async => value;
-
-  @override
-  Future<void> save(String groupId) async {
-    value = groupId;
-  }
-
-  @override
-  Future<void> clear() async {
-    cleared = true;
-    value = null;
-  }
-}
 
 http.Response _json(Object body, [int status = 200]) => http.Response(
       jsonEncode(body),
@@ -44,14 +24,12 @@ void main() {
     'confirmed deletion removes owned groups, then account, and returns success',
     (WidgetTester tester) async {
       final List<String> requests = <String>[];
-      final _MemoryCurrentGroupStore store = _MemoryCurrentGroupStore();
       final HostedGirlsApi api = HostedGirlsApi(
         baseUri: Uri.parse('https://example.com'),
         client: MockClient((http.Request request) async {
           requests.add('${request.method} ${request.url.path}');
           expect(request.headers['authorization'], 'Bearer test-token');
-          if (request.method == 'GET' &&
-              request.url.path == '/hosted/groups') {
+          if (request.method == 'GET' && request.url.path == '/hosted/groups') {
             return _json(<String, Object?>{
               'groups': <Object?>[
                 <String, Object?>{
@@ -99,7 +77,6 @@ void main() {
                             accessToken: 'test-token',
                             expiresIn: 3600,
                           ),
-                          currentGroupStore: store,
                         ),
                       ),
                     );
@@ -135,7 +112,6 @@ void main() {
           'DELETE /hosted/account',
         ],
       );
-      expect(store.cleared, isTrue);
       expect(result, isTrue);
       expect(tester.takeException(), isNull);
     },

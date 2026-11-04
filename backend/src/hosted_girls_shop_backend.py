@@ -7,14 +7,14 @@ from hosted_shop_runtime_backend import HostedShopRuntimeBackend
 from hosted_user_state_backend import HostedUserStateBackend
 
 
-class HostedGirlsShopBackend(HostedShopRuntimeBackend, HostedShopManagedBackend):
-    """Final Girls shop backend: cross-group catalog, managed listing, isolated Runtime."""
+class HostedConsumerBackend(HostedShopRuntimeBackend, HostedShopManagedBackend):
+    """Final consumer backend: cross-group catalog, managed listing, isolated Runtime."""
 
     def list_group_apps(
         self, auth_subject: str, group_id: str
     ) -> list[dict[str, Any]]:
         # The shop is additive. Do not inject shop-only fields into the existing
-        # group-app response contract consumed throughout Girls.
+        # group-app response contract consumed throughout hosted editions.
         return HostedUserStateBackend.list_group_apps(self, auth_subject, group_id)
 
     def delete_hosted_app(
@@ -46,3 +46,7 @@ class HostedGirlsShopBackend(HostedShopRuntimeBackend, HostedShopManagedBackend)
             )
         self._delete_all_runtime_user_state(shop_group_id, app_id)
         super().delete_hosted_app(auth_subject, group_id, app_id)
+
+
+# Compatibility name for deployed imports and older integrations.
+HostedGirlsShopBackend = HostedConsumerBackend

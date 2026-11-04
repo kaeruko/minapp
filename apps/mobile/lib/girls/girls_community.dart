@@ -1,32 +1,14 @@
 import '../hosted_api.dart';
+import '../hosted_edition.dart';
 
-const String girlsCommunityGroupId = '00000000000000000000000000000001';
-const String girlsCommunityGroupName = 'みんなの広場';
+const String girlsCommunityGroupId = HostedEditions.girlsCommunityGroupId;
+const String girlsCommunityGroupName = HostedEditions.girlsCommunityGroupName;
 
-bool isGirlsCommunityGroup(HostedGroup group) {
-  return group.groupId == girlsCommunityGroupId;
-}
+bool isGirlsCommunityGroup(HostedGroup group) =>
+    HostedEditions.girls.community.matches(group);
 
-HostedGroup requireGirlsCommunityGroup(List<HostedGroup> groups) {
-  final List<HostedGroup> matches = groups
-      .where(isGirlsCommunityGroup)
-      .toList(growable: false);
-  if (matches.length != 1) {
-    throw StateError(
-      'Girls API must return exactly one community space; '
-      'received ${matches.length}.',
-    );
-  }
-  final HostedGroup community = matches.single;
-  if (community.name != girlsCommunityGroupName || community.isOwner) {
-    throw StateError('Girls community space metadata is invalid.');
-  }
-  return community;
-}
+HostedGroup requireGirlsCommunityGroup(List<HostedGroup> groups) =>
+    HostedEditions.girls.community.requireFrom(groups);
 
-List<HostedGroup> girlsPrivateGroups(List<HostedGroup> groups) {
-  requireGirlsCommunityGroup(groups);
-  return groups
-      .where((HostedGroup group) => !isGirlsCommunityGroup(group))
-      .toList(growable: false);
-}
+List<HostedGroup> girlsPrivateGroups(List<HostedGroup> groups) =>
+    HostedEditions.girls.community.privateGroupsFrom(groups);

@@ -1,5 +1,6 @@
 aws_region          = "ap-northeast-1"
 environment         = "dev"
+edition             = "girls"
 hosted_tenant_id    = "0123456789abcdef0123456789abcdef"
 expected_account_id = "123456789012"
 allow_self_signup   = false

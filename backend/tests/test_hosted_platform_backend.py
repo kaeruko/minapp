@@ -10,6 +10,7 @@ if str(BACKEND_SRC) not in sys.path:
 
 from aws_backend import _string_attr  # noqa: E402
 from errors import ApiProblem  # noqa: E402
+from hosted_backend import HOSTED_COMMUNITY_GROUP_ID  # noqa: E402
 from hosted_platform_backend import HostedPlatformBackend  # noqa: E402
 from test_hosted_backend import FakeCognito, FakeDynamoDb  # noqa: E402
 
@@ -159,7 +160,11 @@ class HostedPlatformBackendTests(unittest.TestCase):
 
         self._remove_seeded_app(group["group_id"], app_id)
         self.backend.delete_group(alice, group["group_id"])
-        self.assertEqual(self.backend.list_groups(alice), [])
+        groups = self.backend.list_groups(alice)
+        self.assertEqual(
+            [item["group_id"] for item in groups],
+            [HOSTED_COMMUNITY_GROUP_ID],
+        )
 
     def test_runtime_token_is_scoped_and_membership_is_rechecked_each_request(self) -> None:
         alice, _ = self._register("alice")

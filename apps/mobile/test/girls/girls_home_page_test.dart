@@ -5,37 +5,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:minapp_mobile/girls/api.dart';
-import 'package:minapp_mobile/girls/girls_current_group_store.dart';
+import 'package:minapp_mobile/girls/girls_community.dart';
 import 'package:minapp_mobile/girls/girls_home_page.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
 const HostedGroup _currentGroup = HostedGroup(
-  groupId: '0123456789abcdef0123456789abcdef',
-  name: '放課後イラスト部',
-  role: 'owner',
+  groupId: girlsCommunityGroupId,
+  name: girlsCommunityGroupName,
+  role: 'member',
   status: 'active',
 );
 const String _arrangedAppId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const String _ownerUserId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-
-class _MemoryCurrentGroupStore implements GirlsCurrentGroupStore {
-  _MemoryCurrentGroupStore(this.value);
-
-  String? value;
-
-  @override
-  Future<String?> load() async => value;
-
-  @override
-  Future<void> save(String groupId) async {
-    value = groupId;
-  }
-
-  @override
-  Future<void> clear() async {
-    value = null;
-  }
-}
 
 HostedGirlsApi _fakeApi({List<String>? requests}) {
   return HostedGirlsApi(
@@ -52,18 +33,6 @@ HostedGirlsApi _fakeApi({List<String>? requests}) {
               'name': _currentGroup.name,
               'role': _currentGroup.role,
               'status': _currentGroup.status,
-            },
-          ],
-        };
-      } else if (path ==
-          '/hosted/groups/${_currentGroup.groupId}/members') {
-        payload = <String, Object?>{
-          'members': <Object?>[
-            <String, Object?>{
-              'user_id': _ownerUserId,
-              'login_id': 'owner',
-              'role': 'owner',
-              'status': 'active',
             },
           ],
         };
@@ -123,7 +92,7 @@ HostedGirlsApi _fakeApi({List<String>? requests}) {
 
 void main() {
   testWidgets(
-    'Girls home restores the persisted current group when no widget group is supplied',
+    'Girls home always resolves the system community',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -134,14 +103,13 @@ void main() {
               expiresIn: 3600,
             ),
             onLogout: () {},
-            currentGroupStore: _MemoryCurrentGroupStore(_currentGroup.groupId),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
       expect(find.text(_currentGroup.name), findsOneWidget);
-      expect(find.text('友達を招待する？'), findsOneWidget);
+      expect(find.text('アプリを作ってみよう！'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -230,7 +198,8 @@ void main() {
     },
   );
 
-  testWidgets('Girls home shows the intended four cards and opens group creation', (
+  testWidgets(
+      'Girls home shows the intended four cards and opens group creation', (
     WidgetTester tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(360, 720));
@@ -255,14 +224,14 @@ void main() {
     expect(find.byKey(const Key('girls-header-actions-tray')), findsOneWidget);
     expect(find.byKey(const Key('girls-home-mascot-prompt')), findsOneWidget);
     expect(find.byKey(const Key('girls-home-mascot-image')), findsOneWidget);
-    expect(find.text('友達を招待する？'), findsOneWidget);
+    expect(find.text('アプリを作ってみよう！'), findsOneWidget);
     expect(find.text('公式アプリ'), findsOneWidget);
-    expect(find.text('友達の最新情報'), findsOneWidget);
+    expect(find.text('みんなの最新情報'), findsOneWidget);
     expect(find.byKey(const Key('girls-home-memo-app')), findsOneWidget);
     expect(find.byKey(const Key('girls-home-minappchi-app')), findsOneWidget);
     expect(find.byKey(const Key('girls-home-novel-app')), findsOneWidget);
     expect(find.byKey(const Key('girls-home-groups')), findsOneWidget);
-    expect(find.text('放課後イラスト部'), findsOneWidget);
+    expect(find.text(girlsCommunityGroupName), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byKey(const Key('girls-home-memo-app')));
@@ -301,11 +270,11 @@ void main() {
 
     await tester.tap(find.byKey(const Key('girls-footer-groups')));
     await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('girls-groups-first-view-group')),
-      findsOneWidget,
-    );
+    expect(find.text('友達グループ'), findsOneWidget);
+    expect(find.textContaining('普通に遊ぶだけなら'), findsOneWidget);
 
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('girls-footer-home')));
     await tester.pumpAndSettle();
     expect(find.text('公式アプリ'), findsOneWidget);

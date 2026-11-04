@@ -13,11 +13,10 @@ import 'builtin_webview.dart';
 import 'girls_errors.dart';
 import 'girls_group_home_page.dart';
 import 'girls_apps_page.dart';
-import 'girls_current_group_store.dart';
+import 'girls_community.dart';
 import 'girls_email_settings_page.dart';
 import 'girls_footer_nav.dart';
-import 'girls_groups_page.dart';
-import 'girls_registration_onboarding.dart';
+import 'girls_groups_dashboard_page.dart';
 import 'girls_home_mascot_prompt.dart';
 import 'girls_builtin_install_api.dart';
 import 'girls_profile_page.dart';
@@ -42,8 +41,7 @@ const String _novelContentFormat = 'minapp/novel@1';
 const GirlsHomeMascotPromptResolver _mascotPromptResolver =
     GirlsHomeMascotPromptResolver();
 
-const Map<String, List<String>> _arrangeBuiltinAssets =
-    <String, List<String>>{
+const Map<String, List<String>> _arrangeBuiltinAssets = <String, List<String>>{
   'memo': <String>[
     'assets/builtin/memo_pad/index.html',
   ],
@@ -79,7 +77,6 @@ class GirlsHomePage extends StatefulWidget {
     required this.onLogout,
     this.currentGroup,
     this.onCurrentGroupChanged,
-    this.currentGroupStore = const SharedPreferencesGirlsCurrentGroupStore(),
     super.key,
   });
 
@@ -88,7 +85,6 @@ class GirlsHomePage extends StatefulWidget {
   final VoidCallback onLogout;
   final HostedGroup? currentGroup;
   final ValueChanged<HostedGroup?>? onCurrentGroupChanged;
-  final GirlsCurrentGroupStore currentGroupStore;
 
   @override
   State<GirlsHomePage> createState() => _GirlsHomePageState();
@@ -126,7 +122,10 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   }
 
   void _setCurrentGroup(HostedGroup? group) {
-    if (_currentGroup?.groupId == group?.groupId) return;
+    if (group == null || !isGirlsCommunityGroup(group)) {
+      throw StateError('Girls home can only select the community space.');
+    }
+    if (_currentGroup?.groupId == group.groupId) return;
     setState(() => _currentGroup = group);
     widget.onCurrentGroupChanged?.call(group);
   }
@@ -141,38 +140,18 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
       final List<HostedGroup> groups = await widget.api.listGroups(
         widget.session.accessToken,
       );
-      final String? suppliedGroupId = _currentGroup?.groupId;
-      final String? storedGroupId = suppliedGroupId == null
-          ? await widget.currentGroupStore.load()
-          : null;
-      final HostedGroup? currentGroup = resolveGirlsCurrentGroup(
-        groups,
-        storedGroupId: suppliedGroupId ?? storedGroupId,
-      );
-      if (suppliedGroupId == null &&
-          currentGroup != null &&
-          storedGroupId != currentGroup.groupId) {
-        await widget.currentGroupStore.save(currentGroup.groupId);
-      }
+      final HostedGroup currentGroup = requireGirlsCommunityGroup(groups);
 
       GirlsHomeMascotPrompt? mascotPrompt;
-      if (currentGroup != null) {
-        final List<HostedMember> members = await widget.api.listMembers(
-          accessToken: widget.session.accessToken,
-          groupId: currentGroup.groupId,
-        );
-        final List<HostedGroupApp> apps = await widget.api.listGroupApps(
-          accessToken: widget.session.accessToken,
-          groupId: currentGroup.groupId,
-        );
-        final int customAppCount = apps
-            .where((HostedGroupApp app) => app.builtinId == null)
-            .length;
-        mascotPrompt = _mascotPromptResolver.resolve(
-          memberCount: members.length,
-          customAppCount: customAppCount,
-        );
-      }
+      final List<HostedGroupApp> apps = await widget.api.listGroupApps(
+        accessToken: widget.session.accessToken,
+        groupId: currentGroup.groupId,
+      );
+      final int customAppCount =
+          apps.where((HostedGroupApp app) => app.builtinId == null).length;
+      mascotPrompt = _mascotPromptResolver.resolve(
+        customAppCount: customAppCount,
+      );
 
       if (!mounted) return;
       final String? previousGroupId = _currentGroup?.groupId;
@@ -181,7 +160,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         _currentGroup = currentGroup;
         _mascotPrompt = mascotPrompt;
       });
-      if (previousGroupId != currentGroup?.groupId) {
+      if (previousGroupId != currentGroup.groupId) {
         widget.onCurrentGroupChanged?.call(currentGroup);
       }
     } catch (error) {
@@ -210,7 +189,8 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
 
   Future<void> _offerBuiltinArrangement(BuiltInApp app) async {
     if (app.isEditor) {
-      throw StateError('Playable built-in catalog entries must not be Editors.');
+      throw StateError(
+          'Playable built-in catalog entries must not be Editors.');
     }
     final bool isPlayer = app.isPlayer;
     final NavigatorState navigator = Navigator.of(context);
@@ -230,9 +210,7 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Text(
-                isPlayer
-                    ? '✨ この作品を編集する？'
-                    : '✨ このアプリをアレンジする？',
+                isPlayer ? '✨ この作品を編集する？' : '✨ このアプリをアレンジする？',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: _ink,
@@ -259,12 +237,12 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
                     ? null
                     : () => Navigator.of(sheetContext).pop(true),
                 icon: Icon(
-                  isPlayer ? Icons.edit_note_rounded : Icons.auto_fix_high_rounded,
+                  isPlayer
+                      ? Icons.edit_note_rounded
+                      : Icons.auto_fix_high_rounded,
                 ),
                 label: Text(
-                  isPlayer
-                      ? 'コピーして編集する！'
-                      : 'このアプリをアレンジする！',
+                  isPlayer ? 'コピーして編集する！' : 'このアプリをアレンジする！',
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
@@ -395,25 +373,28 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
     String stage = 'ノベルエディタの準備';
     try {
       debugPrint('Girls work copy: START $stage');
-      final HostedGroupApp editorApp = await installApi.ensureNovelEditor(
-        accessToken: session.accessToken,
-        groupId: group.groupId,
-        includeSample: false,
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () => throw TimeoutException('Timed out during $stage'),
-      );
+      final HostedGroupApp editorApp = await installApi
+          .ensureNovelEditor(
+            accessToken: session.accessToken,
+            groupId: group.groupId,
+            includeSample: false,
+          )
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () => throw TimeoutException('Timed out during $stage'),
+          );
       debugPrint('Girls work copy: DONE $stage');
       stage = '公式作品の準備';
       debugPrint('Girls work copy: START $stage');
-      final HostedAuthoringProjectSummary source =
-          await installApi.ensureNovelSampleProject(
-        accessToken: session.accessToken,
-        groupId: group.groupId,
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () => throw TimeoutException('Timed out during $stage'),
-      );
+      final HostedAuthoringProjectSummary source = await installApi
+          .ensureNovelSampleProject(
+            accessToken: session.accessToken,
+            groupId: group.groupId,
+          )
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () => throw TimeoutException('Timed out during $stage'),
+          );
       debugPrint('Girls work copy: DONE $stage content_id=${source.contentId}');
       if (source.groupId != group.groupId ||
           source.contentFormat != contentFormat) {
@@ -424,14 +405,15 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
 
       stage = '作品のコピー';
       debugPrint('Girls work copy: START $stage');
-      final HostedAuthoringProjectSummary copied =
-          await projectsApi.cloneProject(
-        accessToken: session.accessToken,
-        contentId: source.contentId,
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () => throw TimeoutException('Timed out during $stage'),
-      );
+      final HostedAuthoringProjectSummary copied = await projectsApi
+          .cloneProject(
+            accessToken: session.accessToken,
+            contentId: source.contentId,
+          )
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () => throw TimeoutException('Timed out during $stage'),
+          );
       debugPrint('Girls work copy: DONE $stage content_id=${copied.contentId}');
       if (copied.groupId != group.groupId ||
           copied.contentFormat != contentFormat ||
@@ -443,14 +425,15 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
 
       stage = 'ノベルエディタの確認';
       debugPrint('Girls work copy: START $stage');
-      final List<HostedAuthoringAppContract> contracts =
-          await contractApi.listApps(
-        accessToken: session.accessToken,
-        groupId: group.groupId,
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () => throw TimeoutException('Timed out during $stage'),
-      );
+      final List<HostedAuthoringAppContract> contracts = await contractApi
+          .listApps(
+            accessToken: session.accessToken,
+            groupId: group.groupId,
+          )
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () => throw TimeoutException('Timed out during $stage'),
+          );
       debugPrint('Girls work copy: DONE $stage contracts=${contracts.length}');
       final HostedAuthoringAppContract editor =
           HostedAuthoringResolver.requireEditor(
@@ -463,7 +446,8 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         setState(() => _arrangingBuiltin = false);
       }
       if (!navigator.mounted || navigator.overlay == null) {
-        throw StateError('Girls navigator was disposed before opening the editor.');
+        throw StateError(
+            'Girls navigator was disposed before opening the editor.');
       }
       stage = 'ノベルエディタを開く処理';
       debugPrint('Girls work copy: START $stage');
@@ -520,7 +504,8 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   }) async {
     if (_arrangingBuiltin) return;
     if (!app.isStandalone) {
-      throw StateError('Only standalone built-in apps can be arranged as apps.');
+      throw StateError(
+          'Only standalone built-in apps can be arranged as apps.');
     }
     if (group == null) {
       if (messenger.mounted) {
@@ -602,16 +587,9 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
   Future<void> _openGroups() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (BuildContext routeContext) => GirlsGroupsPage(
+        builder: (BuildContext routeContext) => GirlsGroupsDashboardPage(
           api: widget.api,
           session: widget.session,
-          onHome: () => Navigator.of(routeContext).pop(),
-          selectedGroupId: _currentGroup?.groupId,
-          onGroupSelected: _setCurrentGroup,
-          onLogout: () {
-            Navigator.of(routeContext).pop();
-            widget.onLogout();
-          },
         ),
       ),
     );
@@ -660,12 +638,6 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
 
   Future<void> _openMascotPrompt(GirlsHomeMascotPrompt prompt) {
     switch (prompt.destination) {
-      case GirlsHomeMascotDestination.invite:
-        final HostedGroup? group = _currentGroup;
-        if (group == null) {
-          throw StateError('Invite mascot prompt requires a current group.');
-        }
-        return _showCurrentGroupId(group);
       case GirlsHomeMascotDestination.currentGroup:
         final HostedGroup? group = _currentGroup;
         if (group == null) {
@@ -674,19 +646,6 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
         return _openGroup(group);
       case GirlsHomeMascotDestination.apps:
         return _openApps();
-    }
-  }
-
-  Future<void> _showCurrentGroupId(HostedGroup group) async {
-    try {
-      final HostedInvite invite = await widget.api.createInvite(
-        accessToken: widget.session.accessToken,
-        groupId: group.groupId,
-      );
-      if (!mounted) return;
-      await _showGroupId(invite);
-    } catch (error) {
-      if (mounted) setState(() => _groupError = girlsMessageFor(error));
     }
   }
 
@@ -962,13 +921,13 @@ class _GirlsHomePageState extends State<GirlsHomePage> {
                       _HomeMenuCard(
                         key: const Key('girls-home-groups'),
                         assetName: _groupCreateCardAsset,
-                        label: 'グループと友達を招待',
+                        label: '友達だけのグループを作る',
                         onTap: _createGroupFromHome,
                       ),
                     ],
                   ),
                   const SizedBox(height: 13),
-                  const _SectionHeading(title: '友達の最新情報'),
+                  const _SectionHeading(title: 'みんなの最新情報'),
                   const SizedBox(height: 8),
                   if (_loadingGroups && groups == null)
                     const _LatestLoadingCard()

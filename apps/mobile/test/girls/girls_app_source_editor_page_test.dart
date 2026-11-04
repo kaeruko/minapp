@@ -8,7 +8,7 @@ import 'package:http/testing.dart';
 import 'package:minapp_mobile/girls/api.dart';
 import 'package:minapp_mobile/girls/girls_app_management_api.dart';
 import 'package:minapp_mobile/girls/girls_app_source_editor_page.dart';
-import 'package:minapp_mobile/girls/girls_current_group_store.dart';
+import 'package:minapp_mobile/girls/girls_community.dart';
 import 'package:minapp_mobile/girls/girls_home_shop_shell.dart';
 import 'package:minapp_mobile/girls/girls_scaffold.dart';
 import 'package:minapp_mobile/girls/girls_source_zip.dart';
@@ -16,17 +16,6 @@ import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
 const String _groupId = '0123456789abcdef0123456789abcdef';
 const String _appId = 'abcdef0123456789abcdef0123456789';
-
-class _EmptyGroupStore implements GirlsCurrentGroupStore {
-  @override
-  Future<String?> load() async => null;
-
-  @override
-  Future<void> save(String groupId) async {}
-
-  @override
-  Future<void> clear() async {}
-}
 
 void main() {
   testWidgets(
@@ -313,7 +302,16 @@ void main() {
       }
       return http.Response(
           request.url.path == '/hosted/groups'
-              ? '{"groups": []}'
+              ? jsonEncode(<String, Object?>{
+                  'groups': <Object?>[
+                    <String, Object?>{
+                      'group_id': girlsCommunityGroupId,
+                      'name': girlsCommunityGroupName,
+                      'role': 'member',
+                      'status': 'active',
+                    },
+                  ],
+                })
               : '{"apps": []}',
           200,
           headers: {'content-type': 'application/json'});
@@ -326,7 +324,6 @@ void main() {
         session: const AuthenticatedSession(
             accessToken: 'test-token', expiresIn: 3600),
         onLogout: () {},
-        currentGroupStore: _EmptyGroupStore(),
       ),
     ));
     await tester.pumpAndSettle();

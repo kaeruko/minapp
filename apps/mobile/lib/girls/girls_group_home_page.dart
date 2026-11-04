@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'api.dart';
 import 'girls_apps_page.dart';
+import 'girls_community.dart';
 import 'girls_errors.dart';
 import 'girls_scaffold.dart';
 import 'hosted_app_webview.dart';
@@ -38,6 +39,8 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
   String? _launchingAppId;
   String? _inviteCode;
 
+  bool get _isCommunity => isGirlsCommunityGroup(widget.group);
+
   @override
   void initState() {
     super.initState();
@@ -50,17 +53,19 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
       _error = null;
     });
     try {
-      final HostedInvite invite = await widget.api.createInvite(
-        accessToken: widget.session.accessToken,
-        groupId: widget.group.groupId,
-      );
+      final HostedInvite? invite = _isCommunity
+          ? null
+          : await widget.api.createInvite(
+              accessToken: widget.session.accessToken,
+              groupId: widget.group.groupId,
+            );
       final List<HostedGroupApp> apps = await widget.api.listGroupApps(
         accessToken: widget.session.accessToken,
         groupId: widget.group.groupId,
       );
       if (!mounted) return;
       setState(() {
-        _inviteCode = invite.code;
+        _inviteCode = invite?.code;
         _apps = apps;
       });
     } catch (error) {
@@ -71,6 +76,9 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
   }
 
   Future<void> _showGroupId() async {
+    if (_isCommunity) {
+      throw StateError('The community space does not have an invite code.');
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -174,11 +182,32 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
     if (mounted) await _loadApps();
   }
 
+  Future<void> _openPrivateGroupApps() async {
+    if (_isCommunity) {
+      throw StateError('The community uses the main app creation flow.');
+    }
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext routeContext) => GirlsAppsPage(
+          api: widget.api,
+          session: widget.session,
+          currentGroup: widget.group,
+          onHome: () => Navigator.of(routeContext).pop(),
+        ),
+      ),
+    );
+    if (mounted) await _loadApps();
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<HostedGroupApp>? apps = _apps;
     return GirlsScaffold(
-      title: _inviteCode == null ? '招待コード 読み込み中…' : '招待コード $_inviteCode',
+      title: _isCommunity
+          ? widget.group.name
+          : _inviteCode == null
+              ? '招待コード 読み込み中…'
+              : '招待コード $_inviteCode',
       pageBackgroundDecoration: const BoxDecoration(
         image: DecorationImage(
           image: AssetImage(_groupHomeBackgroundAsset),
@@ -207,8 +236,18 @@ class _GirlsGroupHomePageState extends State<GirlsGroupHomePage> {
             _GroupHeaderCard(
               group: widget.group,
               busy: _busy,
-              onInvite: _showGroupId,
+              isCommunity: _isCommunity,
+              onInvite: _isCommunity ? null : _showGroupId,
             ),
+            if (!_isCommunity) ...<Widget>[
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                key: const Key('girls-private-group-make'),
+                onPressed: _busy ? null : _openPrivateGroupApps,
+                icon: const Icon(Icons.auto_fix_high_rounded),
+                label: const Text('このグループで作る'),
+              ),
+            ],
             if (_error != null) ...<Widget>[
               const SizedBox(height: 12),
               _ErrorCard(message: _error!),
@@ -256,11 +295,13 @@ class _GroupHeaderCard extends StatelessWidget {
   const _GroupHeaderCard({
     required this.group,
     required this.busy,
+    required this.isCommunity,
     required this.onInvite,
   });
 
   final HostedGroup group;
   final bool busy;
+  final bool isCommunity;
   final VoidCallback? onInvite;
 
   @override
@@ -298,8 +339,13 @@ class _GroupHeaderCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  group.isOwner ? 'あなたがオーナーです' : '参加中のグループ',
-                  style: const TextStyle(color: Color(0xFF8A716C), fontSize: 12),
+                  isCommunity
+                      ? '全員で楽しむ共通スペース'
+                      : group.isOwner
+                          ? 'あなたがオーナーです'
+                          : '参加中のグループ',
+                  style:
+                      const TextStyle(color: Color(0xFF8A716C), fontSize: 12),
                 ),
               ],
             ),

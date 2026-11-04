@@ -20,6 +20,17 @@ variable "environment" {
   }
 }
 
+variable "edition" {
+  description = "Consumer product edition deployed by this isolated stack."
+  type        = string
+  default     = "girls"
+
+  validation {
+    condition     = contains(["girls", "kobo"], var.edition)
+    error_message = "edition must be either girls or kobo."
+  }
+}
+
 variable "hosted_tenant_id" {
   description = "Immutable MinApp tenant identity for the shared hosted environment. Use a 32-character lowercase hexadecimal ID."
   type        = string

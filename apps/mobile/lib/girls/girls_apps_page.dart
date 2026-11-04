@@ -8,6 +8,7 @@ import '../hosted_app_webview.dart';
 import '../hosted_authoring_editor_action.dart';
 import '../hosted_authoring_projects_api.dart';
 import 'api.dart';
+import 'girls_community.dart';
 import 'girls_errors.dart';
 import 'girls_app_management_api.dart';
 import 'girls_app_detail_content.dart';
@@ -310,7 +311,6 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
           children: <Widget>[
             _CurrentGroupBanner(
               group: _currentGroup,
-              onChange: widget.onGroups,
             ),
             const SizedBox(height: 12),
             FilledButton.icon(
@@ -353,7 +353,7 @@ class _GirlsAppsPageState extends State<GirlsAppsPage> {
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (_currentGroup == null)
-              _NoCurrentGroup(onSelect: widget.onGroups)
+              const _NoCurrentGroup()
             else if (apps.isEmpty)
               const _EmptyApps()
             else
@@ -481,20 +481,27 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
           'does not match saved revision $expectedSourceRevision.',
         );
       }
-      final List<HostedMember> members = await widget.api.listMembers(
-        accessToken: widget.session.accessToken,
-        groupId: detail.summary.app.groupId,
-      );
-      final List<HostedMember> authors = members
-          .where((HostedMember member) =>
-              member.userId == detail.summary.app.ownerUserId)
-          .toList(growable: false);
-      if (authors.length > 1) {
-        throw StateError('Group member list contains duplicate app owner IDs.');
+      final String authorLabel;
+      if (detail.summary.app.groupId == girlsCommunityGroupId) {
+        authorLabel = 'みんなの広場のユーザー';
+      } else {
+        final List<HostedMember> members = await widget.api.listMembers(
+          accessToken: widget.session.accessToken,
+          groupId: detail.summary.app.groupId,
+        );
+        final List<HostedMember> authors = members
+            .where((HostedMember member) =>
+                member.userId == detail.summary.app.ownerUserId)
+            .toList(growable: false);
+        if (authors.length > 1) {
+          throw StateError(
+            'Group member list contains duplicate app owner IDs.',
+          );
+        }
+        authorLabel = authors.isEmpty
+            ? '退出済みユーザー (${detail.summary.app.ownerUserId.substring(0, 8)}…)'
+            : authors.single.displayLabel;
       }
-      final String authorLabel = authors.isEmpty
-          ? '退出済みユーザー (${detail.summary.app.ownerUserId.substring(0, 8)}…)'
-          : authors.single.displayLabel;
 
       bool? shopListed;
       String? shopError;
@@ -503,7 +510,8 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
           final List<GirlsShopApp> shopApps =
               await _shopApi.listApps(widget.session.accessToken);
           final int matches = shopApps
-              .where((GirlsShopApp item) => item.appId == detail.summary.app.appId)
+              .where(
+                  (GirlsShopApp item) => item.appId == detail.summary.app.appId)
               .length;
           if (matches > 1) {
             throw StateError('Girls shop returned duplicate app_id entries.');
@@ -679,7 +687,6 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
       if (mounted) setState(() => _busy = false);
     }
   }
-
 
   Future<void> _setShopListed(bool listed) async {
     final ManagedGirlsAppDetail? detail = _detail;
@@ -910,10 +917,9 @@ class _GirlsAppDetailPageState extends State<GirlsAppDetailPage> {
 }
 
 class _CurrentGroupBanner extends StatelessWidget {
-  const _CurrentGroupBanner({required this.group, required this.onChange});
+  const _CurrentGroupBanner({required this.group});
 
   final HostedGroup? group;
-  final VoidCallback? onChange;
 
   @override
   Widget build(BuildContext context) {
@@ -933,7 +939,7 @@ class _CurrentGroupBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 const Text(
-                  'いまのグループ',
+                  '作る場所',
                   style: TextStyle(
                     color: Color(0xFF8F7A74),
                     fontSize: 11,
@@ -950,10 +956,6 @@ class _CurrentGroupBanner extends StatelessWidget {
               ],
             ),
           ),
-          TextButton(
-            onPressed: onChange,
-            child: Text(group == null ? '選ぶ' : '変更'),
-          ),
         ],
       ),
     );
@@ -961,9 +963,7 @@ class _CurrentGroupBanner extends StatelessWidget {
 }
 
 class _NoCurrentGroup extends StatelessWidget {
-  const _NoCurrentGroup({required this.onSelect});
-
-  final VoidCallback? onSelect;
+  const _NoCurrentGroup();
 
   @override
   Widget build(BuildContext context) {
@@ -973,20 +973,10 @@ class _NoCurrentGroup extends StatelessWidget {
         color: Colors.white.withValues(alpha: .72),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Column(
-        children: <Widget>[
-          const Text(
-            'グループを選ぶと、そのグループのアプリだけがここに並ぶよ。',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: _ink, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: onSelect,
-            icon: const Icon(Icons.groups_rounded),
-            label: const Text('グループを選ぶ'),
-          ),
-        ],
+      child: const Text(
+        'アプリを作る場所を確認できませんでした。',
+        textAlign: TextAlign.center,
+        style: TextStyle(color: _ink, fontWeight: FontWeight.w700),
       ),
     );
   }

@@ -185,6 +185,7 @@ resource "aws_lambda_function" "hosted_identity_api" {
   environment {
     variables = {
       ENVIRONMENT         = var.environment
+      HOSTED_EDITION_ID   = var.edition
       TENANT_ID           = var.hosted_tenant_id
       DATA_TABLE_NAME     = aws_dynamodb_table.main.name
       RUNTIME_TABLE_NAME  = aws_dynamodb_table.runtime.name

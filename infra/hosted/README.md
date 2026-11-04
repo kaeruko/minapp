@@ -59,18 +59,23 @@ Account deletion fails closed while the user owns a group. The owner must either
 
 ## Hosted group model
 
-Global Hosted users have role `user`. A user's permissions inside a group live in Membership records:
+Global Hosted users have role `user`. Every active user also has implicit access
+to the system community space (`00000000000000000000000000000001`). The
+community is returned by `GET /hosted/groups`, but it has no group or Membership
+rows, owner, member list, invite code, leave operation, or delete operation.
+Ordinary play therefore needs no group setup or persisted group selection.
+
+Private groups are optional. A user's permissions inside a private group live in
+Membership records:
 
 - `owner` — group administrator
 - `member` — invited participant
 
 MVP hard guards:
 
-- maximum 20 groups per user
+- maximum 20 private groups per user
 - maximum 20 active members per group
-- one current invite code per group
-- invite lifetime: 7 days
-- creating a new invite immediately invalidates the previous code
+- one permanent invite code per private group
 - owner cannot silently leave a group
 - ownership can only be transferred to an existing active member
 - group deletion is refused while app records still exist
@@ -112,9 +117,22 @@ The fork implemented here establishes identity/provenance and an editable app re
 
 Initial app guard:
 
-- maximum 20 app records per group, including forks
+- maximum 20 app records per private group, including forks
 - the same built-in template can only be installed once directly in a group; users can create separate forks
 - deleting an app also deletes its bounded Runtime key/value state
+
+The community has no group-wide app-count cap. Its normal app list contains only
+published, visible apps; author drafts remain available through the managed-app
+API and never leak into the shared list.
+
+The shop is deployment-wide rather than group-scoped, so every private group and
+the community see the same catalog. Product editions are a deployment boundary:
+Girls and Kobo must use different Hosted tenant/API deployments, which keeps
+their users, community apps, Runtime data, and shop catalogs separate.
+Set `edition = "girls"` or `edition = "kobo"` in each stack's tfvars and use
+separate remote-state keys and `hosted_tenant_id` values. Kobo intentionally
+starts with an empty official catalog; Girls seed content is never copied into
+the Kobo deployment implicitly.
 
 ## Scoped Runtime state and quotas
 
@@ -271,6 +289,7 @@ Copy-Item infra\hosted\backend.hcl.example infra\hosted\backend.hcl
 
 Edit both files before running Terraform. In particular, replace:
 
+- `edition` (`girls` or `kobo`)
 - `hosted_tenant_id`
 - `expected_account_id`
 - remote-state bucket name

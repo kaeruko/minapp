@@ -120,7 +120,7 @@ data "archive_file" "official_shop_directory_source" {
 }
 
 locals {
-  official_shop_apps = merge(
+  official_shop_apps = var.edition == "girls" ? merge(
     {
       drawing = {
         app_id       = "ecb3cb6a08e05305668a952cbdae435b"
@@ -141,7 +141,7 @@ locals {
         published_at = app.published_at
       }
     }
-  )
+  ) : {}
 }
 
 # Official shop works are ordinary immutable published ZIPs. Keeping them under
@@ -170,6 +170,8 @@ resource "aws_s3_object" "official_shop_app" {
 # list_shop_apps resolves every listing owner through USER#{id}/PROFILE. This
 # profile is display-only; deliberately no AUTH row or Cognito user is created.
 resource "aws_dynamodb_table_item" "official_shop_owner" {
+  count = var.edition == "girls" ? 1 : 0
+
   table_name = aws_dynamodb_table.main.name
   hash_key   = aws_dynamodb_table.main.hash_key
   range_key  = aws_dynamodb_table.main.range_key

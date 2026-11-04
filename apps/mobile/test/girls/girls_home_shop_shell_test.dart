@@ -6,28 +6,11 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:minapp_mobile/builtin_webview.dart';
 import 'package:minapp_mobile/girls/api.dart';
-import 'package:minapp_mobile/girls/girls_current_group_store.dart';
 import 'package:minapp_mobile/girls/girls_home_shop_shell.dart';
+import 'package:minapp_mobile/girls/girls_community.dart';
 import 'package:minapp_mobile/girls/girls_profile_page.dart';
 import 'package:minapp_mobile/girls/girls_scaffold.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
-
-class _MemoryCurrentGroupStore implements GirlsCurrentGroupStore {
-  String? value;
-
-  @override
-  Future<String?> load() async => value;
-
-  @override
-  Future<void> save(String groupId) async {
-    value = groupId;
-  }
-
-  @override
-  Future<void> clear() async {
-    value = null;
-  }
-}
 
 HostedGirlsApi _fakeApi() {
   return HostedGirlsApi(
@@ -44,7 +27,25 @@ HostedGirlsApi _fakeApi() {
       }
       if (request.url.path == '/hosted/groups') {
         return http.Response(
-          jsonEncode(<String, Object?>{'groups': <Object?>[]}),
+          jsonEncode(<String, Object?>{
+            'groups': <Object?>[
+              <String, Object?>{
+                'group_id': girlsCommunityGroupId,
+                'name': girlsCommunityGroupName,
+                'role': 'member',
+                'status': 'active',
+              },
+            ],
+          }),
+          200,
+          headers: const <String, String>{
+            'content-type': 'application/json; charset=utf-8',
+          },
+        );
+      }
+      if (request.url.path == '/hosted/groups/$girlsCommunityGroupId/apps') {
+        return http.Response(
+          jsonEncode(<String, Object?>{'apps': <Object?>[]}),
           200,
           headers: const <String, String>{
             'content-type': 'application/json; charset=utf-8',
@@ -144,7 +145,6 @@ void main() {
             expiresIn: 3600,
           ),
           onLogout: () {},
-          currentGroupStore: _MemoryCurrentGroupStore(),
         ),
       ),
     );
@@ -206,7 +206,6 @@ void main() {
             expiresIn: 3600,
           ),
           onLogout: () {},
-          currentGroupStore: _MemoryCurrentGroupStore(),
         ),
       ),
     );
@@ -214,10 +213,12 @@ void main() {
     expect(find.byKey(const Key('girls-footer-home')), findsOneWidget);
 
     final NavigatorState navigator = tester.state<NavigatorState>(
-      find.descendant(
-        of: find.byType(GirlsHomeShopShell),
-        matching: find.byType(Navigator),
-      ).last,
+      find
+          .descendant(
+            of: find.byType(GirlsHomeShopShell),
+            matching: find.byType(Navigator),
+          )
+          .last,
     );
     navigator.push<void>(
       MaterialPageRoute<void>(
@@ -257,7 +258,6 @@ void main() {
           api: api,
           session: session,
           onLogout: () {},
-          currentGroupStore: _MemoryCurrentGroupStore(),
         ),
       ),
     );

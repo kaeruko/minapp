@@ -25,11 +25,11 @@ from hosted_shop_backend import (
 
 
 class HostedShopRuntimeBackend(HostedShopBackend):
-    """Girls shop backend with Runtime state isolated from the source group."""
+    """Hosted shop backend with Runtime state isolated from the source group."""
 
     @staticmethod
     def _shop_runtime_group_id(app_id: str) -> str:
-        return hashlib.sha256(f"girls-shop:{app_id}".encode("ascii")).hexdigest()[:32]
+        return hashlib.sha256(f"hosted-shop:{app_id}".encode("ascii")).hexdigest()[:32]
 
     def create_shop_launch(
         self,

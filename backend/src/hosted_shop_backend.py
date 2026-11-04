@@ -57,7 +57,7 @@ def _shop_download_content_disposition(filename: str, app_id: str) -> str:
 
 
 class HostedShopBackend(HostedUserStateBackend):
-    """Girls shop shared across every Hosted group in this deployment."""
+    """Edition shop shared across every Hosted group in this deployment."""
 
     @staticmethod
     def _shop_visibility(app: dict[str, Any]) -> str:
@@ -564,7 +564,7 @@ class HostedShopBackend(HostedUserStateBackend):
             "reported_by_user_id": _string_attr(reporter.user_id),
             "reason": _string_attr(reason),
             "status": _string_attr("open"),
-            "source": _string_attr("girls_shop"),
+            "source": _string_attr("hosted_shop"),
             "created_at": _string_attr(created_at),
         }
         self._transact_put_new([item])

@@ -14,6 +14,7 @@ if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
 
 from errors import ApiProblem  # noqa: E402
+from hosted_backend import HOSTED_COMMUNITY_GROUP_ID  # noqa: E402
 from hosted_catalog_backend import HostedCatalogBackend  # noqa: E402
 from test_hosted_backend import FakeAwsError, FakeCognito, FakeDynamoDb  # noqa: E402
 
@@ -195,6 +196,42 @@ class HostedCatalogBackendTests(unittest.TestCase):
         bob_user = self.backend._user_by_auth_subject(bob)
         self.assertEqual(installed["owner_user_id"], bob_user.user_id)
         self.assertEqual(len(self.backend.list_group_apps(bob, group["group_id"])), 2)
+
+    def test_community_lists_only_published_apps_and_has_no_group_capacity(self) -> None:
+        alice = self._register("alice")
+        installed = self.backend.install_builtin(
+            alice,
+            HOSTED_COMMUNITY_GROUP_ID,
+            "shiba-game",
+        )
+        self.assertEqual(
+            self.backend.list_group_apps(alice, HOSTED_COMMUNITY_GROUP_ID),
+            [],
+        )
+
+        with patch("hosted_catalog_backend.MAX_APPS_PER_GROUP", 1):
+            forked = self.backend.fork_app(
+                alice,
+                HOSTED_COMMUNITY_GROUP_ID,
+                installed["app_id"],
+                "みんなのゲーム",
+            )
+        self.assertEqual(
+            self.backend.list_group_apps(alice, HOSTED_COMMUNITY_GROUP_ID),
+            [],
+        )
+
+        self.backend.publish_app(
+            alice,
+            HOSTED_COMMUNITY_GROUP_ID,
+            forked["app_id"],
+            1,
+        )
+        visible = self.backend.list_group_apps(
+            alice,
+            HOSTED_COMMUNITY_GROUP_ID,
+        )
+        self.assertEqual([app["app_id"] for app in visible], [forked["app_id"]])
 
     def test_app_count_guard_applies_to_forks(self) -> None:
         alice = self._register("alice")

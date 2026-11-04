@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:minapp_mobile/girls/api.dart';
+import 'package:minapp_mobile/girls/girls_community.dart';
 import 'package:minapp_mobile/girls/girls_group_home_page.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
@@ -70,7 +71,61 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('招待コード $_inviteCode'), findsOneWidget);
+    expect(find.byKey(const Key('girls-private-group-make')), findsOneWidget);
     expect(find.text('みんアプ Girls'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('community home lists apps without requesting an invite', (
+    WidgetTester tester,
+  ) async {
+    final List<String> requests = <String>[];
+    final MockClient client = MockClient((http.Request request) async {
+      requests.add('${request.method} ${request.url.path}');
+      expect(request.method, 'GET');
+      expect(
+        request.url.path,
+        '/hosted/groups/$girlsCommunityGroupId/apps',
+      );
+      return http.Response(
+        jsonEncode(<String, Object?>{'apps': <Object?>[]}),
+        200,
+        headers: const <String, String>{
+          'content-type': 'application/json; charset=utf-8',
+        },
+      );
+    });
+    addTearDown(client.close);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GirlsGroupHomePage(
+          api: HostedGirlsApi(
+            baseUri: Uri.parse('https://example.com'),
+            client: client,
+          ),
+          session: const AuthenticatedSession(
+            accessToken: 'test-token',
+            expiresIn: 3600,
+          ),
+          group: const HostedGroup(
+            groupId: girlsCommunityGroupId,
+            name: girlsCommunityGroupName,
+            role: 'member',
+            status: 'active',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(requests, <String>[
+      'GET /hosted/groups/$girlsCommunityGroupId/apps',
+    ]);
+    expect(find.text(girlsCommunityGroupName), findsWidgets);
+    expect(find.text('全員で楽しむ共通スペース'), findsOneWidget);
+    expect(find.byKey(const Key('girls-group-invite')), findsNothing);
+    expect(find.byKey(const Key('girls-private-group-make')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

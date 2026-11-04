@@ -17,12 +17,12 @@ from handler import (
     _require_fields,
     _required_string,
 )
-from hosted_girls_shop_backend import HostedGirlsShopBackend
+from hosted_girls_shop_backend import HostedConsumerBackend
 from hosted_group_settings import rename_group
 from hosted_user_state_backend import HostedUserStateBackend
 
 _LOGGER = logging.getLogger(__name__)
-_BACKEND: HostedGirlsShopBackend | None = None
+_BACKEND: HostedConsumerBackend | None = None
 _ID_RE = r"([0-9a-f]{32})"
 _GROUP_SETTINGS_RE = re.compile(rf"^/hosted/groups/{_ID_RE}$")
 _SHOP_ACTION_RE = re.compile(
@@ -33,11 +33,11 @@ _SHOP_VISIBILITY_RE = re.compile(rf"^/apps/{_ID_RE}/shop-visibility$")
 _SHOP_CONTENT_RE = re.compile(r"^/shop/content/([A-Za-z0-9_-]{32,128})/(.+)$")
 
 
-def _shared_backend() -> HostedGirlsShopBackend:
+def _shared_backend() -> HostedConsumerBackend:
     global _BACKEND
     backend = hosted_handler._BACKEND
 
-    if isinstance(backend, HostedGirlsShopBackend):
+    if isinstance(backend, HostedConsumerBackend):
         if _BACKEND is None:
             _BACKEND = backend
         elif _BACKEND is not backend:
@@ -50,9 +50,9 @@ def _shared_backend() -> HostedGirlsShopBackend:
         raise RuntimeError("Shop backend is initialized but Hosted API points at a different backend instance")
 
     # Existing Hosted routes can initialize HostedUserStateBackend before the
-    # first Shop request. Promote that process to the final Girls backend here
+    # first Shop request. Promote that process to the final consumer backend here
     # so both handlers share one backend type and one instance from this point on.
-    resolved = HostedGirlsShopBackend.from_environment()
+    resolved = HostedConsumerBackend.from_environment()
     hosted_handler._BACKEND = resolved
     _BACKEND = resolved
     return resolved

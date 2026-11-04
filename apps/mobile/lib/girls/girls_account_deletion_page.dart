@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../hosted_group_management_api.dart';
 import 'api.dart';
-import 'girls_current_group_store.dart';
 import 'girls_errors.dart';
 import 'hosted_girls_api.dart';
 
@@ -14,13 +13,11 @@ class GirlsAccountDeletionPage extends StatefulWidget {
   const GirlsAccountDeletionPage({
     required this.api,
     required this.session,
-    required this.currentGroupStore,
     super.key,
   });
 
   final HostedGirlsApi api;
   final AuthenticatedSession session;
-  final GirlsCurrentGroupStore currentGroupStore;
 
   @override
   State<GirlsAccountDeletionPage> createState() =>
@@ -34,8 +31,7 @@ class _GirlsAccountDeletionPageState extends State<GirlsAccountDeletionPage> {
   Future<void> _confirmAndDelete() async {
     if (_deleting) return;
 
-    final bool confirmed =
-        await showDialog<bool>(
+    final bool confirmed = await showDialog<bool>(
           context: context,
           barrierDismissible: false,
           builder: (BuildContext dialogContext) => AlertDialog(
@@ -80,10 +76,6 @@ class _GirlsAccountDeletionPageState extends State<GirlsAccountDeletionPage> {
     try {
       final String accessToken = widget.session.accessToken;
       final List<HostedGroup> groups = await widget.api.listGroups(accessToken);
-
-      // Clear the local group selection before any remote destructive action.
-      // If local storage cannot be updated, fail before deleting server data.
-      await widget.currentGroupStore.clear();
 
       for (final HostedGroup group in groups) {
         if (!group.isOwner) continue;
@@ -217,7 +209,8 @@ class _GirlsAccountDeletionPageState extends State<GirlsAccountDeletionPage> {
                 ),
                 const SizedBox(height: 10),
                 TextButton(
-                  onPressed: _deleting ? null : () => Navigator.of(context).pop(),
+                  onPressed:
+                      _deleting ? null : () => Navigator.of(context).pop(),
                   child: const Text('削除せず戻る'),
                 ),
               ],

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import secrets
 import time
@@ -19,10 +20,19 @@ from errors import ApiProblem
 
 MAX_GROUPS_PER_USER = 20
 MAX_MEMBERS_PER_GROUP = 20
-HOSTED_COMMUNITY_GROUP_ID = "00000000000000000000000000000001"
-HOSTED_COMMUNITY_GROUP_NAME = "みんなの広場"
+HOSTED_EDITION_ID = os.environ.get("HOSTED_EDITION_ID", "girls")
+_HOSTED_COMMUNITIES = {
+    "girls": ("00000000000000000000000000000001", "みんなの広場"),
+    "kobo": ("00000000000000000000000000000002", "みんなの工房"),
+}
+if HOSTED_EDITION_ID not in _HOSTED_COMMUNITIES:
+    raise RuntimeError(f"Unsupported HOSTED_EDITION_ID: {HOSTED_EDITION_ID!r}")
+HOSTED_COMMUNITY_GROUP_ID, HOSTED_COMMUNITY_GROUP_NAME = _HOSTED_COMMUNITIES[
+    HOSTED_EDITION_ID
+]
 INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
 PERMANENT_GROUP_ID_EXPIRES_AT_EPOCH = 253402300799
+PERMANENT_GROUP_ID_EXPIRES_AT = "9999-12-31T23:59:59Z"
 _INVITE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 _INVITE_CODE_RE = re.compile(r"^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{12}$")
 
@@ -90,7 +100,9 @@ def _permanent_group_id_payload(group_id: str, code: str) -> dict[str, Any]:
     return {
         "group_id": group_id,
         "code": code,
-        "expires_at": _iso_from_epoch(PERMANENT_GROUP_ID_EXPIRES_AT_EPOCH),
+        # Windows' C runtime cannot convert the year-9999 sentinel with
+        # datetime.fromtimestamp. The protocol value itself is fixed.
+        "expires_at": PERMANENT_GROUP_ID_EXPIRES_AT,
         "valid_for_seconds": max(1, PERMANENT_GROUP_ID_EXPIRES_AT_EPOCH - _now_epoch()),
     }
 

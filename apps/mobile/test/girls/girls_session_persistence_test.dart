@@ -4,71 +4,43 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:minapp_mobile/api.dart';
-import 'package:minapp_mobile/girls/girls_current_group_store.dart';
+import 'package:minapp_mobile/girls/girls_community.dart';
 import 'package:minapp_mobile/girls/girls_session_store.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
 
 void main() {
   final Uri baseUri = Uri.parse('https://girls-api.example.com');
-  const String userA = '11111111111111111111111111111111';
-  const String groupA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-  test('login identifies account before restoring its remembered group', () async {
+  test('login verifies the community before saving the refresh token',
+      () async {
     final _MemoryGirlsSessionStore sessionStore = _MemoryGirlsSessionStore();
-    final _MemoryCurrentGroupStore currentGroupStore =
-        _MemoryCurrentGroupStore(remembered: <String, String>{userA: groupA});
     int requestCount = 0;
-    final MockClient client = MockClient((http.Request request) async {
-      requestCount += 1;
-      switch (requestCount) {
-        case 1:
+    final HostedGirlsApi api = HostedGirlsApi(
+      baseUri: baseUri,
+      sessionStore: sessionStore,
+      client: MockClient((http.Request request) async {
+        requestCount += 1;
+        if (requestCount == 1) {
           expect(request.method, 'POST');
-          expect(
-            request.url,
-            Uri.parse('https://girls-api.example.com/auth/login'),
-          );
+          expect(request.url.path, '/auth/login');
           expect(
             jsonDecode(request.body),
             <String, Object?>{'login_id': 'honey', 'password': 'secret12'},
           );
-          return _jsonResponse(<String, Object?>{
-            'state': 'authenticated',
-            'access_token': 'access-1',
-            'token_type': 'Bearer',
-            'expires_in': 3600,
-            'refresh_token': 'refresh-1',
-          });
-        case 2:
+          return _authenticated(
+            accessToken: 'access-1',
+            refreshToken: 'refresh-1',
+          );
+        }
+        if (requestCount == 2) {
           expect(request.method, 'GET');
-          expect(
-            request.url,
-            Uri.parse('https://girls-api.example.com/hosted/me'),
-          );
-          expect(request.headers['Authorization'], 'Bearer access-1');
-          return _meResponse(userA);
-        case 3:
-          expect(request.method, 'GET');
-          expect(
-            request.url,
-            Uri.parse('https://girls-api.example.com/hosted/groups'),
-          );
-          expect(request.headers['Authorization'], 'Bearer access-1');
-          return _groupsResponse(<Map<String, Object?>>[
-            _group(groupA, '放課後イラスト部'),
-            _group('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'マイグループ'),
-          ]);
-        default:
-          fail(
-            'Unexpected request #$requestCount: '
-            '${request.method} ${request.url}',
-          );
-      }
-    });
-    final HostedGirlsApi api = HostedGirlsApi(
-      baseUri: baseUri,
-      client: client,
-      sessionStore: sessionStore,
-      currentGroupStore: currentGroupStore,
+          expect(request.url.path, '/hosted/groups');
+          expect(request.headers['authorization'], 'Bearer access-1');
+          expect(sessionStore.writeCount, 0);
+          return _groupsResponse();
+        }
+        fail('Unexpected request #$requestCount: ${request.url}');
+      }),
     );
 
     final AuthResult result = await api.login('honey', 'secret12');
@@ -77,173 +49,57 @@ void main() {
     expect((result as AuthenticatedSession).accessToken, 'access-1');
     expect(sessionStore.refreshToken, 'refresh-1');
     expect(sessionStore.writeCount, 1);
-    expect(currentGroupStore.activeUserId, userA);
-    expect(await currentGroupStore.load(), groupA);
-    expect(requestCount, 3);
+    expect(requestCount, 2);
   });
 
-  test('restore identifies account and restores its remembered group', () async {
+  test('restore verifies the community and preserves the refresh token',
+      () async {
     final _MemoryGirlsSessionStore sessionStore = _MemoryGirlsSessionStore(
       refreshToken: 'refresh-saved',
     );
-    final _MemoryCurrentGroupStore currentGroupStore =
-        _MemoryCurrentGroupStore(remembered: <String, String>{userA: groupA});
     int requestCount = 0;
-    final MockClient client = MockClient((http.Request request) async {
-      requestCount += 1;
-      switch (requestCount) {
-        case 1:
-          expect(request.method, 'POST');
-          expect(
-            request.url,
-            Uri.parse('https://girls-api.example.com/auth/refresh'),
-          );
-          expect(
-            jsonDecode(request.body),
-            <String, Object?>{'refresh_token': 'refresh-saved'},
-          );
-          return _jsonResponse(<String, Object?>{
-            'state': 'authenticated',
-            'access_token': 'access-restored',
-            'token_type': 'Bearer',
-            'expires_in': 3600,
-          });
-        case 2:
-          expect(request.method, 'GET');
-          expect(
-            request.url,
-            Uri.parse('https://girls-api.example.com/hosted/me'),
-          );
-          return _meResponse(userA);
-        case 3:
-          expect(request.method, 'GET');
-          expect(
-            request.url,
-            Uri.parse('https://girls-api.example.com/hosted/groups'),
-          );
-          return _groupsResponse(<Map<String, Object?>>[
-            _group(groupA, '放課後イラスト部'),
-            _group('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'マイグループ'),
-          ]);
-        default:
-          fail(
-            'Unexpected request #$requestCount: '
-            '${request.method} ${request.url}',
-          );
-      }
-    });
     final HostedGirlsApi api = HostedGirlsApi(
       baseUri: baseUri,
-      client: client,
       sessionStore: sessionStore,
-      currentGroupStore: currentGroupStore,
+      client: MockClient((http.Request request) async {
+        requestCount += 1;
+        if (requestCount == 1) {
+          expect(request.method, 'POST');
+          expect(request.url.path, '/auth/refresh');
+          return _authenticated(accessToken: 'access-restored');
+        }
+        if (requestCount == 2) {
+          expect(request.method, 'GET');
+          expect(request.url.path, '/hosted/groups');
+          return _groupsResponse();
+        }
+        fail('Unexpected request #$requestCount: ${request.url}');
+      }),
     );
 
     final AuthenticatedSession? session = await api.restoreSession();
 
-    expect(session, isNotNull);
-    expect(session!.accessToken, 'access-restored');
+    expect(session?.accessToken, 'access-restored');
     expect(sessionStore.refreshToken, 'refresh-saved');
     expect(sessionStore.clearCount, 0);
-    expect(currentGroupStore.activeUserId, userA);
-    expect(await currentGroupStore.load(), groupA);
-    expect(requestCount, 3);
+    expect(requestCount, 2);
   });
 
-  test('empty account creates and selects My Group before login is committed',
-      () async {
+  test('community lookup failure leaves login uncommitted', () async {
     final _MemoryGirlsSessionStore sessionStore = _MemoryGirlsSessionStore();
-    final _MemoryCurrentGroupStore currentGroupStore =
-        _MemoryCurrentGroupStore();
     int requestCount = 0;
-    final MockClient client = MockClient((http.Request request) async {
-      requestCount += 1;
-      switch (requestCount) {
-        case 1:
-          return _jsonResponse(<String, Object?>{
-            'state': 'authenticated',
-            'access_token': 'access-new',
-            'token_type': 'Bearer',
-            'expires_in': 3600,
-            'refresh_token': 'refresh-new',
-          });
-        case 2:
-          return _meResponse(userA);
-        case 3:
-          expect(request.method, 'GET');
-          expect(
-            request.url,
-            Uri.parse('https://girls-api.example.com/hosted/groups'),
-          );
-          expect(sessionStore.writeCount, 0);
-          return _groupsResponse(const <Map<String, Object?>>[]);
-        case 4:
-          expect(request.method, 'POST');
-          expect(
-            request.url,
-            Uri.parse('https://girls-api.example.com/hosted/groups'),
-          );
-          expect(
-            jsonDecode(request.body),
-            <String, Object?>{'name': 'マイグループ'},
-          );
-          expect(sessionStore.writeCount, 0);
-          return _jsonResponse(
-            _group(
-              'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-              'マイグループ',
-            ),
-            statusCode: 201,
-          );
-        default:
-          fail(
-            'Unexpected request #$requestCount: '
-            '${request.method} ${request.url}',
-          );
-      }
-    });
     final HostedGirlsApi api = HostedGirlsApi(
       baseUri: baseUri,
-      client: client,
       sessionStore: sessionStore,
-      currentGroupStore: currentGroupStore,
-    );
-
-    final AuthResult result = await api.login('honey', 'secret12');
-
-    expect(result, isA<AuthenticatedSession>());
-    expect(currentGroupStore.activeUserId, userA);
-    expect(
-      await currentGroupStore.load(),
-      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    );
-    expect(sessionStore.refreshToken, 'refresh-new');
-    expect(sessionStore.writeCount, 1);
-    expect(requestCount, 4);
-  });
-
-  test('starter group failure leaves login uncommitted and account inactive',
-      () async {
-    final _MemoryGirlsSessionStore sessionStore = _MemoryGirlsSessionStore();
-    final _MemoryCurrentGroupStore currentGroupStore =
-        _MemoryCurrentGroupStore();
-    int requestCount = 0;
-    final MockClient client = MockClient((http.Request request) async {
-      requestCount += 1;
-      switch (requestCount) {
-        case 1:
-          return _jsonResponse(<String, Object?>{
-            'state': 'authenticated',
-            'access_token': 'access-new',
-            'token_type': 'Bearer',
-            'expires_in': 3600,
-            'refresh_token': 'refresh-new',
-          });
-        case 2:
-          return _meResponse(userA);
-        case 3:
-          return _groupsResponse(const <Map<String, Object?>>[]);
-        case 4:
+      client: MockClient((http.Request request) async {
+        requestCount += 1;
+        if (requestCount == 1) {
+          return _authenticated(
+            accessToken: 'access-new',
+            refreshToken: 'refresh-new',
+          );
+        }
+        if (requestCount == 2) {
           return _jsonResponse(
             <String, Object?>{
               'error': 'temporary_failure',
@@ -251,18 +107,9 @@ void main() {
             },
             statusCode: 503,
           );
-        default:
-          fail(
-            'Unexpected request #$requestCount: '
-            '${request.method} ${request.url}',
-          );
-      }
-    });
-    final HostedGirlsApi api = HostedGirlsApi(
-      baseUri: baseUri,
-      client: client,
-      sessionStore: sessionStore,
-      currentGroupStore: currentGroupStore,
+        }
+        fail('Unexpected request #$requestCount: ${request.url}');
+      }),
     );
 
     await expectLater(
@@ -273,212 +120,116 @@ void main() {
             .having((ApiException e) => e.code, 'code', 'temporary_failure'),
       ),
     );
-
     expect(sessionStore.refreshToken, isNull);
     expect(sessionStore.writeCount, 0);
-    expect(currentGroupStore.activeUserId, isNull);
-    expect(requestCount, 4);
+    expect(requestCount, 2);
   });
 
-  test('logout preserves remembered group for the account', () async {
-    final _MemoryGirlsSessionStore sessionStore =
-        _MemoryGirlsSessionStore(refreshToken: 'refresh-saved');
-    final _MemoryCurrentGroupStore currentGroupStore =
-        _MemoryCurrentGroupStore(remembered: <String, String>{userA: groupA});
-    await currentGroupStore.activateAccount(userA);
+  test('logout only clears the saved login', () async {
+    final _MemoryGirlsSessionStore sessionStore = _MemoryGirlsSessionStore(
+      refreshToken: 'refresh-saved',
+    );
     final HostedGirlsApi api = HostedGirlsApi(
       baseUri: baseUri,
+      sessionStore: sessionStore,
       client: MockClient((http.Request request) async {
         fail('Logout must not make a network request.');
       }),
-      sessionStore: sessionStore,
-      currentGroupStore: currentGroupStore,
     );
 
     await api.logout();
 
     expect(sessionStore.refreshToken, isNull);
     expect(sessionStore.clearCount, 1);
-    expect(currentGroupStore.activeUserId, isNull);
-    await currentGroupStore.activateAccount(userA);
-    expect(await currentGroupStore.load(), groupA);
   });
 
   test('explicit invalid_refresh_token clears saved login', () async {
     final _MemoryGirlsSessionStore sessionStore = _MemoryGirlsSessionStore(
       refreshToken: 'refresh-expired',
     );
-    final _MemoryCurrentGroupStore currentGroupStore =
-        _MemoryCurrentGroupStore();
-    final MockClient client = MockClient((http.Request request) async {
-      return _jsonResponse(
-        <String, Object?>{
-          'error': 'invalid_refresh_token',
-          'message': 'ログイン期限が切れました。もう一度ログインしてください。',
-        },
-        statusCode: 401,
-      );
-    });
     final HostedGirlsApi api = HostedGirlsApi(
       baseUri: baseUri,
-      client: client,
       sessionStore: sessionStore,
-      currentGroupStore: currentGroupStore,
+      client: MockClient((http.Request request) async => _jsonResponse(
+            <String, Object?>{
+              'error': 'invalid_refresh_token',
+              'message': 'ログイン期限が切れました。',
+            },
+            statusCode: 401,
+          )),
     );
 
-    final AuthenticatedSession? session = await api.restoreSession();
-
-    expect(session, isNull);
+    expect(await api.restoreSession(), isNull);
     expect(sessionStore.refreshToken, isNull);
     expect(sessionStore.clearCount, 1);
-    expect(currentGroupStore.activeUserId, isNull);
   });
 
-  test('transient refresh failure preserves saved login and propagates error',
-      () async {
+  test('transient refresh failure preserves saved login', () async {
     final _MemoryGirlsSessionStore sessionStore = _MemoryGirlsSessionStore(
       refreshToken: 'refresh-keep-me',
     );
-    final _MemoryCurrentGroupStore currentGroupStore =
-        _MemoryCurrentGroupStore();
-    final MockClient client = MockClient((http.Request request) async {
-      return _jsonResponse(
-        <String, Object?>{
-          'error': 'temporary_failure',
-          'message': 'temporarily unavailable',
-        },
-        statusCode: 503,
-      );
-    });
     final HostedGirlsApi api = HostedGirlsApi(
       baseUri: baseUri,
-      client: client,
       sessionStore: sessionStore,
-      currentGroupStore: currentGroupStore,
+      client: MockClient((http.Request request) async => _jsonResponse(
+            <String, Object?>{
+              'error': 'temporary_failure',
+              'message': 'temporarily unavailable',
+            },
+            statusCode: 503,
+          )),
     );
 
-    await expectLater(
-      api.restoreSession(),
-      throwsA(
-        isA<ApiException>()
-            .having((ApiException e) => e.statusCode, 'statusCode', 503)
-            .having((ApiException e) => e.code, 'code', 'temporary_failure'),
-      ),
-    );
-
+    await expectLater(api.restoreSession(), throwsA(isA<ApiException>()));
     expect(sessionStore.refreshToken, 'refresh-keep-me');
     expect(sessionStore.clearCount, 0);
-    expect(currentGroupStore.activeUserId, isNull);
   });
 
   test('login without refresh token enters a temporary session', () async {
-    final _MemoryGirlsSessionStore sessionStore =
-        _MemoryGirlsSessionStore(refreshToken: 'previous-account-token');
-    final _MemoryCurrentGroupStore currentGroupStore =
-        _MemoryCurrentGroupStore();
+    final _MemoryGirlsSessionStore sessionStore = _MemoryGirlsSessionStore(
+      refreshToken: 'previous-account-token',
+    );
     int requestCount = 0;
-    final MockClient client = MockClient((http.Request request) async {
-      requestCount += 1;
-      switch (requestCount) {
-        case 1:
-          expect(request.url.path, '/auth/login');
-          return _jsonResponse(<String, Object?>{
-            'state': 'authenticated',
-            'access_token': 'access-1',
-            'token_type': 'Bearer',
-            'expires_in': 3600,
-          });
-        case 2:
-          expect(request.url.path, '/hosted/me');
-          return _meResponse(userA);
-        case 3:
-          expect(request.url.path, '/hosted/groups');
-          return _groupsResponse(<Map<String, Object?>>[
-            _group(groupA, '放課後イラスト部'),
-          ]);
-        default:
-          fail('Unexpected request #$requestCount: ${request.url}');
-      }
-    });
     final HostedGirlsApi api = HostedGirlsApi(
       baseUri: baseUri,
-      client: client,
       sessionStore: sessionStore,
-      currentGroupStore: currentGroupStore,
+      client: MockClient((http.Request request) async {
+        requestCount += 1;
+        if (requestCount == 1) {
+          return _authenticated(accessToken: 'access-1');
+        }
+        if (requestCount == 2) return _groupsResponse();
+        fail('Unexpected request #$requestCount: ${request.url}');
+      }),
     );
 
     final AuthResult result = await api.login('honey', 'secret12');
     expect(result, isA<AuthenticatedSession>());
-    expect((result as AuthenticatedSession).accessToken, 'access-1');
     expect(sessionStore.writeCount, 0);
     expect(sessionStore.clearCount, 1);
     expect(sessionStore.refreshToken, isNull);
-    expect(currentGroupStore.activeUserId, userA);
-    expect(requestCount, 3);
+    expect(requestCount, 2);
   });
 
-  test('login still rejects an explicitly invalid refresh token', () async {
+  test('login rejects an explicitly invalid refresh token', () async {
     final _MemoryGirlsSessionStore sessionStore = _MemoryGirlsSessionStore();
-    final MockClient client = MockClient((http.Request request) async {
-      expect(request.url.path, '/auth/login');
-      return _jsonResponse(<String, Object?>{
-        'state': 'authenticated',
-        'access_token': 'access-1',
-        'token_type': 'Bearer',
-        'expires_in': 3600,
-        'refresh_token': '',
-      });
-    });
     final HostedGirlsApi api = HostedGirlsApi(
       baseUri: baseUri,
-      client: client,
       sessionStore: sessionStore,
-      currentGroupStore: _MemoryCurrentGroupStore(),
+      client: MockClient((http.Request request) async => _jsonResponse(
+            <String, Object?>{
+              'state': 'authenticated',
+              'access_token': 'access-1',
+              'token_type': 'Bearer',
+              'expires_in': 3600,
+              'refresh_token': '',
+            },
+          )),
     );
 
     await expectLater(api.login('honey', 'secret12'), throwsFormatException);
     expect(sessionStore.writeCount, 0);
   });
-}
-
-class _MemoryCurrentGroupStore
-    implements GirlsCurrentGroupStore, GirlsCurrentGroupAccountScope {
-  _MemoryCurrentGroupStore({Map<String, String>? remembered})
-      : remembered = <String, String>{...?remembered};
-
-  final Map<String, String> remembered;
-  String? activeUserId;
-
-  @override
-  Future<void> activateAccount(String userId) async {
-    activeUserId = userId;
-  }
-
-  @override
-  Future<void> deactivateAccount() async {
-    activeUserId = null;
-  }
-
-  String _requireActiveUserId() {
-    final String? userId = activeUserId;
-    if (userId == null) {
-      throw StateError('No active test account.');
-    }
-    return userId;
-  }
-
-  @override
-  Future<String?> load() async => remembered[_requireActiveUserId()];
-
-  @override
-  Future<void> save(String groupId) async {
-    remembered[_requireActiveUserId()] = groupId;
-  }
-
-  @override
-  Future<void> clear() async {
-    remembered.remove(_requireActiveUserId());
-  }
 }
 
 class _MemoryGirlsSessionStore implements GirlsSessionStore {
@@ -504,28 +255,29 @@ class _MemoryGirlsSessionStore implements GirlsSessionStore {
   }
 }
 
-Map<String, Object?> _group(String groupId, String name) {
-  return <String, Object?>{
-    'group_id': groupId,
-    'name': name,
-    'role': 'owner',
-    'status': 'active',
-  };
-}
-
-http.Response _groupsResponse(List<Map<String, Object?>> groups) {
-  return _jsonResponse(<String, Object?>{'groups': groups});
-}
-
-http.Response _meResponse(String userId) {
+http.Response _authenticated({
+  required String accessToken,
+  String? refreshToken,
+}) {
   return _jsonResponse(<String, Object?>{
-    'user': <String, Object?>{
-      'user_id': userId,
-      'login_id': 'honey',
-      'role': 'user',
-      'status': 'active',
-    },
-    'groups': <Object?>[],
+    'state': 'authenticated',
+    'access_token': accessToken,
+    'token_type': 'Bearer',
+    'expires_in': 3600,
+    if (refreshToken != null) 'refresh_token': refreshToken,
+  });
+}
+
+http.Response _groupsResponse() {
+  return _jsonResponse(<String, Object?>{
+    'groups': <Object?>[
+      <String, Object?>{
+        'group_id': girlsCommunityGroupId,
+        'name': girlsCommunityGroupName,
+        'role': 'member',
+        'status': 'active',
+      },
+    ],
   });
 }
 

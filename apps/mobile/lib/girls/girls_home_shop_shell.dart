@@ -4,13 +4,12 @@ import '../api.dart';
 import 'girls_account_deletion_page.dart';
 import 'girls_apps_hub_page.dart';
 import 'girls_apps_cache.dart';
-import 'girls_current_group_store.dart';
 import 'girls_email_settings_page.dart';
 import 'girls_footer_nav.dart';
 import 'girls_groups_dashboard_page.dart';
 import 'girls_home_page.dart';
+import 'girls_community.dart';
 import 'girls_profile_page.dart';
-import 'girls_registration_onboarding.dart';
 import 'girls_scaffold.dart';
 import 'girls_shop_page.dart';
 import 'hosted_girls_api.dart';
@@ -35,14 +34,12 @@ class GirlsHomeShopShell extends StatefulWidget {
     required this.api,
     required this.session,
     required this.onLogout,
-    this.currentGroupStore = const SharedPreferencesGirlsCurrentGroupStore(),
     super.key,
   });
 
   final HostedGirlsApi api;
   final AuthenticatedSession session;
   final VoidCallback onLogout;
-  final GirlsCurrentGroupStore currentGroupStore;
 
   @override
   State<GirlsHomeShopShell> createState() => _GirlsHomeShopShellState();
@@ -81,14 +78,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
       final List<HostedGroup> groups = await widget.api.listGroups(
         widget.session.accessToken,
       );
-      final String? storedGroupId = await widget.currentGroupStore.load();
-      final HostedGroup? currentGroup = resolveGirlsCurrentGroup(
-        groups,
-        storedGroupId: storedGroupId,
-      );
-      if (currentGroup != null && storedGroupId != currentGroup.groupId) {
-        await widget.currentGroupStore.save(currentGroup.groupId);
-      }
+      final HostedGroup currentGroup = requireGirlsCommunityGroup(groups);
 
       if (!mounted) return;
       setState(() {
@@ -105,7 +95,10 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
   }
 
   void _setCurrentGroup(HostedGroup? group) {
-    if (_currentGroup?.groupId == group?.groupId) return;
+    if (group == null || !isGirlsCommunityGroup(group)) {
+      throw StateError('Girls root can only select the community space.');
+    }
+    if (_currentGroup?.groupId == group.groupId) return;
     setState(() => _currentGroup = group);
   }
 
@@ -160,14 +153,10 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
               onLogout: widget.onLogout,
               currentGroup: _currentGroup,
               onCurrentGroupChanged: _setCurrentGroup,
-              currentGroupStore: widget.currentGroupStore,
             ),
           GirlsFooterTab.groups => GirlsGroupsDashboardPage(
               api: widget.api,
               session: widget.session,
-              currentGroup: _currentGroup,
-              onCurrentGroupChanged: _setCurrentGroup,
-              currentGroupStore: widget.currentGroupStore,
             ),
           GirlsFooterTab.shop => GirlsShopPage(
               api: widget.api,
@@ -335,7 +324,6 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
             builder: (BuildContext context) => GirlsAccountDeletionPage(
               api: widget.api,
               session: widget.session,
-              currentGroupStore: widget.currentGroupStore,
             ),
           ),
         );
@@ -374,7 +362,7 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'いまのグループを確認できませんでした',
+                  'みんなの広場を確認できませんでした',
                   style: TextStyle(color: _ink, fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 8),
@@ -444,10 +432,9 @@ class _GirlsHomeShopShellState extends State<GirlsHomeShopShell> {
           ),
         ),
       ),
-      bottomNavigationBar:
-          (_footerHidden || _editorFooterReplacementActive)
-              ? const SizedBox.shrink()
-              : GirlsFooterNav(
+      bottomNavigationBar: (_footerHidden || _editorFooterReplacementActive)
+          ? const SizedBox.shrink()
+          : GirlsFooterNav(
               selectedTab: _selectedTab,
               onSelected: _selectTab,
             ),

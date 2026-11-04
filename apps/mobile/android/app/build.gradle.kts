@@ -26,13 +26,21 @@ fun requiredKeystoreProperty(name: String): String =
         ?: error("Missing key.properties value: $name")
 
 val minappVariant = providers.gradleProperty("minappVariant").orNull
-if (minappVariant != null && minappVariant != "girls") {
+val supportedMinappVariants = setOf("girls", "kobo")
+if (minappVariant != null && minappVariant !in supportedMinappVariants) {
     error("Unsupported minappVariant: $minappVariant")
 }
 val flutterTarget = providers.gradleProperty("target").orNull
 val girlsEntrypointRequested =
     flutterTarget?.replace('\\', '/')?.endsWith("lib/main_girls.dart") == true
+val koboEntrypointRequested =
+    flutterTarget?.replace('\\', '/')?.endsWith("lib/main_kobo.dart") == true
 val isGirlsVariant = minappVariant == "girls" || girlsEntrypointRequested
+val isKoboVariant = minappVariant == "kobo" || koboEntrypointRequested
+
+if (isGirlsVariant && isKoboVariant) {
+    error("Flutter target and minappVariant select different editions.")
+}
 
 android {
     namespace = "jp.cloxs.min"
@@ -45,8 +53,11 @@ android {
     }
 
     defaultConfig {
-        applicationId =
-            if (isGirlsVariant) "jp.cloxs.minapp.girls" else "jp.cloxs.min"
+        applicationId = when {
+            isGirlsVariant -> "jp.cloxs.minapp.girls"
+            isKoboVariant -> "jp.cloxs.minapp.kobo"
+            else -> "jp.cloxs.min"
+        }
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -56,7 +67,11 @@ android {
             if (isGirlsVariant) "@drawable/girls_brand_icon" else "@mipmap/ic_launcher"
         manifestPlaceholders["launchTheme"] =
             if (isGirlsVariant) "@style/GirlsLaunchTheme" else "@style/LaunchTheme"
-        manifestPlaceholders["appLabel"] = if (isGirlsVariant) "みんアプGirls" else "min"
+        manifestPlaceholders["appLabel"] = when {
+            isGirlsVariant -> "みんアプGirls"
+            isKoboVariant -> "みんアプ工房"
+            else -> "min"
+        }
     }
 
     signingConfigs {
