@@ -30,7 +30,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('girls-guest-banner')), findsOneWidget);
+    expect(find.byKey(const Key('girls-guest-memo')), findsOneWidget);
     expect(find.byKey(const Key('girls-login-id')), findsNothing);
     expect(requestCount, 0);
   });
@@ -56,7 +56,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('まずは登録なしで遊べるよ'), findsOneWidget);
+    expect(find.text('まずは登録なしで遊べるよ'), findsNothing);
+    expect(find.text('遊んだ記録はこの端末に保存されます'), findsNothing);
+    expect(find.text('登録なしで遊べる公式アプリ'), findsNothing);
     expect(find.byKey(const Key('girls-guest-memo')), findsOneWidget);
     expect(find.byKey(const Key('girls-guest-minappchi')), findsOneWidget);
     expect(find.byKey(const Key('girls-guest-novel')), findsOneWidget);
@@ -90,7 +92,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('girls-guest-banner')), findsOneWidget);
+    expect(find.byKey(const Key('girls-guest-memo')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -124,7 +126,7 @@ void main() {
 
     await tester.tap(find.text('今はしない'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('girls-guest-banner')), findsOneWidget);
+    expect(find.byKey(const Key('girls-guest-memo')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -175,7 +177,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('girls-auth-back')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('girls-guest-banner')), findsOneWidget);
+    expect(find.byKey(const Key('girls-guest-memo')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
