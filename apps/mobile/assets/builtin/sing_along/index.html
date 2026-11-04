@@ -104,6 +104,7 @@
       <select id="track">
         <option value="jupiter">木星（ホルスト）・ラララでうたおう</option>
         <option value="mozart-25">交響曲第25番（モーツァルト）・ラララでうたおう</option>
+        <option value="clair-de-lune">月の光（ドビュッシー）・ラララでうたおう</option>
         <option value="sparkle">きらきらポップ</option>
         <option value="after-school">放課後バラード</option>
         <option value="idol-step">アイドルステップ</option>
@@ -174,6 +175,22 @@
       [[43, 50, 58], 4], [[38, 45, 54], 4], [[48, 55, 63], 4],
       [[38, 54, 60], 4], [[43, 50, 58], 4],
     ]);
+    // Debussy, Clair de lune: upper voice of bars 1-4, down one octave.
+    // Source: Keith OHara's public-domain Mutopia 1778 / E. Fromont (1905).
+    // Durations use quarter-note beats; null is an explicit rest. Tied notes
+    // and the 9/8 bar-3 duplets are combined without reattacking the note.
+    // Our repeat and held Db cadence are documented in sing_along/README.md.
+    const CLAIR_DE_LUNE_THEME = Object.freeze([
+      [null, 0.5], [56, 0.5], [68, 2], [65, 2],
+      [63, 0.5], [65, 0.5], [63, 3.5],
+      [61, 0.5], [63, 0.5], [61, 0.75], [65, 1.5], [61, 1.25],
+      [60, 0.5], [61, 0.5], [60, 3],
+    ]);
+    // Our simplified accompaniment, including the opening eighth-note rest.
+    const CLAIR_DE_LUNE_CHORDS = Object.freeze([
+      [null, 0.5], [[49, 56, 65], 4], [[51, 58, 61], 4.5],
+      [[44, 54, 60], 4.5], [[49, 56, 65], 4.5],
+    ]);
     const TRACKS = Object.freeze({
       jupiter: Object.freeze({
         kind: 'score',
@@ -191,6 +208,15 @@
         description: 'モーツァルト「交響曲第25番」第1楽章の冒頭。4つの合図のあと、ラララで短い旋律を3回うたおう。',
         melody: [...MOZART_25_THEME, ...MOZART_25_THEME, ...MOZART_25_THEME, [67, 4]],
         harmony: [...MOZART_25_CHORDS, ...MOZART_25_CHORDS, ...MOZART_25_CHORDS, [[43, 50, 58], 4]],
+      }),
+      'clair-de-lune': Object.freeze({
+        kind: 'score',
+        bpm: 72,
+        leadInBeats: 4.5,
+        countInPulseBeats: 1.5,
+        description: 'ドビュッシー「月の光」の静かな冒頭。3つの合図のあと、ラララで短い旋律を2回うたおう。',
+        melody: [...CLAIR_DE_LUNE_THEME, ...CLAIR_DE_LUNE_THEME, [61, 1.5]],
+        harmony: [...CLAIR_DE_LUNE_CHORDS, ...CLAIR_DE_LUNE_CHORDS, [[49, 56, 65], 1.5]],
       }),
       sparkle: Object.freeze({
         kind: 'loop',
@@ -383,19 +409,30 @@
       return 440 * Math.pow(2, (note - 69) / 12);
     }
 
+    // Both the count-in duration and pulse spacing use quarter-note beats.
+    function scoreCountInPulseBeats(track) {
+      const pulse = track.countInPulseBeats === undefined ? 1 : track.countInPulseBeats;
+      if (!Number.isFinite(pulse) || pulse <= 0 ||
+          !Number.isInteger(track.leadInBeats / pulse)) {
+        throw new Error(`Invalid score count-in pulse: leadIn=${track.leadInBeats}, pulse=${pulse}`);
+      }
+      return pulse;
+    }
+
     function scoreBeats(track) {
       if (!Number.isFinite(track.bpm) || track.bpm <= 0 ||
-          !Number.isInteger(track.leadInBeats) || track.leadInBeats < 0) {
+          !Number.isFinite(track.leadInBeats) || track.leadInBeats < 0) {
         throw new Error(`Invalid score tempo/count-in: bpm=${track.bpm}, leadIn=${track.leadInBeats}`);
       }
+      scoreCountInPulseBeats(track);
       function sumEvents(events, harmony) {
         if (!Array.isArray(events) || events.length === 0) throw new Error('Score events must not be empty.');
         return events.reduce((total, event, index) => {
           if (!Array.isArray(event) || event.length !== 2) throw new Error(`Invalid score event at ${index}.`);
           const [value, beats] = event;
           const notes = harmony ? value : [value];
-          if (!Array.isArray(notes) || notes.length === 0 ||
-              notes.some((note) => !Number.isInteger(note) || note < 0 || note > 127) ||
+          if ((value !== null && (!Array.isArray(notes) || notes.length === 0 ||
+              notes.some((note) => !Number.isInteger(note) || note < 0 || note > 127))) ||
               !Number.isFinite(beats) || beats <= 0) {
             throw new Error(`Invalid ${harmony ? 'harmony' : 'melody'} event at ${index}: notes=${String(value)}, beats=${beats}`);
           }
@@ -464,18 +501,23 @@
 
       stopBgm();
       if (track.kind === 'score') {
-        for (let count = 0; count < track.leadInBeats; count += 1) {
-          scheduleTone(context, context.destination, midiToHz(79), start + count * beat, 0.09, 0.018, 'sine');
+        const pulse = scoreCountInPulseBeats(track);
+        for (let count = 0; count < track.leadInBeats / pulse; count += 1) {
+          scheduleTone(context, context.destination, midiToHz(79), start + count * pulse * beat, 0.09, 0.018, 'sine');
         }
         let melodyBeat = track.leadInBeats;
         for (const [note, beats] of track.melody) {
-          scheduleTone(context, context.destination, midiToHz(note), start + melodyBeat * beat, beats * beat * 0.96, 0.055, 'triangle');
+          if (note !== null) {
+            scheduleTone(context, context.destination, midiToHz(note), start + melodyBeat * beat, beats * beat * 0.96, 0.055, 'triangle');
+          }
           melodyBeat += beats;
         }
         let harmonyBeat = track.leadInBeats;
         for (const [notes, beats] of track.harmony) {
-          for (const note of notes) {
-            scheduleTone(context, context.destination, midiToHz(note), start + harmonyBeat * beat, beats * beat * 0.98, 0.009, 'sine');
+          if (notes !== null) {
+            for (const note of notes) {
+              scheduleTone(context, context.destination, midiToHz(note), start + harmonyBeat * beat, beats * beat * 0.98, 0.009, 'sine');
+            }
           }
           harmonyBeat += beats;
         }
