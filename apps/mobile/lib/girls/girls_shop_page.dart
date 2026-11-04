@@ -247,7 +247,7 @@ class _GirlsShopCard extends StatelessWidget {
 
   final GirlsShopApp app;
   final Uri? thumbnailUri;
-  final String accessToken;
+  final String? accessToken;
   final VoidCallback onTap;
 
   @override
