@@ -292,9 +292,11 @@
     let timerId = null;
     let startedAt = 0;
     let recordingBgmOffsetSeconds = 0;
+    let fatalPlaybackError = null;
 
     function fail(error) {
       console.error(error);
+      fatalPlaybackError = error;
       stopEverything();
       const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
       statusBox.className = 'status error';
@@ -700,6 +702,9 @@
           if (event.data && event.data.size > 0) chunks.push(event.data);
         });
         recorder.addEventListener('stop', async () => {
+          // A fatal WebAudio failure may stop MediaRecorder too. Never replace
+          // the original error with a misleading "recording complete" message.
+          if (fatalPlaybackError) return;
           try {
             if (chunks.length === 0) throw new Error('録音データが空でした。');
             recordedMimeType = requireRecordedMimeType(chunks);
@@ -710,6 +715,7 @@
             }
             stopStream();
             recordedBuffer = await decodeRecordedBlob(recordedBlob);
+            if (fatalPlaybackError) return;
             setMode('idle');
             setStatus(`録音できたよ！形式: ${recordedMimeType} / ${recordedBlob.size} bytes / ${recordedBuffer.duration.toFixed(1)}秒。「BGM＋うた」で聞いてみよう。曲を変えるときは「とりなおす」を押してね。`);
           } catch (error) {
