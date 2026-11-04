@@ -15,6 +15,7 @@ locals {
     "GET /shop/content/{token}/{proxy+}",
     "GET /shop/apps",
     "GET /shop/apps/{app_id}/thumbnail",
+    "GET /shop/apps/{app_id}/preview/{version}/{proxy+}",
   ])
 
   hosted_protected_routes = toset([

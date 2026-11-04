@@ -306,17 +306,31 @@ class HostedShopBackend(HostedUserStateBackend):
 
         app_id = _item_string(session, "app_id")
         self._current_shop_app(app_id)
+        return self._read_shop_published_file(session, path)
+
+    def get_shop_preview_file(
+        self, app_id: str, version: str, path: str
+    ) -> tuple[bytes, str]:
+        # Public previews can only read the exact currently listed version.
+        # They do not create runtime or user-specific server-side state.
+        app = self._current_shop_app(app_id)
+        self._assert_version(app, version)
+        return self._read_shop_published_file(app, path)
+
+    def _read_shop_published_file(
+        self, published: dict[str, Any], path: str
+    ) -> tuple[bytes, str]:
         normalized = self._normalize_content_path(path)
-        expected_files = _item_files(session, "published_files_json")
+        expected_files = _item_files(published, "published_files_json")
         if normalized not in expected_files:
             raise ApiProblem(404, "shop_file_not_found", "Shop file was not found.")
         zip_bytes, actual_files, _ = self._read_zip_object(
             bucket=self._published_bucket,
-            key=_item_string(session, "published_key"),
-            expected_sha256=_item_string(session, "published_sha256"),
+            key=_item_string(published, "published_key"),
+            expected_sha256=_item_string(published, "published_sha256"),
         )
         if actual_files != expected_files:
-            raise RuntimeError("Shop ZIP manifest does not match session metadata")
+            raise RuntimeError("Shop ZIP manifest does not match published metadata")
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
             try:
                 return archive.read(normalized), self._content_type(normalized)

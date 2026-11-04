@@ -40,6 +40,12 @@ class FakeBackend(HostedGirlsShopBackend):
             }
         ]
 
+    def get_shop_preview_file(
+        self, app_id: str, version: str, path: str
+    ) -> tuple[bytes, str]:
+        self.calls.append(("preview", app_id, version, path))
+        return b"<h1>published preview</h1>", "text/html; charset=utf-8"
+
     def set_shop_visibility(
         self, auth_subject: str, app_id: str, visibility: str
     ) -> dict[str, Any]:
@@ -165,6 +171,32 @@ class HostedShopHandlerTests(unittest.TestCase):
         )
         self.assertEqual(response["statusCode"], 200)
         self.assertEqual(self.backend.calls, [("thumbnail", APP_ID)])
+
+    def test_guest_can_preview_published_files_without_authentication(self) -> None:
+        response = hosted_shop_handler.lambda_handler(
+            _event(
+                "GET",
+                f"/shop/apps/{APP_ID}/preview/3/assets%2Fintro.html",
+                subject=None,
+            ),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(
+            self.backend.calls,
+            [("preview", APP_ID, "3", "assets/intro.html")],
+        )
+        self.assertEqual(response["headers"]["content-type"], "text/html; charset=utf-8")
+
+    def test_guest_preview_rejects_invalid_version_path(self) -> None:
+        response = hosted_shop_handler.lambda_handler(
+            _event(
+                "GET", f"/shop/apps/{APP_ID}/preview/03/index.html", subject=None
+            ),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 404)
+        self.assertEqual(self.backend.calls, [])
 
     def test_guest_cannot_launch_shop_app(self) -> None:
         response = hosted_shop_handler.lambda_handler(

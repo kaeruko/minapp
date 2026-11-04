@@ -29,6 +29,7 @@ _SHOP_ACTION_RE = re.compile(
     rf"^/shop/apps/{_ID_RE}/(launch|download|add|sync-thumbnail|reports)$"
 )
 _SHOP_THUMBNAIL_RE = re.compile(rf"^/shop/apps/{_ID_RE}/thumbnail$")
+_SHOP_PREVIEW_RE = re.compile(rf"^/shop/apps/{_ID_RE}/preview/([1-9][0-9]{{0,31}})/(.+)$")
 _SHOP_VISIBILITY_RE = re.compile(rf"^/apps/{_ID_RE}/shop-visibility$")
 _SHOP_CONTENT_RE = re.compile(r"^/shop/content/([A-Za-z0-9_-]{32,128})/(.+)$")
 
@@ -122,6 +123,14 @@ def _handle_shop_request(event: dict[str, Any]) -> dict[str, Any] | None:
     thumbnail_match = _SHOP_THUMBNAIL_RE.fullmatch(path)
     if method == "GET" and thumbnail_match is not None:
         data, content_type = backend.get_shop_thumbnail(thumbnail_match.group(1))
+        return hosted_handler._published_content_response(data, content_type)
+
+    preview_match = _SHOP_PREVIEW_RE.fullmatch(path)
+    if method == "GET" and preview_match is not None:
+        app_id, version, encoded_path = preview_match.groups()
+        data, content_type = backend.get_shop_preview_file(
+            app_id, version, unquote(encoded_path)
+        )
         return hosted_handler._published_content_response(data, content_type)
 
     visibility_match = _SHOP_VISIBILITY_RE.fullmatch(path)
