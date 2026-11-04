@@ -134,6 +134,17 @@ class GirlsShopApi {
     return _baseUri.resolve(path);
   }
 
+  Uri guestPreviewUri(GirlsShopApp app) {
+    if (!_hexIdPattern.hasMatch(app.appId) ||
+        !_versionPattern.hasMatch(app.version) ||
+        app.version.length > 32) {
+      throw ArgumentError('Guest preview requires a valid shop app ID and version.');
+    }
+    return _baseUri.resolve(
+      '/shop/apps/${app.appId}/preview/${app.version}/index.html',
+    );
+  }
+
   Future<List<GirlsShopApp>> listApps([String? accessToken]) async {
     final Map<String, Object?> payload = await _jsonRequest(
       method: 'GET',

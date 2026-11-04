@@ -202,6 +202,12 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
       final _HostedPreviewNavigationPolicy policy =
           _HostedPreviewNavigationPolicy(contentUri);
       _allowsNavigation = policy.allows;
+    } else if (contentUri.pathSegments.length >= 2 &&
+        contentUri.pathSegments[0] == 'shop' &&
+        contentUri.pathSegments[1] == 'apps') {
+      final HostedContentNavigationPolicy policy =
+          HostedContentNavigationPolicy.shopPreview(contentUri);
+      _allowsNavigation = policy.allows;
     } else if (contentUri.pathSegments.firstOrNull == 'shop') {
       final HostedContentNavigationPolicy policy =
           HostedContentNavigationPolicy.shop(contentUri);

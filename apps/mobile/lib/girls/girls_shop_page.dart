@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../hosted_app_management_api.dart';
 import '../hosted_app_webview.dart';
+import '../hosted_runtime_bridge.dart';
 import '../hosted_guest_access.dart';
 import '../ugc_safety.dart';
 import 'girls_apps_page.dart';
 import 'girls_errors.dart';
 import 'girls_scaffold.dart';
 import 'girls_shop_api.dart';
+import 'girls_shop_guest_preview_transport.dart';
 import 'hosted_girls_api.dart';
 
 const Color _ink = Color(0xFF604943);
@@ -455,21 +457,39 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
   }
 
   Future<void> _launch() => _run(() async {
-        final GirlsShopLaunchGrant grant = await widget.shopApi.createLaunch(
-          accessToken: _session.accessToken,
-          app: widget.app,
-        );
-        if (!mounted) return;
-        await Navigator.of(context).push<void>(
-          MaterialPageRoute<void>(
-            builder: (BuildContext context) => HostedAppWebViewPage.session(
-              title: widget.app.title,
-              contentUri: grant.contentUri,
-              runtimeToken: grant.runtimeToken,
-              runtimeTransport: widget.api.runtimeClient,
+        final GirlsGuestPreviewRuntimeTransport? guestPreview =
+            widget.session == null ? GirlsGuestPreviewRuntimeTransport() : null;
+        try {
+          final Uri contentUri;
+          final String runtimeToken;
+          final HostedRuntimeTransport runtimeTransport;
+          if (guestPreview != null) {
+            contentUri = widget.shopApi.guestPreviewUri(widget.app);
+            runtimeToken = guestPreview.runtimeToken;
+            runtimeTransport = guestPreview;
+          } else {
+            final GirlsShopLaunchGrant grant = await widget.shopApi.createLaunch(
+              accessToken: _session.accessToken,
+              app: widget.app,
+            );
+            contentUri = grant.contentUri;
+            runtimeToken = grant.runtimeToken;
+            runtimeTransport = widget.api.runtimeClient;
+          }
+          if (!mounted) return;
+          await Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(
+              builder: (BuildContext context) => HostedAppWebViewPage.session(
+                title: widget.app.title,
+                contentUri: contentUri,
+                runtimeToken: runtimeToken,
+                runtimeTransport: runtimeTransport,
+              ),
             ),
-          ),
-        );
+          );
+        } finally {
+          guestPreview?.close();
+        }
       });
 
   Future<void> _addToGroup() => _run(() async {
@@ -673,20 +693,23 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
           ),
           const SizedBox(height: 24),
           FilledButton.icon(
-            onPressed: _busy
-                ? null
-                : guest
-                    ? () => HostedGuestAccessScope.requireAuthentication(
-                          context, feature: 'ショップの作品で遊ぶ',
-                        )
-                    : _launch,
+            onPressed: _busy ? null : _launch,
             style: FilledButton.styleFrom(
               backgroundColor: _lavender,
               padding: const EdgeInsets.symmetric(vertical: 15),
             ),
             icon: const Icon(Icons.play_arrow_rounded),
-            label: Text(guest ? '遊ぶには登録・ログイン' : 'あそんでみる'),
+            label: const Text('あそんでみる'),
           ),
+          if (guest)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'おためしプレイの記録は保存されません',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF9B7F91), fontSize: 12),
+              ),
+            ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
             onPressed: guest

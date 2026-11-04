@@ -9,6 +9,7 @@ const int hostedBridgeVersion = 1;
 final RegExp _hostedIdPattern = RegExp(r'^[0-9a-f]{32}$');
 final RegExp _runtimeTokenPattern = RegExp(r'^[A-Za-z0-9_-]{32,64}$');
 final RegExp _contentTokenPattern = RegExp(r'^[A-Za-z0-9_-]{32,128}$');
+final RegExp _shopPreviewVersionPattern = RegExp(r'^[1-9][0-9]{0,31}$');
 final RegExp _contentPathPattern = RegExp(
   r'^/hosted/content/[A-Za-z0-9_-]{32,128}/index\.html$',
 );
@@ -491,6 +492,9 @@ class HostedContentNavigationPolicy {
   HostedContentNavigationPolicy.shop(Uri contentUri)
       : this._(contentUri, 'shop');
 
+  HostedContentNavigationPolicy.shopPreview(Uri contentUri)
+      : this._(contentUri, 'shop-preview');
+
   HostedContentNavigationPolicy._(Uri contentUri, String namespace)
       : _contentUri = _validateContentUri(contentUri, namespace),
         _allowedPathPrefix = _contentPathPrefix(contentUri, namespace);
@@ -517,7 +521,17 @@ class HostedContentNavigationPolicy {
       throw ArgumentError.value(uri, 'contentUri', 'Hosted content URL is invalid.');
     }
     final List<String> segments = uri.pathSegments;
-    if (segments.length != 4 ||
+    if (namespace == 'shop-preview') {
+      if (segments.length != 6 ||
+          segments[0] != 'shop' ||
+          segments[1] != 'apps' ||
+          !_hostedIdPattern.hasMatch(segments[2]) ||
+          segments[3] != 'preview' ||
+          !_shopPreviewVersionPattern.hasMatch(segments[4]) ||
+          segments[5] != 'index.html') {
+        throw ArgumentError.value(uri, 'contentUri', 'Shop preview URL path is invalid.');
+      }
+    } else if (segments.length != 4 ||
         segments[0] != namespace ||
         segments[1] != 'content' ||
         !_contentTokenPattern.hasMatch(segments[2]) ||
@@ -529,6 +543,9 @@ class HostedContentNavigationPolicy {
 
   static String _contentPathPrefix(Uri uri, String namespace) {
     final List<String> segments = uri.pathSegments;
+    if (namespace == 'shop-preview') {
+      return '/shop/apps/${segments[2]}/preview/${segments[4]}/';
+    }
     return '/$namespace/content/${segments[2]}/';
   }
 
