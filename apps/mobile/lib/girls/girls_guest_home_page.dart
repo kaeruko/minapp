@@ -10,7 +10,6 @@ import 'hosted_girls_api.dart';
 
 const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF745B9E);
-const Color _pink = Color(0xFFE79AAF);
 const String _memoCardAsset = 'assets/girls/home/cards/memo_card.png';
 const String _minappchiCardAsset = 'assets/girls/home/cards/minappchi_card.png';
 const String _novelCardAsset = 'assets/girls/home/cards/novel_card.png';
@@ -84,48 +83,6 @@ class GirlsGuestHomePage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                Container(
-                  key: const Key('girls-guest-banner'),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .88),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: const Color(0xFFE7DDF2)),
-                  ),
-                  child: const Row(
-                    children: <Widget>[
-                      Icon(Icons.auto_awesome_rounded, color: _pink, size: 30),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              'まずは登録なしで遊べるよ',
-                              style: TextStyle(
-                                color: _ink,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              '遊んだ記録はこの端末に保存されます',
-                              style: TextStyle(
-                                color: Color(0xFF8C7893),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const _GuestSectionTitle(title: '登録なしで遊べる公式アプリ'),
-                const SizedBox(height: 8),
                 GridView.count(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -186,22 +143,6 @@ class GirlsGuestHomePage extends StatelessWidget {
       ),
     );
   }
-}
-
-class _GuestSectionTitle extends StatelessWidget {
-  const _GuestSectionTitle({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) => Text(
-        title,
-        style: const TextStyle(
-          color: _ink,
-          fontSize: 18,
-          fontWeight: FontWeight.w900,
-        ),
-      );
 }
 
 class _GuestAppCard extends StatelessWidget {
