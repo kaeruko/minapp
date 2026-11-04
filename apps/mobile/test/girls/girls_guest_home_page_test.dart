@@ -49,7 +49,7 @@ void main() {
     await tester.pumpWidget(
       GirlsPersistentApp(
         api: HostedGirlsApi(
-            baseUri: Uri.parse('https://girls-api.example.com'),
+          baseUri: Uri.parse('https://girls-api.example.com'),
           client: client,
           sessionStore: _EmptySessionStore(),
         ),
@@ -83,7 +83,7 @@ void main() {
     await tester.pumpWidget(
       GirlsPersistentApp(
         api: HostedGirlsApi(
-            baseUri: Uri.parse('https://girls-api.example.com'),
+          baseUri: Uri.parse('https://girls-api.example.com'),
           client: client,
           sessionStore: _EmptySessionStore(),
         ),
@@ -106,7 +106,7 @@ void main() {
     await tester.pumpWidget(
       GirlsPersistentApp(
         api: HostedGirlsApi(
-            baseUri: Uri.parse('https://girls-api.example.com'),
+          baseUri: Uri.parse('https://girls-api.example.com'),
           client: client,
           sessionStore: _EmptySessionStore(),
         ),
@@ -160,7 +160,7 @@ void main() {
     await tester.pumpWidget(
       GirlsPersistentApp(
         api: HostedGirlsApi(
-            baseUri: Uri.parse('https://girls-api.example.com'),
+          baseUri: Uri.parse('https://girls-api.example.com'),
           client: client,
           sessionStore: _EmptySessionStore(),
         ),
