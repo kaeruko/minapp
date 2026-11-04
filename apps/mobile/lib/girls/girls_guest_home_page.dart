@@ -89,7 +89,8 @@ class GirlsGuestHomePage extends StatelessWidget {
                   crossAxisCount: 2,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 1,
+                  // Square artwork plus a separate caption below each image.
+                  childAspectRatio: 0.8,
                   children: <Widget>[
                     _GuestAppCard(
                       key: const Key('girls-guest-memo'),
@@ -174,7 +175,7 @@ class _GuestAppCard extends StatelessWidget {
                 child: Image.asset(
                   assetName,
                   width: double.infinity,
-                  fit: BoxFit.cover,
+                  fit: BoxFit.contain,
                 ),
               ),
               Padding(
