@@ -488,6 +488,66 @@
       bgmNodes.push(oscillator, gain);
     }
 
+    function scoreToneEvents(track) {
+      const pulse = scoreCountInPulseBeats(track);
+      const events = [];
+      for (let count = 0; count < track.leadInBeats / pulse; count += 1) {
+        events.push({ lane: 'cue', kind: 'cue', note: 79, offsetBeats: count * pulse,
+          fixedDurationSeconds: 0.09, gainValue: 0.018, wave: 'sine' });
+      }
+
+      let melodyBeat = track.leadInBeats;
+      for (const [note, beats] of track.melody) {
+        if (note !== null) {
+          events.push({ lane: 'melody', kind: 'melody', note, offsetBeats: melodyBeat,
+            durationBeats: beats, durationFactor: 0.96, gainValue: 0.055, wave: 'triangle' });
+        }
+        melodyBeat += beats;
+      }
+
+      let harmonyBeat = track.leadInBeats;
+      for (const [notes, beats] of track.harmony) {
+        if (notes !== null) {
+          for (const [voice, note] of notes.entries()) {
+            events.push({ lane: `harmony-${voice}`, kind: 'harmony', note, offsetBeats: harmonyBeat,
+              durationBeats: beats, durationFactor: 0.98, gainValue: 0.009, wave: 'sine' });
+          }
+        }
+        harmonyBeat += beats;
+      }
+      return events;
+    }
+
+    function scheduleScore(context, destination, track, start) {
+      const beat = 60 / track.bpm;
+      const stop = start + trackDurationSeconds(track);
+      const lanes = new Map();
+      for (const event of scoreToneEvents(track)) {
+        if (!lanes.has(event.lane)) lanes.set(event.lane, []);
+        lanes.get(event.lane).push(event);
+      }
+
+      for (const events of lanes.values()) {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = events[0].wave;
+        gain.gain.setValueAtTime(0.0001, start);
+        for (const event of events) {
+          const when = start + event.offsetBeats * beat;
+          const duration = event.fixedDurationSeconds ?? event.durationBeats * beat * event.durationFactor;
+          const attack = Math.min(0.02, duration / 2);
+          oscillator.frequency.setValueAtTime(midiToHz(event.note), when);
+          gain.gain.setValueAtTime(0.0001, when);
+          gain.gain.exponentialRampToValueAtTime(event.gainValue * BGM_MASTER_GAIN, when + attack);
+          gain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+        }
+        oscillator.connect(gain).connect(destination);
+        oscillator.start(start);
+        oscillator.stop(stop);
+        bgmNodes.push(oscillator, gain);
+      }
+    }
+
     async function startBgm(scheduledStart = null) {
       const context = await ensureAudioContext();
       const track = currentTrack();
@@ -501,26 +561,7 @@
 
       stopBgm();
       if (track.kind === 'score') {
-        const pulse = scoreCountInPulseBeats(track);
-        for (let count = 0; count < track.leadInBeats / pulse; count += 1) {
-          scheduleTone(context, context.destination, midiToHz(79), start + count * pulse * beat, 0.09, 0.018, 'sine');
-        }
-        let melodyBeat = track.leadInBeats;
-        for (const [note, beats] of track.melody) {
-          if (note !== null) {
-            scheduleTone(context, context.destination, midiToHz(note), start + melodyBeat * beat, beats * beat * 0.96, 0.055, 'triangle');
-          }
-          melodyBeat += beats;
-        }
-        let harmonyBeat = track.leadInBeats;
-        for (const [notes, beats] of track.harmony) {
-          if (notes !== null) {
-            for (const note of notes) {
-              scheduleTone(context, context.destination, midiToHz(note), start + harmonyBeat * beat, beats * beat * 0.98, 0.009, 'sine');
-            }
-          }
-          harmonyBeat += beats;
-        }
+        scheduleScore(context, context.destination, track, start);
         return start;
       }
       for (let beatIndex = 0; beatIndex < totalBeats; beatIndex += 1) {

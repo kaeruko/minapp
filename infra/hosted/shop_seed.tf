@@ -46,6 +46,7 @@ locals {
       version      = 1
       source_dir   = "${local.minapp_apps_source_root}/sing_along"
       files        = ["index.html"]
+      excludes     = ["README.md", "test_sing_along.js"]
       published_at = "2026-09-26T00:00:00Z"
     }
     omiai-nekosan = {
@@ -114,7 +115,7 @@ data "archive_file" "official_shop_directory_source" {
 
   type        = "zip"
   source_dir  = each.value.source_dir
-  excludes    = ["icon.webp"]
+  excludes    = concat(["icon.webp"], try(each.value.excludes, []))
   output_path = "${path.module}/minapp-hosted-shop-${each.key}-v${each.value.version}.zip"
 }
 
