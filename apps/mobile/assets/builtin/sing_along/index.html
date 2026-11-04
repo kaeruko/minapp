@@ -88,7 +88,7 @@
   <main class="app">
     <header>
       <h1>🎤 うたってみよう</h1>
-      <p class="subtitle">すきな伴奏にあわせて、じぶんの声をろくおんしよう</p>
+      <p class="subtitle">すきな曲や伴奏にあわせて、じぶんの声をろくおんしよう</p>
     </header>
 
     <section class="stage" aria-label="うたのステージ">
@@ -100,8 +100,10 @@
     </section>
 
     <section class="card">
-      <label class="label" for="track">🎵 BGMをえらぶ</label>
+      <label class="label" for="track">🎵 曲・BGMをえらぶ</label>
       <select id="track">
+        <option value="jupiter">木星（ホルスト）・ラララでうたおう</option>
+        <option value="mozart-25">交響曲第25番（モーツァルト）・ラララでうたおう</option>
         <option value="sparkle">きらきらポップ</option>
         <option value="after-school">放課後バラード</option>
         <option value="idol-step">アイドルステップ</option>
@@ -110,7 +112,7 @@
 
       <div class="time-row">
         <span id="timer" class="timer">00:00</span>
-        <span class="limit">最大 01:00</span>
+        <span id="limit" class="limit">最大 01:00</span>
       </div>
 
       <div class="buttons">
@@ -133,8 +135,65 @@
 
     const MAX_SECONDS = 60;
     const BGM_MASTER_GAIN = 3.0;
+    // Holst, The Planets (1921 score), Jupiter, Andante maestoso:
+    // first seven complete bars after the G3/Bb3 pickup (printed p.91).
+    // Each pair is [MIDI note, quarter-note beats]; tied notes are combined.
+    // The eighth bar's Eb4 closes the phrase (printed p.92).
+    // Source and our repeat/cadence edits: sing_along/README.md.
+    const JUPITER_THEME = Object.freeze([
+      [60, 1.5], [63, 0.5], [62, 0.75], [58, 0.25],
+      [63, 0.5], [65, 0.5], [63, 1], [62, 1],
+      [60, 0.5], [62, 0.5], [60, 1], [58, 1],
+      [55, 2], [55, 0.5], [58, 0.5],
+      [60, 1.5], [63, 0.5], [62, 0.75], [58, 0.25],
+      [63, 0.5], [65, 0.5], [67, 1], [67, 1],
+      [67, 0.5], [65, 0.5], [63, 1], [65, 1],
+    ]);
+    // Our own simple accompaniment, one chord per 3/4 bar.
+    const JUPITER_CHORDS = Object.freeze([
+      [[48, 55, 58, 63], 3], [[51, 58, 63, 67], 3],
+      [[44, 51, 56, 60], 3], [[39, 51, 55, 58], 3],
+      [[48, 55, 58, 63], 3], [[43, 51, 58, 63], 3],
+      [[46, 53, 56, 62], 3], [[39, 51, 55, 58], 3],
+    ]);
+    // Mozart, Symphony No.25 K.183, I: opening five-bar incipit on IMSLP.
+    // Preserve the 8th/quarter-note syncopation and the bar-5 arpeggio,
+    // transposed down one octave. Repeats and the held closing G are ours.
+    // This uses Mozart's theme, not the modern CM work "HASSIN".
+    // Score provenance and the exact LilyPond incipit: sing_along/README.md.
+    const MOZART_25_THEME = Object.freeze([
+      [67, 0.5], [67, 1], [67, 1], [67, 1], [67, 0.5],
+      [62, 0.5], [62, 1], [62, 1], [62, 1], [62, 0.5],
+      [63, 0.5], [63, 1], [63, 1], [63, 1], [63, 0.5],
+      [54, 0.5], [54, 1], [54, 1], [54, 1], [54, 0.5],
+      [55, 0.5], [58, 0.5], [62, 0.5], [67, 0.5],
+      [70, 0.25], [69, 0.25], [67, 0.25], [66, 0.25], [67, 1],
+    ]);
+    // Original, simplified accompaniment: G minor, D, C minor, D7, G minor.
+    const MOZART_25_CHORDS = Object.freeze([
+      [[43, 50, 58], 4], [[38, 45, 54], 4], [[48, 55, 63], 4],
+      [[38, 54, 60], 4], [[43, 50, 58], 4],
+    ]);
     const TRACKS = Object.freeze({
+      jupiter: Object.freeze({
+        kind: 'score',
+        bpm: 76,
+        leadInBeats: 2,
+        description: 'ホルスト「木星」の有名な中間部。2つの合図のあと、ラララで短い旋律を2回うたおう。',
+        melody: [[55, 0.5], [58, 0.5], ...JUPITER_THEME,
+          [63, 2], [55, 0.5], [58, 0.5], ...JUPITER_THEME, [63, 3]],
+        harmony: [[[46, 55, 58], 1], ...JUPITER_CHORDS, ...JUPITER_CHORDS],
+      }),
+      'mozart-25': Object.freeze({
+        kind: 'score',
+        bpm: 128,
+        leadInBeats: 4,
+        description: 'モーツァルト「交響曲第25番」第1楽章の冒頭。4つの合図のあと、ラララで短い旋律を3回うたおう。',
+        melody: [...MOZART_25_THEME, ...MOZART_25_THEME, ...MOZART_25_THEME, [67, 4]],
+        harmony: [...MOZART_25_CHORDS, ...MOZART_25_CHORDS, ...MOZART_25_CHORDS, [[43, 50, 58], 4]],
+      }),
       sparkle: Object.freeze({
+        kind: 'loop',
         bpm: 124,
         description: '明るくて軽いポップ。自由にメロディをのせてみよう。',
         root: 60,
@@ -142,6 +201,7 @@
         wave: 'triangle',
       }),
       'after-school': Object.freeze({
+        kind: 'loop',
         bpm: 82,
         description: 'ゆっくり歌える、やさしい放課後の伴奏。',
         root: 53,
@@ -149,6 +209,7 @@
         wave: 'sine',
       }),
       'idol-step': Object.freeze({
+        kind: 'loop',
         bpm: 148,
         description: '元気に歌いたいときの、はずむアイドル風伴奏。',
         root: 55,
@@ -160,6 +221,7 @@
     const trackSelect = document.getElementById('track');
     const trackInfo = document.getElementById('track-info');
     const timer = document.getElementById('timer');
+    const limit = document.getElementById('limit');
     const statusBox = document.getElementById('status');
     const previewButton = document.getElementById('preview');
     const recordButton = document.getElementById('record');
@@ -171,6 +233,7 @@
       trackSelect,
       trackInfo,
       timer,
+      limit,
       statusBox,
       previewButton,
       recordButton,
@@ -193,8 +256,10 @@
     let voiceSource = null;
     let timerId = null;
     let startedAt = 0;
+    let recordingBgmOffsetSeconds = 0;
 
     function fail(error) {
+      console.error(error);
       stopEverything();
       const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
       statusBox.className = 'status error';
@@ -278,7 +343,7 @@
 
     function setMode(next) {
       const busy = next === 'preview' || next === 'recording' || next === 'processing' || next === 'playback';
-      trackSelect.disabled = busy || next === 'error';
+      trackSelect.disabled = busy || !!recordedBlob || next === 'error';
       previewButton.disabled = busy || next === 'error';
       recordButton.disabled = busy || next === 'error';
       stopButton.disabled = !busy;
@@ -291,13 +356,17 @@
       return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
     }
 
-    function beginTimer(onLimit) {
+    function beginTimer(onLimit, limitSeconds, audioStart) {
+      if (!audioContext || !Number.isFinite(audioStart) || !Number.isFinite(limitSeconds) || limitSeconds <= 0) {
+        throw new Error(`Invalid timer: start=${audioStart}, limit=${limitSeconds}`);
+      }
       if (timerId !== null) clearInterval(timerId);
-      startedAt = performance.now();
+      // Keep the recording limit on a wall clock even if the audio device suspends.
+      startedAt = performance.now() + (audioStart - audioContext.currentTime) * 1000;
       timerId = setInterval(() => {
         const elapsed = (performance.now() - startedAt) / 1000;
-        timer.textContent = formatTime(elapsed);
-        if (elapsed >= MAX_SECONDS) {
+        timer.textContent = formatTime(Math.min(elapsed, limitSeconds));
+        if (elapsed >= limitSeconds) {
           clearInterval(timerId);
           timerId = null;
           onLimit();
@@ -312,6 +381,50 @@
 
     function midiToHz(note) {
       return 440 * Math.pow(2, (note - 69) / 12);
+    }
+
+    function scoreBeats(track) {
+      if (!Number.isFinite(track.bpm) || track.bpm <= 0 ||
+          !Number.isInteger(track.leadInBeats) || track.leadInBeats < 0) {
+        throw new Error(`Invalid score tempo/count-in: bpm=${track.bpm}, leadIn=${track.leadInBeats}`);
+      }
+      function sumEvents(events, harmony) {
+        if (!Array.isArray(events) || events.length === 0) throw new Error('Score events must not be empty.');
+        return events.reduce((total, event, index) => {
+          if (!Array.isArray(event) || event.length !== 2) throw new Error(`Invalid score event at ${index}.`);
+          const [value, beats] = event;
+          const notes = harmony ? value : [value];
+          if (!Array.isArray(notes) || notes.length === 0 ||
+              notes.some((note) => !Number.isInteger(note) || note < 0 || note > 127) ||
+              !Number.isFinite(beats) || beats <= 0) {
+            throw new Error(`Invalid ${harmony ? 'harmony' : 'melody'} event at ${index}: notes=${String(value)}, beats=${beats}`);
+          }
+          return total + beats;
+        }, 0);
+      }
+      const melodyBeats = sumEvents(track.melody, false);
+      const harmonyBeats = sumEvents(track.harmony, true);
+      if (melodyBeats !== harmonyBeats) {
+        throw new Error(`Score lengths differ: melody=${melodyBeats}, harmony=${harmonyBeats}`);
+      }
+      return melodyBeats;
+    }
+
+    function trackDurationSeconds(track = currentTrack()) {
+      if (track.kind === 'loop') return MAX_SECONDS;
+      if (track.kind !== 'score') throw new Error(`Unknown track kind: ${track.kind}`);
+      const duration = (track.leadInBeats + scoreBeats(track)) * 60 / track.bpm + 0.15;
+      if (!Number.isFinite(duration) || duration > MAX_SECONDS) {
+        throw new Error(`Score exceeds recording limit: duration=${duration}, limit=${MAX_SECONDS}`);
+      }
+      return duration;
+    }
+
+    function updateTrackInfo() {
+      const track = currentTrack();
+      const duration = trackDurationSeconds(track);
+      trackInfo.textContent = `${track.description}  ${track.bpm} BPM`;
+      limit.textContent = track.kind === 'score' ? `曲の長さ ${formatTime(Math.ceil(duration))}` : '最大 01:00';
     }
 
     async function ensureAudioContext() {
@@ -341,6 +454,7 @@
     async function startBgm(scheduledStart = null) {
       const context = await ensureAudioContext();
       const track = currentTrack();
+      trackDurationSeconds(track);
       const beat = 60 / track.bpm;
       const start = scheduledStart === null ? context.currentTime + 0.05 : scheduledStart;
       if (!Number.isFinite(start) || start < context.currentTime) {
@@ -349,6 +463,24 @@
       const totalBeats = Math.ceil(MAX_SECONDS / beat) + 4;
 
       stopBgm();
+      if (track.kind === 'score') {
+        for (let count = 0; count < track.leadInBeats; count += 1) {
+          scheduleTone(context, context.destination, midiToHz(79), start + count * beat, 0.09, 0.018, 'sine');
+        }
+        let melodyBeat = track.leadInBeats;
+        for (const [note, beats] of track.melody) {
+          scheduleTone(context, context.destination, midiToHz(note), start + melodyBeat * beat, beats * beat * 0.96, 0.055, 'triangle');
+          melodyBeat += beats;
+        }
+        let harmonyBeat = track.leadInBeats;
+        for (const [notes, beats] of track.harmony) {
+          for (const note of notes) {
+            scheduleTone(context, context.destination, midiToHz(note), start + harmonyBeat * beat, beats * beat * 0.98, 0.009, 'sine');
+          }
+          harmonyBeat += beats;
+        }
+        return start;
+      }
       for (let beatIndex = 0; beatIndex < totalBeats; beatIndex += 1) {
         const chord = track.chords[Math.floor(beatIndex / 4) % track.chords.length];
         const when = start + beatIndex * beat;
@@ -409,8 +541,8 @@
         requireCapabilities();
         setMode('preview');
         timer.textContent = '00:00';
-        await startBgm();
-        beginTimer(stopByUser);
+        const start = await startBgm();
+        beginTimer(stopByUser, trackDurationSeconds(), start);
         setStatus('BGMを再生中です。');
       } catch (error) { fail(error); }
     }
@@ -419,6 +551,8 @@
       try {
         requireCapabilities();
         if (recordedBlob) throw new Error('録音済みです。「とりなおす」を押してから録音してください。');
+        trackDurationSeconds();
+        const context = await ensureAudioContext();
         mediaStream = await openMicrophone();
         const chunks = [];
         recorder = new MediaRecorder(mediaStream);
@@ -437,16 +571,18 @@
             stopStream();
             recordedBuffer = await decodeRecordedBlob(recordedBlob);
             setMode('idle');
-            setStatus(`録音できたよ！形式: ${recordedMimeType} / ${recordedBlob.size} bytes / ${recordedBuffer.duration.toFixed(1)}秒。「BGM＋うた」で聞いてみよう。`);
+            setStatus(`録音できたよ！形式: ${recordedMimeType} / ${recordedBlob.size} bytes / ${recordedBuffer.duration.toFixed(1)}秒。「BGM＋うた」で聞いてみよう。曲を変えるときは「とりなおす」を押してね。`);
           } catch (error) {
             fail(error);
           }
         }, { once: true });
+        const recordingStart = context.currentTime;
         recorder.start();
         setMode('recording');
         timer.textContent = '00:00';
-        await startBgm();
-        beginTimer(stopByUser);
+        const bgmStart = await startBgm();
+        recordingBgmOffsetSeconds = bgmStart - recordingStart;
+        beginTimer(stopByUser, trackDurationSeconds() + recordingBgmOffsetSeconds, recordingStart);
         setStatus('🔴 ろくおん中… うたってね！');
       } catch (error) { fail(error); }
     }
@@ -474,7 +610,7 @@
         }, { once: true });
 
         try {
-          await startBgm(startAt);
+          await startBgm(startAt + recordingBgmOffsetSeconds);
         } catch (error) {
           throw playbackFailure('BGMの再生', error);
         }
@@ -484,7 +620,7 @@
           throw playbackFailure('録音音声の再生', error);
         }
 
-        beginTimer(stopByUser);
+        beginTimer(stopByUser, recordedBuffer.duration, startAt);
         setStatus(`BGMといっしょに再生中です。形式: ${recordedMimeType}`);
       } catch (error) { fail(error); }
     }
@@ -516,6 +652,7 @@
       recordedBlob = null;
       recordedBuffer = null;
       recordedMimeType = null;
+      recordingBgmOffsetSeconds = 0;
       recorder = null;
       timer.textContent = '00:00';
       setMode('idle');
@@ -523,8 +660,7 @@
     }
 
     trackSelect.addEventListener('change', () => {
-      const track = currentTrack();
-      trackInfo.textContent = `${track.description}  ${track.bpm} BPM`;
+      try { updateTrackInfo(); } catch (error) { fail(error); }
     });
     previewButton.addEventListener('click', previewBgm);
     recordButton.addEventListener('click', startRecording);
@@ -537,8 +673,7 @@
 
     try {
       requireCapabilities();
-      const track = currentTrack();
-      trackInfo.textContent = `${track.description}  ${track.bpm} BPM`;
+      updateTrackInfo();
       setMode('idle');
     } catch (error) {
       fail(error);
@@ -546,3 +681,4 @@
   </script>
 </body>
 </html>
+
