@@ -62,6 +62,26 @@ void main() {
     expect(find.byKey(const Key('girls-guest-memo')), findsOneWidget);
     expect(find.byKey(const Key('girls-guest-minappchi')), findsOneWidget);
     expect(find.byKey(const Key('girls-guest-novel')), findsOneWidget);
+    final GridView grid = tester.widget<GridView>(find.byType(GridView));
+    final SliverGridDelegateWithFixedCrossAxisCount gridDelegate =
+        grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+    // Card height includes a square illustration and a separate caption.
+    expect(gridDelegate.childAspectRatio, 0.8);
+
+    for (final String assetName in <String>[
+      'assets/girls/home/cards/memo_card.png',
+      'assets/girls/home/cards/minappchi_card.png',
+      'assets/girls/home/cards/novel_card.png',
+    ]) {
+      final Finder imageFinder = find.byWidgetPredicate(
+        (Widget widget) =>
+            widget is Image &&
+            widget.image is AssetImage &&
+            (widget.image as AssetImage).assetName == assetName,
+      );
+      expect(imageFinder, findsOneWidget);
+      expect(tester.widget<Image>(imageFinder).fit, BoxFit.contain);
+    }
     expect(find.byKey(const Key('girls-guest-auth')), findsOneWidget);
     expect(requestCount, 0);
     expect(tester.takeException(), isNull);
