@@ -62,6 +62,26 @@ void main() {
     expect(tester.widget<FilledButton>(play).onPressed, isNotNull);
     expect(find.text('おためしプレイの記録は保存されません'), findsOneWidget);
     expect(find.text('遊ぶには登録・ログイン'), findsNothing);
+
+    await tester.pumpWidget(MaterialApp(
+      home: GirlsShopDetailPage(
+        key: const ValueKey<String>('signed-in-shop'),
+        api: api,
+        shopApi: shopApi,
+        session: const AuthenticatedSession(
+          accessToken: 'signed-in-test-token',
+          expiresIn: 3600,
+        ),
+        app: app,
+        currentGroup: null,
+        onHideCreator: (_) async {},
+      ),
+    ));
+    await tester.pumpAndSettle();
+    final Finder signedPlay = find.widgetWithText(FilledButton, 'あそんでみる');
+    expect(signedPlay, findsOneWidget);
+    expect(tester.widget<FilledButton>(signedPlay).onPressed, isNotNull);
+    expect(find.text('おためしプレイの記録は保存されません'), findsNothing);
   });
 
   testWidgets(
