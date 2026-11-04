@@ -72,7 +72,7 @@ class KoboHeroCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             Text(
-                              'AIで、自分だけの道具を作る',
+                              '自分だけの小さな道具を作る',
                               style: TextStyle(
                                 color: KoboColors.brown,
                                 fontSize: 13,
@@ -270,7 +270,11 @@ class KoboBottomNavigation extends StatelessWidget {
   static const List<({KoboNavigationItem item, IconData icon, String label})>
       _items = <({KoboNavigationItem item, IconData icon, String label})>[
     (item: KoboNavigationItem.home, icon: Icons.home_outlined, label: 'ホーム'),
-    (item: KoboNavigationItem.create, icon: Icons.add_box_outlined, label: 'つくる'),
+    (
+      item: KoboNavigationItem.create,
+      icon: Icons.add_box_outlined,
+      label: 'つくる'
+    ),
     (
       item: KoboNavigationItem.community,
       icon: Icons.grid_view_outlined,
@@ -323,7 +327,8 @@ class KoboBottomNavigation extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: selected ? KoboColors.red : KoboColors.brown,
+                              color:
+                                  selected ? KoboColors.red : KoboColors.brown,
                               fontSize: 11,
                               height: 1.2,
                               fontWeight:

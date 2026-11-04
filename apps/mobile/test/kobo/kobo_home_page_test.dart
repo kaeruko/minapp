@@ -24,7 +24,7 @@ void main() {
     expect(find.byType(KoboHomePage), findsOneWidget);
     expect(find.text('みんアプ工房'), findsOneWidget);
     expect(find.text('今日、なに作る？'), findsOneWidget);
-    expect(find.text('AIで作ってもらう'), findsOneWidget);
+    expect(find.text('新しいアプリをつくる'), findsOneWidget);
     expect(find.byType(KoboCategoryCard), findsNWidgets(4));
     expect(find.text('晩酌予算'), findsOneWidget);
     expect(find.text('町中華メモ'), findsNWidgets(2));
@@ -69,7 +69,7 @@ void main() {
     await tester.tap(find.byKey(const Key('kobo-create-cta')));
     await tester.pump();
 
-    expect(find.text('AIで作る機能は次のPhaseで利用できるようになります'), findsOneWidget);
+    expect(find.text('アプリ作成機能は次のPhaseで利用できるようになります'), findsOneWidget);
     expect(find.text('みんアプ工房'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('kobo-nav-community')));

@@ -3,7 +3,8 @@ import 'package:http/http.dart' as http;
 import 'endpoint_validation.dart';
 import 'hosted_endpoint_source.dart';
 
-const String minAppGirlsHostedGoogleDriveFileId = minAppHostedGoogleDriveFileId;
+const String minAppGirlsHostedGoogleDriveFileId =
+    '17BOAlIhz-DPxtsWYMl68Ze0XQILb5bq2';
 const Duration minAppGirlsHostedFetchTimeout = minAppHostedFetchTimeout;
 
 const bool minAppGirlsDemoFast = bool.fromEnvironment(
@@ -47,5 +48,9 @@ Future<Uri> loadGirlsHostedBaseUriFromGoogleDrive({
   http.Client? client,
   DateTime? now,
 }) {
-  return loadHostedBaseUriFromGoogleDrive(client: client, now: now);
+  return loadHostedBaseUriFromGoogleDrive(
+    fileId: minAppGirlsHostedGoogleDriveFileId,
+    client: client,
+    now: now,
+  );
 }

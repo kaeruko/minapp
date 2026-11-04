@@ -2,14 +2,20 @@ import 'package:http/http.dart' as http;
 
 import 'endpoint_validation.dart';
 
-const String minAppHostedGoogleDriveFileId =
-    '17BOAlIhz-DPxtsWYMl68Ze0XQILb5bq2';
 const Duration minAppHostedFetchTimeout = Duration(seconds: 12);
 
 Future<Uri> loadHostedBaseUriFromGoogleDrive({
+  required String fileId,
   http.Client? client,
   DateTime? now,
 }) async {
+  if (!RegExp(r'^[A-Za-z0-9_-]{10,128}$').hasMatch(fileId)) {
+    throw ArgumentError.value(
+      fileId,
+      'fileId',
+      'must be a Google Drive file ID',
+    );
+  }
   final bool ownsClient = client == null;
   final http.Client httpClient = client ?? http.Client();
   try {
@@ -18,7 +24,7 @@ Future<Uri> loadHostedBaseUriFromGoogleDrive({
       '/uc',
       <String, String>{
         'export': 'download',
-        'id': minAppHostedGoogleDriveFileId,
+        'id': fileId,
         't': (now ?? DateTime.now()).millisecondsSinceEpoch.toString(),
       },
     );

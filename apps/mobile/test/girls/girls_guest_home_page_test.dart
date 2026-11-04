@@ -142,7 +142,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('アプリ作成や公開には登録が必要です'), findsOneWidget);
-    expect(find.textContaining('遊んだ記録は、この端末にそのまま残ります'), findsOneWidget);
+    expect(find.textContaining('ゲストのまま公開アプリで遊ぶことはできます'), findsOneWidget);
 
     await tester.tap(find.text('今はしない'));
     await tester.pumpAndSettle();

@@ -5,9 +5,18 @@ import 'kobo_models.dart';
 import 'kobo_theme.dart';
 
 class KoboHomePage extends StatelessWidget {
-  const KoboHomePage({this.data = KoboHomeData.phaseOne, super.key});
+  const KoboHomePage({
+    this.data = KoboHomeData.phaseOne,
+    this.onCreate,
+    this.onViewAllApps,
+    this.onNavigationSelected,
+    super.key,
+  });
 
   final KoboHomeData data;
+  final VoidCallback? onCreate;
+  final VoidCallback? onViewAllApps;
+  final ValueChanged<KoboNavigationItem>? onNavigationSelected;
 
   void _showNotImplemented(BuildContext context, String feature) {
     ScaffoldMessenger.of(context)
@@ -43,8 +52,9 @@ class KoboHomePage extends StatelessWidget {
                       const SizedBox(height: KoboSpacing.md),
                       KoboPrimaryButton(
                         key: const Key('kobo-create-cta'),
-                        label: 'AIで作ってもらう',
-                        onPressed: () => _showNotImplemented(context, 'AIで作る機能'),
+                        label: '新しいアプリをつくる',
+                        onPressed: onCreate ??
+                            () => _showNotImplemented(context, 'アプリ作成機能'),
                       ),
                       const SizedBox(height: KoboSpacing.lg),
                       const KoboSectionHeader(title: 'こんなの作れます'),
@@ -70,7 +80,8 @@ class KoboHomePage extends StatelessWidget {
                       KoboSectionHeader(
                         title: '俺のアプリ',
                         actionLabel: 'すべて見る',
-                        onAction: () => _showNotImplemented(context, 'アプリ一覧'),
+                        onAction: onViewAllApps ??
+                            () => _showNotImplemented(context, 'アプリ一覧'),
                       ),
                       const SizedBox(height: KoboSpacing.sm),
                       ...data.apps.indexed.map(((int, KoboAppSummary) entry) {
@@ -94,6 +105,12 @@ class KoboHomePage extends StatelessWidget {
       bottomNavigationBar: KoboBottomNavigation(
         selectedItem: KoboNavigationItem.home,
         onSelected: (KoboNavigationItem item) {
+          final ValueChanged<KoboNavigationItem>? handler =
+              onNavigationSelected;
+          if (handler != null) {
+            handler(item);
+            return;
+          }
           if (item == KoboNavigationItem.home) return;
           final String feature = switch (item) {
             KoboNavigationItem.home => 'ホーム',

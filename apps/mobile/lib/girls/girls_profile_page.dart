@@ -1,7 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
+import '../hosted_profile_api.dart';
 import 'api.dart';
 import 'girls_errors.dart';
 import 'girls_scaffold.dart';
@@ -11,7 +10,6 @@ const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF8062A7);
 const Color _pink = Color(0xFFE79AAF);
 const Color _cream = Color(0xFFFFFAF0);
-const int _maxDisplayNameLength = 40;
 
 class GirlsProfilePage extends StatefulWidget {
   const GirlsProfilePage({
@@ -28,6 +26,7 @@ class GirlsProfilePage extends StatefulWidget {
 }
 
 class _GirlsProfilePageState extends State<GirlsProfilePage> {
+  late final HostedProfileApi _profileApi;
   final TextEditingController _displayNameController = TextEditingController();
   final FocusNode _displayNameFocusNode = FocusNode();
 
@@ -41,11 +40,16 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
   @override
   void initState() {
     super.initState();
+    _profileApi = HostedProfileApi(
+      baseUri: widget.api.baseUri,
+      client: widget.api.httpClient,
+    );
     _load();
   }
 
   @override
   void dispose() {
+    _profileApi.close();
     _displayNameFocusNode.dispose();
     _displayNameController.dispose();
     super.dispose();
@@ -68,7 +72,9 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
       _message = null;
     });
     try {
-      final _DisplayNameProfile profile = await _request(method: 'GET');
+      final HostedProfile profile = await _profileApi.fetch(
+        widget.session.accessToken,
+      );
       if (!mounted) return;
       setState(() {
         _loginId = profile.loginId;
@@ -88,8 +94,10 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
       setState(() => _error = '表示名を入力してね。');
       return;
     }
-    if (value.length > _maxDisplayNameLength) {
-      setState(() => _error = '表示名は$_maxDisplayNameLength文字以内にしてね。');
+    if (value.length > maxHostedDisplayNameLength) {
+      setState(
+        () => _error = '表示名は$maxHostedDisplayNameLength文字以内にしてね。',
+      );
       return;
     }
     if (value != value.trim()) {
@@ -108,8 +116,8 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
       _message = null;
     });
     try {
-      final _DisplayNameProfile profile = await _request(
-        method: 'PATCH',
+      final HostedProfile profile = await _profileApi.updateDisplayName(
+        accessToken: widget.session.accessToken,
         displayName: value,
       );
       if (!mounted) return;
@@ -124,63 +132,6 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
-  }
-
-  Future<_DisplayNameProfile> _request({
-    required String method,
-    String? displayName,
-  }) async {
-    if (method != 'GET' && method != 'PATCH') {
-      throw ArgumentError.value(method, 'method', 'Unsupported method.');
-    }
-    if (method == 'GET' && displayName != null) {
-      throw ArgumentError('GET display-name request must not contain a body.');
-    }
-    if (method == 'PATCH' && displayName == null) {
-      throw ArgumentError('PATCH display-name request requires a display name.');
-    }
-
-    final Uri uri = widget.api.baseUri.resolve('/hosted/me/display-name');
-    final Map<String, String> headers = <String, String>{
-      'Accept': 'application/json',
-      'Authorization': 'Bearer ${widget.session.accessToken}',
-    };
-    final response = switch (method) {
-      'GET' => await widget.api.httpClient.get(uri, headers: headers),
-      'PATCH' => await widget.api.httpClient.patch(
-          uri,
-          headers: <String, String>{
-            ...headers,
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode(<String, Object?>{'display_name': displayName}),
-        ),
-      _ => throw StateError('Unreachable display-name method.'),
-    };
-
-    final String? contentType = response.headers['content-type'];
-    if (contentType == null ||
-        !contentType.toLowerCase().startsWith('application/json')) {
-      throw FormatException(
-        'Display-name API returned a non-JSON response (HTTP ${response.statusCode}).',
-      );
-    }
-    final Object? decoded = jsonDecode(response.body);
-    if (decoded is! Map<String, Object?>) {
-      throw const FormatException(
-        'Display-name API returned an unexpected JSON payload.',
-      );
-    }
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw ApiException(
-        statusCode: response.statusCode,
-        code: decoded['error'] is String ? decoded['error']! as String : 'api_error',
-        message: decoded['message'] is String
-            ? decoded['message']! as String
-            : 'Display-name API request failed with HTTP ${response.statusCode}.',
-      );
-    }
-    return _DisplayNameProfile.fromJson(decoded);
   }
 
   @override
@@ -244,7 +195,8 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
                                 ),
                               ),
                             ),
-                            Icon(Icons.edit_rounded, color: _lavender, size: 20),
+                            Icon(Icons.edit_rounded,
+                                color: _lavender, size: 20),
                           ],
                         ),
                         const SizedBox(height: 5),
@@ -261,7 +213,7 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
                           controller: _displayNameController,
                           focusNode: _displayNameFocusNode,
                           enabled: !_saving,
-                          maxLength: _maxDisplayNameLength,
+                          maxLength: maxHostedDisplayNameLength,
                           textCapitalization: TextCapitalization.sentences,
                           decoration: InputDecoration(
                             labelText: '名前',
@@ -380,62 +332,6 @@ class _GirlsProfilePageState extends State<GirlsProfilePage> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _DisplayNameProfile {
-  const _DisplayNameProfile({
-    required this.userId,
-    required this.loginId,
-    required this.role,
-    required this.displayName,
-  });
-
-  final String userId;
-  final String loginId;
-  final String role;
-  final String? displayName;
-
-  factory _DisplayNameProfile.fromJson(Map<String, Object?> json) {
-    const Set<String> expected = <String>{
-      'user_id',
-      'login_id',
-      'role',
-      'display_name',
-    };
-    if (json.keys.toSet().difference(expected).isNotEmpty ||
-        expected.difference(json.keys.toSet()).isNotEmpty) {
-      throw const FormatException(
-        'Display-name profile returned unexpected fields.',
-      );
-    }
-    final Object? userId = json['user_id'];
-    final Object? loginId = json['login_id'];
-    final Object? role = json['role'];
-    final Object? displayName = json['display_name'];
-    if (userId is! String || !RegExp(r'^[0-9a-f]{32}$').hasMatch(userId)) {
-      throw const FormatException('Display-name profile has invalid user_id.');
-    }
-    if (loginId is! String || loginId.isEmpty) {
-      throw const FormatException('Display-name profile has invalid login_id.');
-    }
-    if (role != 'user') {
-      throw const FormatException('Display-name profile has invalid role.');
-    }
-    if (displayName != null &&
-        (displayName is! String ||
-            displayName.isEmpty ||
-            displayName.length > _maxDisplayNameLength ||
-            displayName != displayName.trim() ||
-            RegExp(r'[\x00-\x1f\x7f]').hasMatch(displayName))) {
-      throw const FormatException('Display-name profile has invalid display_name.');
-    }
-    return _DisplayNameProfile(
-      userId: userId,
-      loginId: loginId,
-      role: role as String,
-      displayName: displayName as String?,
     );
   }
 }

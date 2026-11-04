@@ -13,7 +13,7 @@ import 'refreshable_auth_client.dart';
 export 'hosted_api.dart';
 
 /// Edition-neutral authenticated API used by hosted consumer applications.
-class HostedConsumerApi {
+class HostedConsumerApi implements HostedPlatformApi {
   HostedConsumerApi({
     required Uri baseUri,
     required HostedEdition edition,

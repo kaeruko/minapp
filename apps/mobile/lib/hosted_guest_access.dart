@@ -18,8 +18,8 @@ class HostedGuestAccessScope extends InheritedWidget {
   final HostedAuthenticationLauncher onAuthenticationRequested;
 
   static HostedGuestAccessScope of(BuildContext context) {
-    final HostedGuestAccessScope? scope = context
-        .dependOnInheritedWidgetOfExactType<HostedGuestAccessScope>();
+    final HostedGuestAccessScope? scope =
+        context.dependOnInheritedWidgetOfExactType<HostedGuestAccessScope>();
     if (scope == null) {
       throw StateError(
         'Guest UI must be hosted inside HostedGuestAccessScope.',
@@ -42,8 +42,8 @@ class HostedGuestAccessScope extends InheritedWidget {
       builder: (BuildContext dialogContext) => AlertDialog(
         title: Text('$featureには登録が必要です'),
         content: const Text(
-          '登録前に遊んだ記録は、この端末にそのまま残ります。'
-          '登録済みの場合はログインしてください。',
+          'ゲストのまま公開アプリで遊ぶことはできます。'
+          '自分のアプリへの追加や作成には、登録またはログインが必要です。',
         ),
         actions: <Widget>[
           TextButton(
