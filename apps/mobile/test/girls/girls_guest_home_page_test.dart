@@ -47,12 +47,11 @@ void main() {
     addTearDown(client.close);
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: GirlsGuestHomePage(
-          api: HostedGirlsApi(
+      GirlsPersistentApp(
+        api: HostedGirlsApi(
             baseUri: Uri.parse('https://girls-api.example.com'),
-            client: client,
-          ),
+          client: client,
+          sessionStore: _EmptySessionStore(),
         ),
       ),
     );
@@ -82,12 +81,11 @@ void main() {
     addTearDown(client.close);
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: GirlsGuestHomePage(
-          api: HostedGirlsApi(
+      GirlsPersistentApp(
+        api: HostedGirlsApi(
             baseUri: Uri.parse('https://girls-api.example.com'),
-            client: client,
-          ),
+          client: client,
+          sessionStore: _EmptySessionStore(),
         ),
       ),
     );
@@ -106,12 +104,11 @@ void main() {
     addTearDown(client.close);
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: GirlsGuestHomePage(
-          api: HostedGirlsApi(
+      GirlsPersistentApp(
+        api: HostedGirlsApi(
             baseUri: Uri.parse('https://girls-api.example.com'),
-            client: client,
-          ),
+          client: client,
+          sessionStore: _EmptySessionStore(),
         ),
       ),
     );
@@ -161,12 +158,11 @@ void main() {
     addTearDown(client.close);
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: GirlsGuestHomePage(
-          api: HostedGirlsApi(
+      GirlsPersistentApp(
+        api: HostedGirlsApi(
             baseUri: Uri.parse('https://girls-api.example.com'),
-            client: client,
-          ),
+          client: client,
+          sessionStore: _EmptySessionStore(),
         ),
       ),
     );
