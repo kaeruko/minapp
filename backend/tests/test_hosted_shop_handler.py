@@ -25,8 +25,8 @@ class FakeBackend(HostedGirlsShopBackend):
     def __init__(self) -> None:
         self.calls: list[tuple[Any, ...]] = []
 
-    def list_shop_apps(self, auth_subject: str) -> list[dict[str, Any]]:
-        self.calls.append(("list", auth_subject))
+    def list_shop_apps(self) -> list[dict[str, Any]]:
+        self.calls.append(("list",))
         return [
             {
                 "app_id": APP_ID,
@@ -100,12 +100,8 @@ class FakeBackend(HostedGirlsShopBackend):
             "created_at": "2026-09-13T02:10:00Z",
         }
 
-    def get_shop_thumbnail(
-        self,
-        auth_subject: str,
-        app_id: str,
-    ) -> tuple[bytes, str]:
-        self.calls.append(("thumbnail", auth_subject, app_id))
+    def get_shop_thumbnail(self, app_id: str) -> tuple[bytes, str]:
+        self.calls.append(("thumbnail", app_id))
         return b"RIFF\x00\x00\x00\x00WEBPicon", "image/webp"
 
     def get_shop_file(self, token: str, path: str) -> tuple[bytes, str]:
@@ -146,14 +142,37 @@ class HostedShopHandlerTests(unittest.TestCase):
         hosted_handler._BACKEND = None
         hosted_shop_handler._BACKEND = None
 
-    def test_list_is_global_shop_route_and_requires_only_authenticated_subject(self) -> None:
+    def test_list_is_global_public_shop_route(self) -> None:
         response = hosted_shop_handler.lambda_handler(
             _event("GET", "/shop/apps"), None
         )
         self.assertEqual(response["statusCode"], 200)
         payload = json.loads(response["body"])
         self.assertEqual(payload["apps"][0]["app_id"], APP_ID)
-        self.assertEqual(self.backend.calls, [("list", "girls-user-subject")])
+        self.assertEqual(self.backend.calls, [("list",)])
+
+    def test_guest_can_list_published_shop_apps_without_authentication(self) -> None:
+        response = hosted_shop_handler.lambda_handler(
+            _event("GET", "/shop/apps", subject=None), None
+        )
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(json.loads(response["body"])["apps"][0]["app_id"], APP_ID)
+        self.assertEqual(self.backend.calls, [("list",)])
+
+    def test_guest_can_read_shop_thumbnail_without_authentication(self) -> None:
+        response = hosted_shop_handler.lambda_handler(
+            _event("GET", f"/shop/apps/{APP_ID}/thumbnail", subject=None), None
+        )
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(self.backend.calls, [("thumbnail", APP_ID)])
+
+    def test_guest_cannot_launch_shop_app(self) -> None:
+        response = hosted_shop_handler.lambda_handler(
+            _event("POST", f"/shop/apps/{APP_ID}/launch", subject=None, body={"version": "3"}),
+            None,
+        )
+        self.assertEqual(response["statusCode"], 401)
+        self.assertEqual(self.backend.calls, [])
 
     def test_legacy_hosted_backend_is_promoted_before_first_shop_request(self) -> None:
         legacy_backend = object.__new__(HostedUserStateBackend)
@@ -173,10 +192,10 @@ class HostedShopHandlerTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 200)
         self.assertIs(hosted_handler._BACKEND, replacement)
         self.assertIs(hosted_shop_handler._BACKEND, replacement)
-        self.assertEqual(replacement.calls, [("list", "girls-user-subject")])
+        self.assertEqual(replacement.calls, [("list",)])
         factory.assert_called_once_with()
 
-    def test_thumbnail_is_authenticated_and_returns_binary_image(self) -> None:
+    def test_thumbnail_returns_binary_image(self) -> None:
         response = hosted_shop_handler.lambda_handler(
             _event("GET", f"/shop/apps/{APP_ID}/thumbnail"),
             None,
@@ -186,7 +205,7 @@ class HostedShopHandlerTests(unittest.TestCase):
         self.assertTrue(response["isBase64Encoded"])
         self.assertEqual(
             self.backend.calls,
-            [("thumbnail", "girls-user-subject", APP_ID)],
+            [("thumbnail", APP_ID)],
         )
 
     def test_launch_returns_content_and_isolated_runtime_token(self) -> None:

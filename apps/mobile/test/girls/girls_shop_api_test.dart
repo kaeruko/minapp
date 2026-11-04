@@ -53,6 +53,40 @@ void main() {
     );
   });
 
+  test('anonymous catalog sends no Authorization header', () async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'GET');
+      expect(request.url.path, '/shop/apps');
+      expect(request.headers.containsKey('authorization'), isFalse);
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'apps': <Object?>[
+            <String, Object?>{
+              'app_id': appId,
+              'version': '3',
+              'title': '放課後ねこ',
+              'owner_user_id': ownerId,
+              'owner_display_name': 'creator',
+              'published_at': '2026-09-13T02:00:00Z',
+              'sha256': sha256,
+              'thumbnail_path': '/shop/apps/$appId/thumbnail',
+            },
+          ],
+        }),
+        200,
+        headers: <String, String>{'content-type': 'application/json'},
+      );
+    });
+    final GirlsShopApi api = GirlsShopApi(
+      baseUri: Uri.parse('https://girls-api.example.com'),
+      client: client,
+    );
+    addTearDown(api.close);
+
+    final List<GirlsShopApp> apps = await api.listApps();
+    expect(apps.single.title, '放課後ねこ');
+  });
+
   test('listApps rejects thumbnail paths outside the app scope', () async {
     final MockClient client = MockClient((http.Request request) async {
       return http.Response(

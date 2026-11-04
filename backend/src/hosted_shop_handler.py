@@ -117,14 +117,11 @@ def _handle_shop_request(event: dict[str, Any]) -> dict[str, Any] | None:
         return hosted_handler._published_content_response(data, content_type)
 
     if method == "GET" and path == "/shop/apps":
-        return _json_response(200, {"apps": backend.list_shop_apps(_auth_subject(event))})
+        return _json_response(200, {"apps": backend.list_shop_apps()})
 
     thumbnail_match = _SHOP_THUMBNAIL_RE.fullmatch(path)
     if method == "GET" and thumbnail_match is not None:
-        data, content_type = backend.get_shop_thumbnail(
-            _auth_subject(event),
-            thumbnail_match.group(1),
-        )
+        data, content_type = backend.get_shop_thumbnail(thumbnail_match.group(1))
         return hosted_handler._published_content_response(data, content_type)
 
     visibility_match = _SHOP_VISIBILITY_RE.fullmatch(path)

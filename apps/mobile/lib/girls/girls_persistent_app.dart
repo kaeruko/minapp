@@ -50,7 +50,7 @@ class GirlsPersistentApp extends StatelessWidget {
         ),
       ),
       guestBuilder: (_) => _authenticatedMaterialApp(
-        home: const GirlsGuestHomePage(),
+        home: GirlsGuestHomePage(api: api),
       ),
       signedInBuilder: (_, session, logout) => _authenticatedMaterialApp(
         home: GirlsHomeShopShell(

@@ -134,7 +134,7 @@ class GirlsShopApi {
     return _baseUri.resolve(path);
   }
 
-  Future<List<GirlsShopApp>> listApps(String accessToken) async {
+  Future<List<GirlsShopApp>> listApps([String? accessToken]) async {
     final Map<String, Object?> payload = await _jsonRequest(
       method: 'GET',
       path: '/shop/apps',
@@ -341,19 +341,22 @@ class GirlsShopApi {
   Future<Map<String, Object?>> _jsonRequest({
     required String method,
     required String path,
-    required String accessToken,
+    required String? accessToken,
     Map<String, Object?>? body,
   }) async {
     if (!path.startsWith('/') || path.startsWith('//')) {
       throw ArgumentError.value(path, 'path', 'must be origin-relative');
     }
-    if (accessToken.isEmpty) {
+    if (accessToken == null && (method != 'GET' || path != '/shop/apps')) {
+      throw ArgumentError('Anonymous access is allowed only for the shop catalog.');
+    }
+    if (accessToken != null && accessToken.isEmpty) {
       throw ArgumentError.value(accessToken, 'accessToken', 'must not be empty');
     }
     final Uri uri = _baseUri.resolve(path);
     final Map<String, String> headers = <String, String>{
       'Accept': 'application/json',
-      'Authorization': 'Bearer $accessToken',
+      if (accessToken != null) 'Authorization': 'Bearer $accessToken',
     };
     if (body != null) headers['Content-Type'] = 'application/json';
 

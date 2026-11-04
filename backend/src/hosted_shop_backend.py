@@ -9,6 +9,7 @@ from typing import Any
 from urllib.parse import quote
 
 from aws_backend import _item_string, _string_attr
+from display_name_store import read_display_name
 from errors import ApiProblem
 from hosted_catalog_backend import _item_files, _optional_number, _optional_string
 from hosted_platform_backend import _now_iso, _number_attr
@@ -99,8 +100,7 @@ class HostedShopBackend(HostedUserStateBackend):
             "listed_at": _string_attr(listed_at),
         }
 
-    def list_shop_apps(self, auth_subject: str) -> list[dict[str, Any]]:
-        self._user_by_auth_subject(auth_subject)
+    def list_shop_apps(self) -> list[dict[str, Any]]:
         response = self._dynamodb.query(
             TableName=self._table_name,
             KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
@@ -134,7 +134,7 @@ class HostedShopBackend(HostedUserStateBackend):
                     "version": str(published_version),
                     "title": _item_string(app, "title"),
                     "owner_user_id": owner.user_id,
-                    "owner_display_name": owner.login_id,
+                    "owner_display_name": read_display_name(self, owner.user_id) or "みんアプユーザー",
                     "published_at": published_at,
                     "sha256": sha256,
                     "thumbnail_path": thumbnail_path,
@@ -143,12 +143,7 @@ class HostedShopBackend(HostedUserStateBackend):
         result.sort(key=lambda app: (app["published_at"], app["app_id"]), reverse=True)
         return result
 
-    def get_shop_thumbnail(
-        self,
-        auth_subject: str,
-        app_id: str,
-    ) -> tuple[bytes, str]:
-        self._user_by_auth_subject(auth_subject)
+    def get_shop_thumbnail(self, app_id: str) -> tuple[bytes, str]:
         app = self._current_shop_app(app_id)
         return thumbnail_from_app(app)
 

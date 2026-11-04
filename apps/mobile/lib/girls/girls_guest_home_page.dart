@@ -5,6 +5,8 @@ import '../builtin_webview.dart';
 import '../hosted_guest_access.dart';
 import 'girls_footer_nav.dart';
 import 'girls_scaffold.dart';
+import 'girls_shop_page.dart';
+import 'hosted_girls_api.dart';
 
 const Color _ink = Color(0xFF604943);
 const Color _lavender = Color(0xFF745B9E);
@@ -13,9 +15,11 @@ const String _memoCardAsset = 'assets/girls/home/cards/memo_card.png';
 const String _minappchiCardAsset = 'assets/girls/home/cards/minappchi_card.png';
 const String _novelCardAsset = 'assets/girls/home/cards/novel_card.png';
 
-/// Login-free Girls entrance. Only bundled, device-local apps are playable.
+/// Login-free Girls entrance with bundled local apps and public shop browsing.
 class GirlsGuestHomePage extends StatelessWidget {
-  const GirlsGuestHomePage({super.key});
+  const GirlsGuestHomePage({required this.api, super.key});
+
+  final HostedGirlsApi api;
 
   BuiltInApp _builtin(String id) =>
       builtInApps.firstWhere((BuiltInApp app) => app.id == id);
@@ -40,6 +44,18 @@ class GirlsGuestHomePage extends StatelessWidget {
           appId: app.id,
           title: app.title,
           assetPath: app.assetPath,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openShop(BuildContext context) {
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => GirlsShopPage(
+          api: api,
+          session: null,
+          currentGroup: null,
         ),
       ),
     );
@@ -154,6 +170,10 @@ class GirlsGuestHomePage extends StatelessWidget {
         enabledTabs: GirlsFooterTab.values.toSet(),
         onSelected: (GirlsFooterTab tab) {
           if (tab == GirlsFooterTab.home) return;
+          if (tab == GirlsFooterTab.shop) {
+            _openShop(context);
+            return;
+          }
           final String feature = switch (tab) {
             GirlsFooterTab.home => 'ホーム',
             GirlsFooterTab.groups => 'グループ',

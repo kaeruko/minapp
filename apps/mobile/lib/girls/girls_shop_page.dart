@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../hosted_app_management_api.dart';
 import '../hosted_app_webview.dart';
+import '../hosted_guest_access.dart';
 import '../ugc_safety.dart';
 import 'girls_apps_page.dart';
 import 'girls_errors.dart';
@@ -46,7 +47,7 @@ class GirlsShopPage extends StatefulWidget {
   });
 
   final HostedGirlsApi api;
-  final AuthenticatedSession session;
+  final AuthenticatedSession? session;
   final HostedGroup? currentGroup;
   final VoidCallback? onGroupAppsChanged;
 
@@ -87,7 +88,7 @@ class _GirlsShopPageState extends State<GirlsShopPage> {
       final Set<String> hidden =
           await _safetyStore.loadHiddenCreatorUserIds();
       final List<GirlsShopApp> apps =
-          await _shopApi.listApps(widget.session.accessToken);
+          await _shopApi.listApps(widget.session?.accessToken);
       if (!mounted) return;
       setState(() {
         _hiddenCreators = hidden;
@@ -167,6 +168,13 @@ class _GirlsShopPageState extends State<GirlsShopPage> {
               ),
             ),
             const SizedBox(height: 14),
+            if (widget.session == null) ...<Widget>[
+              const Text(
+                '登録なしで作品を見られるよ。遊んだり追加するには登録・ログインしてね。',
+                style: TextStyle(color: _ink, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+            ],
             TextField(
               controller: _searchController,
               onChanged: (_) => setState(() {}),
@@ -203,7 +211,7 @@ class _GirlsShopPageState extends State<GirlsShopPage> {
                 _GirlsShopCard(
                   app: app,
                   thumbnailUri: _shopApi.thumbnailUri(app),
-                  accessToken: widget.session.accessToken,
+                  accessToken: widget.session?.accessToken,
                   onTap: () async {
                     await Navigator.of(context).push<void>(
                       MaterialPageRoute<void>(
@@ -313,7 +321,7 @@ class GirlsShopDetailPage extends StatefulWidget {
 
   final HostedGirlsApi api;
   final GirlsShopApi shopApi;
-  final AuthenticatedSession session;
+  final AuthenticatedSession? session;
   final GirlsShopApp app;
   final HostedGroup? currentGroup;
   final VoidCallback? onGroupAppsChanged;
@@ -324,6 +332,14 @@ class GirlsShopDetailPage extends StatefulWidget {
 }
 
 class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
+  AuthenticatedSession get _session {
+    final AuthenticatedSession? session = widget.session;
+    if (session == null) {
+      throw StateError('Shop account action requires authentication.');
+    }
+    return session;
+  }
+
   late final HostedAppManagementApi _managementApi;
   HostedGroupApp? _installedCopy;
   bool _checkingInstallState = true;
@@ -353,7 +369,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
       });
     }
     final HostedGroup? group = widget.currentGroup;
-    if (group == null) {
+    if (group == null || widget.session == null) {
       if (mounted) {
         setState(() {
           _installStateResolved = true;
@@ -364,7 +380,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
     }
     try {
       final List<HostedGroupApp> apps = await widget.api.listGroupApps(
-        accessToken: widget.session.accessToken,
+        accessToken: _session.accessToken,
         groupId: group.groupId,
       );
       final List<HostedGroupApp> editableUploads = apps
@@ -402,7 +418,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
         }
         if (legacy.length == 1) {
           installed = await widget.shopApi.syncThumbnailToGroupCopy(
-            accessToken: widget.session.accessToken,
+            accessToken: _session.accessToken,
             app: widget.app,
             groupId: group.groupId,
             targetAppId: legacy.single.appId,
@@ -440,7 +456,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
 
   Future<void> _launch() => _run(() async {
         final GirlsShopLaunchGrant grant = await widget.shopApi.createLaunch(
-          accessToken: widget.session.accessToken,
+          accessToken: _session.accessToken,
           app: widget.app,
         );
         if (!mounted) return;
@@ -462,7 +478,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
           throw StateError('追加先のグループが選ばれていません。');
         }
         final HostedGroupApp added = await widget.shopApi.addToGroup(
-          accessToken: widget.session.accessToken,
+          accessToken: _session.accessToken,
           app: widget.app,
           groupId: group.groupId,
         );
@@ -480,7 +496,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
                   MaterialPageRoute<bool>(
                     builder: (BuildContext context) => GirlsAppDetailPage(
                       api: widget.api,
-                      session: widget.session,
+                      session: _session,
                       appId: added.appId,
                     ),
                   ),
@@ -538,7 +554,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
 
     await _run(() async {
       await _managementApi.deleteApp(
-        accessToken: widget.session.accessToken,
+        accessToken: _session.accessToken,
         groupId: group.groupId,
         appId: installed.appId,
       );
@@ -588,7 +604,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
     if (reason == null || !mounted) return;
     await _run(() async {
       await widget.shopApi.report(
-        accessToken: widget.session.accessToken,
+        accessToken: _session.accessToken,
         app: widget.app,
         reason: reason,
       );
@@ -608,6 +624,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
   @override
   Widget build(BuildContext context) {
     final GirlsShopApp app = widget.app;
+    final bool guest = widget.session == null;
     final bool embedded = GirlsScaffoldChromeScope.isEmbedded(context);
     final Color pageBackground = embedded ? Colors.transparent : _cream;
     return Scaffold(
@@ -628,7 +645,7 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
             child: _GirlsShopArtwork(
               app: app,
               thumbnailUri: widget.shopApi.thumbnailUri(app),
-              accessToken: widget.session.accessToken,
+              accessToken: widget.session?.accessToken,
               size: 108,
               radius: 30,
               iconSize: 54,
@@ -656,17 +673,27 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
           ),
           const SizedBox(height: 24),
           FilledButton.icon(
-            onPressed: _busy ? null : _launch,
+            onPressed: _busy
+                ? null
+                : guest
+                    ? () => HostedGuestAccessScope.requireAuthentication(
+                          context, feature: 'ショップの作品で遊ぶ',
+                        )
+                    : _launch,
             style: FilledButton.styleFrom(
               backgroundColor: _lavender,
               padding: const EdgeInsets.symmetric(vertical: 15),
             ),
             icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('あそんでみる'),
+            label: Text(guest ? '遊ぶには登録・ログイン' : 'あそんでみる'),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
-            onPressed: _busy ||
+            onPressed: guest
+                ? () => HostedGuestAccessScope.requireAuthentication(
+                      context, feature: 'マイアプリへの追加',
+                    )
+                : _busy ||
                     _checkingInstallState ||
                     !_installStateResolved ||
                     widget.currentGroup == null
@@ -680,14 +707,18 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
                   )
                 : null,
             icon: Icon(
-              !_installStateResolved
+              guest
+                  ? Icons.add_to_photos_rounded
+                  : !_installStateResolved
                   ? Icons.error_outline_rounded
                   : _installedCopy == null
                       ? Icons.add_to_photos_rounded
                       : Icons.delete_outline_rounded,
             ),
             label: Text(
-              widget.currentGroup == null
+              guest
+                  ? '追加するには登録・ログイン'
+                  : widget.currentGroup == null
                   ? '追加するグループを選んでね'
                   : _checkingInstallState
                       ? '追加状況を確認中…'
@@ -700,7 +731,13 @@ class _GirlsShopDetailPageState extends State<GirlsShopDetailPage> {
           ),
           const SizedBox(height: 18),
           TextButton.icon(
-            onPressed: _busy ? null : _report,
+            onPressed: _busy
+                ? null
+                : guest
+                    ? () => HostedGuestAccessScope.requireAuthentication(
+                          context, feature: '作品の報告',
+                        )
+                    : _report,
             icon: const Icon(Icons.flag_outlined),
             label: const Text('この作品を報告'),
           ),
@@ -732,7 +769,7 @@ class _GirlsShopArtwork extends StatelessWidget {
 
   final GirlsShopApp app;
   final Uri? thumbnailUri;
-  final String accessToken;
+  final String? accessToken;
   final double size;
   final double radius;
   final double iconSize;
@@ -781,9 +818,9 @@ class _GirlsShopArtwork extends StatelessWidget {
           borderRadius: BorderRadius.circular(radius),
           child: Image.network(
             remoteThumbnail.toString(),
-            headers: <String, String>{
-              'Authorization': 'Bearer $accessToken',
-            },
+            headers: accessToken == null
+                ? null
+                : <String, String>{'Authorization': 'Bearer $accessToken'},
             fit: BoxFit.contain,
             semanticLabel: _shopDisplayTitle(app),
             errorBuilder: (
