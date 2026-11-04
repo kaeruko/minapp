@@ -401,6 +401,7 @@
       // Keep the recording limit on a wall clock even if the audio device suspends.
       startedAt = performance.now() + (audioStart - audioContext.currentTime) * 1000;
       timerId = setInterval(() => {
+        if (fatalPlaybackError) return;
         const elapsed = (performance.now() - startedAt) / 1000;
         timer.textContent = formatTime(Math.min(elapsed, limitSeconds));
         if (elapsed >= limitSeconds) {
@@ -772,6 +773,7 @@
     }
 
     function stopByUser() {
+      if (fatalPlaybackError) return;
       const wasRecording = recorder && recorder.state === 'recording';
       stopTimer();
       stopBgm();
