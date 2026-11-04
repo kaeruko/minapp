@@ -9,7 +9,7 @@ const vm = require('node:vm');
 const html = fs.readFileSync(
   path.join(__dirname, '../assets/builtin/sing_along/index.html'), 'utf8'
 );
-const scripts = [...html.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];
+const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
 assert.equal(scripts.length, 1, 'Karaoke must have exactly one inline script.');
 
 function makeHarness() {
@@ -24,7 +24,7 @@ function makeHarness() {
     addEventListener(name, callback) { this.listeners.set(name, callback); }
   }
   const elements = Object.fromEntries(
-    [...html.matchAll(/\\bid="([^"]+)"/g)].map((match) => [match[1], new Element()])
+    [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => [match[1], new Element()])
   );
   elements.track.value = 'clair-de-lune';
   const intervals = new Map();
