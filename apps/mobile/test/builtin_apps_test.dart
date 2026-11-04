@@ -116,13 +116,17 @@ void main() {
     );
   });
 
-  test('karaoke uses louder BGM and preserves microphone diagnostics', () async {
+  test('karaoke bundles Jupiter, louder BGM, and microphone diagnostics', () async {
     final BuiltInApp karaoke = builtInApps.singleWhere(
       (BuiltInApp app) => app.id == 'sing-along',
     );
     final String html = await rootBundle.loadString(karaoke.assetPath);
 
     expect(html, contains('const BGM_MASTER_GAIN = 3.0;'));
+    expect(html, contains('<option value="jupiter">'));
+    expect(html, contains('const JUPITER_THEME = Object.freeze(['));
+    expect(html, contains("kind: 'score'"));
+    expect(html, contains('trackDurationSeconds()'));
     expect(html, contains('gainValue * BGM_MASTER_GAIN'));
     expect(html, contains('async function openMicrophone()'));
     expect(html, contains(r'元のエラー: ${error.name}: ${error.message}'));
