@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'kobo_assets.dart';
 import 'kobo_models.dart';
 import 'kobo_theme.dart';
 
@@ -8,65 +9,40 @@ class KoboHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 180,
-      decoration: BoxDecoration(
-        color: KoboColors.paper,
-        border: Border.all(color: KoboColors.divider),
-        borderRadius: BorderRadius.circular(KoboRadii.card),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x175B3A22),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(KoboRadii.card),
-        child: Stack(
-          children: <Widget>[
-            Positioned(
-              right: -20,
-              bottom: -30,
-              child: Container(
-                width: 132,
-                height: 132,
-                decoration: const BoxDecoration(
-                  color: Color(0x24D4A126),
-                  shape: BoxShape.circle,
-                ),
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints outerConstraints) {
+        final double height = (outerConstraints.maxWidth / (898 / 404))
+            .clamp(180.0, 220.0)
+            .toDouble();
+        return SizedBox(
+          height: height,
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              Image.asset(
+                KoboAssets.heroSign,
+                key: const Key('kobo-hero-sign'),
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.medium,
+                excludeFromSemantics: true,
               ),
-            ),
-            Positioned(
-              right: KoboSpacing.md,
-              bottom: KoboSpacing.md,
-              child: Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: KoboColors.paperLight,
-                  border: Border.all(color: KoboColors.divider),
-                  borderRadius: BorderRadius.circular(KoboRadii.card),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  KoboSpacing.lg,
+                  KoboSpacing.lg,
+                  KoboSpacing.lg,
+                  KoboSpacing.md,
                 ),
-                child: const Icon(
-                  Icons.handyman_outlined,
-                  size: 38,
-                  color: KoboColors.navy,
-                ),
-              ),
-            ),
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.all(KoboSpacing.md),
                 child: LayoutBuilder(
                   builder: (BuildContext context, BoxConstraints constraints) {
-                    final double reservedIllustrationWidth =
-                        constraints.maxWidth < 300 ? 72 : 104;
                     return Align(
                       alignment: Alignment.centerLeft,
-                      child: SizedBox(
-                        width: constraints.maxWidth - reservedIllustrationWidth,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: constraints.maxWidth < 360
+                              ? constraints.maxWidth
+                              : constraints.maxWidth * .72,
+                        ),
                         child: const Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,7 +57,10 @@ class KoboHeroCard extends StatelessWidget {
                               ),
                             ),
                             SizedBox(height: KoboSpacing.xs),
-                            Text('今日、なに作る？', style: KoboTextStyles.heroTitle),
+                            Text(
+                              '今日、なに作る？',
+                              style: KoboTextStyles.heroTitle,
+                            ),
                           ],
                         ),
                       ),
@@ -89,10 +68,10 @@ class KoboHeroCard extends StatelessWidget {
                   },
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -171,8 +150,18 @@ class KoboCategoryCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Icon(category.icon, size: 28, color: KoboColors.red),
-            const SizedBox(height: KoboSpacing.xs),
+            Image.asset(
+              category.assetPath,
+              key: Key('kobo-category-image-${category.title}'),
+              width: 40,
+              height: 40,
+              cacheWidth: 120,
+              cacheHeight: 120,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.medium,
+              excludeFromSemantics: true,
+            ),
+            const SizedBox(height: KoboSpacing.xxs),
             Text(
               category.title,
               maxLines: 1,

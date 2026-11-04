@@ -51,3 +51,8 @@ flutter:
     - assets/girls/cutouts/
     - assets/girls/cutouts/minapp_cards_480/
     - assets/girls/home/cards/
+    - assets/kobo/hero_sign.png
+    - assets/kobo/categories/allowance.png
+    - assets/kobo/categories/drink_izakaya.png
+    - assets/kobo/categories/games.png
+    - assets/kobo/categories/gourmet.png

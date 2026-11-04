@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'kobo_assets.dart';
+
 @immutable
 class KoboCategory {
-  const KoboCategory({required this.title, required this.icon});
+  const KoboCategory({required this.title, required this.assetPath});
 
   final String title;
-  final IconData icon;
+  final String assetPath;
 }
 
 @immutable
@@ -30,10 +32,10 @@ class KoboHomeData {
 
   static const KoboHomeData phaseOne = KoboHomeData(
     categories: <KoboCategory>[
-      KoboCategory(title: '晩酌予算', icon: Icons.savings_outlined),
-      KoboCategory(title: '町中華メモ', icon: Icons.restaurant_outlined),
-      KoboCategory(title: '昼メシルーレット', icon: Icons.casino_outlined),
-      KoboCategory(title: '小遣い管理', icon: Icons.account_balance_wallet_outlined),
+      KoboCategory(title: '晩酌予算', assetPath: KoboAssets.drinkIzakaya),
+      KoboCategory(title: '町中華メモ', assetPath: KoboAssets.gourmet),
+      KoboCategory(title: '昼メシルーレット', assetPath: KoboAssets.games),
+      KoboCategory(title: '小遣い管理', assetPath: KoboAssets.allowance),
     ],
     apps: <KoboAppSummary>[
       KoboAppSummary(

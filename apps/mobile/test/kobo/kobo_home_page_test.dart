@@ -25,11 +25,28 @@ void main() {
     expect(find.text('みんアプ工房'), findsOneWidget);
     expect(find.text('今日、なに作る？'), findsOneWidget);
     expect(find.text('新しいアプリをつくる'), findsOneWidget);
+    expect(find.byKey(const Key('kobo-hero-sign')), findsOneWidget);
     expect(find.byType(KoboCategoryCard), findsNWidgets(4));
     expect(find.text('晩酌予算'), findsOneWidget);
     expect(find.text('町中華メモ'), findsNWidgets(2));
     expect(find.text('昼メシルーレット'), findsOneWidget);
     expect(find.text('小遣い管理'), findsOneWidget);
+    expect(
+      find.byKey(const Key('kobo-category-image-晩酌予算')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('kobo-category-image-町中華メモ')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('kobo-category-image-昼メシルーレット')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('kobo-category-image-小遣い管理')),
+      findsOneWidget,
+    );
     expect(find.text('俺のアプリ'), findsOneWidget);
   });
 
