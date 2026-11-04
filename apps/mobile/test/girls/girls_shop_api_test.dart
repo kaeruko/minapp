@@ -46,11 +46,34 @@ void main() {
     expect(apps, hasLength(1));
     expect(apps.single.appId, appId);
     expect(apps.single.version, '3');
+    expect(
+      api.guestPreviewUri(apps.single),
+      Uri.parse('https://girls-api.example.com/shop/apps/$appId/preview/3/index.html'),
+    );
     expect(apps.single.ownerDisplayName, 'creator');
     expect(
       api.thumbnailUri(apps.single),
       Uri.parse('https://girls-api.example.com/shop/apps/$appId/thumbnail'),
     );
+  });
+
+  test('guest preview URI rejects invalid app ID and version', () {
+    final GirlsShopApi api = GirlsShopApi(
+      baseUri: Uri.parse('https://girls-api.example.com'),
+    );
+    addTearDown(api.close);
+    GirlsShopApp app(String id, String version) => GirlsShopApp(
+          appId: id,
+          version: version,
+          title: 'Preview',
+          ownerUserId: ownerId,
+          ownerDisplayName: 'creator',
+          publishedAt: DateTime.utc(2026, 9, 13),
+          sha256: sha256,
+        );
+    expect(() => api.guestPreviewUri(app('not-an-id', '3')), throwsArgumentError);
+    expect(() => api.guestPreviewUri(app(appId, '03')), throwsArgumentError);
+    expect(() => api.guestPreviewUri(app(appId, '0')), throwsArgumentError);
   });
 
   test('anonymous catalog sends no Authorization header', () async {

@@ -421,6 +421,49 @@ void main() {
     });
   });
 
+  group('Public shop preview navigation boundary', () {
+    const String origin = 'https://hosted.example.test';
+    const String id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const String anotherId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const String url = '$origin/shop/apps/$id/preview/3/index.html';
+
+    test('same published preview allows only its own assets', () {
+      final HostedContentNavigationPolicy policy =
+          HostedContentNavigationPolicy.shopPreview(Uri.parse(url));
+      expect(policy.allows(Uri.parse(url)), isTrue);
+      expect(
+        policy.allows(Uri.parse('$origin/shop/apps/$id/preview/3/assets/app.js')),
+        isTrue,
+      );
+      for (final String forbidden in <String>[
+        '$origin/shop/apps/$id/preview/4/index.html',
+        '$origin/shop/apps/$anotherId/preview/3/index.html',
+        '$origin/shop/content/$_contentToken/index.html',
+        'https://evil.example/shop/apps/$id/preview/3/index.html',
+        'http://hosted.example.test/shop/apps/$id/preview/3/index.html',
+        '$origin/shop/apps/$id/preview/3/../index.html',
+      ]) {
+        expect(policy.allows(Uri.parse(forbidden)), isFalse, reason: forbidden);
+      }
+    });
+
+    test('rejects malformed preview entry URLs', () {
+      for (final String invalid in <String>[
+        '$origin/shop/apps/$id/preview/03/index.html',
+        '$origin/shop/apps/$id/preview/3/other.html',
+        '$origin/shop/apps/bad/preview/3/index.html',
+        '$url?mode=edit',
+        'https://user@hosted.example.test/shop/apps/$id/preview/3/index.html',
+      ]) {
+        expect(
+          () => HostedContentNavigationPolicy.shopPreview(Uri.parse(invalid)),
+          throwsArgumentError,
+          reason: invalid,
+        );
+      }
+    });
+  });
+
   group('Shop navigation boundary', () {
     const String origin = 'https://hosted.example.test';
     const String entry = '$origin/shop/content/$_contentToken/index.html';

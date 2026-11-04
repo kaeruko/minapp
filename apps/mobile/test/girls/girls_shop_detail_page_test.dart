@@ -20,6 +20,50 @@ http.Response jsonResponse(Object value, [int status = 200]) => http.Response(
     );
 
 void main() {
+  testWidgets('guest and signed-in shop use the same play button text', (
+    WidgetTester tester,
+  ) async {
+    final MockClient client = MockClient((http.Request request) async {
+      throw StateError('Unexpected request: ${request.method} ${request.url.path}');
+    });
+    addTearDown(client.close);
+    final HostedGirlsApi api = HostedGirlsApi(
+      baseUri: Uri.parse('https://example.com'),
+      client: client,
+    );
+    final GirlsShopApi shopApi = GirlsShopApi(
+      baseUri: Uri.parse('https://example.com'),
+      client: client,
+    );
+    addTearDown(shopApi.close);
+    final GirlsShopApp app = GirlsShopApp(
+      appId: appId,
+      version: '3',
+      title: 'ねこゲーム',
+      ownerUserId: ownerUserId,
+      ownerDisplayName: 'ねこさん',
+      publishedAt: DateTime.utc(2026, 9, 30),
+      sha256: List<String>.filled(64, 'd').join(),
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: GirlsShopDetailPage(
+        api: api,
+        shopApi: shopApi,
+        session: null,
+        app: app,
+        currentGroup: null,
+        onHideCreator: (_) async {},
+      ),
+    ));
+    await tester.pumpAndSettle();
+    final Finder play = find.widgetWithText(FilledButton, 'あそんでみる');
+    expect(play, findsOneWidget);
+    expect(tester.widget<FilledButton>(play).onPressed, isNotNull);
+    expect(find.text('おためしプレイの記録は保存されません'), findsOneWidget);
+    expect(find.text('遊ぶには登録・ログイン'), findsNothing);
+  });
+
   testWidgets(
     'install-state failure keeps shop mutation disabled',
     (WidgetTester tester) async {

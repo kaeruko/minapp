@@ -223,6 +223,17 @@ void main() {
     });
   }
 
+  testWidgets('guest shop preview uses the same WebView session', (
+    WidgetTester tester,
+  ) async {
+    const String appId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const String preview = '/shop/apps/$appId/preview/3/index.html';
+    await openSession(tester, preview);
+    expect(platform.controller!.requests.single.uri, Uri.parse('$_origin$preview'));
+    expect(find.byType(WebViewWidget), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('failed bridge registration stops before loading child content',
       (WidgetTester tester) async {
     final Completer<void> registration = Completer<void>();
