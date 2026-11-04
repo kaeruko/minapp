@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../hosted_session_gate.dart';
 import 'girls_app.dart';
 import 'girls_errors.dart';
+import 'girls_guest_home_page.dart';
 import 'girls_home_shop_shell.dart';
 import 'hosted_girls_api.dart';
 
@@ -22,6 +23,17 @@ class GirlsPersistentApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return HostedSessionGate(
       api: api,
+      authenticationLauncher: (BuildContext context) {
+        return Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (BuildContext context) => GirlsAuthPage(
+              api: api,
+              canCancel: true,
+              onAuthenticated: (_) {},
+            ),
+          ),
+        );
+      },
       restoringBuilder: (_) => _authenticatedMaterialApp(
         home: const _RestoreProgressPage(),
       ),
@@ -37,7 +49,9 @@ class GirlsPersistentApp extends StatelessWidget {
           },
         ),
       ),
-      signedOutBuilder: (_) => GirlsApp(api: api),
+      guestBuilder: (_) => _authenticatedMaterialApp(
+        home: const GirlsGuestHomePage(),
+      ),
       signedInBuilder: (_, session, logout) => _authenticatedMaterialApp(
         home: GirlsHomeShopShell(
           api: api,

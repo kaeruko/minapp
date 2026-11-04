@@ -7,7 +7,6 @@ import 'girls_home_page.dart';
 import 'girls_scaffold.dart';
 import 'hosted_girls_api.dart';
 
-
 const Color _lavender = Color(0xFFB39DDB);
 const Color _lavenderDark = Color(0xFF745B9E);
 const Color _text = Color(0xFF5D4037);
@@ -79,7 +78,7 @@ class _GirlsSessionRootState extends State<_GirlsSessionRoot> {
   Widget build(BuildContext context) {
     final AuthenticatedSession? session = _session;
     if (session == null) {
-      return _GirlsAuthPage(
+      return GirlsAuthPage(
         api: widget.api,
         onAuthenticated: (AuthenticatedSession value) {
           setState(() => _session = value);
@@ -109,9 +108,10 @@ class _GirlsBackground extends StatelessWidget {
 }
 
 class _GirlsPngHero extends StatelessWidget {
-  const _GirlsPngHero({required this.title});
+  const _GirlsPngHero({required this.title, this.leading});
 
   final String title;
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -126,7 +126,7 @@ class _GirlsPngHero extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          const GirlsCommonHeader(),
+          GirlsCommonHeader(leading: leading),
           GirlsPageTitle(title: title),
           const SizedBox(height: 4),
           Stack(
@@ -227,20 +227,23 @@ class _GirlsLoginCharacter extends StatelessWidget {
   }
 }
 
-class _GirlsAuthPage extends StatefulWidget {
-  const _GirlsAuthPage({
+class GirlsAuthPage extends StatefulWidget {
+  const GirlsAuthPage({
     required this.api,
     required this.onAuthenticated,
+    this.canCancel = false,
+    super.key,
   });
 
   final HostedGirlsApi api;
   final ValueChanged<AuthenticatedSession> onAuthenticated;
+  final bool canCancel;
 
   @override
-  State<_GirlsAuthPage> createState() => _GirlsAuthPageState();
+  State<GirlsAuthPage> createState() => _GirlsAuthPageState();
 }
 
-class _GirlsAuthPageState extends State<_GirlsAuthPage> {
+class _GirlsAuthPageState extends State<GirlsAuthPage> {
   final TextEditingController _loginId = TextEditingController();
   final TextEditingController _password = TextEditingController();
   final TextEditingController _passwordConfirm = TextEditingController();
@@ -437,7 +440,17 @@ class _GirlsAuthPageState extends State<_GirlsAuthPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                _GirlsPngHero(title: _creating ? '新規登録' : 'ログイン'),
+                _GirlsPngHero(
+                  title: _creating ? '新規登録' : 'ログイン',
+                  leading: widget.canCancel
+                      ? IconButton(
+                          key: const Key('girls-auth-back'),
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.arrow_back_rounded),
+                          tooltip: 'ゲストホームへ戻る',
+                        )
+                      : null,
+                ),
                 const SizedBox(height: 20),
                 Center(
                   child: ConstrainedBox(

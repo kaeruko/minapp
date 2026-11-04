@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import 'api.dart';
 import 'hosted_consumer_api.dart';
+import 'hosted_guest_access.dart';
 
 typedef HostedSignedInBuilder = Widget Function(
   BuildContext context,
@@ -22,17 +23,19 @@ typedef HostedRestoreErrorBuilder = Widget Function(
 class HostedSessionGate extends StatefulWidget {
   const HostedSessionGate({
     required this.api,
+    required this.authenticationLauncher,
     required this.restoringBuilder,
     required this.restoreErrorBuilder,
-    required this.signedOutBuilder,
+    required this.guestBuilder,
     required this.signedInBuilder,
     super.key,
   });
 
   final HostedConsumerApi api;
+  final HostedAuthenticationLauncher authenticationLauncher;
   final WidgetBuilder restoringBuilder;
   final HostedRestoreErrorBuilder restoreErrorBuilder;
-  final WidgetBuilder signedOutBuilder;
+  final WidgetBuilder guestBuilder;
   final HostedSignedInBuilder signedInBuilder;
 
   @override
@@ -132,7 +135,12 @@ class _HostedSessionGateState extends State<HostedSessionGate> {
     }
 
     final AuthenticatedSession? session = _session;
-    if (session == null) return widget.signedOutBuilder(context);
+    if (session == null) {
+      return HostedGuestAccessScope(
+        onAuthenticationRequested: widget.authenticationLauncher,
+        child: widget.guestBuilder(context),
+      );
+    }
     return widget.signedInBuilder(context, session, _logout);
   }
 }
