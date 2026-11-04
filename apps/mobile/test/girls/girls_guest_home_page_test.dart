@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:minapp_mobile/girls/girls_guest_home_page.dart';
 import 'package:minapp_mobile/girls/girls_persistent_app.dart';
 import 'package:minapp_mobile/girls/girls_session_store.dart';
 import 'package:minapp_mobile/girls/hosted_girls_api.dart';
