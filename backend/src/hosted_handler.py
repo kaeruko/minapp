@@ -124,9 +124,9 @@ class Backend(Protocol):
 def _get_backend() -> Backend:
     global _BACKEND
     if _BACKEND is None:
-        from hosted_user_state_backend import HostedUserStateBackend
+        from hosted_shop_preview_state_backend import HostedShopPreviewStateBackend
 
-        _BACKEND = HostedUserStateBackend.from_environment()
+        _BACKEND = HostedShopPreviewStateBackend.from_environment()
     return _BACKEND
 
 
