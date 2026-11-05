@@ -34,7 +34,7 @@ class KoboHomeData {
     categories: <KoboCategory>[
       KoboCategory(title: '晩酌予算', assetPath: KoboAssets.drinkIzakaya),
       KoboCategory(title: '町中華メモ', assetPath: KoboAssets.gourmet),
-      KoboCategory(title: '昼メシルーレット', assetPath: KoboAssets.games),
+      KoboCategory(title: '昼めしルーレット', assetPath: KoboAssets.games),
       KoboCategory(title: '小遣い管理', assetPath: KoboAssets.allowance),
     ],
     apps: <KoboAppSummary>[
