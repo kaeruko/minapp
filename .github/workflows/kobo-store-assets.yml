@@ -1,0 +1,182 @@
+name: Kobo Store Assets
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  feature-graphic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install graphics dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk
+          python -m pip install Pillow==11.3.0
+      - name: Generate feature graphic
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/store_assets/generate_kobo_feature.py \
+            --font /usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc \
+            --output "$RUNNER_TEMP/store-assets/kobo/feature-graphic.png"
+          python tools/store_assets/validate_store_images.py \
+            --kind feature \
+            --directory "$RUNNER_TEMP/store-assets/kobo"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kobo-assets-feature
+          path: ${{ runner.temp }}/store-assets/kobo
+          if-no-files-found: error
+
+  screenshots:
+    runs-on: macos-15
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - device: "iPhone 16 Pro"
+            folder: iphone
+          - device: "iPad Pro 13-inch (M4)"
+            folder: ipad
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          cache: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install image validator
+        shell: bash
+        run: python -m pip install Pillow==11.3.0
+      - name: Prepare Flutter packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter config --enable-swift-package-manager
+          flutter pub get
+          flutter analyze
+      - name: Generate iOS runner (same layout as TestFlight workflow)
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ ! -e ios ]] || { echo "Unexpected checked-in iOS runner" >&2; exit 1; }
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          flutter create --platforms=ios --org jp.cloxs --project-name minapp "$tmp"
+          [[ -d "$tmp/ios" ]] || { echo "Flutter did not generate ios/" >&2; exit 1; }
+          cp -R "$tmp/ios" ios
+      - name: Boot required simulator
+        id: simulator
+        shell: bash
+        env:
+          REQUIRED_DEVICE: ${{ matrix.device }}
+        run: |
+          set -euo pipefail
+          sim_id="$(python3 - "$REQUIRED_DEVICE" <<'PY'
+          import json
+          import subprocess
+          import sys
+
+          name = sys.argv[1]
+          payload = json.loads(subprocess.check_output(
+              ["xcrun", "simctl", "list", "devices", "available", "--json"], text=True
+          ))
+          matches = sorted(
+              (runtime, device["udid"])
+              for runtime, devices in payload["devices"].items()
+              if runtime.startswith("com.apple.CoreSimulator.SimRuntime.iOS-26-")
+              for device in devices
+              if device["name"] == name and device["state"] == "Shutdown"
+          )
+          if not matches:
+              raise RuntimeError(f"Required iOS 26 simulator is unavailable or booted: {name}")
+          runtime = matches[-1][0]
+          selected = [udid for key, udid in matches if key == runtime]
+          if len(selected) != 1:
+              raise RuntimeError(f"Ambiguous simulator candidates for {name}: {selected}")
+          print(selected[0])
+          PY
+          )"
+          [[ -n "$sim_id" ]] || { echo "Simulator selector returned an empty ID" >&2; exit 1; }
+          echo "id=$sim_id" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "$sim_id"
+          xcrun simctl bootstatus "$sim_id" -b
+          flutter devices
+      - name: Capture real iOS simulator screenshots
+        shell: bash
+        env:
+          SIMULATOR_ID: ${{ steps.simulator.outputs.id }}
+          MINAPP_STORE_SHOTS_DIR: ${{ runner.temp }}/store-assets/kobo/${{ matrix.folder }}
+        run: |
+          set -euo pipefail
+          [[ -n "$SIMULATOR_ID" ]] || { echo "Missing simulator ID" >&2; exit 1; }
+          mkdir -p "$MINAPP_STORE_SHOTS_DIR"
+          flutter drive \
+            --device-id "$SIMULATOR_ID" \
+            --driver test_driver/store_screenshot_driver.dart \
+            --target integration_test/kobo_store_screenshots_test.dart
+      - name: Validate simulator images
+        shell: bash
+        env:
+          SHOT_DIR: ${{ runner.temp }}/store-assets/kobo/${{ matrix.folder }}
+          SHOT_KIND: ${{ matrix.folder }}
+        run: |
+          set -euo pipefail
+          python ../../tools/store_assets/validate_store_images.py \
+            --kind "$SHOT_KIND" --directory "$SHOT_DIR"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kobo-assets-${{ matrix.folder }}
+          path: ${{ runner.temp }}/store-assets/kobo
+          if-no-files-found: error
+      - name: Shutdown simulator
+        if: always()
+        shell: bash
+        env:
+          SIMULATOR_ID: ${{ steps.simulator.outputs.id }}
+        run: |
+          if [[ -n "$SIMULATOR_ID" ]]; then
+            xcrun simctl shutdown "$SIMULATOR_ID"
+          fi
+
+  package:
+    needs: [feature-graphic, screenshots]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install image validator
+        run: python -m pip install Pillow==11.3.0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: kobo-assets-*
+          merge-multiple: true
+          path: store-assets/kobo
+      - name: Verify assembled files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/store_assets/validate_store_images.py --kind feature --directory store-assets/kobo
+          python tools/store_assets/validate_store_images.py --kind iphone --directory store-assets/kobo/iphone
+          python tools/store_assets/validate_store_images.py --kind ipad --directory store-assets/kobo/ipad
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kobo-store-assets
+          path: store-assets/kobo
+          if-no-files-found: error
