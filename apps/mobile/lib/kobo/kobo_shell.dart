@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../hosted_consumer_api.dart';
+import '../hosted_app_management_api.dart';
+import '../hosted_my_apps_page.dart';
 import '../hosted_consumer_errors.dart';
 import '../hosted_guest_access.dart';
 import 'kobo_account_settings_page.dart';
@@ -31,6 +33,75 @@ class KoboShell extends StatefulWidget {
 class _KoboShellState extends State<KoboShell> {
   KoboNavigationItem _selected = KoboNavigationItem.home;
   String _shopSearchQuery = '';
+  late final HostedAppManagementApi _managementApi;
+  List<ManagedHostedApp> _homeApps = const <ManagedHostedApp>[];
+  bool _homeAppsLoading = false;
+  String? _homeAppsError;
+
+  @override
+  void initState() {
+    super.initState();
+    _managementApi = HostedAppManagementApi(
+      baseUri: widget.api.baseUri,
+      client: widget.api.httpClient,
+    );
+    _loadHomeApps();
+  }
+
+  @override
+  void dispose() {
+    _managementApi.close();
+    super.dispose();
+  }
+
+  Future<void> _loadHomeApps() async {
+    final AuthenticatedSession? session = widget.session;
+    if (session == null || _homeAppsLoading) return;
+    setState(() {
+      _homeAppsLoading = true;
+      _homeAppsError = null;
+    });
+    try {
+      final List<ManagedHostedApp> apps =
+          await _managementApi.listApps(session.accessToken);
+      if (!mounted) return;
+      setState(() => _homeApps = apps);
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _homeApps = const <ManagedHostedApp>[];
+          _homeAppsError = hostedConsumerMessageFor(error);
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _homeAppsLoading = false);
+    }
+  }
+
+  Future<void> _openHomeApp(ManagedHostedApp app) async {
+    final AuthenticatedSession? session = widget.session;
+    if (session == null) {
+      HostedGuestAccessScope.requireAuthentication(
+        context,
+        feature: '俺のアプリ',
+      );
+      return;
+    }
+    if (!_homeApps.any((ManagedHostedApp item) =>
+        item.app.appId == app.app.appId)) {
+      throw StateError('Selected app is not in the current user's app list.');
+    }
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => HostedManagedAppDetailPage(
+          baseUri: widget.api.baseUri,
+          session: session,
+          appId: app.app.appId,
+        ),
+      ),
+    );
+    if (mounted) await _loadHomeApps();
+  }
 
   void _openFeaturedCategory(KoboCategory category) {
     setState(() {
@@ -53,6 +124,7 @@ class _KoboShellState extends State<KoboShell> {
       if (item == KoboNavigationItem.community) _shopSearchQuery = '';
       _selected = item;
     });
+    if (item == KoboNavigationItem.home) _loadHomeApps();
   }
 
   void _openCreate() {
@@ -85,6 +157,12 @@ class _KoboShellState extends State<KoboShell> {
           onViewAllApps: _openMyApps,
           onCategorySelected: _openFeaturedCategory,
           onNavigationSelected: _select,
+          signedIn: widget.session != null,
+          apps: _homeApps,
+          appsLoading: _homeAppsLoading,
+          appsError: _homeAppsError,
+          onAppSelected: _openHomeApp,
+          onRetryApps: _loadHomeApps,
         ),
       KoboNavigationItem.community => KoboShopPage(
           api: widget.api,
