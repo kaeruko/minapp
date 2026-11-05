@@ -97,6 +97,7 @@ class _KoboShellState extends State<KoboShell> {
           baseUri: widget.api.baseUri,
           session: session,
           appId: app.app.appId,
+          client: widget.api.httpClient,
         ),
       ),
     );
