@@ -16,12 +16,14 @@ class KoboShopPage extends StatefulWidget {
     required this.api,
     required this.session,
     required this.onNavigationSelected,
+    this.initialSearchQuery = '',
     super.key,
   });
 
   final HostedConsumerApi api;
   final AuthenticatedSession? session;
   final ValueChanged<KoboNavigationItem> onNavigationSelected;
+  final String initialSearchQuery;
 
   @override
   State<KoboShopPage> createState() => _KoboShopPageState();
@@ -29,7 +31,7 @@ class KoboShopPage extends StatefulWidget {
 
 class _KoboShopPageState extends State<KoboShopPage> {
   late final HostedShopApi _shopApi;
-  final TextEditingController _searchController = TextEditingController();
+  late final TextEditingController _searchController;
   List<HostedShopApp>? _apps;
   bool _loading = false;
   bool _opening = false;
@@ -38,6 +40,7 @@ class _KoboShopPageState extends State<KoboShopPage> {
   @override
   void initState() {
     super.initState();
+    _searchController = TextEditingController(text: widget.initialSearchQuery);
     _shopApi = HostedShopApi(
       baseUri: widget.api.baseUri,
       client: widget.api.httpClient,
@@ -193,11 +196,23 @@ class _KoboShopPageState extends State<KoboShopPage> {
             ),
             const SizedBox(height: KoboSpacing.md),
             TextField(
+              key: const Key('kobo-shop-search'),
               controller: _searchController,
               onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: '道具名・作者名で探す',
-                prefixIcon: Icon(Icons.search_rounded),
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: _searchController.text.isEmpty
+                    ? null
+                    : IconButton(
+                        key: const Key('kobo-shop-clear-search'),
+                        tooltip: '検索を解除',
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {});
+                        },
+                        icon: const Icon(Icons.close_rounded),
+                      ),
               ),
             ),
             if (_error != null) ...<Widget>[
@@ -222,17 +237,24 @@ class _KoboShopPageState extends State<KoboShopPage> {
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (apps.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 48),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 48),
                 child: Column(
                   children: <Widget>[
-                    Icon(
+                    const Icon(
                       Icons.inventory_2_outlined,
                       color: KoboColors.brown,
                       size: 42,
                     ),
-                    SizedBox(height: KoboSpacing.sm),
-                    Text('公開中の道具はまだありません。'),
+                    const SizedBox(height: KoboSpacing.sm),
+                    Text(
+                      _error != null
+                          ? '公開アプリの取得に失敗しました。更新して再試行してください。'
+                          : _searchController.text.trim().isNotEmpty
+                              ? '「${_searchController.text.trim()}」に一致する公開アプリはありません。'
+                              : '公開中の道具はまだありません。',
+                      textAlign: TextAlign.center,
+                    ),
                   ],
                 ),
               )
