@@ -4,6 +4,13 @@ import 'package:http/testing.dart';
 import 'package:minapp_mobile/kobo_hosted_endpoint_source.dart';
 
 void main() {
+  test('Kobo production endpoint file is configured', () {
+    expect(
+      minAppKoboHostedGoogleDriveFileId,
+      '1FmP9ABSz2ROTBFf_TBPxC6mgOKG5jdlQ',
+    );
+  });
+
   test('Kobo endpoint accepts an explicitly configured HTTPS origin', () async {
     final Uri endpoint = await loadKoboHostedBaseUri(
       directBaseUri: 'https://kobo-api.example.com',

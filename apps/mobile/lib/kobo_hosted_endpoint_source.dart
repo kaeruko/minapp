@@ -5,6 +5,7 @@ import 'hosted_endpoint_source.dart';
 
 const String minAppKoboHostedGoogleDriveFileId = String.fromEnvironment(
   'MINAPP_KOBO_HOSTED_ENDPOINT_FILE_ID',
+  defaultValue: '1FmP9ABSz2ROTBFf_TBPxC6mgOKG5jdlQ',
 );
 const String minAppKoboHostedBaseUri = String.fromEnvironment(
   'MINAPP_KOBO_HOSTED_BASE_URI',

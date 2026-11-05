@@ -51,6 +51,36 @@ flutter test
 flutter run
 ```
 
+### みんアプ工房
+
+工房版は起動時に公開Google Driveファイル `kobo_hosted_api.txt` を取得し、
+その唯一の非空行をKobo Hosted APIのbase URLとして使う。Girlsのendpointへは
+フォールバックしない。
+
+Google Drive file ID:
+
+```text
+1FmP9ABSz2ROTBFf_TBPxC6mgOKG5jdlQ
+```
+
+現在の内容:
+
+```text
+https://x7orfbyn18.execute-api.us-west-2.amazonaws.com
+```
+
+Android StudioではFlutterの実行構成でDart entrypointを
+`apps/mobile/lib/main_kobo.dart` に設定する。API URL用の追加引数は不要。
+開発時に接続先を明示的に差し替える場合だけ、次のbuild-time設定を使う。
+
+```text
+--dart-define=MINAPP_KOBO_HOSTED_BASE_URI=https://<kobo-api-origin>
+```
+
+APIを移行する場合は、Google Drive上の `kobo_hosted_api.txt` の1行だけを更新する。
+Drive取得失敗、不正なURI、空ファイル、複数の非空行は起動エラーとし、別endpointへ
+暗黙にフォールバックしない。
+
 制作・提出ポータルなどの任意のbuild-time設定も使う場合は、リポジトリ直下から次を使える。
 
 ```powershell
