@@ -128,8 +128,7 @@ void main() {
       return http.Response(
         jsonEncode(<String, Object?>{
           'apps': <Object?>[
-            for (final (String id, String title) entry in
-                <(String, String)>[
+            for (final entry in <(String, String)>[
                   ('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '晩酌予算'),
                   ('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', '町中華メモ'),
                   ('cccccccccccccccccccccccccccccccc', '昼めしルーレット'),
