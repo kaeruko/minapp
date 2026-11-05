@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:minapp_mobile/api.dart';
 import 'package:minapp_mobile/hosted_session_store.dart';
+import 'package:minapp_mobile/hosted_my_apps_page.dart';
 import 'package:minapp_mobile/kobo/hosted_kobo_api.dart';
 import 'package:minapp_mobile/kobo/kobo_persistent_app.dart';
 import 'package:minapp_mobile/kobo/kobo_shell.dart';
@@ -313,6 +314,97 @@ void main() {
     expect(find.byKey(const Key('kobo-upload-zip')), findsOneWidget);
     expect(find.text('俺のアプリ'), findsOneWidget);
     expect(find.textContaining('AI'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('personal home rows load live apps and open their details', (
+    WidgetTester tester,
+  ) async {
+    const String appId = '22222222222222222222222222222222';
+    const String groupId = '11111111111111111111111111111111';
+    const String ownerId = '33333333333333333333333333333333';
+    final Map<String, Object?> app = <String, Object?>{
+      'app_id': appId,
+      'group_id': groupId,
+      'title': '自分で作ったアプリ',
+      'source_kind': 'upload',
+      'created_at': '2026-11-05T00:00:00Z',
+      'published_version': 2,
+      'owner_user_id': ownerId,
+      'source_revision': 1,
+      'source_updated_at': '2026-11-05T01:00:00Z',
+      'published_at': '2026-11-05T01:00:00Z',
+      'editable': true,
+      'visibility': 'visible',
+      'group_name': '自分の工房',
+      'stats': <String, Object?>{
+        'total_plays': 2,
+        'unique_users': 1,
+        'monthly_plays': 1,
+      },
+    };
+    int listRequests = 0;
+    int detailRequests = 0;
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'GET');
+      expect(request.headers['authorization'], 'Bearer access-token');
+      if (request.url.path == '/hosted/my/apps') {
+        listRequests++;
+        return http.Response(
+          jsonEncode(<String, Object?>{'apps': <Object?>[app]}),
+          200,
+          headers: const <String, String>{'content-type': 'application/json'},
+        );
+      }
+      if (request.url.path == '/hosted/my/apps/$appId') {
+        detailRequests++;
+        return http.Response(
+          jsonEncode(<String, Object?>{
+            ...app,
+            'source_history': <Object?>[],
+            'published_history': <Object?>[],
+          }),
+          200,
+          headers: const <String, String>{'content-type': 'application/json'},
+        );
+      }
+      fail('Unexpected request: ${request.method} ${request.url}');
+    });
+    addTearDown(client.close);
+    await tester.pumpWidget(MaterialApp(
+      theme: KoboTheme.light(),
+      home: KoboShell(
+        api: HostedKoboApi(
+          baseUri: Uri.parse('https://kobo-api.example.com'),
+          client: client,
+          sessionStore: _EmptySessionStore(),
+        ),
+        session: const AuthenticatedSession(
+          accessToken: 'access-token',
+          expiresIn: 3600,
+        ),
+        onLogout: () async {},
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(listRequests, 1);
+    expect(find.text('せんべろ計算機'), findsNothing);
+    expect(find.text('自分で作ったアプリ'), findsOneWidget);
+    final Finder row = find.byKey(const Key('kobo-my-app-$appId'));
+    await tester.ensureVisible(row);
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HostedManagedAppDetailPage), findsOneWidget);
+    expect(detailRequests, 1);
+    expect(find.text('状態: 公開中'), findsOneWidget);
+    expect(find.text('グループ: 自分の工房'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(listRequests, 2, reason: 'home must refresh after viewing app details');
+    expect(find.byKey(const Key('kobo-my-app-$appId')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
