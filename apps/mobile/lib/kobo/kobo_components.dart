@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../hosted_app_management_api.dart';
+
 import 'kobo_assets.dart';
 import 'kobo_models.dart';
 import 'kobo_theme.dart';
@@ -196,64 +198,80 @@ class KoboCategoryCard extends StatelessWidget {
 }
 
 class KoboAppListTile extends StatelessWidget {
-  const KoboAppListTile({required this.app, super.key});
+  const KoboAppListTile({
+    required this.app,
+    required this.onTap,
+    super.key,
+  });
 
-  final KoboAppSummary app;
+  final ManagedHostedApp app;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 76),
-      padding: const EdgeInsets.symmetric(
-        horizontal: KoboSpacing.sm,
-        vertical: KoboSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: KoboColors.paper,
-        border: Border.all(color: KoboColors.divider),
+    return Material(
+      color: KoboColors.paper,
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: KoboColors.divider),
         borderRadius: BorderRadius.circular(KoboRadii.card),
       ),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: KoboColors.navy,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(app.icon, color: Colors.white, size: 27),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: Key('kobo-my-app-${app.app.appId}'),
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 76),
+          padding: const EdgeInsets.symmetric(
+            horizontal: KoboSpacing.sm,
+            vertical: KoboSpacing.sm,
           ),
-          const SizedBox(width: KoboSpacing.sm),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  app.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: KoboColors.ink,
-                    fontSize: 16,
-                    height: 1.25,
-                    fontWeight: FontWeight.w700,
-                  ),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: KoboColors.navy,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: KoboSpacing.xxs),
-                Text(
-                  app.description,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: KoboTextStyles.secondary,
+                child: const Icon(
+                  Icons.apps_rounded,
+                  color: Colors.white,
+                  size: 27,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: KoboSpacing.sm),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      app.app.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: KoboColors.ink,
+                        fontSize: 16,
+                        height: 1.25,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: KoboSpacing.xxs),
+                    Text(
+                      app.app.isPublished ? '公開中・タップして管理' : '下書き・タップして管理',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: KoboTextStyles.secondary,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: KoboSpacing.xs),
+              const Icon(Icons.chevron_right_rounded, color: KoboColors.brown),
+            ],
           ),
-          const SizedBox(width: KoboSpacing.xs),
-          const Icon(Icons.chevron_right_rounded, color: KoboColors.brown),
-        ],
+        ),
       ),
     );
   }
