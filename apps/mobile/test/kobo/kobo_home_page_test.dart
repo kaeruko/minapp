@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:minapp_mobile/hosted_app_management_api.dart';
 import 'package:minapp_mobile/kobo/kobo_app.dart';
 import 'package:minapp_mobile/kobo/kobo_components.dart';
 import 'package:minapp_mobile/kobo/kobo_home_page.dart';
@@ -87,6 +88,79 @@ void main() {
       expect(tapped?.title, title);
       expect(tester.takeException(), isNull);
     }
+  });
+
+  testWidgets('real managed app row is tappable and opens selected app', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const String appId = '22222222222222222222222222222222';
+    final ManagedHostedApp app = ManagedHostedApp.fromJson(
+      <String, Object?>{
+        'app_id': appId,
+        'group_id': '11111111111111111111111111111111',
+        'title': '自分の本物のアプリ',
+        'source_kind': 'upload',
+        'created_at': '2026-11-05T01:00:00Z',
+        'published_version': 2,
+        'owner_user_id': '33333333333333333333333333333333',
+        'source_revision': 1,
+        'source_updated_at': '2026-11-05T02:00:00Z',
+        'published_at': '2026-11-05T02:00:00Z',
+        'editable': true,
+        'visibility': 'visible',
+        'group_name': '工房',
+        'stats': <String, Object?>{
+          'total_plays': 2,
+          'unique_users': 1,
+          'monthly_plays': 1,
+        },
+      },
+    );
+    ManagedHostedApp? selected;
+    await tester.pumpWidget(MaterialApp(
+      home: KoboHomePage(
+        signedIn: true,
+        apps: <ManagedHostedApp>[app],
+        onAppSelected: (ManagedHostedApp tapped) => selected = tapped,
+        onViewAllApps: () {},
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('せんべろ計算機'), findsNothing);
+    expect(find.text('自分の本物のアプリ'), findsOneWidget);
+    final Finder row = find.byKey(const Key('kobo-my-app-$appId'));
+    await tester.ensureVisible(row);
+    await tester.tap(row);
+    await tester.pump();
+    expect(selected?.app.appId, appId);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('signed-in empty state and load error do not fabricate apps', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: KoboHomePage(signedIn: true),
+    ));
+    expect(
+      find.text('まだ自分のアプリがありません。「つくる」から追加できます。'),
+      findsOneWidget,
+    );
+    expect(find.byType(KoboAppListTile), findsNothing);
+    await tester.pumpWidget(const MaterialApp(
+      home: KoboHomePage(
+        signedIn: true,
+        appsError: 'API接続に失敗しました',
+      ),
+    ));
+    expect(find.textContaining('API接続に失敗しました'), findsOneWidget);
+    expect(find.byType(KoboAppListTile), findsNothing);
   });
 
   testWidgets('Kobo home has no overflow around the reference width', (
