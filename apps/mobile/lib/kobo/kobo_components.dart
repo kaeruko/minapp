@@ -132,48 +132,63 @@ class KoboSectionHeader extends StatelessWidget {
 }
 
 class KoboCategoryCard extends StatelessWidget {
-  const KoboCategoryCard({required this.category, super.key});
+  const KoboCategoryCard({
+    required this.category,
+    required this.onTap,
+    super.key,
+  });
 
   final KoboCategory category;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: KoboColors.paper,
-        border: Border.all(color: KoboColors.divider),
+    return Material(
+      color: KoboColors.paper,
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: KoboColors.divider),
         borderRadius: BorderRadius.circular(KoboRadii.card),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(KoboSpacing.sm),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Image.asset(
-              category.assetPath,
-              key: Key('kobo-category-image-${category.title}'),
-              width: 40,
-              height: 40,
-              cacheWidth: 120,
-              cacheHeight: 120,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.medium,
-              excludeFromSemantics: true,
+      clipBehavior: Clip.antiAlias,
+      child: Semantics(
+        button: true,
+        label: '${category.title}をみんなのアプリで探す',
+        excludeSemantics: true,
+        child: InkWell(
+          key: Key('kobo-category-${category.title}'),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(KoboSpacing.sm),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Image.asset(
+                  category.assetPath,
+                  key: Key('kobo-category-image-${category.title}'),
+                  width: 40,
+                  height: 40,
+                  cacheWidth: 120,
+                  cacheHeight: 120,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.medium,
+                  excludeFromSemantics: true,
+                ),
+                const SizedBox(height: KoboSpacing.xxs),
+                Text(
+                  category.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: KoboColors.ink,
+                    fontSize: 16,
+                    height: 1.2,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: KoboSpacing.xxs),
-            Text(
-              category.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: KoboColors.ink,
-                fontSize: 16,
-                height: 1.2,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
