@@ -118,6 +118,114 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('featured example opens matching public shop app', (
+    WidgetTester tester,
+  ) async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'GET');
+      expect(request.url.path, '/shop/apps');
+      expect(request.headers.containsKey('authorization'), isFalse);
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'apps': <Object?>[
+            for (final (String id, String title) entry in
+                <(String, String)>[
+                  ('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '晩酌予算'),
+                  ('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', '町中華メモ'),
+                  ('cccccccccccccccccccccccccccccccc', '昼めしルーレット'),
+                ])
+              <String, Object?>{
+                'app_id': entry.$1,
+                'version': '1',
+                'title': entry.$2,
+                'owner_user_id': 'dddddddddddddddddddddddddddddddd',
+                'owner_display_name': '工房の親方',
+                'published_at': '2026-11-05T02:00:00Z',
+                'sha256': List<String>.filled(64, 'e').join(),
+                'thumbnail_path': null,
+              },
+          ],
+        }),
+        200,
+        headers: const <String, String>{'content-type': 'application/json'},
+      );
+    });
+    addTearDown(client.close);
+    await tester.pumpWidget(
+      KoboPersistentApp(
+        api: HostedKoboApi(
+          baseUri: Uri.parse('https://kobo-api.example.com'),
+          client: client,
+          sessionStore: _EmptySessionStore(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The featured card is a touch target, not a decorative example.
+    await tester.tap(find.byKey(const Key('kobo-category-晩酌予算')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('みんなのアプリ'), findsOneWidget);
+    expect(find.byKey(const Key('kobo-shop-search')), findsOneWidget);
+    expect(find.text('晩酌予算'), findsOneWidget);
+    expect(find.text('町中華メモ'), findsNothing);
+    expect(find.byKey(const Key('kobo-shop-play-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')), findsOneWidget);
+    expect(find.byKey(const Key('kobo-shop-play-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')), findsNothing);
+
+    // Removing the search recovers the full public catalog.
+    await tester.tap(find.byKey(const Key('kobo-shop-clear-search')));
+    await tester.pumpAndSettle();
+    expect(find.text('町中華メモ'), findsOneWidget);
+    expect(find.text('昼めしルーレット'), findsOneWidget);
+
+    // The regular bottom-nav entry must not inherit the featured search.
+    await tester.tap(find.byKey(const Key('kobo-nav-home')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('kobo-nav-community')));
+    await tester.pumpAndSettle();
+    expect(find.text('晩酌予算'), findsOneWidget);
+    expect(find.text('町中華メモ'), findsOneWidget);
+    expect(find.text('昼めしルーレット'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('unpublished featured example gives truthful empty result', (
+    WidgetTester tester,
+  ) async {
+    final MockClient client = MockClient((http.Request request) async {
+      expect(request.method, 'GET');
+      expect(request.url.path, '/shop/apps');
+      return http.Response(
+        jsonEncode(<String, Object?>{'apps': <Object?>[]}),
+        200,
+        headers: const <String, String>{'content-type': 'application/json'},
+      );
+    });
+    addTearDown(client.close);
+    await tester.pumpWidget(
+      KoboPersistentApp(
+        api: HostedKoboApi(
+          baseUri: Uri.parse('https://kobo-api.example.com'),
+          client: client,
+          sessionStore: _EmptySessionStore(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const Key('kobo-category-小遣い管理')));
+    await tester.tap(find.byKey(const Key('kobo-category-小遣い管理')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('「小遣い管理」に一致する公開アプリはありません。'), findsOneWidget);
+    expect(find.byKey(const Key('kobo-shop-clear-search')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('kobo-shop-clear-search')));
+    await tester.pumpAndSettle();
+    expect(find.text('公開中の道具はまだありません。'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('signed-in create action opens the existing app workflow', (
     WidgetTester tester,
   ) async {
