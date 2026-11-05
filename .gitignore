@@ -35,6 +35,9 @@ infra/*/terraform.tfvars
 !.env.example
 *.local
 
+# Browser test artifacts (local only)
+/.cache/
+
 # IDE / OS
 .idea/
 .vscode/
