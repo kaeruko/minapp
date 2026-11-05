@@ -248,6 +248,17 @@ def _source_response(data: bytes, app_id: str, metadata: dict[str, Any]) -> dict
 
 def _published_content_response(data: bytes, content_type: str) -> dict[str, Any]:
     response = _content_response(data, content_type)
+    csp = response["headers"]["content-security-policy"]
+    blocked_frames = "frame-src 'none'"
+    if csp.count(blocked_frames) != 1:
+        raise RuntimeError("Published content CSP must contain exactly one blocked frame-src directive")
+    # Hosted mini apps may embed only the Google Maps Embed API. Scripts and
+    # direct network requests remain self-only/disabled, so this does not grant
+    # arbitrary external API access to uploaded apps.
+    response["headers"]["content-security-policy"] = csp.replace(
+        blocked_frames,
+        "frame-src https://www.google.com",
+    )
     portal_origin = os.environ.get("PORTAL_ORIGIN")
     if portal_origin is not None and re.fullmatch(r"https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?", portal_origin):
         frame_ancestors = f"'self' {portal_origin}"

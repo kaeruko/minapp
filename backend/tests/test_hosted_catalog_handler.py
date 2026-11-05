@@ -219,6 +219,9 @@ class HostedCatalogHandlerTests(unittest.TestCase):
         csp = response["headers"]["content-security-policy"]
         self.assertIn("frame-ancestors", csp)
         self.assertIn("media-src 'self' data: blob:", csp)
+        self.assertIn("frame-src https://www.google.com", csp)
+        self.assertNotIn("frame-src 'none'", csp)
+        self.assertIn("connect-src 'none'", csp)
         self.assertEqual(base64.b64decode(response["body"]), b"<h1>published</h1>")
 
 
