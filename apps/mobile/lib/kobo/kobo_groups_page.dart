@@ -4,6 +4,8 @@ import '../api.dart';
 import '../hosted_consumer_api.dart';
 import '../hosted_consumer_errors.dart';
 import '../hosted_group_management_page.dart';
+import '../hosted_private_group_dialogs.dart';
+import '../hosted_private_groups.dart';
 import 'kobo_theme.dart';
 
 class KoboGroupsPage extends StatefulWidget {
@@ -21,6 +23,7 @@ class KoboGroupsPage extends StatefulWidget {
 }
 
 class _KoboGroupsPageState extends State<KoboGroupsPage> {
+  late final HostedPrivateGroupsService _privateGroupService;
   List<HostedGroup>? _privateGroups;
   bool _busy = false;
   String? _error;
@@ -28,6 +31,10 @@ class _KoboGroupsPageState extends State<KoboGroupsPage> {
   @override
   void initState() {
     super.initState();
+    _privateGroupService = HostedPrivateGroupsService(
+      api: widget.api,
+      session: widget.session,
+    );
     _load();
   }
 
@@ -38,11 +45,9 @@ class _KoboGroupsPageState extends State<KoboGroupsPage> {
       _error = null;
     });
     try {
-      final List<HostedGroup> groups =
-          await widget.api.listGroups(widget.session.accessToken);
-      final List<HostedGroup> privateGroups =
-          widget.api.edition.community.privateGroupsFrom(groups);
-      if (mounted) setState(() => _privateGroups = privateGroups);
+      final HostedPrivateGroupsSnapshot snapshot =
+          await _privateGroupService.load();
+      if (mounted) setState(() => _privateGroups = snapshot.privateGroups);
     } catch (error) {
       if (mounted) {
         setState(() => _error = hostedConsumerMessageFor(error));
@@ -52,57 +57,38 @@ class _KoboGroupsPageState extends State<KoboGroupsPage> {
     }
   }
 
-  Future<String?> _askText({
-    required String title,
-    required String label,
-    required String initialValue,
-  }) {
-    String value = initialValue;
-    return showDialog<String>(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: Text(title),
-        content: TextFormField(
-          initialValue: value,
-          autofocus: true,
-          maxLength: 60,
-          decoration: InputDecoration(labelText: label),
-          onChanged: (String next) => value = next,
-          onFieldSubmitted: (_) => Navigator.of(dialogContext).pop(value),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('やめる'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(value),
-            child: const Text('決定'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _create() async {
-    final String? name = await _askText(
+    final String? rawName = await showHostedPrivateGroupTextDialog(
+      context: context,
       title: '非公開グループをつくる',
       label: 'グループ名',
+      hint: '例：釣り仲間の工房',
+      maxLength: maxHostedGroupNameLength,
+      submitLabel: 'つくる',
+      capitalize: false,
       initialValue: '仲間の工房',
     );
-    if (name == null || !mounted) return;
+    if (rawName == null || !mounted) return;
+    final String name = rawName.trim();
+    if (name.isEmpty) return;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      await widget.api.createGroup(
-        accessToken: widget.session.accessToken,
-        name: name,
-      );
+      final HostedPrivateGroupCreation creation =
+          await _privateGroupService.create(name: name);
       if (mounted) {
         setState(() => _busy = false);
         await _load();
+        if (!mounted) return;
+        await showHostedPrivateGroupCreatedDialog(
+          context: context,
+          creation: creation,
+          title: '「${creation.group.name}」を作りました',
+          codeColor: KoboColors.navy,
+          codeBackgroundColor: KoboColors.paper,
+        );
       }
     } catch (error) {
       if (mounted) {
@@ -114,21 +100,24 @@ class _KoboGroupsPageState extends State<KoboGroupsPage> {
   }
 
   Future<void> _join() async {
-    final String? code = await _askText(
+    final String? rawCode = await showHostedPrivateGroupTextDialog(
+      context: context,
       title: 'グループに参加する',
       label: 'グループID',
-      initialValue: '',
+      hint: 'XXXX-XXXX-XXXX',
+      maxLength: 20,
+      submitLabel: '参加する',
+      capitalize: true,
     );
-    if (code == null || !mounted) return;
+    if (rawCode == null || !mounted) return;
+    final String code = rawCode.trim();
+    if (code.isEmpty) return;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      await widget.api.joinGroup(
-        accessToken: widget.session.accessToken,
-        code: code.trim(),
-      );
+      await _privateGroupService.join(code: code);
       if (mounted) {
         setState(() => _busy = false);
         await _load();

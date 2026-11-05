@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../hosted_private_group_dialogs.dart';
+import '../hosted_private_groups.dart';
 import 'api.dart';
-import 'girls_community.dart';
 import 'girls_errors.dart';
 import 'girls_group_home_page.dart';
 import 'girls_group_settings_page.dart';
@@ -33,6 +33,7 @@ class GirlsGroupsDashboardPage extends StatefulWidget {
 }
 
 class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
+  late final HostedPrivateGroupsService _privateGroups;
   List<HostedGroup>? _groups;
   bool _busy = false;
   String? _error;
@@ -40,6 +41,10 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
   @override
   void initState() {
     super.initState();
+    _privateGroups = HostedPrivateGroupsService(
+      api: widget.api,
+      session: widget.session,
+    );
     _reload();
   }
 
@@ -49,12 +54,9 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
       _error = null;
     });
     try {
-      final List<HostedGroup> groups = await widget.api.listGroups(
-        widget.session.accessToken,
-      );
-      final List<HostedGroup> privateGroups = girlsPrivateGroups(groups);
+      final HostedPrivateGroupsSnapshot snapshot = await _privateGroups.load();
       if (!mounted) return;
-      setState(() => _groups = privateGroups);
+      setState(() => _groups = snapshot.privateGroups);
     } catch (error) {
       if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
@@ -63,13 +65,15 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
   }
 
   Future<void> _joinGroup() async {
-    final String? rawCode = await _showTextInputDialog(
+    final String? rawCode = await showHostedPrivateGroupTextDialog(
+      context: context,
       title: '友達グループに参加',
       label: 'グループID',
       hint: 'XXXX-XXXX-XXXX',
       maxLength: 20,
       submitLabel: '参加する',
       capitalize: true,
+      autofocus: false,
     );
     if (rawCode == null || !mounted) return;
     final String code = rawCode.trim();
@@ -80,10 +84,7 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
       _error = null;
     });
     try {
-      final HostedGroup joined = await widget.api.joinGroup(
-        accessToken: widget.session.accessToken,
-        code: code,
-      );
+      final HostedGroup joined = await _privateGroups.join(code: code);
       await _reload();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -97,13 +98,15 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
   }
 
   Future<void> _createGroup() async {
-    final String? rawName = await _showTextInputDialog(
+    final String? rawName = await showHostedPrivateGroupTextDialog(
+      context: context,
       title: '友達だけのグループを作る',
       label: 'グループ名',
       hint: '例：女子会アプリ開発部',
       maxLength: maxHostedGroupNameLength,
       submitLabel: '作る',
       capitalize: false,
+      autofocus: false,
     );
     if (rawName == null || !mounted) return;
     final String name = rawName.trim();
@@ -114,111 +117,23 @@ class _GirlsGroupsDashboardPageState extends State<GirlsGroupsDashboardPage> {
       _error = null;
     });
     try {
-      final HostedGroup created = await widget.api.createGroup(
-        accessToken: widget.session.accessToken,
-        name: name,
-      );
-      final HostedInvite invite = await widget.api.createInvite(
-        accessToken: widget.session.accessToken,
-        groupId: created.groupId,
-      );
+      final HostedPrivateGroupCreation creation =
+          await _privateGroups.create(name: name);
       await _reload();
       if (!mounted) return;
-      await _showGroupId(created, invite);
+      await showHostedPrivateGroupCreatedDialog(
+        context: context,
+        creation: creation,
+        title: '「${creation.group.name}」を作ったよ',
+        description: 'このIDを知っている友達だけが参加できます。',
+        codeColor: _lavender,
+        codeBackgroundColor: const Color(0xFFF3ECFF),
+      );
     } catch (error) {
       if (mounted) setState(() => _error = girlsMessageFor(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  Future<String?> _showTextInputDialog({
-    required String title,
-    required String label,
-    required String hint,
-    required int maxLength,
-    required String submitLabel,
-    required bool capitalize,
-  }) async {
-    String value = '';
-    return showDialog<String>(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          maxLength: maxLength,
-          autocorrect: !capitalize,
-          enableSuggestions: !capitalize,
-          textCapitalization: capitalize
-              ? TextCapitalization.characters
-              : TextCapitalization.sentences,
-          decoration: InputDecoration(labelText: label, hintText: hint),
-          onChanged: (String nextValue) => value = nextValue,
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('やめる'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(value),
-            child: Text(submitLabel),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showGroupId(
-    HostedGroup group,
-    HostedInvite invite,
-  ) async {
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: Text('「${group.name}」を作ったよ'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            const Text('このIDを知っている友達だけが参加できます。'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF3ECFF),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: SelectableText(
-                invite.code,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: _lavender,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1,
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: () => Clipboard.setData(
-                ClipboardData(text: invite.code),
-              ),
-              icon: const Icon(Icons.copy_rounded),
-              label: const Text('IDをコピー'),
-            ),
-          ],
-        ),
-        actions: <Widget>[
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _openGroup(HostedGroup group) async {
