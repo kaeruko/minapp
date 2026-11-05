@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import 'api.dart';
 import 'hosted_app.dart' show hostedMessageFor;
@@ -135,12 +136,14 @@ class HostedManagedAppDetailPage extends StatefulWidget {
     required this.baseUri,
     required this.session,
     required this.appId,
+    this.client,
     super.key,
   });
 
   final Uri baseUri;
   final AuthenticatedSession session;
   final String appId;
+  final http.Client? client;
 
   @override
   State<HostedManagedAppDetailPage> createState() =>
@@ -157,7 +160,10 @@ class _HostedManagedAppDetailPageState
   @override
   void initState() {
     super.initState();
-    _api = HostedAppManagementApi(baseUri: widget.baseUri);
+    _api = HostedAppManagementApi(
+      baseUri: widget.baseUri,
+      client: widget.client,
+    );
     _load();
   }
 
