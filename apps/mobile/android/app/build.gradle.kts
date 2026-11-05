@@ -63,8 +63,11 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        manifestPlaceholders["appIcon"] =
-            if (isGirlsVariant) "@drawable/girls_brand_icon" else "@mipmap/ic_launcher"
+        manifestPlaceholders["appIcon"] = when {
+            isGirlsVariant -> "@drawable/girls_brand_icon"
+            isKoboVariant -> "@mipmap/ic_launcher_kobo"
+            else -> "@mipmap/ic_launcher"
+        }
         manifestPlaceholders["launchTheme"] =
             if (isGirlsVariant) "@style/GirlsLaunchTheme" else "@style/LaunchTheme"
         manifestPlaceholders["appLabel"] = when {

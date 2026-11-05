@@ -63,6 +63,28 @@ Google Drive file ID:
 1FmP9ABSz2ROTBFf_TBPxC6mgOKG5jdlQ
 ```
 
+#### Google Play用AAB
+
+署名済みのGoogle Play用AABは、リポジトリ直下から次のコマンドで生成する。
+`apps/mobile/android/key.properties` と、そこから参照されるkeystoreが必須。
+
+```powershell
+.\scripts\build-mobile-kobo-aab.ps1
+```
+
+既定では `pubspec.yaml` のversionを使用する。Google Playへ次のビルドを
+アップロードする場合は、version codeを明示して増やす。
+
+```powershell
+.\scripts\build-mobile-kobo-aab.ps1 -BuildName 0.2.3 -BuildNumber 8
+```
+
+出力先:
+
+```text
+apps/mobile/build/app/outputs/bundle/release/app-release.aab
+```
+
 現在の内容:
 
 ```text
