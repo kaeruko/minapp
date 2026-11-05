@@ -89,7 +89,7 @@ class _KoboShellState extends State<KoboShell> {
     }
     if (!_homeApps.any((ManagedHostedApp item) =>
         item.app.appId == app.app.appId)) {
-      throw StateError('Selected app is not in the current user's app list.');
+      throw StateError("Selected app is not in the current user\'s app list.");
     }
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
