@@ -9,6 +9,7 @@ class KoboHomePage extends StatelessWidget {
     this.data = KoboHomeData.phaseOne,
     this.onCreate,
     this.onViewAllApps,
+    this.onCategorySelected,
     this.onNavigationSelected,
     super.key,
   });
@@ -16,6 +17,7 @@ class KoboHomePage extends StatelessWidget {
   final KoboHomeData data;
   final VoidCallback? onCreate;
   final VoidCallback? onViewAllApps;
+  final ValueChanged<KoboCategory>? onCategorySelected;
   final ValueChanged<KoboNavigationItem>? onNavigationSelected;
 
   void _showNotImplemented(BuildContext context, String feature) {
@@ -73,6 +75,15 @@ class KoboHomePage extends StatelessWidget {
                         itemBuilder: (BuildContext context, int index) {
                           return KoboCategoryCard(
                             category: data.categories[index],
+                            onTap: () {
+                              final ValueChanged<KoboCategory>? handler =
+                                  onCategorySelected;
+                              if (handler != null) {
+                                handler(data.categories[index]);
+                              } else {
+                                _showNotImplemented(context, '作品の検索');
+                              }
+                            },
                           );
                         },
                       ),
