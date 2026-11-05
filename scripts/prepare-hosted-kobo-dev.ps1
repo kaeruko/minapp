@@ -1,5 +1,9 @@
 # Prepare Kobo dev deployment settings on this machine only. No AWS command runs.
 # backend.hcl and terraform.tfvars are gitignored and must never be committed.
+param(
+    [switch]$PermitMixedLineEndings
+)
+
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
@@ -87,11 +91,31 @@ $newVars = $vars.Text
 if ($editionMatches.Count -eq 0) {
     $crlf = [string][char]13 + [string][char]10
     $lf = [string][char]10
-    if ($vars.Text.Contains($crlf) -and
-        $vars.Text.Replace($crlf, '').Contains($lf)) {
-        throw 'terraform.tfvars has mixed line endings.'
+    $withoutCrLf = $vars.Text.Replace($crlf, '')
+    if ($withoutCrLf.Contains([string][char]13)) {
+        throw 'terraform.tfvars has unsupported standalone CR line endings.'
     }
-    $newline = if ($vars.Text.Contains($crlf)) { $crlf } else { $lf }
+    $mixedLineEndings = $vars.Text.Contains($crlf) -and
+        $withoutCrLf.Contains($lf)
+    if ($mixedLineEndings -and -not $PermitMixedLineEndings) {
+        throw (
+            'terraform.tfvars has mixed CRLF/LF line endings. ' +
+            'Re-run with -PermitMixedLineEndings to preserve them without normalization.'
+        )
+    }
+    if ($mixedLineEndings) {
+        # Preserve every existing byte; use the file's last line ending for
+        # the one appended setting. Never normalize the earlier lines.
+        $lastLf = $vars.Text.LastIndexOf($lf)
+        if ($lastLf -lt 0) {
+            throw 'Mixed line endings reported but no final LF was found.'
+        }
+        $newline = if ($lastLf -gt 0 -and
+            $vars.Text[$lastLf - 1] -eq [char]13) { $crlf } else { $lf }
+    }
+    else {
+        $newline = if ($vars.Text.Contains($crlf)) { $crlf } else { $lf }
+    }
     $separator = if ($vars.Text.EndsWith($lf)) { '' } else { $newline }
     $newVars = $vars.Text + $separator + 'edition = "kobo"' + $newline
 }
