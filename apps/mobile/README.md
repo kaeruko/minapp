@@ -72,11 +72,11 @@ Google Drive file ID:
 .\scripts\build-mobile-kobo-aab.ps1
 ```
 
-既定では `pubspec.yaml` のversionを使用する。Google Playへ次のビルドを
-アップロードする場合は、version codeを明示して増やす。
+既定では `pubspec.yaml` のversion（現在 `0.2.4+8`）を使用する。
+Google Playへさらに次のビルドをアップロードする場合は、version codeを明示して増やす。
 
 ```powershell
-.\scripts\build-mobile-kobo-aab.ps1 -BuildName 0.2.3 -BuildNumber 8
+.\scripts\build-mobile-kobo-aab.ps1 -BuildName 0.2.5 -BuildNumber 9
 ```
 
 出力先:
