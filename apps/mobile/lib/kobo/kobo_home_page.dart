@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../hosted_app_management_api.dart';
+
 import 'kobo_components.dart';
 import 'kobo_models.dart';
 import 'kobo_theme.dart';
@@ -11,6 +13,12 @@ class KoboHomePage extends StatelessWidget {
     this.onViewAllApps,
     this.onCategorySelected,
     this.onNavigationSelected,
+    this.signedIn = false,
+    this.apps = const <ManagedHostedApp>[],
+    this.appsLoading = false,
+    this.appsError,
+    this.onAppSelected,
+    this.onRetryApps,
     super.key,
   });
 
@@ -19,6 +27,12 @@ class KoboHomePage extends StatelessWidget {
   final VoidCallback? onViewAllApps;
   final ValueChanged<KoboCategory>? onCategorySelected;
   final ValueChanged<KoboNavigationItem>? onNavigationSelected;
+  final bool signedIn;
+  final List<ManagedHostedApp> apps;
+  final bool appsLoading;
+  final String? appsError;
+  final ValueChanged<ManagedHostedApp>? onAppSelected;
+  final VoidCallback? onRetryApps;
 
   void _showNotImplemented(BuildContext context, String feature) {
     ScaffoldMessenger.of(context)
@@ -95,16 +109,67 @@ class KoboHomePage extends StatelessWidget {
                             () => _showNotImplemented(context, 'アプリ一覧'),
                       ),
                       const SizedBox(height: KoboSpacing.sm),
-                      ...data.apps.indexed.map(((int, KoboAppSummary) entry) {
-                        return Padding(
-                          padding: EdgeInsets.only(
-                            bottom: entry.$1 == data.apps.length - 1
-                                ? 0
-                                : KoboSpacing.sm,
+                      if (!signedIn)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(
+                            vertical: KoboSpacing.md,
                           ),
-                          child: KoboAppListTile(app: entry.$2),
-                        );
-                      }),
+                          child: Text(
+                            'ログインすると、自分で作ったアプリをここに表示できます。',
+                            style: KoboTextStyles.secondary,
+                          ),
+                        )
+                      else if (appsLoading)
+                        const Padding(
+                          padding: EdgeInsets.all(KoboSpacing.md),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (appsError != null)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              '俺のアプリを読み込めませんでした：$appsError',
+                              style: const TextStyle(color: KoboColors.error),
+                            ),
+                            TextButton(
+                              key: const Key('kobo-my-apps-retry'),
+                              onPressed: onRetryApps,
+                              child: const Text('再読み込み'),
+                            ),
+                          ],
+                        )
+                      else if (apps.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(
+                            vertical: KoboSpacing.md,
+                          ),
+                          child: Text(
+                            'まだ自分のアプリがありません。「つくる」から追加できます。',
+                            style: KoboTextStyles.secondary,
+                          ),
+                        )
+                      else
+                        ...apps.take(3).map((ManagedHostedApp app) {
+                          return Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: KoboSpacing.sm,
+                            ),
+                            child: KoboAppListTile(
+                              app: app,
+                              onTap: () {
+                                final ValueChanged<ManagedHostedApp>? handler =
+                                    onAppSelected;
+                                if (handler == null) {
+                                  throw StateError(
+                                    'My Apps tap requires an app navigation handler.',
+                                  );
+                                }
+                                handler(app);
+                              },
+                            ),
+                          );
+                        }),
                     ],
                   ),
                 ),
