@@ -415,6 +415,13 @@ void main() {
     final MockClient client = MockClient((http.Request request) async {
       expect(request.headers['authorization'], 'Bearer access-token');
       requestedPaths.add(request.url.path);
+      if (request.url.path == '/hosted/my/apps') {
+        return http.Response(
+          jsonEncode(<String, Object?>{'apps': <Object?>[]}),
+          200,
+          headers: const <String, String>{'content-type': 'application/json'},
+        );
+      }
       if (request.url.path == '/hosted/me/display-name') {
         return http.Response(
           jsonEncode(<String, Object?>{
