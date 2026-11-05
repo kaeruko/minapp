@@ -379,6 +379,42 @@ void main() {
     });
   }
 
+  testWidgets('outdated shop preview HTTP 409 shows a native error, not JSON',
+      (WidgetTester tester) async {
+    const String path =
+        '/shop/apps/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/preview/2/index.html';
+    await openSession(tester, path);
+    final _FakeWebViewController controller = platform.controller!;
+    final Uri uri = Uri.parse('$_origin$path');
+    controller.navigation!.onHttpError!(HttpResponseError(
+      request: WebResourceRequest(uri: uri),
+      response: WebResourceResponse(uri: uri, statusCode: 409),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('ショップの一覧を更新して'), findsOneWidget);
+    expect(find.byType(WebViewWidget), findsNothing);
+    expect(tester.takeException(), isA<StateError>());
+  });
+
+  testWidgets('shop subresource HTTP error does not stop the app page',
+      (WidgetTester tester) async {
+    const String path =
+        '/shop/apps/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/preview/2/index.html';
+    await openSession(tester, path);
+    final _FakeWebViewController controller = platform.controller!;
+    final Uri asset = Uri.parse(
+        '$_origin/shop/apps/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/preview/2/app.js');
+    controller.navigation!.onHttpError!(HttpResponseError(
+      request: WebResourceRequest(uri: asset),
+      response: WebResourceResponse(uri: asset, statusCode: 404),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(WebViewWidget), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('invalid content URL shows an error instead of an error widget',
       (WidgetTester tester) async {
     await openSession(tester, '/shop/content/invalid/index.html');
@@ -538,6 +574,7 @@ class _FakeNavigationDelegate extends PlatformNavigationDelegate {
   NavigationRequestCallback? onNavigationRequest;
   PageEventCallback? onPageFinished;
   ProgressCallback? onProgress;
+  HttpResponseErrorCallback? onHttpError;
 
   @override
   Future<void> setOnNavigationRequest(
@@ -553,5 +590,10 @@ class _FakeNavigationDelegate extends PlatformNavigationDelegate {
   @override
   Future<void> setOnProgress(ProgressCallback callback) async {
     onProgress = callback;
+  }
+
+  @override
+  Future<void> setOnHttpError(HttpResponseErrorCallback callback) async {
+    onHttpError = callback;
   }
 }

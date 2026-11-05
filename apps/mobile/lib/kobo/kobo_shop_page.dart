@@ -8,6 +8,7 @@ import '../hosted_runtime_bridge.dart';
 import '../hosted_shop_api.dart';
 import '../hosted_shop_guest_preview_transport.dart';
 import 'kobo_components.dart';
+import 'kobo_shop_version_check.dart';
 import 'kobo_theme.dart';
 
 class KoboShopPage extends StatefulWidget {
@@ -31,6 +32,7 @@ class _KoboShopPageState extends State<KoboShopPage> {
   final TextEditingController _searchController = TextEditingController();
   List<HostedShopApp>? _apps;
   bool _loading = false;
+  bool _opening = false;
   String? _error;
 
   @override
@@ -51,7 +53,7 @@ class _KoboShopPageState extends State<KoboShopPage> {
   }
 
   Future<void> _load() async {
-    if (_loading) return;
+    if (_loading || _opening) return;
     setState(() {
       _loading = true;
       _error = null;
@@ -83,10 +85,24 @@ class _KoboShopPageState extends State<KoboShopPage> {
   }
 
   Future<void> _play(HostedShopApp app) async {
+    if (_opening || _loading) return;
+    setState(() => _opening = true);
     final AuthenticatedSession? session = widget.session;
-    final HostedGuestPreviewRuntimeTransport? guestPreview =
-        session == null ? HostedGuestPreviewRuntimeTransport() : null;
+    HostedGuestPreviewRuntimeTransport? guestPreview;
     try {
+      // Catalog cards can outlive a source publication. Revalidate before
+      // building any guest preview URL or signed-in launch request.
+      final List<HostedShopApp> freshApps =
+          await _shopApi.listApps(session?.accessToken);
+      if (!mounted) return;
+      setState(() {
+        _apps = freshApps;
+        _error = null;
+      });
+      requireCurrentKoboShopVersion(app, freshApps);
+      guestPreview =
+          session == null ? HostedGuestPreviewRuntimeTransport() : null;
+
       final Uri contentUri;
       final String runtimeToken;
       final HostedRuntimeTransport runtimeTransport;
@@ -122,6 +138,7 @@ class _KoboShopPageState extends State<KoboShopPage> {
       }
     } finally {
       guestPreview?.close();
+      if (mounted) setState(() => _opening = false);
     }
   }
 
@@ -134,7 +151,7 @@ class _KoboShopPageState extends State<KoboShopPage> {
         actions: <Widget>[
           IconButton(
             tooltip: '更新',
-            onPressed: _loading ? null : _load,
+            onPressed: _loading || _opening ? null : _load,
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
@@ -224,7 +241,7 @@ class _KoboShopPageState extends State<KoboShopPage> {
                 _KoboShopCard(
                   app: app,
                   thumbnailUri: _shopApi.thumbnailUri(app),
-                  onPlay: () => _play(app),
+                  onPlay: _loading || _opening ? null : () => _play(app),
                 ),
                 const SizedBox(height: KoboSpacing.sm),
               ],
@@ -248,7 +265,7 @@ class _KoboShopCard extends StatelessWidget {
 
   final HostedShopApp app;
   final Uri? thumbnailUri;
-  final VoidCallback onPlay;
+  final VoidCallback? onPlay;
 
   @override
   Widget build(BuildContext context) {

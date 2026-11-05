@@ -280,6 +280,21 @@ class _HostedAppWebViewPageState extends State<HostedAppWebViewPage> {
           onPageFinished: (String url) {
             _injectBridgeForFinishedDocument(url);
           },
+          onHttpError: (HttpResponseError error) {
+            // A stale shop preview returns HTTP 409 JSON. Do not render that
+            // JSON as an app page or treat subresource failures as main-page
+            // failures. The parent UI must show a native diagnostic instead.
+            if (error.request?.uri != widget.contentUri) return;
+            final int? status = error.response?.statusCode;
+            final String message = status == 409
+                ? '作品の公開版が更新された可能性があります。ショップの一覧を更新して開き直してください（HTTP 409）。'
+                : '作品のページを読み込めませんでした（HTTP ${status ?? '不明'}）。';
+            _failBridgeOrPage(
+              context: 'Hosted main document returned an HTTP error.',
+              error: StateError(message),
+              stackTrace: StackTrace.current,
+            );
+          },
         ),
       );
       if (_usesGirlsNovelBackground) {
