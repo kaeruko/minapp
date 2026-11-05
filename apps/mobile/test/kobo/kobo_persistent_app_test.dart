@@ -165,9 +165,13 @@ void main() {
     await tester.tap(find.byKey(const Key('kobo-category-晩酌予算')));
     await tester.pumpAndSettle();
 
-    expect(find.text('みんなのアプリ'), findsOneWidget);
+    expect(find.text('みんなのアプリ'), findsWidgets);
     expect(find.byKey(const Key('kobo-shop-search')), findsOneWidget);
-    expect(find.text('晩酌予算'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.byKey(const Key('kobo-shop-search')))
+          .controller!.text,
+      '晩酌予算',
+    );
     expect(find.text('町中華メモ'), findsNothing);
     expect(find.byKey(const Key('kobo-shop-play-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')), findsOneWidget);
     expect(find.byKey(const Key('kobo-shop-play-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')), findsNothing);
@@ -183,9 +187,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('kobo-nav-community')));
     await tester.pumpAndSettle();
-    expect(find.text('晩酌予算'), findsOneWidget);
-    expect(find.text('町中華メモ'), findsOneWidget);
-    expect(find.text('昼めしルーレット'), findsOneWidget);
+    expect(find.byKey(const Key('kobo-shop-play-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')), findsOneWidget);
+    expect(find.byKey(const Key('kobo-shop-play-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')), findsOneWidget);
+    expect(find.byKey(const Key('kobo-shop-play-cccccccccccccccccccccccccccccccc')), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.byKey(const Key('kobo-shop-search')))
+          .controller!.text,
+      isEmpty,
+    );
     expect(tester.takeException(), isNull);
   });
 
