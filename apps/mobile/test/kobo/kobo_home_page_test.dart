@@ -29,7 +29,7 @@ void main() {
     expect(find.byKey(const Key('kobo-hero-sign')), findsOneWidget);
     expect(find.byType(KoboCategoryCard), findsNWidgets(4));
     expect(find.text('晩酌予算'), findsOneWidget);
-    expect(find.text('町中華メモ'), findsNWidgets(2));
+    expect(find.text('町中華メモ'), findsOneWidget);
     expect(find.text('昼めしルーレット'), findsOneWidget);
     expect(find.text('小遣い管理'), findsOneWidget);
     expect(
@@ -49,6 +49,12 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('俺のアプリ'), findsOneWidget);
+    expect(find.text('せんべろ計算機'), findsNothing);
+    expect(find.byType(KoboAppListTile), findsNothing);
+    expect(
+      find.text('ログインすると、自分で作ったアプリをここに表示できます。'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('featured example cards forward taps to the host', (
