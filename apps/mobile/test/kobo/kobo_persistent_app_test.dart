@@ -180,7 +180,6 @@ void main() {
     await tester.tap(find.byKey(const Key('kobo-shop-clear-search')));
     await tester.pumpAndSettle();
     expect(find.text('町中華メモ'), findsOneWidget);
-    expect(find.text('昼めしルーレット'), findsOneWidget);
 
     // The regular bottom-nav entry must not inherit the featured search.
     await tester.tap(find.byKey(const Key('kobo-nav-home')));
@@ -189,11 +188,32 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('kobo-shop-play-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')), findsOneWidget);
     expect(find.byKey(const Key('kobo-shop-play-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')), findsOneWidget);
-    expect(find.byKey(const Key('kobo-shop-play-cccccccccccccccccccccccccccccccc')), findsOneWidget);
     expect(
       tester.widget<TextField>(find.byKey(const Key('kobo-shop-search')))
           .controller!.text,
       isEmpty,
+    );
+
+    // The lunch card uses the published title exactly; only that app remains.
+    await tester.tap(find.byKey(const Key('kobo-nav-home')));
+    await tester.pumpAndSettle();
+    final Finder lunchCard =
+        find.byKey(const Key('kobo-category-昼めしルーレット'));
+    await tester.ensureVisible(lunchCard);
+    await tester.tap(lunchCard);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(find.byKey(const Key('kobo-shop-search')))
+          .controller!.text,
+      '昼めしルーレット',
+    );
+    expect(
+      find.byKey(const Key('kobo-shop-play-cccccccccccccccccccccccccccccccc')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('kobo-shop-play-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')),
+      findsNothing,
     );
     expect(tester.takeException(), isNull);
   });
