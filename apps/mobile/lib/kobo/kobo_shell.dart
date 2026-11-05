@@ -8,6 +8,7 @@ import 'kobo_account_settings_page.dart';
 import 'kobo_apps_page.dart';
 import 'kobo_components.dart';
 import 'kobo_home_page.dart';
+import 'kobo_models.dart';
 import 'kobo_shop_page.dart';
 import 'kobo_theme.dart';
 
@@ -29,6 +30,14 @@ class KoboShell extends StatefulWidget {
 
 class _KoboShellState extends State<KoboShell> {
   KoboNavigationItem _selected = KoboNavigationItem.home;
+  String _shopSearchQuery = '';
+
+  void _openFeaturedCategory(KoboCategory category) {
+    setState(() {
+      _shopSearchQuery = category.title;
+      _selected = KoboNavigationItem.community;
+    });
+  }
 
   void _select(KoboNavigationItem item) {
     if (item == KoboNavigationItem.create && widget.session == null) {
@@ -38,7 +47,12 @@ class _KoboShellState extends State<KoboShell> {
       );
       return;
     }
-    setState(() => _selected = item);
+    setState(() {
+      // A normal navigation to the catalog must not keep the featured
+      // card's search filter from an earlier visit.
+      if (item == KoboNavigationItem.community) _shopSearchQuery = '';
+      _selected = item;
+    });
   }
 
   void _openCreate() {
@@ -69,11 +83,13 @@ class _KoboShellState extends State<KoboShell> {
       KoboNavigationItem.home => KoboHomePage(
           onCreate: _openCreate,
           onViewAllApps: _openMyApps,
+          onCategorySelected: _openFeaturedCategory,
           onNavigationSelected: _select,
         ),
       KoboNavigationItem.community => KoboShopPage(
           api: widget.api,
           session: widget.session,
+          initialSearchQuery: _shopSearchQuery,
           onNavigationSelected: _select,
         ),
       KoboNavigationItem.create => KoboAppsPage(
