@@ -14,8 +14,7 @@ import 'package:minapp_mobile/kobo/kobo_theme.dart';
 
 void main() {
   final IntegrationTestWidgetsFlutterBinding binding =
-      IntegrationTestWidgetsFlutterBinding.ensureInitialized()
-          as IntegrationTestWidgetsFlutterBinding;
+      IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('capture Kobo production widgets with deterministic sample data',
       (WidgetTester tester) async {
